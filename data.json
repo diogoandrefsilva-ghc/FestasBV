@@ -1056,84 +1056,84 @@
     "de": "Zé Carlos",
     "para": "Diogo",
     "valor": 50.0,
-    "ref": "Zé Carlos",
+    "ref": "own:Zé Carlos",
     "data": "2025-08-12"
    },
    {
     "de": "Margarida",
     "para": "Diogo",
     "valor": 58.0,
-    "ref": "Margarida",
+    "ref": "own:Margarida",
     "data": "2025-08-20"
    },
    {
     "de": "Samuel",
     "para": "Diogo",
     "valor": 248.49,
-    "ref": "Samuel, Ivone e Convidados",
+    "ref": "own:Samuel, own:Ivone, conv:Samuel",
     "data": "2025-08-20"
    },
    {
     "de": "Toorn",
     "para": "Diogo",
     "valor": 56.0,
-    "ref": "Toorn e Raquel",
+    "ref": "own:Toorn, own:Raquel",
     "data": "2025-08-20"
    },
    {
     "de": "Luís Pedro",
     "para": "Diogo",
     "valor": 224.05,
-    "ref": "Luís Pedro, Inês e Convidados",
+    "ref": "own:Luís Pedro, own:Inês, conv:Luís Pedro, conv:Inês",
     "data": "2025-08-20"
    },
    {
     "de": "Rogélio",
     "para": "Diogo",
     "valor": 77.15,
-    "ref": "Rogélio e Lara",
+    "ref": "own:Rogélio, own:Lara",
     "data": "2025-08-20"
    },
    {
     "de": "João Hélder",
     "para": "Diogo",
     "valor": 106.76,
-    "ref": "João Hélder e Paulinha",
+    "ref": "own:João Hélder, own:Paulinha",
     "data": "2025-08-20"
    },
    {
     "de": "João Mestre",
     "para": "Diogo",
     "valor": 35.0,
-    "ref": "João Mestre e Carol",
+    "ref": "own:João Mestre, own:Carol",
     "data": "2025-08-20"
    },
    {
     "de": "Tânia",
     "para": "Diogo",
     "valor": 85.12,
-    "ref": "Tânia e Filipe",
+    "ref": "own:Tânia, own:Filipe",
     "data": "2025-08-21"
    },
    {
     "de": "Filipe",
     "para": "Diogo",
     "valor": 38.0,
-    "ref": "Convidados",
+    "ref": "conv:Filipe",
     "data": "2025-08-28"
    },
    {
     "de": "Toorn",
     "para": "Diogo",
     "valor": 25.5,
-    "ref": "Convidados",
+    "ref": "conv:Toorn",
     "data": "2025-08-28"
    },
    {
     "de": "Zé Carlos",
     "para": "Diogo",
     "valor": 54.0,
-    "ref": "Convidados",
+    "ref": "conv:Zé Carlos",
     "data": "2025-08-28"
    },
    {

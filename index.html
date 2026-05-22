@@ -76,7 +76,9 @@ header .sub{font-size:12.5px;color:var(--muted);margin-top:7px}
 .sheet{position:fixed;left:0;right:0;bottom:0;max-width:560px;margin:0 auto;background:var(--panel);border-radius:22px 22px 0 0;border:1px solid var(--line);border-bottom:none;z-index:51;transform:translateY(100%);transition:transform .3s cubic-bezier(.3,.8,.3,1);max-height:92vh;display:flex;flex-direction:column;box-shadow:0 -10px 40px rgba(0,0,0,.5)}
 .sheet.show{transform:translateY(0)}
 body.no-scroll{overflow:hidden;position:fixed;width:100%;}
-.sheet-header{flex-shrink:0;padding:0 18px 12px;border-bottom:1px solid var(--line);background:var(--panel);border-radius:22px 22px 0 0}
+.sheet-header{flex-shrink:0;padding:0 18px 14px;border-bottom:1px solid var(--line);background:var(--panel);border-radius:22px 22px 0 0}
+.sheet-header-row{display:flex;align-items:center;gap:12px;padding-top:6px}
+.sheet-header-name{font-size:24px;font-weight:700;letter-spacing:-.4px;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .sheet-body{flex:1;overflow-y:auto;padding:12px 18px 34px;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
 .grab{width:40px;height:4px;border-radius:3px;background:var(--line);margin:11px auto 8px}
 .back-btn{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;font-size:16px;color:var(--muted);cursor:pointer;border:1px solid var(--line);background:var(--panel2);border-radius:9px;flex-shrink:0}
@@ -143,7 +145,24 @@ body.no-scroll{overflow:hidden;position:fixed;width:100%;}
 .debt-sub-name{flex:1;font-size:12px;font-weight:500;color:var(--muted)}
 .debt-sub.on .debt-sub-name{color:var(--ink)}
 .debt-sub-val{font-size:12px;font-weight:700;color:var(--red)}
-.debt-sub.on .debt-sub-val{color:var(--green)}left:50%;bottom:84px;transform:translateX(-50%) translateY(20px);background:#222a36;border:1px solid var(--line);color:var(--ink);padding:11px 18px;border-radius:11px;font-size:13px;opacity:0;pointer-events:none;transition:.25s;z-index:80;box-shadow:var(--shadow);max-width:90%;text-align:center}
+.debt-sub.on .debt-sub-val{color:var(--green)}
+
+/* Redesigned debt rows — single card per person, inline own+guest */
+.debt-row{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:0;overflow:hidden;transition:.15s}
+.debt-row.any-on{border-color:rgba(232,176,75,.4)}
+.debt-row-name{font-size:14px;font-weight:700;color:var(--ink);padding:11px 14px 4px;letter-spacing:-.1px}
+.debt-row-checks{display:flex;gap:0;border-top:1px solid var(--line);margin-top:4px}
+.debt-check-cell{flex:1;display:flex;align-items:center;gap:8px;padding:9px 12px;cursor:pointer;user-select:none;transition:.12s;border-right:1px solid var(--line)}
+.debt-check-cell:last-child{border-right:none}
+.debt-check-cell.on{background:rgba(232,176,75,.07)}
+.debt-check-cell input[type=checkbox]{width:15px;height:15px;accent-color:var(--gold);flex-shrink:0;cursor:pointer;margin:0}
+.dcc-label{font-size:11px;font-weight:600;color:var(--faint);text-transform:uppercase;letter-spacing:.06em;line-height:1.2}
+.dcc-val{font-size:12px;font-weight:700;color:var(--red);margin-top:1px}
+.debt-check-cell.on .dcc-label{color:var(--muted)}
+.debt-check-cell.on .dcc-val{color:var(--green)}
+
+/* Toast */
+.toast{position:fixed;left:50%;bottom:84px;transform:translateX(-50%) translateY(20px);background:#222a36;border:1px solid var(--line);color:var(--ink);padding:11px 18px;border-radius:11px;font-size:13px;opacity:0;pointer-events:none;transition:.25s;z-index:80;box-shadow:var(--shadow);max-width:90%;text-align:center}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 .toast.ok{border-color:var(--green)}.toast.bad{border-color:var(--red)}
 .sf,.eyebrow,.syncpill,.hero .cell .k,.tabs,.tab,.mrow .nm small,.card .meta,.chip,.sec-title,.back-btn,.bd-title,.li .lbl small,.meal,.sheet .final .k,.sheet .verdict,.empty,.fab,.modal,.modal h3,.modal p,.modal label,.modal input,.modal select,.btn,.note,.seg-btn,.toast,.badge,.year-nav,.yr-btn,.yr-label{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
@@ -190,7 +209,6 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 <div class="sheet-bg" id="sheet-bg" onclick="closeSheet()"></div>
 <div class="sheet" id="sheet">
   <div class="sheet-header">
-    <div class="grab"></div>
     <div id="sheet-hdr"></div>
   </div>
   <div class="sheet-body" id="sheet-in"></div>
@@ -561,7 +579,13 @@ function openMember(nome){
         <span class="val ${sent?'minus':'plus'}">${sent?'−':''}${eur(p.valor)}</span></div>`;});
     h+=`<div class="li tot"><span class="lbl">Saldo após pagamentos</span><span class="val ${sf>=0?'plus':'minus'}">${eur(sf)}</span></div>`;}
 
-  document.getElementById('sheet-hdr').innerHTML=`<h2>${av(nome,CALC.membros.indexOf(m))}${nome}<button class="back-btn" onclick="closeSheet()" style="margin-left:auto">✕</button></h2>
+  document.getElementById('sheet-hdr').innerHTML=`
+    <div class="grab"></div>
+    <div class="sheet-header-row">
+      ${av(nome,CALC.membros.indexOf(m))}
+      <span class="sheet-header-name">${nome}</span>
+      <button class="back-btn" onclick="closeSheet()">✕</button>
+    </div>
     <div class="final"><div class="k sf">Saldo atual</div><div class="v ${cls}">${eur(sf)}</div>
     <div class="verdict sf">${verd}</div></div>`;
   document.getElementById('sheet-in').innerHTML=h;
@@ -643,49 +667,41 @@ function updateDebtList(){
   if(!who){container.innerHTML='<div class="empty sf">Seleciona quem pagou primeiro</div>';recalcPayVal();return;}
 
   const ms=CALC.membros;
-  // Find the paying member
-  const payer=ms.find(m=>m.nome===who);
-  // Show payer + any other member whose debt is outstanding (they might be paying for others)
-  // Each group = one member with their own debt + guest debt split
-  const groups=[];
-  ms.filter(m=>m.AC<-0.005).forEach(m=>{
-    const ownDebt=Math.max(0,rnd(m.V-m.Y-m.W-m.X,2)); // own meal debt
-    const guestDebt=Math.max(0,m.AA);                  // guest debt
-    const totalDebt=Math.abs(m.AC);
-    groups.push({nome:m.nome,ownDebt,guestDebt,totalDebt,isDefault:m.nome===who});
-  });
+  const debtors=ms.filter(m=>m.AC<-0.005);
 
-  if(!groups.length){container.innerHTML='<div class="empty sf">Sem dívidas por saldar</div>';recalcPayVal();return;}
+  if(!debtors.length){container.innerHTML='<div class="empty sf">Sem dívidas por saldar</div>';recalcPayVal();return;}
 
-  container.innerHTML=groups.map(g=>{
-    const gid=g.nome.replace(/[^a-z0-9]/gi,'_');
-    const hasGuests=g.guestDebt>0.005;
-    const headerOn=g.isDefault?' on':'';
+  container.innerHTML=debtors.map(m=>{
+    const gid=m.nome.replace(/[^a-z0-9]/gi,'_');
+    const isDefault=m.nome===who;
+    const ownDebt=Math.max(0,rnd(m.V-m.Y-m.W-m.X,2));
+    const guestDebt=Math.max(0,m.AA);
+    const hasGuests=guestDebt>0.005;
+
     if(!hasGuests){
-      // Simple single-row item
-      return`<label class="debt-item${headerOn}" id="di-${gid}">
-        <input type="checkbox" value="own:${g.nome}" onchange="onDebtCheck(this)"${g.isDefault?' checked':''}>
-        <span class="di-name">${g.nome}</span>
-        <span class="di-val">${eur(g.totalDebt)}</span>
-      </label>`;
+      // Single full-width check cell
+      return`<div class="debt-row${isDefault?' any-on':''}" id="dr-${gid}">
+        <div class="debt-row-name">${m.nome}</div>
+        <div class="debt-row-checks">
+          <label class="debt-check-cell${isDefault?' on':''}" id="dcc-own-${gid}" onclick="event.stopPropagation()">
+            <input type="checkbox" value="own:${m.nome}" onchange="onDebtCheck(this,'${gid}')"${isDefault?' checked':''}>
+            <div><div class="dcc-label">Próprio</div><div class="dcc-val">${eur(ownDebt)}</div></div>
+          </label>
+        </div>
+      </div>`;
     }
-    // Group with own + guests sub-items
-    return`<div class="debt-group" id="dg-${gid}">
-      <div class="debt-group-header${headerOn}" id="dgh-${gid}" onclick="toggleDebtGroup('${g.nome}')">
-        <input type="checkbox" value="group:${g.nome}" onclick="event.stopPropagation();onGroupCheck(this,'${g.nome}')"${g.isDefault?' checked':''}>
-        <span class="debt-group-name">${g.nome}</span>
-        <span class="debt-group-total" id="dgt-${gid}">${eur(g.totalDebt)}</span>
-      </div>
-      <div class="debt-group-body" id="dgb-${gid}" style="display:${g.isDefault?'flex':'none'}">
-        <label class="debt-sub${g.isDefault?' on':''}" id="ds-own-${gid}">
-          <input type="checkbox" value="own:${g.nome}" onchange="onDebtCheck(this)"${g.isDefault?' checked':''}>
-          <span class="debt-sub-name">Próprio</span>
-          <span class="debt-sub-val">${eur(g.ownDebt)}</span>
+
+    // Two cells: own + guests
+    return`<div class="debt-row${isDefault?' any-on':''}" id="dr-${gid}">
+      <div class="debt-row-name">${m.nome}</div>
+      <div class="debt-row-checks">
+        <label class="debt-check-cell${isDefault?' on':''}" id="dcc-own-${gid}" onclick="event.stopPropagation()">
+          <input type="checkbox" value="own:${m.nome}" onchange="onDebtCheck(this,'${gid}')"${isDefault?' checked':''}>
+          <div><div class="dcc-label">Próprio</div><div class="dcc-val">${eur(ownDebt)}</div></div>
         </label>
-        <label class="debt-sub${g.isDefault?' on':''}" id="ds-conv-${gid}">
-          <input type="checkbox" value="conv:${g.nome}" onchange="onDebtCheck(this)"${g.isDefault?' checked':''}>
-          <span class="debt-sub-name">Convidados</span>
-          <span class="debt-sub-val">${eur(g.guestDebt)}</span>
+        <label class="debt-check-cell${isDefault?' on':''}" id="dcc-conv-${gid}" onclick="event.stopPropagation()">
+          <input type="checkbox" value="conv:${m.nome}" onchange="onDebtCheck(this,'${gid}')"${isDefault?' checked':''}>
+          <div><div class="dcc-label">Convidados</div><div class="dcc-val">${eur(guestDebt)}</div></div>
         </label>
       </div>
     </div>`;
@@ -693,42 +709,15 @@ function updateDebtList(){
   recalcPayVal();
 }
 
-function toggleDebtGroup(nome){
-  const gid=nome.replace(/[^a-z0-9]/gi,'_');
-  const body=document.getElementById('dgb-'+gid);
-  if(body)body.style.display=body.style.display==='none'?'flex':'none';
-}
-
-function onGroupCheck(cb,nome){
-  const gid=nome.replace(/[^a-z0-9]/gi,'_');
-  const body=document.getElementById('dgb-'+gid);
-  const header=document.getElementById('dgh-'+gid);
-  const ownCb=document.querySelector(`#ds-own-${gid} input`);
-  const convCb=document.querySelector(`#ds-conv-${gid} input`);
-  const checked=cb.checked;
-  if(ownCb){ownCb.checked=checked;ownCb.closest('.debt-sub').classList.toggle('on',checked);}
-  if(convCb){convCb.checked=checked;convCb.closest('.debt-sub').classList.toggle('on',checked);}
-  if(header)header.classList.toggle('on',checked);
-  if(body&&checked)body.style.display='flex';
-  recalcPayVal();
-}
-
-function onDebtCheck(cb){
-  const item=cb.closest('.debt-item, .debt-sub');
-  if(item)item.classList.toggle('on',cb.checked);
-  // Update group header checkbox state
-  const key=cb.value;
-  if(key.startsWith('own:')||key.startsWith('conv:')){
-    const nome=key.slice(key.indexOf(':')+1);
-    const gid=nome.replace(/[^a-z0-9]/gi,'_');
-    const ownCb=document.querySelector(`#ds-own-${gid} input`);
-    const convCb=document.querySelector(`#ds-conv-${gid} input`);
-    const groupCb=document.querySelector(`#dg-${gid} .debt-group-header input[type=checkbox]`);
-    const header=document.getElementById('dgh-'+gid);
-    if(groupCb){
-      const anyChecked=(ownCb&&ownCb.checked)||(convCb&&convCb.checked);
-      groupCb.checked=anyChecked;
-      if(header)header.classList.toggle('on',anyChecked);
+function onDebtCheck(cb,gid){
+  const cell=cb.closest('.debt-check-cell');
+  if(cell)cell.classList.toggle('on',cb.checked);
+  // Update parent row highlight
+  if(gid){
+    const row=document.getElementById('dr-'+gid);
+    if(row){
+      const anyChecked=row.querySelectorAll('input[type=checkbox]:checked').length>0;
+      row.classList.toggle('any-on',anyChecked);
     }
   }
   recalcPayVal();
