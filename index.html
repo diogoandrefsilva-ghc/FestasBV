@@ -77,9 +77,9 @@ header .sub{font-size:12.5px;color:var(--muted);margin-top:7px}
 .sheet.show{transform:translateY(0)}
 .grab{width:40px;height:4px;border-radius:3px;background:var(--line);margin:11px auto 4px}
 .sheet-in{padding:8px 18px 34px}
-.back-btn{display:inline-flex;align-items:center;gap:5px;font-size:13px;color:var(--blue);cursor:pointer;padding:6px 0 10px;font-weight:600;border:none;background:none}
+.back-btn{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;font-size:16px;color:var(--muted);cursor:pointer;border:1px solid var(--line);background:var(--panel2);border-radius:9px;flex-shrink:0}
 .back-btn:active{opacity:.6}
-.sheet h2{font-size:26px;font-weight:700;letter-spacing:-.4px;display:flex;align-items:center;gap:12px}
+.sheet h2{font-size:26px;font-weight:700;letter-spacing:-.4px;display:flex;align-items:center;gap:12px;justify-content:space-between}
 .sheet .final{margin:14px 0;padding:16px;border-radius:14px;text-align:center;background:rgba(0,0,0,.22)}
 .sheet .final .k{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
 .sheet .final .v{font-size:38px;font-weight:700;letter-spacing:-1px;margin-top:2px}
@@ -130,14 +130,13 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 </head>
 <body>
 <header>
-  <div class="eyebrow">Contas Transparentes</div>
   <h1 id="ev-nome">MEO</h1>
   <div class="year-nav sf" id="year-nav">
     <button class="yr-btn" id="yr-prev" onclick="changeYear(-1)" title="Ano anterior">‹</button>
     <span class="yr-label" id="yr-label">—</span>
     <button class="yr-btn" id="yr-next" onclick="changeYear(1)" title="Ano seguinte">›</button>
   </div>
-  <div class="sub" id="ev-sub">a carregar…</div>
+  <div class="sub" id="ev-sub"></div>
   <div class="syncpill"><span class="dot" id="sync-dot"></span><span id="sync-txt">a ligar ao GitHub…</span></div>
 </header>
 <div class="wrap">
@@ -408,7 +407,7 @@ function setTab(t){TAB=t;document.querySelectorAll('.tab').forEach(e=>e.classLis
 function renderAll(){
   if(!CALC)return;const ms=CALC.membros;
   document.getElementById('ev-nome').textContent=DATA.evento.nome;
-  document.getElementById('ev-sub').textContent=`${ms.length} membros · ${DATA.despesas.length} despesas · ${CALC.pagamentos.length} pagamentos`;
+  document.getElementById('ev-sub').textContent=DATA.evento.datas||DATA.evento.local||'';
   const sg=CALC.saldoGrupo;const sgEl=document.getElementById('saldo-grupo');
   sgEl.textContent=eur(sg);sgEl.className='big '+(sg>=0?'pos':'neg');
   document.getElementById('tot-rec').textContent=eur(CALC.totReceitas);
@@ -462,9 +461,8 @@ function renderAll(){
 function openMember(nome){
   const m=CALC.membros.find(x=>x.nome===nome);if(!m)return;
   const sf=m.saldoFinal;const cls=Math.abs(sf)<0.005?'':(sf>0?'pos':'neg');
-  const verd=sf>0.005?`O grupo deve-te ${eur(sf)}`:(sf<-0.005?`Tens de pagar ${eur(-sf)}`:'Estás saldado 👌');
-  let h=`<button class="back-btn" onclick="closeSheet()">‹ Voltar</button>
-    <h2>${av(nome,CALC.membros.indexOf(m))}${nome}</h2>
+  const verd=sf>0.005?`O grupo deve-te ${eur(sf)}`:(sf<-0.005?`Deves ${eur(-sf)} ao grupo`:'Estás saldado 👌');
+  let h=`<h2>${av(nome,CALC.membros.indexOf(m))}${nome}<button class="back-btn" onclick="closeSheet()" style="margin-left:auto">✕</button></h2>
     <div class="final"><div class="k sf">Saldo atual</div><div class="v ${cls}">${eur(sf)}</div>
     <div class="verdict sf">${verd}</div></div>`;
 
