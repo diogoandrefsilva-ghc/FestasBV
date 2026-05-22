@@ -1,1351 +1,1346 @@
-{
- "evento": {
-  "nome": "MEO 2025",
-  "ano": 2025,
-  "tesoureiro": "Diogo",
-  "descontoTshirts": 44,
-  "saldoAnoAnterior": 68.88
- },
- "membros": [
-  {
-   "nome": "Carol",
-   "fator": 0,
-   "presencas": [
-    "Ter|Jantar"
-   ],
-   "sobras": 0,
-   "outras": 0
-  },
-  {
-   "nome": "Diogo",
-   "fator": 1,
-   "presencas": [
-    "Sex|Jantar",
-    "Sáb|Jantar",
-    "Dom|Jantar",
-    "Seg|Almoço",
-    "Ter|Jantar",
-    "Qua|Jantar"
-   ],
-   "sobras": 112.88,
-   "outras": 0
-  },
-  {
-   "nome": "Filipe",
-   "fator": 1,
-   "presencas": [
-    "Sex|Jantar",
-    "Sáb|Jantar",
-    "Dom|Jantar",
-    "Seg|Almoço",
-    "Ter|Jantar",
-    "Qua|Jantar"
-   ],
-   "sobras": 0,
-   "outras": 0
-  },
-  {
-   "nome": "Inês",
-   "fator": 0.2,
-   "presencas": [
-    "Sex|Jantar",
-    "Seg|Almoço"
-   ],
-   "sobras": 0,
-   "outras": 0
-  },
-  {
-   "nome": "Ivone",
-   "fator": 0.2,
-   "presencas": [
-    "Sáb|Jantar",
-    "Dom|Jantar",
-    "Seg|Almoço",
-    "Ter|Jantar"
-   ],
-   "sobras": 0,
-   "outras": 0
-  },
-  {
-   "nome": "João Hélder",
-   "fator": 1,
-   "presencas": [
-    "Sex|Jantar",
-    "Sáb|Jantar",
-    "Dom|Jantar",
-    "Seg|Almoço",
-    "Ter|Jantar",
-    "Qua|Jantar"
-   ],
-   "sobras": 0,
-   "outras": 0
-  },
-  {
-   "nome": "João Mestre",
-   "fator": 0.5,
-   "presencas": [
-    "Seg|Almoço",
-    "Ter|Jantar"
-   ],
-   "sobras": 0,
-   "outras": 1.0
-  },
-  {
-   "nome": "João Paulo",
-   "fator": 1,
-   "presencas": [
-    "Sex|Jantar",
-    "Sáb|Jantar",
-    "Dom|Jantar",
-    "Seg|Almoço",
-    "Ter|Jantar",
-    "Qua|Jantar"
-   ],
-   "sobras": 0,
-   "outras": 0
-  },
-  {
-   "nome": "Lara",
-   "fator": 0.2,
-   "presencas": [
-    "Dom|Jantar",
-    "Seg|Almoço",
-    "Ter|Jantar",
-    "Qua|Jantar"
-   ],
-   "sobras": 0,
-   "outras": 0
-  },
-  {
-   "nome": "Luís Pedro",
-   "fator": 1,
-   "presencas": [
-    "Sex|Jantar",
-    "Sáb|Jantar",
-    "Seg|Tarde",
-    "Ter|Jantar",
-    "Qua|Jantar"
-   ],
-   "sobras": 0,
-   "outras": 0
-  },
-  {
-   "nome": "Margarida",
-   "fator": 0.25,
-   "presencas": [
-    "Sex|Jantar",
-    "Sáb|Jantar",
-    "Dom|Jantar",
-    "Seg|Almoço",
-    "Ter|Jantar",
-    "Qua|Jantar"
-   ],
-   "sobras": 0,
-   "outras": 0
-  },
-  {
-   "nome": "Paulinha",
-   "fator": 0.25,
-   "presencas": [
-    "Sex|Jantar",
-    "Sáb|Jantar",
-    "Dom|Jantar",
-    "Seg|Almoço",
-    "Ter|Jantar",
-    "Qua|Jantar"
-   ],
-   "sobras": 0,
-   "outras": 0
-  },
-  {
-   "nome": "Raquel",
-   "fator": 0.1,
-   "presencas": [
-    "Sáb|Jantar",
-    "Qua|Jantar"
-   ],
-   "sobras": 0,
-   "outras": 0
-  },
-  {
-   "nome": "Rita",
-   "fator": 0.2,
-   "presencas": [
-    "Sex|Jantar",
-    "Sáb|Jantar",
-    "Dom|Jantar",
-    "Seg|Almoço"
-   ],
-   "sobras": 0,
-   "outras": 0
-  },
-  {
-   "nome": "Rogélio",
-   "fator": 1,
-   "presencas": [
-    "Sex|Jantar",
-    "Dom|Jantar",
-    "Seg|Almoço",
-    "Ter|Jantar",
-    "Qua|Jantar"
-   ],
-   "sobras": 0,
-   "outras": 0
-  },
-  {
-   "nome": "Samuel",
-   "fator": 1,
-   "presencas": [
-    "Sex|Jantar",
-    "Sáb|Jantar",
-    "Dom|Jantar",
-    "Seg|Almoço",
-    "Ter|Jantar",
-    "Qua|Jantar"
-   ],
-   "sobras": 0,
-   "outras": 0
-  },
-  {
-   "nome": "Tânia",
-   "fator": 0.25,
-   "presencas": [
-    "Sex|Jantar",
-    "Sáb|Jantar",
-    "Dom|Jantar",
-    "Seg|Almoço",
-    "Ter|Jantar",
-    "Qua|Jantar"
-   ],
-   "sobras": 0,
-   "outras": 0
-  },
-  {
-   "nome": "Toorn",
-   "fator": 0.5,
-   "presencas": [
-    "Sáb|Jantar",
-    "Qua|Jantar"
-   ],
-   "sobras": 0,
-   "outras": 0
-  },
-  {
-   "nome": "Zé Carlos",
-   "fator": 1,
-   "presencas": [
-    "Sex|Jantar",
-    "Sáb|Jantar",
-    "Dom|Jantar",
-    "Seg|Almoço",
-    "Ter|Jantar",
-    "Qua|Jantar"
-   ],
-   "sobras": 0,
-   "outras": 0
-  }
- ],
- "despesas": [
-  {
-   "quem": "Samuel",
-   "dataDesp": "2025-08-04",
-   "dataValor": "2025-08-08",
-   "desc": "Continente Bom Dia: Bacalhau",
-   "tipo": "Jantar",
-   "valor": 17.98,
-   "reembolsada": null,
-   "quemReemb": null
-  },
-  {
-   "quem": "Rogélio",
-   "dataDesp": "2025-08-04",
-   "dataValor": "2025-08-04",
-   "desc": "Mercadona: Produtos Limpeza e Outros",
-   "tipo": "Gerais",
-   "valor": 12.85,
-   "reembolsada": null,
-   "quemReemb": null
-  },
-  {
-   "quem": "Samuel",
-   "dataDesp": "2025-08-05",
-   "dataValor": "2025-08-05",
-   "desc": "Leroy Merlin: Ficha Tripla + Lâmpadas",
-   "tipo": "Gerais",
-   "valor": 8.48,
-   "reembolsada": null,
-   "quemReemb": null
-  },
-  {
-   "quem": "Samuel",
-   "dataDesp": "2025-08-06",
-   "dataValor": "2025-08-08",
-   "desc": "LIDL: Batata palha, Cebola, Azeitona, Alho, Ovos, Bacalhau",
-   "tipo": "Jantar",
-   "valor": 38.05,
-   "reembolsada": null,
-   "quemReemb": null
-  },
-  {
-   "quem": "Luís Pedro",
-   "dataDesp": "2025-08-06",
-   "dataValor": "2025-08-11",
-   "desc": "Azeiteiro: ver \"Compras Detalhadas\"",
-   "tipo": "Almoço",
-   "valor": 60.66,
-   "reembolsada": "Sim",
-   "quemReemb": "Diogo"
-  },
-  {
-   "quem": "Luís Pedro",
-   "dataDesp": "2025-08-06",
-   "dataValor": "2025-08-06",
-   "desc": "Azeiteiro: ver \"Compras Detalhadas\"",
-   "tipo": "Bebidas",
-   "valor": 107.51,
-   "reembolsada": "Sim",
-   "quemReemb": "Diogo"
-  },
-  {
-   "quem": "Luís Pedro",
-   "dataDesp": "2025-08-06",
-   "dataValor": "2025-08-06",
-   "desc": "Azeiteiro: ver \"Compras Detalhadas\"",
-   "tipo": "Gerais",
-   "valor": 24.14,
-   "reembolsada": "Sim",
-   "quemReemb": "Diogo"
-  },
-  {
-   "quem": "Luís Pedro",
-   "dataDesp": "2025-08-07",
-   "dataValor": "2025-08-11",
-   "desc": "Mercadona: ver \"Compras Detalhadas\"",
-   "tipo": "Almoço",
-   "valor": 4.8,
-   "reembolsada": "Sim",
-   "quemReemb": "Diogo"
-  },
-  {
-   "quem": "Luís Pedro",
-   "dataDesp": "2025-08-07",
-   "dataValor": "2025-08-09",
-   "desc": "Mercadona: ver \"Compras Detalhadas\"",
-   "tipo": "Jantar",
-   "valor": 15,
-   "reembolsada": "Sim",
-   "quemReemb": "Diogo"
-  },
-  {
-   "quem": "Luís Pedro",
-   "dataDesp": "2025-08-07",
-   "dataValor": "2025-08-07",
-   "desc": "Mercadona: ver \"Compras Detalhadas\"",
-   "tipo": "Bebidas",
-   "valor": 68.54,
-   "reembolsada": "Sim",
-   "quemReemb": "Diogo"
-  },
-  {
-   "quem": "Luís Pedro",
-   "dataDesp": "2025-08-07",
-   "dataValor": "2025-08-07",
-   "desc": "Mercadona: ver \"Compras Detalhadas\"",
-   "tipo": "Gerais",
-   "valor": 34.78,
-   "reembolsada": "Sim",
-   "quemReemb": "Diogo"
-  },
-  {
-   "quem": "Rogélio",
-   "dataDesp": "2025-08-08",
-   "dataValor": "2025-08-08",
-   "desc": "Gelo",
-   "tipo": "Bebidas",
-   "valor": 4,
-   "reembolsada": null,
-   "quemReemb": null
-  },
-  {
-   "quem": "Luís Pedro",
-   "dataDesp": "2025-08-08",
-   "dataValor": "2025-08-08",
-   "desc": "Azeiteiro: ver \"Compras Detalhadas\"",
-   "tipo": "Gerais",
-   "valor": 46.16,
-   "reembolsada": "Sim",
-   "quemReemb": "Diogo"
-  },
-  {
-   "quem": "Luís Pedro",
-   "dataDesp": "2025-08-08",
-   "dataValor": "2025-08-08",
-   "desc": "Chaves MEO",
-   "tipo": "Gerais",
-   "valor": 7,
-   "reembolsada": "Sim",
-   "quemReemb": "Diogo"
-  },
-  {
-   "quem": "Luís Pedro",
-   "dataDesp": "2025-08-08",
-   "dataValor": "2025-08-11",
-   "desc": "Intermarché: Couve Lombardo",
-   "tipo": "Almoço",
-   "valor": 3.18,
-   "reembolsada": "Sim",
-   "quemReemb": "Diogo"
-  },
-  {
-   "quem": "Luís Pedro",
-   "dataDesp": "2025-08-08",
-   "dataValor": "2025-08-08",
-   "desc": "Intermarché: Limas",
-   "tipo": "Bebidas",
-   "valor": 3.89,
-   "reembolsada": "Sim",
-   "quemReemb": "Diogo"
-  },
-  {
-   "quem": "Diogo",
-   "dataDesp": "2025-08-08",
-   "dataValor": "2025-08-08",
-   "desc": "Café: ver \"Compras Detalhadas\"",
-   "tipo": "Gerais",
-   "valor": 17.96,
-   "reembolsada": null,
-   "quemReemb": null
-  },
-  {
-   "quem": "Diogo",
-   "dataDesp": "2025-08-09",
-   "dataValor": "2025-08-09",
-   "desc": "Eduardo: Carnes",
-   "tipo": "Jantar",
-   "valor": 162.56,
-   "reembolsada": null,
-   "quemReemb": null
-  },
-  {
-   "quem": "Diogo",
-   "dataDesp": "2025-08-09",
-   "dataValor": "2025-08-11",
-   "desc": "Eduardo: Carnes",
-   "tipo": "Almoço",
-   "valor": 112.22,
-   "reembolsada": null,
-   "quemReemb": null
-  },
-  {
-   "quem": "Diogo",
-   "dataDesp": "2025-08-09",
-   "dataValor": "2025-08-09",
-   "desc": "Lidl Montijo: Queijos, Chouriço e Amendoins",
-   "tipo": "Gerais",
-   "valor": 22.21,
-   "reembolsada": null,
-   "quemReemb": null
-  },
-  {
-   "quem": "Luís Pedro",
-   "dataDesp": "2025-08-09",
-   "dataValor": "2025-08-09",
-   "desc": "Mercadona: Patê de Atum",
-   "tipo": "Gerais",
-   "valor": 5,
-   "reembolsada": null,
-   "quemReemb": null
-  },
-  {
-   "quem": "Diogo",
-   "dataDesp": "2025-08-09",
-   "dataValor": "2025-08-09",
-   "desc": "Continente Bom Dia: 3 Costeletas extra",
-   "tipo": "Jantar",
-   "valor": 17.15,
-   "reembolsada": null,
-   "quemReemb": null
-  },
-  {
-   "quem": "João Hélder",
-   "dataDesp": "2025-08-09",
-   "dataValor": "2025-08-09",
-   "desc": "Continente Bom Dia: Sacos do Lixo",
-   "tipo": "Gerais",
-   "valor": 2.58,
-   "reembolsada": null,
-   "quemReemb": null
-  },
-  {
-   "quem": "João Hélder",
-   "dataDesp": "2025-08-09",
-   "dataValor": "2025-08-09",
-   "desc": "Continente Bom Dia: Gelo",
-   "tipo": "Bebidas",
-   "valor": 2,
-   "reembolsada": null,
-   "quemReemb": null
-  },
-  {
-   "quem": "João Hélder",
-   "dataDesp": "2025-08-09",
-   "dataValor": "2025-08-09",
-   "desc": "Continente Bom Dia: Entrecôte extra",
-   "tipo": "Jantar",
-   "valor": 7.32,
-   "reembolsada": null,
-   "quemReemb": null
-  },
-  {
-   "quem": "João Hélder",
-   "dataDesp": "2025-08-09",
-   "dataValor": "2025-08-09",
-   "desc": "Continente Bom Dia: Entrecôte extra",
-   "tipo": "Jantar",
-   "valor": 6.34,
-   "reembolsada": null,
-   "quemReemb": null
-  },
-  {
-   "quem": "João Paulo",
-   "dataDesp": "2025-08-09",
-   "dataValor": "2025-08-10",
-   "desc": "Pão para açorda",
-   "tipo": "Jantar",
-   "valor": 4,
-   "reembolsada": null,
-   "quemReemb": null
-  },
-  {
-   "quem": "João Paulo",
-   "dataDesp": "2025-08-10",
-   "dataValor": "2025-08-10",
-   "desc": "Lidl: Compras para açorda",
-   "tipo": "Jantar",
-   "valor": 44.21,
-   "reembolsada": null,
-   "quemReemb": null
-  },
-  {
-   "quem": "João Paulo",
-   "dataDesp": "2025-08-10",
-   "dataValor": "2025-08-10",
-   "desc": "Lidl: Compras para açorda (extra convidados)",
-   "tipo": "Jantar",
-   "valor": 15.69,
-   "reembolsada": null,
-   "quemReemb": null
-  },
-  {
-   "quem": "Samuel",
-   "dataDesp": "2025-08-10",
-   "dataValor": "2025-08-10",
-   "desc": "Telheiro: Frango",
-   "tipo": "Jantar",
-   "valor": 14,
-   "reembolsada": null,
-   "quemReemb": null
-  },
-  {
-   "quem": "Diogo",
-   "dataDesp": "2025-08-11",
-   "dataValor": "2025-08-11",
-   "desc": "Café: ver \"Compras Detalhadas\"",
-   "tipo": "Gerais",
-   "valor": 12.66,
-   "reembolsada": null,
-   "quemReemb": null
-  },
-  {
-   "quem": "Diogo",
-   "dataDesp": "2025-08-10",
-   "dataValor": "2025-08-10",
-   "desc": "Gelo",
-   "tipo": "Bebidas",
-   "valor": 3,
-   "reembolsada": null,
-   "quemReemb": null
-  },
-  {
-   "quem": "Diogo",
-   "dataDesp": "2025-08-11",
-   "dataValor": "2025-08-11",
-   "desc": "Continente Bom Dia: Somersby, Águas e Gelo",
-   "tipo": "Bebidas",
-   "valor": 20.65,
-   "reembolsada": null,
-   "quemReemb": null
-  },
-  {
-   "quem": "Diogo",
-   "dataDesp": "2025-08-11",
-   "dataValor": "2025-08-11",
-   "desc": "Continente Bom Dia: Chouriços",
-   "tipo": "Almoço",
-   "valor": 5.18,
-   "reembolsada": null,
-   "quemReemb": null
-  },
-  {
-   "quem": "João Hélder",
-   "dataDesp": "2025-08-11",
-   "dataValor": "2025-08-11",
-   "desc": "Pão Feijoada Jaime",
-   "tipo": "Almoço",
-   "valor": 7,
-   "reembolsada": null,
-   "quemReemb": null
-  },
-  {
-   "quem": "Diogo",
-   "dataDesp": "2025-08-11",
-   "dataValor": "2025-08-11",
-   "desc": "Gelo",
-   "tipo": "Bebidas",
-   "valor": 3,
-   "reembolsada": null,
-   "quemReemb": null
-  },
-  {
-   "quem": "Luís Pedro",
-   "dataDesp": "2025-08-11",
-   "dataValor": "2025-08-11",
-   "desc": "Microfone",
-   "tipo": "Gerais",
-   "valor": 19.95,
-   "reembolsada": null,
-   "quemReemb": null
-  },
-  {
-   "quem": "Diogo",
-   "dataDesp": "2025-08-12",
-   "dataValor": "2025-08-12",
-   "desc": "Compras Esparguete à Bolonhesa",
-   "tipo": "Jantar",
-   "valor": 49.51,
-   "reembolsada": null,
-   "quemReemb": null
-  },
-  {
-   "quem": "Diogo",
-   "dataDesp": "2025-08-12",
-   "dataValor": "2025-08-12",
-   "desc": "Águas",
-   "tipo": "Bebidas",
-   "valor": 3.49,
-   "reembolsada": null,
-   "quemReemb": null
-  },
-  {
-   "quem": "Filipe",
-   "dataDesp": "2025-08-13",
-   "dataValor": "2025-08-13",
-   "desc": "Compras Caril",
-   "tipo": "Jantar",
-   "valor": 46.88,
-   "reembolsada": null,
-   "quemReemb": null
-  },
-  {
-   "quem": "Diogo",
-   "dataDesp": "2025-08-13",
-   "dataValor": "2025-08-13",
-   "desc": "Uber Eats: Gelados + Águas ",
-   "tipo": "Jantar",
-   "valor": 15.34,
-   "reembolsada": null,
-   "quemReemb": null
-  },
-  {
-   "quem": "Luís Pedro",
-   "dataDesp": "2025-08-11",
-   "dataValor": "2025-08-11",
-   "desc": "T-Shirt Barrona",
-   "tipo": "Gerais",
-   "valor": 7,
-   "reembolsada": null,
-   "quemReemb": null
-  },
-  {
-   "quem": "Diogo",
-   "dataDesp": "2025-08-18",
-   "dataValor": "2025-08-18",
-   "desc": "Renda MEO",
-   "tipo": "Renda",
-   "valor": 100,
-   "reembolsada": null,
-   "quemReemb": null
-  },
-  {
-   "quem": "Diogo",
-   "dataDesp": "2025-08-18",
-   "dataValor": "2025-08-18",
-   "desc": "RR2B: Cerveja (6 barris - 1 de oferta)",
-   "tipo": "Cerveja",
-   "valor": 362.42,
-   "reembolsada": null,
-   "quemReemb": null
-  },
-  {
-   "quem": "Diogo",
-   "dataDesp": "2025-08-18",
-   "dataValor": "2025-08-18",
-   "desc": "RR2B: Sangria Espumante (18x - 6x de oferta)",
-   "tipo": "Bebidas",
-   "valor": 42.91,
-   "reembolsada": null,
-   "quemReemb": null
-  },
-  {
-   "quem": "Diogo",
-   "dataDesp": "2025-08-18",
-   "dataValor": "2025-08-18",
-   "desc": "RR2B: Sangria Frutos Vermelhos (6x)",
-   "tipo": "Bebidas",
-   "valor": 21.45,
-   "reembolsada": null,
-   "quemReemb": null
-  },
-  {
-   "quem": "Diogo",
-   "dataDesp": "2025-08-18",
-   "dataValor": "2025-08-18",
-   "desc": "RR2B: Vinho Branco Dom Xisto (6x)",
-   "tipo": "Bebidas",
-   "valor": 11.53,
-   "reembolsada": null,
-   "quemReemb": null
-  },
-  {
-   "quem": "Diogo",
-   "dataDesp": "2025-08-18",
-   "dataValor": "2025-08-18",
-   "desc": "RR2B: Vinho Tinto Piano (6x)",
-   "tipo": "Bebidas",
-   "valor": 21.7,
-   "reembolsada": null,
-   "quemReemb": null
-  }
- ],
- "convidados": [
-  {
-   "membro": "Samuel",
-   "nome": "Irmão (João)",
-   "data": "2025-08-11",
-   "dia": "Seg",
-   "ref": "Almoço",
-   "pagante": "Sim",
-   "preco": 15
-  },
-  {
-   "membro": "Samuel",
-   "nome": "Namorada do irmão (Rita)",
-   "data": "2025-08-11",
-   "dia": "Seg",
-   "ref": "Almoço",
-   "pagante": "Sim",
-   "preco": 15
-  },
-  {
-   "membro": "Inês",
-   "nome": "Tito 1",
-   "data": "2025-08-11",
-   "dia": "Seg",
-   "ref": "Almoço",
-   "pagante": "Sim",
-   "preco": 15
-  },
-  {
-   "membro": "Inês",
-   "nome": "Tito 2",
-   "data": "2025-08-11",
-   "dia": "Seg",
-   "ref": "Almoço",
-   "pagante": "Sim",
-   "preco": 15
-  },
-  {
-   "membro": "Inês",
-   "nome": "Tito 3",
-   "data": "2025-08-11",
-   "dia": "Seg",
-   "ref": "Almoço",
-   "pagante": "Sim",
-   "preco": 15
-  },
-  {
-   "membro": "Inês",
-   "nome": "Tito 4",
-   "data": "2025-08-11",
-   "dia": "Seg",
-   "ref": "Almoço",
-   "pagante": "Sim",
-   "preco": 15
-  },
-  {
-   "membro": "Inês",
-   "nome": "Tito 5",
-   "data": "2025-08-11",
-   "dia": "Seg",
-   "ref": "Almoço",
-   "pagante": "Sim",
-   "preco": 15
-  },
-  {
-   "membro": "Inês",
-   "nome": "Tito 6",
-   "data": "2025-08-11",
-   "dia": "Seg",
-   "ref": "Almoço",
-   "pagante": "Sim",
-   "preco": 15
-  },
-  {
-   "membro": "Inês",
-   "nome": "Tito 7",
-   "data": "2025-08-11",
-   "dia": "Seg",
-   "ref": "Almoço",
-   "pagante": "Sim",
-   "preco": 15
-  },
-  {
-   "membro": "Inês",
-   "nome": "Tito 8",
-   "data": "2025-08-11",
-   "dia": "Seg",
-   "ref": "Almoço",
-   "pagante": "Sim",
-   "preco": 15
-  },
-  {
-   "membro": "Samuel",
-   "nome": "Ninja",
-   "data": "2025-08-11",
-   "dia": "Seg",
-   "ref": "Almoço",
-   "pagante": "Sim",
-   "preco": 15
-  },
-  {
-   "membro": "Samuel",
-   "nome": "Carolina",
-   "data": "2025-08-11",
-   "dia": "Seg",
-   "ref": "Almoço",
-   "pagante": "Sim",
-   "preco": 15
-  },
-  {
-   "membro": "Samuel",
-   "nome": "Barrona",
-   "data": "2025-08-11",
-   "dia": "Seg",
-   "ref": "Almoço",
-   "pagante": "Não",
-   "preco": 15
-  },
-  {
-   "membro": "Samuel",
-   "nome": "Susana",
-   "data": "2025-08-11",
-   "dia": "Seg",
-   "ref": "Almoço",
-   "pagante": "Não",
-   "preco": 15
-  },
-  {
-   "membro": "Samuel",
-   "nome": "Ninja Amigos (1)",
-   "data": "2025-08-11",
-   "dia": "Seg",
-   "ref": "Almoço",
-   "pagante": "Sim",
-   "preco": 15
-  },
-  {
-   "membro": "Samuel",
-   "nome": "Ninja Amigos (2)",
-   "data": "2025-08-11",
-   "dia": "Seg",
-   "ref": "Almoço",
-   "pagante": "Sim",
-   "preco": 15
-  },
-  {
-   "membro": "Samuel",
-   "nome": "Ninja Amigos (3)",
-   "data": "2025-08-11",
-   "dia": "Seg",
-   "ref": "Almoço",
-   "pagante": "Sim",
-   "preco": 15
-  },
-  {
-   "membro": "Samuel",
-   "nome": "Ninja Amigos (4)",
-   "data": "2025-08-11",
-   "dia": "Seg",
-   "ref": "Almoço",
-   "pagante": "Sim",
-   "preco": 15
-  },
-  {
-   "membro": "Samuel",
-   "nome": "Ninja Amigos (5)",
-   "data": "2025-08-11",
-   "dia": "Seg",
-   "ref": "Almoço",
-   "pagante": "Sim",
-   "preco": 15
-  },
-  {
-   "membro": "João Paulo",
-   "nome": "Bronze",
-   "data": "2025-08-11",
-   "dia": "Seg",
-   "ref": "Almoço",
-   "pagante": "Não",
-   "preco": 15
-  },
-  {
-   "membro": "Filipe",
-   "nome": "Pedro",
-   "data": "2025-08-08",
-   "dia": "Sex",
-   "ref": "Jantar",
-   "pagante": "Sim",
-   "preco": 11
-  },
-  {
-   "membro": "Filipe",
-   "nome": "Filipa",
-   "data": "2025-08-08",
-   "dia": "Sex",
-   "ref": "Jantar",
-   "pagante": "Sim",
-   "preco": 11
-  },
-  {
-   "membro": "Zé Carlos",
-   "nome": "Prima 1",
-   "data": "2025-08-11",
-   "dia": "Seg",
-   "ref": "Almoço",
-   "pagante": "Sim",
-   "preco": 15
-  },
-  {
-   "membro": "Zé Carlos",
-   "nome": "Prima 2",
-   "data": "2025-08-11",
-   "dia": "Seg",
-   "ref": "Almoço",
-   "pagante": "Sim",
-   "preco": 15
-  },
-  {
-   "membro": "João Paulo",
-   "nome": "David",
-   "data": "2025-08-09",
-   "dia": "Sáb",
-   "ref": "Jantar",
-   "pagante": "Sim",
-   "preco": 17.5
-  },
-  {
-   "membro": "João Paulo",
-   "nome": "Maria",
-   "data": "2025-08-09",
-   "dia": "Sáb",
-   "ref": "Jantar",
-   "pagante": "Sim",
-   "preco": 17.5
-  },
-  {
-   "membro": "Samuel",
-   "nome": "Barrona",
-   "data": "2025-08-09",
-   "dia": "Sáb",
-   "ref": "Jantar",
-   "pagante": "Sim",
-   "preco": 17.5
-  },
-  {
-   "membro": "Samuel",
-   "nome": "Susana",
-   "data": "2025-08-09",
-   "dia": "Sáb",
-   "ref": "Jantar",
-   "pagante": "Sim",
-   "preco": 17.5
-  },
-  {
-   "membro": "Luís Pedro",
-   "nome": "Pedro Madeira",
-   "data": "2025-08-09",
-   "dia": "Sáb",
-   "ref": "Jantar",
-   "pagante": "Sim",
-   "preco": 17.5
-  },
-  {
-   "membro": "Luís Pedro",
-   "nome": "Davi",
-   "data": "2025-08-09",
-   "dia": "Sáb",
-   "ref": "Jantar",
-   "pagante": "Sim",
-   "preco": 17.5
-  },
-  {
-   "membro": "Luís Pedro",
-   "nome": "Diogo Rocha",
-   "data": "2025-08-12",
-   "dia": "Ter",
-   "ref": "Jantar",
-   "pagante": "Sim",
-   "preco": 8
-  },
-  {
-   "membro": "Luís Pedro",
-   "nome": "Tiago Labreca",
-   "data": "2025-08-12",
-   "dia": "Ter",
-   "ref": "Jantar",
-   "pagante": "Sim",
-   "preco": 8
-  },
-  {
-   "membro": "João Paulo",
-   "nome": "Primo Bruno",
-   "data": "2025-08-08",
-   "dia": "Sex",
-   "ref": "Jantar",
-   "pagante": "Sim",
-   "preco": 11
-  },
-  {
-   "membro": "João Paulo",
-   "nome": "Mulher Primo Bruno",
-   "data": "2025-08-08",
-   "dia": "Sex",
-   "ref": "Jantar",
-   "pagante": "Sim",
-   "preco": 11
-  },
-  {
-   "membro": "João Paulo",
-   "nome": "Sogra Primo Bruno",
-   "data": "2025-08-08",
-   "dia": "Sex",
-   "ref": "Jantar",
-   "pagante": "Sim",
-   "preco": 11
-  },
-  {
-   "membro": "João Paulo",
-   "nome": "Gonçalo",
-   "data": "2025-08-09",
-   "dia": "Sáb",
-   "ref": "Jantar",
-   "pagante": "Sim",
-   "preco": 17.5
-  },
-  {
-   "membro": "João Paulo",
-   "nome": "Cláudia",
-   "data": "2025-08-09",
-   "dia": "Sáb",
-   "ref": "Jantar",
-   "pagante": "Sim",
-   "preco": 17.5
-  },
-  {
-   "membro": "Toorn",
-   "nome": "Cácá",
-   "data": "2025-08-09",
-   "dia": "Sáb",
-   "ref": "Jantar",
-   "pagante": "Sim",
-   "preco": 17.5
-  },
-  {
-   "membro": "Samuel",
-   "nome": "Ninja",
-   "data": "2025-08-10",
-   "dia": "Dom",
-   "ref": "Jantar",
-   "pagante": "Sim",
-   "preco": 10
-  },
-  {
-   "membro": "Samuel",
-   "nome": "Carolina",
-   "data": "2025-08-10",
-   "dia": "Dom",
-   "ref": "Jantar",
-   "pagante": "Sim",
-   "preco": 10
-  },
-  {
-   "membro": "Samuel",
-   "nome": "Big (Ninja)",
-   "data": "2025-08-10",
-   "dia": "Dom",
-   "ref": "Jantar",
-   "pagante": "Sim",
-   "preco": 10
-  },
-  {
-   "membro": "Samuel",
-   "nome": "Catarina (Ninja)",
-   "data": "2025-08-10",
-   "dia": "Dom",
-   "ref": "Jantar",
-   "pagante": "Sim",
-   "preco": 10
-  },
-  {
-   "membro": "Toorn",
-   "nome": "Cunhada (Liliana)",
-   "data": "2025-08-13",
-   "dia": "Qua",
-   "ref": "Jantar",
-   "pagante": "Sim",
-   "preco": 8
-  },
-  {
-   "membro": "Filipe",
-   "nome": "Pedro",
-   "data": "2025-08-12",
-   "dia": "Ter",
-   "ref": "Jantar",
-   "pagante": "Sim",
-   "preco": 8
-  },
-  {
-   "membro": "Filipe",
-   "nome": "Filipa",
-   "data": "2025-08-12",
-   "dia": "Ter",
-   "ref": "Jantar",
-   "pagante": "Sim",
-   "preco": 8
-  }
- ],
- "mealheiros": [
-  {
-   "quem": "Diogo",
-   "data": "2025-08-11",
-   "valor": 84
-  },
-  {
-   "quem": "Diogo",
-   "data": "2025-08-13",
-   "valor": 19
-  }
- ],
- "pagamentos": [
-  {
-   "quem": "Zé Carlos",
-   "ref": "Zé Carlos",
-   "data": "2025-08-12",
-   "valor": 50
-  },
-  {
-   "quem": "Margarida",
-   "ref": "Margarida",
-   "data": "2025-08-20",
-   "valor": 58
-  },
-  {
-   "quem": "Samuel",
-   "ref": "Samuel, Ivone e Convidados",
-   "data": "2025-08-20",
-   "valor": 248.49
-  },
-  {
-   "quem": "Toorn",
-   "ref": "Toorn e Raquel",
-   "data": "2025-08-20",
-   "valor": 56
-  },
-  {
-   "quem": "Luís Pedro",
-   "ref": "Luís Pedro, Inês e Convidados",
-   "data": "2025-08-20",
-   "valor": 224.05
-  },
-  {
-   "quem": "Rogélio",
-   "ref": "Rogélio e Lara",
-   "data": "2025-08-20",
-   "valor": 77.15
-  },
-  {
-   "quem": "João Hélder",
-   "ref": "João Hélder e Paulinha",
-   "data": "2025-08-20",
-   "valor": 106.76
-  },
-  {
-   "quem": "João Mestre",
-   "ref": "João Mestre e Carol",
-   "data": "2025-08-20",
-   "valor": 35
-  },
-  {
-   "quem": "Tânia",
-   "ref": "Tânia e Filipe",
-   "data": "2025-08-21",
-   "valor": 85.12
-  },
-  {
-   "quem": "Filipe",
-   "ref": "Convidados",
-   "data": "2025-08-28",
-   "valor": 38
-  },
-  {
-   "quem": "Toorn",
-   "ref": "Convidados",
-   "data": "2025-08-28",
-   "valor": 25.5
-  },
-  {
-   "quem": "Zé Carlos",
-   "ref": "Convidados",
-   "data": "2025-08-28",
-   "valor": 54
-  }
- ],
- "refeicoesDef": [
-  {
-   "data": "2025-08-08",
-   "dia": "Sex",
-   "ref": "Jantar",
-   "peso": 0.2,
-   "minMEO": 0,
-   "minConv": 10,
-   "extraConv": 2
-  },
-  {
-   "data": "2025-08-09",
-   "dia": "Sáb",
-   "ref": "Almoço",
-   "peso": 0,
-   "minMEO": 0,
-   "minConv": 10,
-   "extraConv": 0
-  },
-  {
-   "data": "2025-08-09",
-   "dia": "Sáb",
-   "ref": "Jantar",
-   "peso": 0.25,
-   "minMEO": 0,
-   "minConv": 15,
-   "extraConv": 2.5
-  },
-  {
-   "data": "2025-08-10",
-   "dia": "Dom",
-   "ref": "Almoço",
-   "peso": 0,
-   "minMEO": 0,
-   "minConv": 10,
-   "extraConv": 0
-  },
-  {
-   "data": "2025-08-10",
-   "dia": "Dom",
-   "ref": "Jantar",
-   "peso": 0.1,
-   "minMEO": 0,
-   "minConv": 10,
-   "extraConv": 2
-  },
-  {
-   "data": "2025-08-11",
-   "dia": "Seg",
-   "ref": "Almoço",
-   "peso": 0.3,
-   "minMEO": 0,
-   "minConv": 10,
-   "extraConv": 4
-  },
-  {
-   "data": "2025-08-11",
-   "dia": "Seg",
-   "ref": "Lanche",
-   "peso": null,
-   "minMEO": 0,
-   "minConv": 5,
-   "extraConv": 4
-  },
-  {
-   "data": "2025-08-11",
-   "dia": "Seg",
-   "ref": "Jantar",
-   "peso": 0,
-   "minMEO": 0,
-   "minConv": 7.5,
-   "extraConv": 0
-  },
-  {
-   "data": "2025-08-12",
-   "dia": "Ter",
-   "ref": "Almoço",
-   "peso": 0,
-   "minMEO": 0,
-   "minConv": 7.5,
-   "extraConv": 0
-  },
-  {
-   "data": "2025-08-12",
-   "dia": "Ter",
-   "ref": "Jantar",
-   "peso": 0.1,
-   "minMEO": 0,
-   "minConv": 7.5,
-   "extraConv": 2
-  },
-  {
-   "data": "2025-08-13",
-   "dia": "Qua",
-   "ref": "Almoço",
-   "peso": 0,
-   "minMEO": 0,
-   "minConv": 7.5,
-   "extraConv": 0
-  },
-  {
-   "data": "2025-08-13",
-   "dia": "Qua",
-   "ref": "Jantar",
-   "peso": 0.05,
-   "minMEO": 0,
-   "minConv": 7.5,
-   "extraConv": 2
-  },
-  {
-   "data": "2025-08-14",
-   "dia": "Qui",
-   "ref": "Almoço",
-   "peso": 0,
-   "minMEO": 0,
-   "minConv": 7.5,
-   "extraConv": 0
-  },
-  {
-   "data": "2025-08-14",
-   "dia": "Qui",
-   "ref": "Jantar",
-   "peso": 0,
-   "minMEO": 0,
-   "minConv": 7.5,
-   "extraConv": 0
-  }
- ]
-}
+[
+ {
+  "evento": {
+   "nome": "MEO 2025",
+   "ano": 2025,
+   "tesoureiro": "Diogo",
+   "descontoTshirts": 44,
+   "saldoAnoAnterior": 68.88
+  },
+  "membros": [
+   {
+    "nome": "Carol",
+    "fator": 0,
+    "presencas": [
+     "Ter|Jantar"
+    ],
+    "sobras": 0,
+    "outras": 0
+   },
+   {
+    "nome": "Diogo",
+    "fator": 1,
+    "presencas": [
+     "Sex|Jantar",
+     "Sáb|Jantar",
+     "Dom|Jantar",
+     "Seg|Almoço",
+     "Ter|Jantar",
+     "Qua|Jantar"
+    ],
+    "sobras": 112.88,
+    "outras": 0
+   },
+   {
+    "nome": "Filipe",
+    "fator": 1,
+    "presencas": [
+     "Sex|Jantar",
+     "Sáb|Jantar",
+     "Dom|Jantar",
+     "Seg|Almoço",
+     "Ter|Jantar",
+     "Qua|Jantar"
+    ],
+    "sobras": 0,
+    "outras": 0
+   },
+   {
+    "nome": "Inês",
+    "fator": 0.2,
+    "presencas": [
+     "Sex|Jantar",
+     "Seg|Almoço"
+    ],
+    "sobras": 0,
+    "outras": 0
+   },
+   {
+    "nome": "Ivone",
+    "fator": 0.2,
+    "presencas": [
+     "Sáb|Jantar",
+     "Dom|Jantar",
+     "Seg|Almoço",
+     "Ter|Jantar"
+    ],
+    "sobras": 0,
+    "outras": 0
+   },
+   {
+    "nome": "João Hélder",
+    "fator": 1,
+    "presencas": [
+     "Sex|Jantar",
+     "Sáb|Jantar",
+     "Dom|Jantar",
+     "Seg|Almoço",
+     "Ter|Jantar",
+     "Qua|Jantar"
+    ],
+    "sobras": 0,
+    "outras": 0
+   },
+   {
+    "nome": "João Mestre",
+    "fator": 0.5,
+    "presencas": [
+     "Seg|Almoço",
+     "Ter|Jantar"
+    ],
+    "sobras": 0,
+    "outras": 1.0
+   },
+   {
+    "nome": "João Paulo",
+    "fator": 1,
+    "presencas": [
+     "Sex|Jantar",
+     "Sáb|Jantar",
+     "Dom|Jantar",
+     "Seg|Almoço",
+     "Ter|Jantar",
+     "Qua|Jantar"
+    ],
+    "sobras": 0,
+    "outras": 0
+   },
+   {
+    "nome": "Lara",
+    "fator": 0.2,
+    "presencas": [
+     "Dom|Jantar",
+     "Seg|Almoço",
+     "Ter|Jantar",
+     "Qua|Jantar"
+    ],
+    "sobras": 0,
+    "outras": 0
+   },
+   {
+    "nome": "Luís Pedro",
+    "fator": 1,
+    "presencas": [
+     "Sex|Jantar",
+     "Sáb|Jantar",
+     "Seg|Tarde",
+     "Ter|Jantar",
+     "Qua|Jantar"
+    ],
+    "sobras": 0,
+    "outras": 0
+   },
+   {
+    "nome": "Margarida",
+    "fator": 0.25,
+    "presencas": [
+     "Sex|Jantar",
+     "Sáb|Jantar",
+     "Dom|Jantar",
+     "Seg|Almoço",
+     "Ter|Jantar",
+     "Qua|Jantar"
+    ],
+    "sobras": 0,
+    "outras": 0
+   },
+   {
+    "nome": "Paulinha",
+    "fator": 0.25,
+    "presencas": [
+     "Sex|Jantar",
+     "Sáb|Jantar",
+     "Dom|Jantar",
+     "Seg|Almoço",
+     "Ter|Jantar",
+     "Qua|Jantar"
+    ],
+    "sobras": 0,
+    "outras": 0
+   },
+   {
+    "nome": "Raquel",
+    "fator": 0.1,
+    "presencas": [
+     "Sáb|Jantar",
+     "Qua|Jantar"
+    ],
+    "sobras": 0,
+    "outras": 0
+   },
+   {
+    "nome": "Rita",
+    "fator": 0.2,
+    "presencas": [
+     "Sex|Jantar",
+     "Sáb|Jantar",
+     "Dom|Jantar",
+     "Seg|Almoço"
+    ],
+    "sobras": 0,
+    "outras": 0
+   },
+   {
+    "nome": "Rogélio",
+    "fator": 1,
+    "presencas": [
+     "Sex|Jantar",
+     "Dom|Jantar",
+     "Seg|Almoço",
+     "Ter|Jantar",
+     "Qua|Jantar"
+    ],
+    "sobras": 0,
+    "outras": 0
+   },
+   {
+    "nome": "Samuel",
+    "fator": 1,
+    "presencas": [
+     "Sex|Jantar",
+     "Sáb|Jantar",
+     "Dom|Jantar",
+     "Seg|Almoço",
+     "Ter|Jantar",
+     "Qua|Jantar"
+    ],
+    "sobras": 0,
+    "outras": 0
+   },
+   {
+    "nome": "Tânia",
+    "fator": 0.25,
+    "presencas": [
+     "Sex|Jantar",
+     "Sáb|Jantar",
+     "Dom|Jantar",
+     "Seg|Almoço",
+     "Ter|Jantar",
+     "Qua|Jantar"
+    ],
+    "sobras": 0,
+    "outras": 0
+   },
+   {
+    "nome": "Toorn",
+    "fator": 0.5,
+    "presencas": [
+     "Sáb|Jantar",
+     "Qua|Jantar"
+    ],
+    "sobras": 0,
+    "outras": 0
+   },
+   {
+    "nome": "Zé Carlos",
+    "fator": 1,
+    "presencas": [
+     "Sex|Jantar",
+     "Sáb|Jantar",
+     "Dom|Jantar",
+     "Seg|Almoço",
+     "Ter|Jantar",
+     "Qua|Jantar"
+    ],
+    "sobras": 0,
+    "outras": 0
+   }
+  ],
+  "despesas": [
+   {
+    "quem": "Samuel",
+    "dataDesp": "2025-08-04",
+    "dataValor": "2025-08-08",
+    "desc": "Continente Bom Dia: Bacalhau",
+    "tipo": "Jantar",
+    "valor": 17.98
+   },
+   {
+    "quem": "Rogélio",
+    "dataDesp": "2025-08-04",
+    "dataValor": "2025-08-04",
+    "desc": "Mercadona: Produtos Limpeza e Outros",
+    "tipo": "Gerais",
+    "valor": 12.85
+   },
+   {
+    "quem": "Samuel",
+    "dataDesp": "2025-08-05",
+    "dataValor": "2025-08-05",
+    "desc": "Leroy Merlin: Ficha Tripla + Lâmpadas",
+    "tipo": "Gerais",
+    "valor": 8.48
+   },
+   {
+    "quem": "Samuel",
+    "dataDesp": "2025-08-06",
+    "dataValor": "2025-08-08",
+    "desc": "LIDL: Batata palha, Cebola, Azeitona, Alho, Ovos, Bacalhau",
+    "tipo": "Jantar",
+    "valor": 38.05
+   },
+   {
+    "quem": "Luís Pedro",
+    "dataDesp": "2025-08-06",
+    "dataValor": "2025-08-11",
+    "desc": "Azeiteiro: ver \"Compras Detalhadas\"",
+    "tipo": "Almoço",
+    "valor": 60.66
+   },
+   {
+    "quem": "Luís Pedro",
+    "dataDesp": "2025-08-06",
+    "dataValor": "2025-08-06",
+    "desc": "Azeiteiro: ver \"Compras Detalhadas\"",
+    "tipo": "Bebidas",
+    "valor": 107.51
+   },
+   {
+    "quem": "Luís Pedro",
+    "dataDesp": "2025-08-06",
+    "dataValor": "2025-08-06",
+    "desc": "Azeiteiro: ver \"Compras Detalhadas\"",
+    "tipo": "Gerais",
+    "valor": 24.14
+   },
+   {
+    "quem": "Luís Pedro",
+    "dataDesp": "2025-08-07",
+    "dataValor": "2025-08-11",
+    "desc": "Mercadona: ver \"Compras Detalhadas\"",
+    "tipo": "Almoço",
+    "valor": 4.8
+   },
+   {
+    "quem": "Luís Pedro",
+    "dataDesp": "2025-08-07",
+    "dataValor": "2025-08-09",
+    "desc": "Mercadona: ver \"Compras Detalhadas\"",
+    "tipo": "Jantar",
+    "valor": 15
+   },
+   {
+    "quem": "Luís Pedro",
+    "dataDesp": "2025-08-07",
+    "dataValor": "2025-08-07",
+    "desc": "Mercadona: ver \"Compras Detalhadas\"",
+    "tipo": "Bebidas",
+    "valor": 68.54
+   },
+   {
+    "quem": "Luís Pedro",
+    "dataDesp": "2025-08-07",
+    "dataValor": "2025-08-07",
+    "desc": "Mercadona: ver \"Compras Detalhadas\"",
+    "tipo": "Gerais",
+    "valor": 34.78
+   },
+   {
+    "quem": "Rogélio",
+    "dataDesp": "2025-08-08",
+    "dataValor": "2025-08-08",
+    "desc": "Gelo",
+    "tipo": "Bebidas",
+    "valor": 4
+   },
+   {
+    "quem": "Luís Pedro",
+    "dataDesp": "2025-08-08",
+    "dataValor": "2025-08-08",
+    "desc": "Azeiteiro: ver \"Compras Detalhadas\"",
+    "tipo": "Gerais",
+    "valor": 46.16
+   },
+   {
+    "quem": "Luís Pedro",
+    "dataDesp": "2025-08-08",
+    "dataValor": "2025-08-08",
+    "desc": "Chaves MEO",
+    "tipo": "Gerais",
+    "valor": 7
+   },
+   {
+    "quem": "Luís Pedro",
+    "dataDesp": "2025-08-08",
+    "dataValor": "2025-08-11",
+    "desc": "Intermarché: Couve Lombardo",
+    "tipo": "Almoço",
+    "valor": 3.18
+   },
+   {
+    "quem": "Luís Pedro",
+    "dataDesp": "2025-08-08",
+    "dataValor": "2025-08-08",
+    "desc": "Intermarché: Limas",
+    "tipo": "Bebidas",
+    "valor": 3.89
+   },
+   {
+    "quem": "Diogo",
+    "dataDesp": "2025-08-08",
+    "dataValor": "2025-08-08",
+    "desc": "Café: ver \"Compras Detalhadas\"",
+    "tipo": "Gerais",
+    "valor": 17.96
+   },
+   {
+    "quem": "Diogo",
+    "dataDesp": "2025-08-09",
+    "dataValor": "2025-08-09",
+    "desc": "Eduardo: Carnes",
+    "tipo": "Jantar",
+    "valor": 162.56
+   },
+   {
+    "quem": "Diogo",
+    "dataDesp": "2025-08-09",
+    "dataValor": "2025-08-11",
+    "desc": "Eduardo: Carnes",
+    "tipo": "Almoço",
+    "valor": 112.22
+   },
+   {
+    "quem": "Diogo",
+    "dataDesp": "2025-08-09",
+    "dataValor": "2025-08-09",
+    "desc": "Lidl Montijo: Queijos, Chouriço e Amendoins",
+    "tipo": "Gerais",
+    "valor": 22.21
+   },
+   {
+    "quem": "Luís Pedro",
+    "dataDesp": "2025-08-09",
+    "dataValor": "2025-08-09",
+    "desc": "Mercadona: Patê de Atum",
+    "tipo": "Gerais",
+    "valor": 5
+   },
+   {
+    "quem": "Diogo",
+    "dataDesp": "2025-08-09",
+    "dataValor": "2025-08-09",
+    "desc": "Continente Bom Dia: 3 Costeletas extra",
+    "tipo": "Jantar",
+    "valor": 17.15
+   },
+   {
+    "quem": "João Hélder",
+    "dataDesp": "2025-08-09",
+    "dataValor": "2025-08-09",
+    "desc": "Continente Bom Dia: Sacos do Lixo",
+    "tipo": "Gerais",
+    "valor": 2.58
+   },
+   {
+    "quem": "João Hélder",
+    "dataDesp": "2025-08-09",
+    "dataValor": "2025-08-09",
+    "desc": "Continente Bom Dia: Gelo",
+    "tipo": "Bebidas",
+    "valor": 2
+   },
+   {
+    "quem": "João Hélder",
+    "dataDesp": "2025-08-09",
+    "dataValor": "2025-08-09",
+    "desc": "Continente Bom Dia: Entrecôte extra",
+    "tipo": "Jantar",
+    "valor": 7.32
+   },
+   {
+    "quem": "João Hélder",
+    "dataDesp": "2025-08-09",
+    "dataValor": "2025-08-09",
+    "desc": "Continente Bom Dia: Entrecôte extra",
+    "tipo": "Jantar",
+    "valor": 6.34
+   },
+   {
+    "quem": "João Paulo",
+    "dataDesp": "2025-08-09",
+    "dataValor": "2025-08-10",
+    "desc": "Pão para açorda",
+    "tipo": "Jantar",
+    "valor": 4
+   },
+   {
+    "quem": "João Paulo",
+    "dataDesp": "2025-08-10",
+    "dataValor": "2025-08-10",
+    "desc": "Lidl: Compras para açorda",
+    "tipo": "Jantar",
+    "valor": 44.21
+   },
+   {
+    "quem": "João Paulo",
+    "dataDesp": "2025-08-10",
+    "dataValor": "2025-08-10",
+    "desc": "Lidl: Compras para açorda (extra convidados)",
+    "tipo": "Jantar",
+    "valor": 15.69
+   },
+   {
+    "quem": "Samuel",
+    "dataDesp": "2025-08-10",
+    "dataValor": "2025-08-10",
+    "desc": "Telheiro: Frango",
+    "tipo": "Jantar",
+    "valor": 14
+   },
+   {
+    "quem": "Diogo",
+    "dataDesp": "2025-08-11",
+    "dataValor": "2025-08-11",
+    "desc": "Café: ver \"Compras Detalhadas\"",
+    "tipo": "Gerais",
+    "valor": 12.66
+   },
+   {
+    "quem": "Diogo",
+    "dataDesp": "2025-08-10",
+    "dataValor": "2025-08-10",
+    "desc": "Gelo",
+    "tipo": "Bebidas",
+    "valor": 3
+   },
+   {
+    "quem": "Diogo",
+    "dataDesp": "2025-08-11",
+    "dataValor": "2025-08-11",
+    "desc": "Continente Bom Dia: Somersby, Águas e Gelo",
+    "tipo": "Bebidas",
+    "valor": 20.65
+   },
+   {
+    "quem": "Diogo",
+    "dataDesp": "2025-08-11",
+    "dataValor": "2025-08-11",
+    "desc": "Continente Bom Dia: Chouriços",
+    "tipo": "Almoço",
+    "valor": 5.18
+   },
+   {
+    "quem": "João Hélder",
+    "dataDesp": "2025-08-11",
+    "dataValor": "2025-08-11",
+    "desc": "Pão Feijoada Jaime",
+    "tipo": "Almoço",
+    "valor": 7
+   },
+   {
+    "quem": "Diogo",
+    "dataDesp": "2025-08-11",
+    "dataValor": "2025-08-11",
+    "desc": "Gelo",
+    "tipo": "Bebidas",
+    "valor": 3
+   },
+   {
+    "quem": "Luís Pedro",
+    "dataDesp": "2025-08-11",
+    "dataValor": "2025-08-11",
+    "desc": "Microfone",
+    "tipo": "Gerais",
+    "valor": 19.95
+   },
+   {
+    "quem": "Diogo",
+    "dataDesp": "2025-08-12",
+    "dataValor": "2025-08-12",
+    "desc": "Compras Esparguete à Bolonhesa",
+    "tipo": "Jantar",
+    "valor": 49.51
+   },
+   {
+    "quem": "Diogo",
+    "dataDesp": "2025-08-12",
+    "dataValor": "2025-08-12",
+    "desc": "Águas",
+    "tipo": "Bebidas",
+    "valor": 3.49
+   },
+   {
+    "quem": "Filipe",
+    "dataDesp": "2025-08-13",
+    "dataValor": "2025-08-13",
+    "desc": "Compras Caril",
+    "tipo": "Jantar",
+    "valor": 46.88
+   },
+   {
+    "quem": "Diogo",
+    "dataDesp": "2025-08-13",
+    "dataValor": "2025-08-13",
+    "desc": "Uber Eats: Gelados + Águas ",
+    "tipo": "Jantar",
+    "valor": 15.34
+   },
+   {
+    "quem": "Luís Pedro",
+    "dataDesp": "2025-08-11",
+    "dataValor": "2025-08-11",
+    "desc": "T-Shirt Barrona",
+    "tipo": "Gerais",
+    "valor": 7
+   },
+   {
+    "quem": "Diogo",
+    "dataDesp": "2025-08-18",
+    "dataValor": "2025-08-18",
+    "desc": "Renda MEO",
+    "tipo": "Renda",
+    "valor": 100
+   },
+   {
+    "quem": "Diogo",
+    "dataDesp": "2025-08-18",
+    "dataValor": "2025-08-18",
+    "desc": "RR2B: Cerveja (6 barris - 1 de oferta)",
+    "tipo": "Cerveja",
+    "valor": 362.42
+   },
+   {
+    "quem": "Diogo",
+    "dataDesp": "2025-08-18",
+    "dataValor": "2025-08-18",
+    "desc": "RR2B: Sangria Espumante (18x - 6x de oferta)",
+    "tipo": "Bebidas",
+    "valor": 42.91
+   },
+   {
+    "quem": "Diogo",
+    "dataDesp": "2025-08-18",
+    "dataValor": "2025-08-18",
+    "desc": "RR2B: Sangria Frutos Vermelhos (6x)",
+    "tipo": "Bebidas",
+    "valor": 21.45
+   },
+   {
+    "quem": "Diogo",
+    "dataDesp": "2025-08-18",
+    "dataValor": "2025-08-18",
+    "desc": "RR2B: Vinho Branco Dom Xisto (6x)",
+    "tipo": "Bebidas",
+    "valor": 11.53
+   },
+   {
+    "quem": "Diogo",
+    "dataDesp": "2025-08-18",
+    "dataValor": "2025-08-18",
+    "desc": "RR2B: Vinho Tinto Piano (6x)",
+    "tipo": "Bebidas",
+    "valor": 21.7
+   }
+  ],
+  "convidados": [
+   {
+    "membro": "Samuel",
+    "nome": "Irmão (João)",
+    "data": "2025-08-11",
+    "dia": "Seg",
+    "ref": "Almoço",
+    "pagante": "Sim",
+    "preco": 15
+   },
+   {
+    "membro": "Samuel",
+    "nome": "Namorada do irmão (Rita)",
+    "data": "2025-08-11",
+    "dia": "Seg",
+    "ref": "Almoço",
+    "pagante": "Sim",
+    "preco": 15
+   },
+   {
+    "membro": "Inês",
+    "nome": "Tito 1",
+    "data": "2025-08-11",
+    "dia": "Seg",
+    "ref": "Almoço",
+    "pagante": "Sim",
+    "preco": 15
+   },
+   {
+    "membro": "Inês",
+    "nome": "Tito 2",
+    "data": "2025-08-11",
+    "dia": "Seg",
+    "ref": "Almoço",
+    "pagante": "Sim",
+    "preco": 15
+   },
+   {
+    "membro": "Inês",
+    "nome": "Tito 3",
+    "data": "2025-08-11",
+    "dia": "Seg",
+    "ref": "Almoço",
+    "pagante": "Sim",
+    "preco": 15
+   },
+   {
+    "membro": "Inês",
+    "nome": "Tito 4",
+    "data": "2025-08-11",
+    "dia": "Seg",
+    "ref": "Almoço",
+    "pagante": "Sim",
+    "preco": 15
+   },
+   {
+    "membro": "Inês",
+    "nome": "Tito 5",
+    "data": "2025-08-11",
+    "dia": "Seg",
+    "ref": "Almoço",
+    "pagante": "Sim",
+    "preco": 15
+   },
+   {
+    "membro": "Inês",
+    "nome": "Tito 6",
+    "data": "2025-08-11",
+    "dia": "Seg",
+    "ref": "Almoço",
+    "pagante": "Sim",
+    "preco": 15
+   },
+   {
+    "membro": "Inês",
+    "nome": "Tito 7",
+    "data": "2025-08-11",
+    "dia": "Seg",
+    "ref": "Almoço",
+    "pagante": "Sim",
+    "preco": 15
+   },
+   {
+    "membro": "Inês",
+    "nome": "Tito 8",
+    "data": "2025-08-11",
+    "dia": "Seg",
+    "ref": "Almoço",
+    "pagante": "Sim",
+    "preco": 15
+   },
+   {
+    "membro": "Samuel",
+    "nome": "Ninja",
+    "data": "2025-08-11",
+    "dia": "Seg",
+    "ref": "Almoço",
+    "pagante": "Sim",
+    "preco": 15
+   },
+   {
+    "membro": "Samuel",
+    "nome": "Carolina",
+    "data": "2025-08-11",
+    "dia": "Seg",
+    "ref": "Almoço",
+    "pagante": "Sim",
+    "preco": 15
+   },
+   {
+    "membro": "Samuel",
+    "nome": "Barrona",
+    "data": "2025-08-11",
+    "dia": "Seg",
+    "ref": "Almoço",
+    "pagante": "Não",
+    "preco": 15
+   },
+   {
+    "membro": "Samuel",
+    "nome": "Susana",
+    "data": "2025-08-11",
+    "dia": "Seg",
+    "ref": "Almoço",
+    "pagante": "Não",
+    "preco": 15
+   },
+   {
+    "membro": "Samuel",
+    "nome": "Ninja Amigos (1)",
+    "data": "2025-08-11",
+    "dia": "Seg",
+    "ref": "Almoço",
+    "pagante": "Sim",
+    "preco": 15
+   },
+   {
+    "membro": "Samuel",
+    "nome": "Ninja Amigos (2)",
+    "data": "2025-08-11",
+    "dia": "Seg",
+    "ref": "Almoço",
+    "pagante": "Sim",
+    "preco": 15
+   },
+   {
+    "membro": "Samuel",
+    "nome": "Ninja Amigos (3)",
+    "data": "2025-08-11",
+    "dia": "Seg",
+    "ref": "Almoço",
+    "pagante": "Sim",
+    "preco": 15
+   },
+   {
+    "membro": "Samuel",
+    "nome": "Ninja Amigos (4)",
+    "data": "2025-08-11",
+    "dia": "Seg",
+    "ref": "Almoço",
+    "pagante": "Sim",
+    "preco": 15
+   },
+   {
+    "membro": "Samuel",
+    "nome": "Ninja Amigos (5)",
+    "data": "2025-08-11",
+    "dia": "Seg",
+    "ref": "Almoço",
+    "pagante": "Sim",
+    "preco": 15
+   },
+   {
+    "membro": "João Paulo",
+    "nome": "Bronze",
+    "data": "2025-08-11",
+    "dia": "Seg",
+    "ref": "Almoço",
+    "pagante": "Não",
+    "preco": 15
+   },
+   {
+    "membro": "Filipe",
+    "nome": "Pedro",
+    "data": "2025-08-08",
+    "dia": "Sex",
+    "ref": "Jantar",
+    "pagante": "Sim",
+    "preco": 11
+   },
+   {
+    "membro": "Filipe",
+    "nome": "Filipa",
+    "data": "2025-08-08",
+    "dia": "Sex",
+    "ref": "Jantar",
+    "pagante": "Sim",
+    "preco": 11
+   },
+   {
+    "membro": "Zé Carlos",
+    "nome": "Prima 1",
+    "data": "2025-08-11",
+    "dia": "Seg",
+    "ref": "Almoço",
+    "pagante": "Sim",
+    "preco": 15
+   },
+   {
+    "membro": "Zé Carlos",
+    "nome": "Prima 2",
+    "data": "2025-08-11",
+    "dia": "Seg",
+    "ref": "Almoço",
+    "pagante": "Sim",
+    "preco": 15
+   },
+   {
+    "membro": "João Paulo",
+    "nome": "David",
+    "data": "2025-08-09",
+    "dia": "Sáb",
+    "ref": "Jantar",
+    "pagante": "Sim",
+    "preco": 17.5
+   },
+   {
+    "membro": "João Paulo",
+    "nome": "Maria",
+    "data": "2025-08-09",
+    "dia": "Sáb",
+    "ref": "Jantar",
+    "pagante": "Sim",
+    "preco": 17.5
+   },
+   {
+    "membro": "Samuel",
+    "nome": "Barrona",
+    "data": "2025-08-09",
+    "dia": "Sáb",
+    "ref": "Jantar",
+    "pagante": "Sim",
+    "preco": 17.5
+   },
+   {
+    "membro": "Samuel",
+    "nome": "Susana",
+    "data": "2025-08-09",
+    "dia": "Sáb",
+    "ref": "Jantar",
+    "pagante": "Sim",
+    "preco": 17.5
+   },
+   {
+    "membro": "Luís Pedro",
+    "nome": "Pedro Madeira",
+    "data": "2025-08-09",
+    "dia": "Sáb",
+    "ref": "Jantar",
+    "pagante": "Sim",
+    "preco": 17.5
+   },
+   {
+    "membro": "Luís Pedro",
+    "nome": "Davi",
+    "data": "2025-08-09",
+    "dia": "Sáb",
+    "ref": "Jantar",
+    "pagante": "Sim",
+    "preco": 17.5
+   },
+   {
+    "membro": "Luís Pedro",
+    "nome": "Diogo Rocha",
+    "data": "2025-08-12",
+    "dia": "Ter",
+    "ref": "Jantar",
+    "pagante": "Sim",
+    "preco": 8
+   },
+   {
+    "membro": "Luís Pedro",
+    "nome": "Tiago Labreca",
+    "data": "2025-08-12",
+    "dia": "Ter",
+    "ref": "Jantar",
+    "pagante": "Sim",
+    "preco": 8
+   },
+   {
+    "membro": "João Paulo",
+    "nome": "Primo Bruno",
+    "data": "2025-08-08",
+    "dia": "Sex",
+    "ref": "Jantar",
+    "pagante": "Sim",
+    "preco": 11
+   },
+   {
+    "membro": "João Paulo",
+    "nome": "Mulher Primo Bruno",
+    "data": "2025-08-08",
+    "dia": "Sex",
+    "ref": "Jantar",
+    "pagante": "Sim",
+    "preco": 11
+   },
+   {
+    "membro": "João Paulo",
+    "nome": "Sogra Primo Bruno",
+    "data": "2025-08-08",
+    "dia": "Sex",
+    "ref": "Jantar",
+    "pagante": "Sim",
+    "preco": 11
+   },
+   {
+    "membro": "João Paulo",
+    "nome": "Gonçalo",
+    "data": "2025-08-09",
+    "dia": "Sáb",
+    "ref": "Jantar",
+    "pagante": "Sim",
+    "preco": 17.5
+   },
+   {
+    "membro": "João Paulo",
+    "nome": "Cláudia",
+    "data": "2025-08-09",
+    "dia": "Sáb",
+    "ref": "Jantar",
+    "pagante": "Sim",
+    "preco": 17.5
+   },
+   {
+    "membro": "Toorn",
+    "nome": "Cácá",
+    "data": "2025-08-09",
+    "dia": "Sáb",
+    "ref": "Jantar",
+    "pagante": "Sim",
+    "preco": 17.5
+   },
+   {
+    "membro": "Samuel",
+    "nome": "Ninja",
+    "data": "2025-08-10",
+    "dia": "Dom",
+    "ref": "Jantar",
+    "pagante": "Sim",
+    "preco": 10
+   },
+   {
+    "membro": "Samuel",
+    "nome": "Carolina",
+    "data": "2025-08-10",
+    "dia": "Dom",
+    "ref": "Jantar",
+    "pagante": "Sim",
+    "preco": 10
+   },
+   {
+    "membro": "Samuel",
+    "nome": "Big (Ninja)",
+    "data": "2025-08-10",
+    "dia": "Dom",
+    "ref": "Jantar",
+    "pagante": "Sim",
+    "preco": 10
+   },
+   {
+    "membro": "Samuel",
+    "nome": "Catarina (Ninja)",
+    "data": "2025-08-10",
+    "dia": "Dom",
+    "ref": "Jantar",
+    "pagante": "Sim",
+    "preco": 10
+   },
+   {
+    "membro": "Toorn",
+    "nome": "Cunhada (Liliana)",
+    "data": "2025-08-13",
+    "dia": "Qua",
+    "ref": "Jantar",
+    "pagante": "Sim",
+    "preco": 8
+   },
+   {
+    "membro": "Filipe",
+    "nome": "Pedro",
+    "data": "2025-08-12",
+    "dia": "Ter",
+    "ref": "Jantar",
+    "pagante": "Sim",
+    "preco": 8
+   },
+   {
+    "membro": "Filipe",
+    "nome": "Filipa",
+    "data": "2025-08-12",
+    "dia": "Ter",
+    "ref": "Jantar",
+    "pagante": "Sim",
+    "preco": 8
+   }
+  ],
+  "mealheiros": [
+   {
+    "quem": "Diogo",
+    "data": "2025-08-11",
+    "valor": 84
+   },
+   {
+    "quem": "Diogo",
+    "data": "2025-08-13",
+    "valor": 19
+   }
+  ],
+  "pagamentos": [
+   {
+    "de": "Zé Carlos",
+    "para": "Diogo",
+    "valor": 50.0,
+    "ref": "Zé Carlos",
+    "data": "2025-08-12"
+   },
+   {
+    "de": "Margarida",
+    "para": "Diogo",
+    "valor": 58.0,
+    "ref": "Margarida",
+    "data": "2025-08-20"
+   },
+   {
+    "de": "Samuel",
+    "para": "Diogo",
+    "valor": 248.49,
+    "ref": "Samuel, Ivone e Convidados",
+    "data": "2025-08-20"
+   },
+   {
+    "de": "Toorn",
+    "para": "Diogo",
+    "valor": 56.0,
+    "ref": "Toorn e Raquel",
+    "data": "2025-08-20"
+   },
+   {
+    "de": "Luís Pedro",
+    "para": "Diogo",
+    "valor": 224.05,
+    "ref": "Luís Pedro, Inês e Convidados",
+    "data": "2025-08-20"
+   },
+   {
+    "de": "Rogélio",
+    "para": "Diogo",
+    "valor": 77.15,
+    "ref": "Rogélio e Lara",
+    "data": "2025-08-20"
+   },
+   {
+    "de": "João Hélder",
+    "para": "Diogo",
+    "valor": 106.76,
+    "ref": "João Hélder e Paulinha",
+    "data": "2025-08-20"
+   },
+   {
+    "de": "João Mestre",
+    "para": "Diogo",
+    "valor": 35.0,
+    "ref": "João Mestre e Carol",
+    "data": "2025-08-20"
+   },
+   {
+    "de": "Tânia",
+    "para": "Diogo",
+    "valor": 85.12,
+    "ref": "Tânia e Filipe",
+    "data": "2025-08-21"
+   },
+   {
+    "de": "Filipe",
+    "para": "Diogo",
+    "valor": 38.0,
+    "ref": "Convidados",
+    "data": "2025-08-28"
+   },
+   {
+    "de": "Toorn",
+    "para": "Diogo",
+    "valor": 25.5,
+    "ref": "Convidados",
+    "data": "2025-08-28"
+   },
+   {
+    "de": "Zé Carlos",
+    "para": "Diogo",
+    "valor": 54.0,
+    "ref": "Convidados",
+    "data": "2025-08-28"
+   },
+   {
+    "de": "Diogo",
+    "para": "Luís Pedro",
+    "valor": 60.66,
+    "ref": "Reembolso: Azeiteiro: ver \"Compras Detalhadas\"",
+    "data": "2025-08-11"
+   },
+   {
+    "de": "Diogo",
+    "para": "Luís Pedro",
+    "valor": 107.51,
+    "ref": "Reembolso: Azeiteiro: ver \"Compras Detalhadas\"",
+    "data": "2025-08-06"
+   },
+   {
+    "de": "Diogo",
+    "para": "Luís Pedro",
+    "valor": 24.14,
+    "ref": "Reembolso: Azeiteiro: ver \"Compras Detalhadas\"",
+    "data": "2025-08-06"
+   },
+   {
+    "de": "Diogo",
+    "para": "Luís Pedro",
+    "valor": 4.8,
+    "ref": "Reembolso: Mercadona: ver \"Compras Detalhadas\"",
+    "data": "2025-08-11"
+   },
+   {
+    "de": "Diogo",
+    "para": "Luís Pedro",
+    "valor": 15,
+    "ref": "Reembolso: Mercadona: ver \"Compras Detalhadas\"",
+    "data": "2025-08-09"
+   },
+   {
+    "de": "Diogo",
+    "para": "Luís Pedro",
+    "valor": 68.54,
+    "ref": "Reembolso: Mercadona: ver \"Compras Detalhadas\"",
+    "data": "2025-08-07"
+   },
+   {
+    "de": "Diogo",
+    "para": "Luís Pedro",
+    "valor": 34.78,
+    "ref": "Reembolso: Mercadona: ver \"Compras Detalhadas\"",
+    "data": "2025-08-07"
+   },
+   {
+    "de": "Diogo",
+    "para": "Luís Pedro",
+    "valor": 46.16,
+    "ref": "Reembolso: Azeiteiro: ver \"Compras Detalhadas\"",
+    "data": "2025-08-08"
+   },
+   {
+    "de": "Diogo",
+    "para": "Luís Pedro",
+    "valor": 7,
+    "ref": "Reembolso: Chaves MEO",
+    "data": "2025-08-08"
+   },
+   {
+    "de": "Diogo",
+    "para": "Luís Pedro",
+    "valor": 3.18,
+    "ref": "Reembolso: Intermarché: Couve Lombardo",
+    "data": "2025-08-11"
+   },
+   {
+    "de": "Diogo",
+    "para": "Luís Pedro",
+    "valor": 3.89,
+    "ref": "Reembolso: Intermarché: Limas",
+    "data": "2025-08-08"
+   }
+  ],
+  "refeicoesDef": [
+   {
+    "data": "2025-08-08",
+    "dia": "Sex",
+    "ref": "Jantar",
+    "peso": 0.2,
+    "minMEO": 0,
+    "minConv": 10,
+    "extraConv": 2
+   },
+   {
+    "data": "2025-08-09",
+    "dia": "Sáb",
+    "ref": "Almoço",
+    "peso": 0,
+    "minMEO": 0,
+    "minConv": 10,
+    "extraConv": 0
+   },
+   {
+    "data": "2025-08-09",
+    "dia": "Sáb",
+    "ref": "Jantar",
+    "peso": 0.25,
+    "minMEO": 0,
+    "minConv": 15,
+    "extraConv": 2.5
+   },
+   {
+    "data": "2025-08-10",
+    "dia": "Dom",
+    "ref": "Almoço",
+    "peso": 0,
+    "minMEO": 0,
+    "minConv": 10,
+    "extraConv": 0
+   },
+   {
+    "data": "2025-08-10",
+    "dia": "Dom",
+    "ref": "Jantar",
+    "peso": 0.1,
+    "minMEO": 0,
+    "minConv": 10,
+    "extraConv": 2
+   },
+   {
+    "data": "2025-08-11",
+    "dia": "Seg",
+    "ref": "Almoço",
+    "peso": 0.3,
+    "minMEO": 0,
+    "minConv": 10,
+    "extraConv": 4
+   },
+   {
+    "data": "2025-08-11",
+    "dia": "Seg",
+    "ref": "Lanche",
+    "peso": null,
+    "minMEO": 0,
+    "minConv": 5,
+    "extraConv": 4
+   },
+   {
+    "data": "2025-08-11",
+    "dia": "Seg",
+    "ref": "Jantar",
+    "peso": 0,
+    "minMEO": 0,
+    "minConv": 7.5,
+    "extraConv": 0
+   },
+   {
+    "data": "2025-08-12",
+    "dia": "Ter",
+    "ref": "Almoço",
+    "peso": 0,
+    "minMEO": 0,
+    "minConv": 7.5,
+    "extraConv": 0
+   },
+   {
+    "data": "2025-08-12",
+    "dia": "Ter",
+    "ref": "Jantar",
+    "peso": 0.1,
+    "minMEO": 0,
+    "minConv": 7.5,
+    "extraConv": 2
+   },
+   {
+    "data": "2025-08-13",
+    "dia": "Qua",
+    "ref": "Almoço",
+    "peso": 0,
+    "minMEO": 0,
+    "minConv": 7.5,
+    "extraConv": 0
+   },
+   {
+    "data": "2025-08-13",
+    "dia": "Qua",
+    "ref": "Jantar",
+    "peso": 0.05,
+    "minMEO": 0,
+    "minConv": 7.5,
+    "extraConv": 2
+   },
+   {
+    "data": "2025-08-14",
+    "dia": "Qui",
+    "ref": "Almoço",
+    "peso": 0,
+    "minMEO": 0,
+    "minConv": 7.5,
+    "extraConv": 0
+   },
+   {
+    "data": "2025-08-14",
+    "dia": "Qui",
+    "ref": "Jantar",
+    "peso": 0,
+    "minMEO": 0,
+    "minConv": 7.5,
+    "extraConv": 0
+   }
+  ]
+ }
+]
