@@ -75,8 +75,9 @@ header .sub{font-size:12.5px;color:var(--muted);margin-top:7px}
 .sheet-bg.show{opacity:1;pointer-events:auto}
 .sheet{position:fixed;left:0;right:0;bottom:0;max-width:560px;margin:0 auto;background:var(--panel);border-radius:22px 22px 0 0;border:1px solid var(--line);border-bottom:none;z-index:51;transform:translateY(100%);transition:transform .3s cubic-bezier(.3,.8,.3,1);max-height:92vh;display:flex;flex-direction:column;box-shadow:0 -10px 40px rgba(0,0,0,.5)}
 .sheet.show{transform:translateY(0)}
+body.no-scroll{overflow:hidden;position:fixed;width:100%;}
 .sheet-header{flex-shrink:0;padding:0 18px 12px;border-bottom:1px solid var(--line);background:var(--panel);border-radius:22px 22px 0 0}
-.sheet-body{flex:1;overflow-y:auto;padding:12px 18px 34px}
+.sheet-body{flex:1;overflow-y:auto;padding:12px 18px 34px;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
 .grab{width:40px;height:4px;border-radius:3px;background:var(--line);margin:11px auto 8px}
 .back-btn{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;font-size:16px;color:var(--muted);cursor:pointer;border:1px solid var(--line);background:var(--panel2);border-radius:9px;flex-shrink:0}
 .back-btn:active{opacity:.6}
@@ -106,7 +107,7 @@ header .sub{font-size:12.5px;color:var(--muted);margin-top:7px}
 /* Modal */
 .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.65);backdrop-filter:blur(4px);opacity:0;pointer-events:none;transition:.2s;z-index:60;display:flex;align-items:flex-end;justify-content:center;padding:0}
 .modal-bg.show{opacity:1;pointer-events:auto}
-.modal{background:var(--panel);border:1px solid var(--line);border-radius:22px 22px 0 0;padding:22px 20px 34px;max-width:560px;width:100%;max-height:86vh;overflow-y:auto;transform:translateY(100%);transition:transform .3s cubic-bezier(.3,.8,.3,1)}
+.modal{background:var(--panel);border:1px solid var(--line);border-radius:22px 22px 0 0;padding:22px 20px 34px;max-width:560px;width:100%;max-height:86vh;overflow-y:auto;transform:translateY(100%);transition:transform .3s cubic-bezier(.3,.8,.3,1);-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
 .modal-bg.show .modal{transform:translateY(0)}
 .modal h3{font-size:18px;margin-bottom:14px}
 .modal p{font-size:12.5px;color:var(--muted);margin-bottom:14px;line-height:1.5}
@@ -127,7 +128,22 @@ header .sub{font-size:12.5px;color:var(--muted);margin-top:7px}
 .debt-item input[type=checkbox]{width:16px;height:16px;accent-color:var(--gold);flex-shrink:0;cursor:pointer}
 .debt-item .di-name{flex:1;font-size:13px;font-weight:600;color:var(--ink)}
 .debt-item .di-val{font-size:13px;font-weight:700;color:var(--red)}
-.debt-item.on .di-val{color:var(--green)}left:50%;bottom:84px;transform:translateX(-50%) translateY(20px);background:#222a36;border:1px solid var(--line);color:var(--ink);padding:11px 18px;border-radius:11px;font-size:13px;opacity:0;pointer-events:none;transition:.25s;z-index:80;box-shadow:var(--shadow);max-width:90%;text-align:center}
+.debt-item.on .di-val{color:var(--green)}
+.debt-group{border:1px solid var(--line);border-radius:11px;overflow:hidden;margin-bottom:2px}
+.debt-group-header{display:flex;align-items:center;gap:10px;background:var(--panel2);padding:11px 13px;cursor:pointer;user-select:none;transition:.15s}
+.debt-group-header.on{background:rgba(232,176,75,.08);border-bottom:1px solid rgba(232,176,75,.25)}
+.debt-group-header input[type=checkbox]{width:16px;height:16px;accent-color:var(--gold);flex-shrink:0;cursor:pointer}
+.debt-group-name{flex:1;font-size:14px;font-weight:700;color:var(--ink)}
+.debt-group-total{font-size:13px;font-weight:700;color:var(--red)}
+.debt-group-header.on .debt-group-total{color:var(--green)}
+.debt-group-body{padding:6px 8px;display:flex;flex-direction:column;gap:4px;background:rgba(0,0,0,.12)}
+.debt-sub{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:8px;background:var(--panel2);border:1px solid var(--line);cursor:pointer;user-select:none;transition:.12s}
+.debt-sub.on{border-color:rgba(232,176,75,.5);background:rgba(232,176,75,.06)}
+.debt-sub input[type=checkbox]{width:14px;height:14px;accent-color:var(--gold);flex-shrink:0;cursor:pointer}
+.debt-sub-name{flex:1;font-size:12px;font-weight:500;color:var(--muted)}
+.debt-sub.on .debt-sub-name{color:var(--ink)}
+.debt-sub-val{font-size:12px;font-weight:700;color:var(--red)}
+.debt-sub.on .debt-sub-val{color:var(--green)}left:50%;bottom:84px;transform:translateX(-50%) translateY(20px);background:#222a36;border:1px solid var(--line);color:var(--ink);padding:11px 18px;border-radius:11px;font-size:13px;opacity:0;pointer-events:none;transition:.25s;z-index:80;box-shadow:var(--shadow);max-width:90%;text-align:center}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 .toast.ok{border-color:var(--green)}.toast.bad{border-color:var(--red)}
 .sf,.eyebrow,.syncpill,.hero .cell .k,.tabs,.tab,.mrow .nm small,.card .meta,.chip,.sec-title,.back-btn,.bd-title,.li .lbl small,.meal,.sheet .final .k,.sheet .verdict,.empty,.fab,.modal,.modal h3,.modal p,.modal label,.modal input,.modal select,.btn,.note,.seg-btn,.toast,.badge,.year-nav,.yr-btn,.yr-label{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
@@ -185,14 +201,17 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
   <div class="modal" id="pay-modal">
     <h3>Registar pagamento</h3>
     <div class="seg" id="pay-dir-seg">
-      <button class="seg-btn on" onclick="setPayDir('receber')">Recebi de alguém</button>
       <button class="seg-btn" onclick="setPayDir('paguei')">Paguei a alguém</button>
+      <button class="seg-btn" onclick="setPayDir('receber')">Recebi de alguém</button>
+      <button class="seg-btn on" onclick="setPayDir('saldar')">Saldar dívida</button>
     </div>
-    <label id="pay-who-lbl">Quem te pagou?</label>
+    <label id="pay-who-lbl">Quem saldou?</label>
     <select id="pay-who" onchange="updateDebtList()"></select>
 
-    <label>Que dívidas saldou?</label>
-    <div id="pay-debts" style="display:flex;flex-direction:column;gap:6px;margin-top:4px"></div>
+    <div id="pay-debts-wrap">
+      <label>Que dívidas saldou?</label>
+      <div id="pay-debts" style="display:flex;flex-direction:column;gap:6px;margin-top:4px"></div>
+    </div>
 
     <label style="margin-top:16px">Valor total (€)</label>
     <input type="number" id="pay-val" step="0.01" min="0.01" placeholder="0,00" inputmode="decimal">
@@ -373,36 +392,53 @@ function calcular(data){
     m.AC=rnd(m.Z-m.AA+m.AB,2);
   }
   /* ── saldoFinal: AC ajustado pelos pagamentos recebidos/feitos ── */
-  /* Para cada pagamento, distribuir o valor pelas dívidas cobertas (ref = nomes separados por vírgula) */
+  /* Para cada pagamento, distribuir o valor pelas dívidas cobertas */
+  /* ref pode ser: "own:Nome, conv:Nome" (novo) ou "Nome1, Nome2" (legacy) */
   const mByName={};for(const m of membros)mByName[m.nome]=m;
-  /* credited[nome] = total liquidado pelo pagador em nome deste membro */
-  const credited={};
+  const credited={};       // credited[nome] = valor abatido ao membro
+  const creditedConv={};   // creditedConv[nome] = valor abatido aos convidados do membro
   for(const p of pagNonReemb){
-    /* Extrair nomes cobertos do ref */
-    let covNames=[];
-    if(p.ref){
-      const parts=p.ref.split(/,\s*/).map(x=>x.trim()).filter(Boolean);
-      covNames=parts.filter(x=>nomes.includes(x));
+    if(!p.ref){
+      // sem ref: cobre o pagador inteiro
+      const m=mByName[p.de];if(m&&m.AC<0)credited[p.de]=(credited[p.de]||0)+p.valor;
+      continue;
     }
-    if(!covNames.length)covNames=[p.de]; /* sem ref estruturado: cobre só o pagador */
-    /* Calcular dívida total dos cobertos para distribuir o valor proporcionalmente */
-    const totalDebtCov=covNames.reduce((a,cn)=>{
-      const mm=mByName[cn];return a+(mm&&mm.AC<0?Math.abs(mm.AC):0);
-    },0);
-    covNames.forEach(cn=>{
-      const mm=mByName[cn];
-      if(!mm)return;
-      /* Valor alocado a este membro: proporcional à dívida, ou igualmente se sem dívida */
-      let alloc;
-      if(totalDebtCov>0&&mm.AC<0){
-        alloc=rnd(p.valor*Math.abs(mm.AC)/totalDebtCov,2);
-      } else if(covNames.length===1){
-        alloc=p.valor;
-      } else {
-        alloc=rnd(p.valor/covNames.length,2);
-      }
-      credited[cn]=(credited[cn]||0)+alloc;
-    });
+    const parts=p.ref.split(/,\s*/).map(x=>x.trim()).filter(Boolean);
+    // Detectar formato novo (own:/conv:) vs legacy (nomes simples)
+    const isNew=parts.some(x=>x.startsWith('own:')||x.startsWith('conv:'));
+    if(isNew){
+      // Novo formato: alocar explicitamente
+      // Primeiro calcular total dos itens para distribuir o valor proporcionalmente
+      let totalItems=0;
+      const items=[];
+      parts.forEach(pt=>{
+        if(pt.startsWith('own:')){
+          const nome=pt.slice(4);const m=mByName[nome];
+          if(m){const v=Math.max(0,rnd(m.V-m.Y-m.W-m.X,2));items.push({type:'own',nome,v});totalItems+=v;}
+        } else if(pt.startsWith('conv:')){
+          const nome=pt.slice(5);const m=mByName[nome];
+          if(m){const v=Math.max(0,m.AA);items.push({type:'conv',nome,v});totalItems+=v;}
+        }
+      });
+      items.forEach(it=>{
+        const alloc=totalItems>0?rnd(p.valor*it.v/totalItems,2):rnd(p.valor/items.length,2);
+        if(it.type==='own')credited[it.nome]=(credited[it.nome]||0)+alloc;
+        else creditedConv[it.nome]=(creditedConv[it.nome]||0)+alloc;
+      });
+    } else {
+      // Legacy: nomes simples → cobrir AC inteiro proporcionalmente
+      const covNames=parts.filter(x=>nomes.includes(x));
+      if(!covNames.length){const m=mByName[p.de];if(m&&m.AC<0)credited[p.de]=(credited[p.de]||0)+p.valor;continue;}
+      const totalDebtCov=covNames.reduce((a,cn)=>{const mm=mByName[cn];return a+(mm&&mm.AC<0?Math.abs(mm.AC):0);},0);
+      covNames.forEach(cn=>{
+        const mm=mByName[cn];if(!mm)return;
+        let alloc;
+        if(totalDebtCov>0&&mm.AC<0){alloc=rnd(p.valor*Math.abs(mm.AC)/totalDebtCov,2);}
+        else if(covNames.length===1){alloc=p.valor;}
+        else{alloc=rnd(p.valor/covNames.length,2);}
+        credited[cn]=(credited[cn]||0)+alloc;
+      });
+    }
   }
   const tes=evento.tesoureiro;
   const recvTes=pagNonReemb.filter(p=>p.para===tes).reduce((a,p)=>a+p.valor,0);
@@ -410,9 +446,13 @@ function calcular(data){
     if(m.nome===tes){
       m.saldoFinal=rnd(m.AC+recvTes,2);
     } else {
-      /* AC é negativo se deve; credited é o que foi pago; saldoFinal = AC + credited */
-      m.saldoFinal=rnd(m.AC+(credited[m.nome]||0),2);
-      /* Evitar arredondamentos que deem -0.01 quando está saldado */
+      /* AC = Z - AA + AB. Z já inclui crédito de despesas.
+         credited = pagamentos que cobrem a dívida própria (m.V)
+         creditedConv = pagamentos que cobrem os convidados (m.AA)
+         saldoFinal = AC + credited[próprio] + creditedConv[convidados] */
+      const ownCredit=credited[m.nome]||0;
+      const convCredit=creditedConv[m.nome]||0;
+      m.saldoFinal=rnd(m.AC+ownCredit+convCredit,2);
       if(Math.abs(m.saldoFinal)<0.02)m.saldoFinal=0;
     }
     m._pagouTotal=rnd(pagNonReemb.filter(p=>p.de===m.nome).reduce((a,p)=>a+p.valor,0),2);
@@ -526,9 +566,14 @@ function openMember(nome){
     <div class="verdict sf">${verd}</div></div>`;
   document.getElementById('sheet-in').innerHTML=h;
   document.getElementById('sheet-bg').classList.add('show');document.getElementById('sheet').classList.add('show');
+  document.body.classList.add('no-scroll');
   document.getElementById('sheet-in').scrollTop=0;
 }
-function closeSheet(){document.getElementById('sheet-bg').classList.remove('show');document.getElementById('sheet').classList.remove('show');}
+function closeSheet(){
+  document.getElementById('sheet-bg').classList.remove('show');
+  document.getElementById('sheet').classList.remove('show');
+  document.body.classList.remove('no-scroll');
+}
 
 /* SYNC */
 function setSync(st,txt){const d=document.getElementById('sync-dot');const t=document.getElementById('sync-txt');
@@ -575,120 +620,189 @@ async function pushToGitHub(msg){
 }
 
 /* PAYMENT MODAL */
-let payDir='receber';
+let payDir='saldar';
 function setPayDir(d){
   payDir=d;
-  document.querySelectorAll('#pay-dir-seg .seg-btn').forEach((b,i)=>b.classList.toggle('on',i===(d==='receber'?0:1)));
-  document.getElementById('pay-who-lbl').textContent=d==='receber'?'Quem te pagou?':'A quem pagaste?';
+  const btns=document.querySelectorAll('#pay-dir-seg .seg-btn');
+  btns.forEach((b,i)=>b.classList.toggle('on',['paguei','receber','saldar'][i]===d));
+  const whoLbl=document.getElementById('pay-who-lbl');
+  const debtsWrap=document.getElementById('pay-debts-wrap');
+  if(d==='paguei'){whoLbl.textContent='A quem pagaste?';debtsWrap.style.display='none';}
+  else if(d==='receber'){whoLbl.textContent='Quem te pagou?';debtsWrap.style.display='none';}
+  else{whoLbl.textContent='Quem saldou?';debtsWrap.style.display='';}
+  document.getElementById('pay-val').value='';
+  document.getElementById('pay-val-hint').textContent='';
   updateDebtList();
 }
 
 function updateDebtList(){
   if(!CALC)return;
+  if(payDir!=='saldar')return;
   const who=document.getElementById('pay-who').value;
   const container=document.getElementById('pay-debts');
+  if(!who){container.innerHTML='<div class="empty sf">Seleciona quem pagou primeiro</div>';recalcPayVal();return;}
 
-  if(payDir==='receber' && !who){
-    container.innerHTML='<div class="empty sf">Seleciona quem pagou primeiro</div>';
-    recalcPayVal();return;
-  }
-
-  // Build items: for the selected payer, show their own debt + debts of other members they might cover
-  // Show all members with AC < 0, pre-checked only the payer themselves
   const ms=CALC.membros;
-  const items=[];
+  // Find the paying member
+  const payer=ms.find(m=>m.nome===who);
+  // Show payer + any other member whose debt is outstanding (they might be paying for others)
+  // Each group = one member with their own debt + guest debt split
+  const groups=[];
+  ms.filter(m=>m.AC<-0.005).forEach(m=>{
+    const ownDebt=Math.max(0,rnd(m.V-m.Y-m.W-m.X,2)); // own meal debt
+    const guestDebt=Math.max(0,m.AA);                  // guest debt
+    const totalDebt=Math.abs(m.AC);
+    groups.push({nome:m.nome,ownDebt,guestDebt,totalDebt,isDefault:m.nome===who});
+  });
 
-  if(payDir==='receber'){
-    // Show all members with outstanding debts — payer might be covering others too
-    ms.filter(m=>m.AC<-0.005).forEach(m=>{
-      const ownDebt=rnd(m.V+m.AA-m.Y-m.W-m.X,2); // contribution + guests - advanced
-      // Show with guest breakdown if they have guests
-      const hasGuests=m.AA>0.005;
-      const label=hasGuests
-        ? `${m.nome} <span style="color:var(--faint);font-weight:400">(próprio ${eur(rnd(m.V-m.Y-m.W-m.X,2))} + conv. ${eur(m.AA)})</span>`
-        : m.nome;
-      items.push({key:'m:'+m.nome, label, val:Math.abs(m.AC), precheck:m.nome===who});
-    });
-  }
+  if(!groups.length){container.innerHTML='<div class="empty sf">Sem dívidas por saldar</div>';recalcPayVal();return;}
 
-  if(!items.length){
-    container.innerHTML=payDir==='receber'
-      ?'<div class="empty sf">Esta pessoa não tem dívidas em aberto</div>'
-      :'<div class="empty sf">Sem dívidas por saldar</div>';
-    recalcPayVal();return;
-  }
+  container.innerHTML=groups.map(g=>{
+    const gid=g.nome.replace(/[^a-z0-9]/gi,'_');
+    const hasGuests=g.guestDebt>0.005;
+    const headerOn=g.isDefault?' on':'';
+    if(!hasGuests){
+      // Simple single-row item
+      return`<label class="debt-item${headerOn}" id="di-${gid}">
+        <input type="checkbox" value="own:${g.nome}" onchange="onDebtCheck(this)"${g.isDefault?' checked':''}>
+        <span class="di-name">${g.nome}</span>
+        <span class="di-val">${eur(g.totalDebt)}</span>
+      </label>`;
+    }
+    // Group with own + guests sub-items
+    return`<div class="debt-group" id="dg-${gid}">
+      <div class="debt-group-header${headerOn}" id="dgh-${gid}" onclick="toggleDebtGroup('${g.nome}')">
+        <input type="checkbox" value="group:${g.nome}" onclick="event.stopPropagation();onGroupCheck(this,'${g.nome}')"${g.isDefault?' checked':''}>
+        <span class="debt-group-name">${g.nome}</span>
+        <span class="debt-group-total" id="dgt-${gid}">${eur(g.totalDebt)}</span>
+      </div>
+      <div class="debt-group-body" id="dgb-${gid}" style="display:${g.isDefault?'flex':'none'}">
+        <label class="debt-sub${g.isDefault?' on':''}" id="ds-own-${gid}">
+          <input type="checkbox" value="own:${g.nome}" onchange="onDebtCheck(this)"${g.isDefault?' checked':''}>
+          <span class="debt-sub-name">Próprio</span>
+          <span class="debt-sub-val">${eur(g.ownDebt)}</span>
+        </label>
+        <label class="debt-sub${g.isDefault?' on':''}" id="ds-conv-${gid}">
+          <input type="checkbox" value="conv:${g.nome}" onchange="onDebtCheck(this)"${g.isDefault?' checked':''}>
+          <span class="debt-sub-name">Convidados</span>
+          <span class="debt-sub-val">${eur(g.guestDebt)}</span>
+        </label>
+      </div>
+    </div>`;
+  }).join('');
+  recalcPayVal();
+}
 
-  container.innerHTML=items.map(it=>`
-    <label class="debt-item${it.precheck?' on':''}" id="di-${it.key.replace(/[^a-z0-9]/gi,'_')}">
-      <input type="checkbox" value="${it.key}" onchange="onDebtCheck(this)"${it.precheck?' checked':''}>
-      <span class="di-name">${it.label}</span>
-      <span class="di-val">${eur(it.val)}</span>
-    </label>`).join('');
+function toggleDebtGroup(nome){
+  const gid=nome.replace(/[^a-z0-9]/gi,'_');
+  const body=document.getElementById('dgb-'+gid);
+  if(body)body.style.display=body.style.display==='none'?'flex':'none';
+}
+
+function onGroupCheck(cb,nome){
+  const gid=nome.replace(/[^a-z0-9]/gi,'_');
+  const body=document.getElementById('dgb-'+gid);
+  const header=document.getElementById('dgh-'+gid);
+  const ownCb=document.querySelector(`#ds-own-${gid} input`);
+  const convCb=document.querySelector(`#ds-conv-${gid} input`);
+  const checked=cb.checked;
+  if(ownCb){ownCb.checked=checked;ownCb.closest('.debt-sub').classList.toggle('on',checked);}
+  if(convCb){convCb.checked=checked;convCb.closest('.debt-sub').classList.toggle('on',checked);}
+  if(header)header.classList.toggle('on',checked);
+  if(body&&checked)body.style.display='flex';
   recalcPayVal();
 }
 
 function onDebtCheck(cb){
-  const item=cb.closest('.debt-item');
-  item.classList.toggle('on',cb.checked);
+  const item=cb.closest('.debt-item, .debt-sub');
+  if(item)item.classList.toggle('on',cb.checked);
+  // Update group header checkbox state
+  const key=cb.value;
+  if(key.startsWith('own:')||key.startsWith('conv:')){
+    const nome=key.slice(key.indexOf(':')+1);
+    const gid=nome.replace(/[^a-z0-9]/gi,'_');
+    const ownCb=document.querySelector(`#ds-own-${gid} input`);
+    const convCb=document.querySelector(`#ds-conv-${gid} input`);
+    const groupCb=document.querySelector(`#dg-${gid} .debt-group-header input[type=checkbox]`);
+    const header=document.getElementById('dgh-'+gid);
+    if(groupCb){
+      const anyChecked=(ownCb&&ownCb.checked)||(convCb&&convCb.checked);
+      groupCb.checked=anyChecked;
+      if(header)header.classList.toggle('on',anyChecked);
+    }
+  }
   recalcPayVal();
 }
 
 function recalcPayVal(){
   if(!CALC)return;
-  const checked=[...document.querySelectorAll('#pay-debts input[type=checkbox]:checked')];
-  let total=0;
+  if(payDir!=='saldar'){return;}
   const ms=CALC.membros;
-  checked.forEach(cb=>{
+  let total=0;
+  document.querySelectorAll('#pay-debts input[type=checkbox]:checked').forEach(cb=>{
     const key=cb.value;
-    if(key.startsWith('m:')){
-      const nome=key.slice(2);
-      const m=ms.find(x=>x.nome===nome);
-      if(m)total+=Math.abs(m.AC);
+    if(key.startsWith('group:'))return; // skip parent group checkbox
+    if(key.startsWith('own:')){
+      const nome=key.slice(4);const m=ms.find(x=>x.nome===nome);
+      if(m){total+=Math.max(0,rnd(m.V-m.Y-m.W-m.X,2));}
+    } else if(key.startsWith('conv:')){
+      const nome=key.slice(5);const m=ms.find(x=>x.nome===nome);
+      if(m)total+=Math.max(0,m.AA);
     }
   });
   total=rnd(total,2);
   const valEl=document.getElementById('pay-val');
   const hint=document.getElementById('pay-val-hint');
-  if(total>0){
-    valEl.value=total.toFixed(2);
-    hint.textContent=`Calculado automaticamente pelas dívidas selecionadas`;
-  } else {
-    valEl.value='';
-    hint.textContent='';
-  }
+  if(total>0){valEl.value=total.toFixed(2);hint.textContent='Calculado automaticamente pelas dívidas selecionadas';}
+  else{valEl.value='';hint.textContent='';}
 }
 
 function openPayModal(){
   document.getElementById('pay-bg').classList.add('show');
+  document.body.classList.add('no-scroll');
   document.getElementById('pay-date').value=new Date().toISOString().slice(0,10);
-  setPayDir('receber');
+  setPayDir('saldar');
 }
-function closePayModal(){document.getElementById('pay-bg').classList.remove('show');}
+function closePayModal(){
+  document.getElementById('pay-bg').classList.remove('show');
+  document.body.classList.remove('no-scroll');
+}
 
 async function savePayment(){
   const who=document.getElementById('pay-who').value;
   const val=parseFloat(document.getElementById('pay-val').value);
   const date=document.getElementById('pay-date').value;
-  if(!who){toast('Seleciona quem','bad');return;}
+  if(!who){toast('Seleciona a pessoa','bad');return;}
   if(!val||val<=0){toast('Valor inválido','bad');return;}
 
   const tes=DATA.evento.tesoureiro;
-  // Build ref from checked debt items
-  const checked=[...document.querySelectorAll('#pay-debts input[type=checkbox]:checked')];
-  let coveredNames=[];
-  checked.forEach(cb=>{
-    const key=cb.value;
-    if(key.startsWith('m:'))coveredNames.push(key.slice(2));
-  });
-  const ref=coveredNames.length?coveredNames.join(', '):'';
+  let pag;
 
-  const pag={
-    de:payDir==='receber'?who:tes,
-    para:payDir==='receber'?tes:who,
-    valor:rnd(val,2),
-    ref,
-    data:date
-  };
+  if(payDir==='paguei'){
+    // Tesoureiro pagou a alguém (reembolso ou outro)
+    pag={de:tes,para:who,valor:rnd(val,2),ref:'',data:date};
+  } else if(payDir==='receber'){
+    // Tesoureiro recebeu de alguém (entrada genérica sem saldar dívida específica)
+    pag={de:who,para:tes,valor:rnd(val,2),ref:'',data:date};
+  } else {
+    // saldar — build structured ref from checked items
+    const covParts=[];
+    // Process group-based items
+    document.querySelectorAll('#pay-debts input[type=checkbox]:checked').forEach(cb=>{
+      const key=cb.value;
+      if(key.startsWith('group:'))return;
+      if(key.startsWith('own:')){const nome=key.slice(4);covParts.push('own:'+nome);}
+      else if(key.startsWith('conv:')){const nome=key.slice(5);covParts.push('conv:'+nome);}
+    });
+    // Also simple items (no-guest members)
+    document.querySelectorAll('#pay-debts .debt-item input[type=checkbox]:checked').forEach(cb=>{
+      const key=cb.value;
+      if(key.startsWith('own:')){const k='own:'+key.slice(4);if(!covParts.includes(k))covParts.push(k);}
+    });
+    const ref=covParts.join(', ');
+    pag={de:who,para:tes,valor:rnd(val,2),ref,data:date};
+  }
+
   document.getElementById('pay-save').disabled=true;
   DATA.pagamentos.push(pag);
   const ok=await pushToGitHub(`Pagamento: ${pag.de} → ${pag.para} ${eur(pag.valor)}`);
@@ -700,8 +814,9 @@ async function savePayment(){
 /* ADMIN */
 function openAdmin(){document.getElementById('adm-token').value=getToken();
   document.getElementById('adm-repo-note').textContent=`Repo: ${GH.owner}/${GH.repo}`;
-  document.getElementById('admin-bg').classList.add('show');}
-function closeAdmin(){document.getElementById('admin-bg').classList.remove('show');}
+  document.getElementById('admin-bg').classList.add('show');
+  document.body.classList.add('no-scroll');}
+function closeAdmin(){document.getElementById('admin-bg').classList.remove('show');document.body.classList.remove('no-scroll');}
 function saveToken(){const t=document.getElementById('adm-token').value.trim();
   if(t)localStorage.setItem(TOKEN_KEY,t);else localStorage.removeItem(TOKEN_KEY);
   closeAdmin();toast(t?'Token guardado ✓':'Token removido','ok');}
