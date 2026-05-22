@@ -250,58 +250,151 @@ function calcular(data){
   const pag=pagamentos||[];
   const slotday={};for(const rd of refeicoesDef)slotday[rd.dia]=rd.data;
   const day2slot={};for(const k in slotday)day2slot[slotday[k]]=k;
+
+  /* ── Despesas por tipo ── */
   const tot={};for(const x of despesas)tot[x.tipo]=(tot[x.tipo]||0)+x.valor;
-  const F20=(sumv(tot)-(tot['Almoço']||0)-(tot['Jantar']||0))*0.5;
+  const totalDesp=rnd(sumv(tot),2);
+
+  /* ── F20: Despesas indiretas = (tudo menos Almoço e Jantar) × 50% ── */
+  const F20=rnd((totalDesp-(tot['Almoço']||0)-(tot['Jantar']||0))*0.5,2);
+
+  /* ── Presenças → membros por refeição ── */
   const cmemb=(d,ref)=>{const rs=ref==='Lanche'?'Tarde':ref;const s=day2slot[d]+'|'+rs;return membros.filter(m=>m.presencas.includes(s)).length;};
-  const refeicoes=[];let prevJ=0;
+
+  /* ── Calcular custo por refeição ── */
+  const refeicoes=[];let prevIndirectPerPerson=0;
   for(const rd of refeicoesDef){
     const Ec=convidados.filter(g=>g.dia===rd.dia&&g.ref===rd.ref&&g.pagante==='Sim').length;
-    const D=cmemb(rd.data,rd.ref)+Ec;let Fdir=0,I=0,L=0;
-    if(rd.ref==='Lanche'){L=rnd(prevJ,2);}
-    else{Fdir=despesas.filter(x=>x.tipo===rd.ref&&x.dataValor===rd.data).reduce((a,x)=>a+x.valor,0);
-      I=rnd(F20*(rd.peso||0),2);L=D?rnd((Fdir+I)/D,2):0;if(D)prevJ=rnd(I/D,2);}
-    const P=D===0?0:Math.max(rd.minMEO,L);let Q;
-    if(Ec===0)Q=0;else if(rd.ref==='Lanche')Q=P===0?0:Math.max(5,roundup(P,0)+rd.extraConv);
+    const D=cmemb(rd.data,rd.ref)+Ec;
+    let Fdir=0,I=0,L=0;
+    if(rd.ref==='Lanche'){
+      /* Lanche: sem despesa direta, custo = indirect per person do almoço anterior */
+      L=rnd(prevIndirectPerPerson,2);
+    } else {
+      Fdir=despesas.filter(x=>x.tipo===rd.ref&&x.dataValor===rd.data).reduce((a,x)=>a+x.valor,0);
+      I=rnd(F20*(rd.peso||0),2);
+      L=D?rnd((Fdir+I)/D,2):0;
+      if(D)prevIndirectPerPerson=rnd(I/D,2);
+    }
+    const P=D===0?0:Math.max(rd.minMEO,L);
+    let Q;
+    if(Ec===0)Q=0;
+    else if(rd.ref==='Lanche')Q=P===0?0:Math.max(5,roundup(P,0)+rd.extraConv);
     else Q=P===0?0:Math.max(rd.minConv,roundup(P,0)+rd.extraConv);
     refeicoes.push({...rd,D,E:Ec,Fdir:rnd(Fdir,2),I,L,P,Q});
   }
+
+  /* ── Mapear refeições e calcular custos por membro ── */
   const rmap={};for(const r of refeicoes)rmap[r.data+'|'+r.ref]=r;
   const reffor=(dia,ref)=>{if(ref==='Tarde')ref='Lanche';return rmap[slotday[dia]+'|'+ref];};
   for(const m of membros){
-    m._refs=[];m.presencas.forEach(k=>{const[dia,ref]=k.split('|');const r=reffor(dia,ref);if(r&&r.P>0)m._refs.push({dia,ref:ref==='Tarde'?'Lanche':ref,p:r.P});});
+    m._refs=[];
+    m.presencas.forEach(k=>{
+      const[dia,ref]=k.split('|');
+      const r=reffor(dia,ref);
+      if(r&&r.P>0)m._refs.push({dia,ref:ref==='Tarde'?'Lanche':ref,p:r.P});
+    });
     m.Sown=rnd(m._refs.reduce((a,x)=>a+x.p,0),2);
-    m._convs=convidados.filter(g=>g.membro===m.nome&&g.pagante==='Sim').map(g=>{const r=reffor(g.dia,g.ref);return{nome:g.nome,dia:g.dia,ref:g.ref,q:r?r.Q:0};});
+    m._convs=convidados.filter(g=>g.membro===m.nome&&g.pagante==='Sim').map(g=>{
+      const r=reffor(g.dia,g.ref);
+      return{nome:g.nome,dia:g.dia,ref:g.ref,q:r?r.Q:0};
+    });
     m.AA=rnd(m._convs.reduce((a,x)=>a+x.q,0),2);
   }
-  const totRef=rnd(membros.reduce((a,m)=>a+m.Sown+m.AA,0),2);
-  const sobrasTot=rnd(membros.reduce((a,m)=>a+(m.sobras||0),0),2);
+
+  /* ── Totais para BN3 ── */
+  const totRefMembros=rnd(membros.reduce((a,m)=>a+m.Sown,0),2); /* só refeições membros */
+  const totGuestPayments=rnd(membros.reduce((a,m)=>a+m.AA,0),2); /* pagamentos convidados */
+  const sobrasTot=rnd(evento.saldoAnoAnterior||0,2);
+  const descontoTot=rnd(evento.descontoTshirts||0,2);
   const mealTot=mealheiros.reduce((a,x)=>a+x.valor,0);
-  const base=rnd(sumv(tot),2)-(totRef+sobrasTot+mealTot);
-  const BN3=base<=0?0:rnd(base+100,2);
+
+  /* ── BN3: valor de referência para quota adicional ── */
+  /* BN3 = totalDesp - (refeições membros + convidados + sobras + desconto + mealheiro) + 100 */
+  const baseQuota=totalDesp-(totRefMembros+totGuestPayments+sobrasTot+descontoTot+mealTot);
+  const BN3=baseQuota<=0?0:rnd(baseQuota+100,2);
   const sumF=membros.reduce((a,m)=>a+m.fator,0);
+
+  /* ── Mealheiro por pessoa ── */
   const mealBy={};for(const x of mealheiros)mealBy[x.quem]=(mealBy[x.quem]||0)+x.valor;
+
+  /* ── Contribuições e saldo por membro ── */
   for(const m of membros){
-    m.R=Math.max(rnd(BN3*m.fator/sumF,2),0);m.T=m.outras||0;
+    /* R = Quota adicional */
+    m.R=sumF>0?Math.max(rnd(BN3*m.fator/sumF,2),0):0;
+    /* T = Outras contribuições */
+    m.T=m.outras||0;
+    /* U = Missão poupança: arredondamento + 1€ + outras */
     m.U=rnd(roundup(m.Sown+m.R,0)-m.R-m.Sown+1+m.T,2);
-    m.V=rnd(m.Sown+m.R+m.U,2);m.W=mealBy[m.nome]||0;
-    m.Y=rnd(despesas.filter(x=>x.quem===m.nome).reduce((a,x)=>a+x.valor,0),2);
-    m._pago=m.Y;m.X=rnd(m.sobras||0,2);
+    /* V = Total contribuição */
+    m.V=rnd(m.Sown+m.R+m.U,2);
+    /* W = Mealheiro recolhido */
+    m.W=mealBy[m.nome]||0;
+    /* X = Sobras ano anterior (só tesoureiro recebe sobras + desconto) */
+    m.X=m.nome===evento.tesoureiro?rnd(sobrasTot+descontoTot,2):0;
+    /* Y = Crédito despesas: total pago - reembolsadas + recebeu reembolsos */
+    const totalPago=despesas.filter(x=>x.quem===m.nome).reduce((a,x)=>a+x.valor,0);
+    const reembolsadas=pag.filter(p=>p.ref&&p.ref.startsWith('Reembolso')&&p.para===m.nome).reduce((a,p)=>a+p.valor,0);
+    const recebeuReemb=pag.filter(p=>p.ref&&p.ref.startsWith('Reembolso')&&p.de===m.nome).reduce((a,p)=>a+p.valor,0);
+    m.Y=rnd(totalPago-reembolsadas+recebeuReemb,2);
+    m._pago=m.Y;
+    /* Z = Saldo antes convidados */
     m.Z=rnd(m.V+m.W+m.X-m.Y,2);
   }
-  const saldoGrupo=rnd(membros.reduce((a,m)=>a+m.Z+m.AA,0),2);
+
+  /* ── Saldo do grupo = totalReceitas - totalDesp ── */
+  const missaoTot=rnd(membros.reduce((a,m)=>a+m.U,0),2);
+  const quotaTot=rnd(membros.reduce((a,m)=>a+m.R,0),2);
+  const totRefAll=rnd(membros.reduce((a,m)=>a+m.Sown,0),2);
+  const totReceitas=rnd(quotaTot+totRefAll+totGuestPayments+sobrasTot+descontoTot+mealTot+missaoTot,2);
+  const saldoGrupo=rnd(totReceitas-totalDesp,2);
+
+  /* ── Saldo final por membro (com convidados, sobras grupo, pagamentos) ── */
+  const pagNonReemb=pag.filter(p=>!p.ref||!p.ref.startsWith('Reembolso'));
+  const nomes=membros.map(m=>m.nome);
   for(const m of membros){
     m.AB=m.nome===evento.tesoureiro?saldoGrupo:0;
     m.AC=rnd(m.Z+m.AA-m.AB,2);
-    m._pagouTotal=rnd(pag.filter(p=>p.de===m.nome).reduce((a,p)=>a+p.valor,0),2);
-    m._recebeuTotal=rnd(pag.filter(p=>p.para===m.nome).reduce((a,p)=>a+p.valor,0),2);
-    m._pagamentos=pag.filter(p=>p.de===m.nome||p.para===m.nome);
-    m.saldoFinal=rnd(m.AC-m._pagouTotal+m._recebeuTotal,2);
   }
-  const missaoTot=rnd(membros.reduce((a,m)=>a+m.U,0),2);
-  const quotaTot=rnd(membros.reduce((a,m)=>a+m.R,0),2);
-  const totReceitas=rnd(quotaTot+totRef+sobrasTot+mealTot+missaoTot,2);
-  const totDespesas=rnd(sumv(tot),2);
-  return{refeicoes,membros,BN3,F20:rnd(F20,2),saldoGrupo,totRef,tot,totReceitas,totDespesas,sumF,pagamentos:pag};
+  /* Pagamentos compostos: o ref indica que membros estão cobertos */
+  /* Cada membro coberto fica com AC alocado; o pagador paga a soma */
+  const mByName={};for(const m of membros)mByName[m.nome]=m;
+  const covered={};/* nome -> total coberto */
+  for(const p of pagNonReemb){
+    let ref=p.ref||p.de;
+    /* Extrair membros do ref */
+    let s=ref.replace(/,?\s*e?\s*Convidados/g,'').trim();
+    let coveredNames=[];
+    if(s){
+      const parts=s.split(/,\s*|\s+e\s+/).map(x=>x.trim()).filter(Boolean);
+      coveredNames=parts.filter(x=>nomes.includes(x));
+    }
+    if(!coveredNames.length)coveredNames=[p.de];
+    /* Cada membro coberto recebe o seu AC como montante liquidado */
+    for(const cn of coveredNames){
+      covered[cn]=(covered[cn]||0)+Math.abs(mByName[cn].AC);
+    }
+  }
+  /* Para o tesoureiro: recebe pagamentos, por isso soma tudo o que recebeu */
+  const tes=evento.tesoureiro;
+  const recvTes=pagNonReemb.filter(p=>p.para===tes).reduce((a,p)=>a+p.valor,0);
+  for(const m of membros){
+    if(m.nome===tes){
+      /* Tesoureiro: AC + total recebido (como crédito) = saldoFinal */
+      m.saldoFinal=rnd(m.AC+recvTes,2);
+    } else if(covered[m.nome]){
+      /* Membro coberto por pagamento composto: saldo = 0 */
+      m.saldoFinal=0;
+    } else {
+      /* Sem pagamento: mantém AC */
+      m.saldoFinal=m.AC;
+    }
+    m._pagouTotal=rnd(pagNonReemb.filter(p=>p.de===m.nome).reduce((a,p)=>a+p.valor,0),2);
+    m._recebeuTotal=rnd(pagNonReemb.filter(p=>p.para===m.nome).reduce((a,p)=>a+p.valor,0),2);
+    m._pagamentos=pagNonReemb.filter(p=>p.de===m.nome||p.para===m.nome);
+  }
+
+  return{refeicoes,membros,BN3,F20,saldoGrupo,totRefMembros,tot,totReceitas,totDespesas:totalDesp,sumF,pagamentos:pag,sobrasTot,descontoTot,mealTot,quotaTot,missaoTot};
 }
 
 /* RENDER */
@@ -425,7 +518,11 @@ async function carregar(){
     const res=await fetch(apiUrl,{headers:hdrs,cache:'no-store'});
     if(!res.ok)throw new Error('HTTP '+res.status);
     const json=await res.json();GH_SHA=json.sha;
-    const parsed=JSON.parse(atob(json.content.replace(/\n/g,'')));
+    const raw=json.content.replace(/\n/g,'');
+    /* Decode base64 → UTF-8 properly */
+    const bytes=Uint8Array.from(atob(raw),c=>c.charCodeAt(0));
+    const decoded=new TextDecoder('utf-8').decode(bytes);
+    const parsed=JSON.parse(decoded);
     // Suportar formato antigo (objeto) e novo (array)
     ALL_YEARS=Array.isArray(parsed)?parsed:[parsed];
     // Ordenar por ano
