@@ -43,6 +43,15 @@ header .sub{font-size:12.5px;color:var(--muted);margin-top:7px}
 .hero .cell{flex:1;background:rgba(0,0,0,.18);border-radius:11px;padding:11px 12px}
 .hero .cell .k{font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint)}
 .hero .cell .v{font-size:19px;font-weight:700;margin-top:3px}.hero .cell .v.rc{color:var(--green)}.hero .cell .v.dp{color:var(--red)}
+.hero-expand{display:flex;align-items:center;gap:4px;margin-top:6px;cursor:pointer;font-size:10px;font-weight:600;color:var(--faint);letter-spacing:.04em;user-select:none;transition:.15s}
+.hero-expand:active{opacity:.6}
+.hero-expand .he-arrow{transition:transform .2s;font-size:9px}
+.hero-expand.open .he-arrow{transform:rotate(180deg)}
+.hero-detail{max-height:0;overflow:hidden;transition:max-height .3s ease}
+.hero-detail.open{max-height:400px}
+.hero-detail-item{display:flex;justify-content:space-between;padding:4px 0;font-size:11px;border-bottom:1px solid rgba(255,255,255,.05)}
+.hero-detail-item:last-child{border-bottom:none}
+.hero-detail-item .hd-lbl{color:var(--muted)}.hero-detail-item .hd-val{font-weight:700;color:var(--ink)}
 
 /* Tabs */
 .tabs{display:flex;gap:6px;background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:5px;margin-bottom:16px;position:sticky;top:8px;z-index:20;backdrop-filter:blur(8px)}
@@ -304,8 +313,8 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
     <div class="lbl sf">Saldo do Grupo</div>
     <div class="big" id="saldo-grupo">—</div>
     <div class="row">
-      <div class="cell"><div class="k sf">Receitas</div><div class="v rc" id="tot-rec">—</div></div>
-      <div class="cell"><div class="k sf">Despesas</div><div class="v dp" id="tot-desp">—</div></div>
+      <div class="cell"><div class="k sf">Receitas</div><div class="v rc" id="tot-rec">—</div><div id="hero-rec-detail"></div></div>
+      <div class="cell"><div class="k sf">Despesas</div><div class="v dp" id="tot-desp">—</div><div id="hero-desp-detail"></div></div>
     </div>
   </div>
   <div class="tabs">
@@ -320,6 +329,7 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 
 <div class="fabs">
   <button class="fab gold" onclick="openPayModal()" title="Registar Cash Flow">💰</button>
+  <button class="fab dark" onclick="openReports()" title="Relatórios">📊</button>
   <button class="fab dark" onclick="openAdmin()" title="Definições">⚙</button>
 </div>
 
@@ -789,6 +799,9 @@ function renderAll(){
   document.getElementById('tot-rec').textContent=eur(CALC.totReceitas);
   document.getElementById('tot-desp').textContent=eur(CALC.totDespesas);
 
+  // Render expandable sub-totals
+  renderHeroSubtotals();
+
   // SALDOS — usar cálculo consistente com o ecrã de detalhe
   const pAll=CALC.pagamentos;
   const pNR=pAll.filter(p=>!p.ref||!p.ref.startsWith('Reembolso'));
@@ -809,16 +822,31 @@ function renderAll(){
     m._sfEcra=rnd(cred-deb,2);
   });
   const sorted=[...ms].sort((a,b)=>b._sfEcra-a._sfEcra);
+  const withDebt=sorted.filter(m=>Math.abs(m._sfEcra)>=0.005);
+  const settled=sorted.filter(m=>Math.abs(m._sfEcra)<0.005);
   let h='<div class="sec-title sf">Quem recebe / quem deve</div><div class="mlist">';
-  sorted.forEach((m,i)=>{
-    const sf=m._sfEcra;const cls=Math.abs(sf)<0.005?'zero':(sf>0?'pos':'neg');
-    const sign=sf>0.005?'a receber':(sf<-0.005?'a pagar':'saldado');
-    const badge=Math.abs(sf)<0.005?'<span class="badge paid">saldado</span>':'';
+  if(!withDebt.length) h+='<div class="empty sf">Todas as contas estão saldadas 🎉</div>';
+  withDebt.forEach((m,i)=>{
+    const sf=m._sfEcra;const cls=sf>0?'pos':'neg';
+    const sign=sf>0.005?'a receber':'a pagar';
     const tag=m.nome===DATA.evento.tesoureiro?' · tesoureiro':'';
     h+=`<div class="mrow" onclick="openMember('${m.nome.replace(/'/g,"\\'")}')">
-      ${av(m.nome,i)}<div class="nm">${m.nome}${badge}<small>${sign}${tag}</small></div>
+      ${av(m.nome,ms.indexOf(m))}<div class="nm">${m.nome}<small>${sign}${tag}</small></div>
       <div class="amt ${cls}">${eur(sf)}</div><div class="chev">›</div></div>`;
   });
+  if(settled.length){
+    h+=`<div class="collapse-toggle sf" onclick="this.classList.toggle('open');this.nextElementSibling.classList.toggle('open')" style="margin-top:10px">
+      <span class="ct-label">✅ Saldados (${settled.length})</span>
+      <span><span class="ct-arrow">▼</span></span>
+    </div><div class="collapse-body"><div class="mlist" style="margin-top:8px">`;
+    settled.forEach((m)=>{
+      const tag=m.nome===DATA.evento.tesoureiro?' · tesoureiro':'';
+      h+=`<div class="mrow" onclick="openMember('${m.nome.replace(/'/g,"\\'")}')">
+        ${av(m.nome,ms.indexOf(m))}<div class="nm">${m.nome}<span class="badge paid">saldado</span><small>sem dívida${tag}</small></div>
+        <div class="amt zero">${eur(0)}</div><div class="chev">›</div></div>`;
+    });
+    h+='</div></div>';
+  }
   h+='</div>';document.getElementById('view-saldos').innerHTML=h;
 
   // REFEIÇÕES — sub-tabbed: Calendário + Presenças
@@ -2178,6 +2206,315 @@ async function deleteRefdef(idx){
     renderAll();
     toast('Refeição removida ✓','ok');
   }
+}
+
+/* ═══ HERO SUB-TOTALS ═══ */
+function renderHeroSubtotals(){
+  if(!CALC)return;
+  // Receitas breakdown
+  const recItems=[];
+  if(CALC.quotaTot>0) recItems.push({label:'Quotas',val:CALC.quotaTot});
+  if(CALC.totRefMembros>0) recItems.push({label:'Refeições',val:CALC.totRefMembros});
+  const guestPay=rnd(CALC.membros.reduce((a,m)=>a+m.AA,0),2);
+  if(guestPay>0) recItems.push({label:'Convidados',val:guestPay});
+  if(CALC.mealTot>0) recItems.push({label:'Mealheiro',val:CALC.mealTot});
+  if(CALC.missaoTot>0) recItems.push({label:'Missão Poupança',val:CALC.missaoTot});
+
+  let rh='';
+  if(recItems.length>1){
+    rh+=`<div class="hero-expand sf" onclick="this.classList.toggle('open');this.nextElementSibling.classList.toggle('open')"><span>ver detalhe</span><span class="he-arrow">▼</span></div>`;
+    rh+='<div class="hero-detail sf">';
+    recItems.forEach(it=>{rh+=`<div class="hero-detail-item"><span class="hd-lbl">${it.label}</span><span class="hd-val">${eur(it.val)}</span></div>`;});
+    rh+='</div>';
+  }
+  document.getElementById('hero-rec-detail').innerHTML=rh;
+
+  // Despesas breakdown
+  const despItems=[];
+  const tot=CALC.tot;
+  const tipoOrder=['Gerais','Bebidas','Almoço','Jantar','Renda','Cerveja'];
+  const allTipos=Object.keys(tot).sort((a,b)=>{const ia=tipoOrder.indexOf(a),ib=tipoOrder.indexOf(b);return(ia<0?99:ia)-(ib<0?99:ib);});
+  allTipos.forEach(tipo=>{if(tot[tipo]>0) despItems.push({label:tipo,val:tot[tipo]});});
+
+  let dh='';
+  if(despItems.length>1){
+    dh+=`<div class="hero-expand sf" onclick="this.classList.toggle('open');this.nextElementSibling.classList.toggle('open')"><span>ver detalhe</span><span class="he-arrow">▼</span></div>`;
+    dh+='<div class="hero-detail sf">';
+    despItems.forEach(it=>{dh+=`<div class="hero-detail-item"><span class="hd-lbl">${it.label}</span><span class="hd-val">${eur(it.val)}</span></div>`;});
+    dh+='</div>';
+  }
+  document.getElementById('hero-desp-detail').innerHTML=dh;
+}
+
+/* ═══ RELATÓRIOS / PDF ═══ */
+function openReports(){
+  let html=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+    <h3 style="margin-bottom:0">📊 Relatórios</h3>
+    <button onclick="closeReports()" style="background:var(--panel2);border:1px solid var(--line);color:var(--muted);border-radius:9px;width:32px;height:32px;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0">✕</button>
+  </div>`;
+  html+=`<p style="font-size:13px;color:var(--muted);margin-bottom:16px;line-height:1.5">Exporta relatórios em PDF com o detalhe do evento.</p>`;
+
+  html+=`<div style="display:flex;flex-direction:column;gap:10px">
+    <button class="btn prim" onclick="generatePDF('geral')" style="display:flex;align-items:center;justify-content:center;gap:8px">
+      📄 Relatório Geral
+    </button>
+    <p style="font-size:11px;color:var(--faint);margin-top:-4px">Saldos de todos os membros, cash-flows, receitas e despesas.</p>
+
+    <div style="margin-top:6px">
+      <label style="font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--faint);font-weight:700;margin-bottom:6px;display:block">Relatório por Pessoa</label>
+      <div style="display:flex;gap:8px">
+        <select id="report-person" style="flex:1;background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:10px 12px;color:var(--ink);font-size:14px;font-family:inherit;-webkit-appearance:none;appearance:none">
+          ${CALC.membros.map(m=>`<option value="${m.nome}">${m.nome}</option>`).join('')}
+        </select>
+        <button class="btn prim" onclick="generatePDF('pessoa')" style="flex:0 0 auto;padding:10px 18px">📄 Gerar</button>
+      </div>
+      <p style="font-size:11px;color:var(--faint);margin-top:6px">Detalhe completo: contribuições, pagamentos, saldo final.</p>
+    </div>
+  </div>`;
+
+  let bg=document.getElementById('report-bg');
+  if(!bg){
+    bg=document.createElement('div');bg.id='report-bg';bg.className='modal-bg';
+    bg.innerHTML='<div class="modal" id="report-inner"></div>';
+    document.body.appendChild(bg);
+    bg.addEventListener('click',e=>{if(e.target===bg)closeReports();});
+  }
+  document.getElementById('report-inner').innerHTML=html;
+  bg.classList.add('show');
+  document.body.classList.add('no-scroll');
+}
+function closeReports(){
+  const bg=document.getElementById('report-bg');
+  if(bg){bg.classList.remove('show');document.body.classList.remove('no-scroll');}
+}
+
+function generatePDF(type){
+  const pessoa=type==='pessoa'?document.getElementById('report-person')?.value:null;
+  const ms=CALC.membros;
+  const ano=DATA.evento.ano||'';
+  const nome=DATA.evento.nome||'MEO';
+
+  // Build SVG-based PDF content as printable HTML and use browser print
+  let body='';
+  const css=`
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;color:#1a1a2e;padding:28px;font-size:11px;line-height:1.5;max-width:800px;margin:0 auto}
+    h1{font-size:22px;font-weight:700;color:#1a1a2e;margin-bottom:2px}
+    h2{font-size:15px;font-weight:700;color:#e8b04b;margin:18px 0 8px;border-bottom:2px solid #e8b04b;padding-bottom:4px}
+    h3{font-size:13px;font-weight:700;color:#333;margin:12px 0 6px}
+    .subtitle{font-size:12px;color:#666;margin-bottom:16px}
+    .hero-row{display:flex;gap:16px;margin:14px 0 10px}
+    .hero-box{flex:1;padding:12px;border-radius:8px;text-align:center}
+    .hero-box.green{background:#e8f9f1;border:1px solid #3ecf8e}
+    .hero-box.red{background:#fff0f0;border:1px solid #ff6b6b}
+    .hero-box.blue{background:#eef5ff;border:1px solid #5aa9ff}
+    .hero-box .hb-label{font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:#666}
+    .hero-box .hb-val{font-size:20px;font-weight:700;margin-top:2px}
+    .hero-box.green .hb-val{color:#2a9d6a}.hero-box.red .hb-val{color:#e04545}.hero-box.blue .hb-val{color:#3a7dd6}
+    table{width:100%;border-collapse:collapse;margin:6px 0 14px;font-size:11px}
+    th{background:#f4f5f7;padding:6px 8px;text-align:left;font-weight:700;font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:#555;border-bottom:2px solid #ddd}
+    td{padding:5px 8px;border-bottom:1px solid #eee}
+    tr:last-child td{border-bottom:none}
+    .pos{color:#2a9d6a;font-weight:700}.neg{color:#e04545;font-weight:700}.zero{color:#999}
+    .right{text-align:right}
+    .section{margin-bottom:8px}
+    .badge{display:inline-block;font-size:9px;font-weight:700;padding:1px 6px;border-radius:4px}
+    .badge-green{background:#e8f9f1;color:#2a9d6a}.badge-red{background:#fff0f0;color:#e04545}.badge-blue{background:#eef5ff;color:#3a7dd6}
+    .footer{margin-top:24px;padding-top:10px;border-top:1px solid #ddd;font-size:10px;color:#999;text-align:center}
+    @media print{body{padding:16px} .no-print{display:none}}
+  `;
+
+  if(type==='geral'){
+    body=buildGeneralReport();
+  } else {
+    body=buildPersonReport(pessoa);
+  }
+
+  const win=window.open('','_blank');
+  win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${nome} ${ano} — Relatório</title><style>${css}</style></head><body>${body}</body></html>`);
+  win.document.close();
+  setTimeout(()=>win.print(),400);
+}
+
+function buildGeneralReport(){
+  const ms=CALC.membros;
+  const ano=DATA.evento.ano||'';
+  const nome=DATA.evento.nome||'MEO';
+  let h=`<h1>${nome} ${ano}</h1>`;
+  h+=`<div class="subtitle">${DATA.evento.datas||''} · Tesoureiro: ${DATA.evento.tesoureiro}</div>`;
+
+  // Hero summary
+  const sg=CALC.saldoGrupo;
+  h+=`<div class="hero-row">
+    <div class="hero-box ${sg>=0?'green':'red'}"><div class="hb-label">Saldo do Grupo</div><div class="hb-val">${eur(sg)}</div></div>
+    <div class="hero-box green"><div class="hb-label">Receitas</div><div class="hb-val">${eur(CALC.totReceitas)}</div></div>
+    <div class="hero-box red"><div class="hb-label">Despesas</div><div class="hb-val">${eur(CALC.totDespesas)}</div></div>
+  </div>`;
+
+  // Receitas breakdown
+  h+='<h2>Receitas — Detalhe</h2><table><tr><th>Item</th><th class="right">Valor</th></tr>';
+  if(CALC.quotaTot>0) h+=`<tr><td>Quotas</td><td class="right">${eur(CALC.quotaTot)}</td></tr>`;
+  if(CALC.totRefMembros>0) h+=`<tr><td>Refeições (membros)</td><td class="right">${eur(CALC.totRefMembros)}</td></tr>`;
+  const gp=rnd(ms.reduce((a,m)=>a+m.AA,0),2);
+  if(gp>0) h+=`<tr><td>Convidados</td><td class="right">${eur(gp)}</td></tr>`;
+  if(CALC.mealTot>0) h+=`<tr><td>Mealheiro</td><td class="right">${eur(CALC.mealTot)}</td></tr>`;
+  if(CALC.missaoTot>0) h+=`<tr><td>Missão Poupança</td><td class="right">${eur(CALC.missaoTot)}</td></tr>`;
+  h+=`<tr style="border-top:2px solid #ddd;font-weight:700"><td><b>Total Receitas</b></td><td class="right pos"><b>${eur(CALC.totReceitas)}</b></td></tr>`;
+  h+='</table>';
+
+  // Despesas breakdown
+  h+='<h2>Despesas — Detalhe</h2><table><tr><th>Tipo</th><th class="right">Valor</th></tr>';
+  const tot=CALC.tot;
+  Object.keys(tot).sort().forEach(tipo=>{
+    if(tot[tipo]>0) h+=`<tr><td>${tipo}</td><td class="right">${eur(tot[tipo])}</td></tr>`;
+  });
+  h+=`<tr style="border-top:2px solid #ddd;font-weight:700"><td><b>Total Despesas</b></td><td class="right neg"><b>${eur(CALC.totDespesas)}</b></td></tr>`;
+  h+='</table>';
+
+  // Saldos de todos os membros
+  h+='<h2>Saldos por Membro</h2>';
+  h+='<table><tr><th>Membro</th><th class="right">Deve</th><th class="right">Crédito</th><th class="right">Saldo</th></tr>';
+  const sorted=[...ms].sort((a,b)=>b._sfEcra-a._sfEcra);
+  sorted.forEach(m=>{
+    const sf=m._sfEcra;
+    const cls=Math.abs(sf)<0.005?'zero':(sf>0?'pos':'neg');
+    const contribT=rnd(m.Sown+m.AA,2);
+    const quotaE=rnd((m.R||0)+(m.U||0),2);
+    h+=`<tr><td>${m.nome}${m.nome===DATA.evento.tesoureiro?' <span class="badge badge-blue">tes.</span>':''}</td>
+      <td class="right">${eur(rnd(contribT+quotaE,2))}</td>
+      <td class="right">${eur(rnd(DATA.despesas.filter(x=>x.quem===m.nome).reduce((a,x)=>a+x.valor,0),2))}</td>
+      <td class="right ${cls}">${eur(sf)}</td></tr>`;
+  });
+  h+='</table>';
+
+  // Cash-flows list
+  const allCf=[];
+  (DATA.pagamentos||[]).forEach(p=>{
+    const t=cfType(p);
+    allCf.push({type:t,date:p.data||'',desc:t==='reembolso'?`${p.de} → ${p.para}`:`${p.de} → ${p.para}`,ref:p.ref||'',valor:p.valor,label:cfLabel(t)});
+  });
+  (DATA.despesas||[]).forEach(d=>{
+    allCf.push({type:'despesa',date:d.dataDesp||d.dataValor||'',desc:d.desc||'(sem descrição)',ref:`${d.tipo} · ${d.quem}`,valor:d.valor,label:'Despesa'});
+  });
+  (DATA.mealheiros||[]).forEach(m=>{
+    allCf.push({type:'mealheiro',date:m.data||'',desc:`${m.quem}`,ref:m.desc||m.subtipo||'',valor:m.valor,label:'Mealheiro'});
+  });
+  allCf.sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+
+  h+='<h2>Cash-Flows</h2>';
+  h+='<table><tr><th>Data</th><th>Tipo</th><th>Descrição</th><th class="right">Valor</th></tr>';
+  allCf.forEach(cf=>{
+    h+=`<tr><td>${cf.date||'—'}</td><td><span class="badge badge-blue">${cf.label}</span></td><td>${cf.desc}${cf.ref?' · '+cf.ref:''}</td><td class="right">${eur(cf.valor)}</td></tr>`;
+  });
+  h+='</table>';
+
+  h+=`<div class="footer">Relatório gerado em ${new Date().toLocaleString('pt-PT')} · ${nome} ${ano}</div>`;
+  return h;
+}
+
+function buildPersonReport(pessoa){
+  const m=CALC.membros.find(x=>x.nome===pessoa);
+  if(!m) return '<h1>Membro não encontrado</h1>';
+  const ano=DATA.evento.ano||'';
+  const evNome=DATA.evento.nome||'MEO';
+  const isTes=m.nome===DATA.evento.tesoureiro;
+
+  let h=`<h1>${evNome} ${ano} — ${pessoa}</h1>`;
+  h+=`<div class="subtitle">${DATA.evento.datas||''} · ${isTes?'Tesoureiro':'Membro'} · Fator: ${m.fator}</div>`;
+
+  // Saldo hero
+  const sf=m._sfEcra;
+  const cls=Math.abs(sf)<0.005?'blue':(sf>0?'green':'red');
+  const saldoLabel=sf>0.005?'A receber':(sf<-0.005?'A pagar':'Saldado');
+  h+=`<div class="hero-row">
+    <div class="hero-box ${cls}"><div class="hb-label">${saldoLabel}</div><div class="hb-val">${eur(sf)}</div></div>
+  </div>`;
+
+  // Contribuições (refeições)
+  if(m._refs.length){
+    h+='<h2>Refeições</h2>';
+    h+='<table><tr><th>Dia</th><th>Refeição</th><th class="right">Valor</th></tr>';
+    m._refs.forEach(r=>{h+=`<tr><td>${r.dia}</td><td>${r.ref}</td><td class="right">${eur(r.p)}</td></tr>`;});
+    h+=`<tr style="border-top:2px solid #ddd;font-weight:700"><td colspan="2"><b>Total Refeições</b></td><td class="right"><b>${eur(m.Sown)}</b></td></tr>`;
+    h+='</table>';
+  }
+
+  // Convidados
+  if(m._convs.length){
+    h+='<h2>Convidados</h2>';
+    h+='<table><tr><th>Nome</th><th>Dia / Ref</th><th class="right">Valor</th></tr>';
+    m._convs.forEach(c=>{h+=`<tr><td>${c.nome}</td><td>${c.dia} · ${c.ref}</td><td class="right">${eur(c.q)}</td></tr>`;});
+    h+=`<tr style="border-top:2px solid #ddd;font-weight:700"><td colspan="2"><b>Total Convidados</b></td><td class="right"><b>${eur(m.AA)}</b></td></tr>`;
+    h+='</table>';
+  }
+
+  // Quota extra
+  const quotaExtra=rnd((m.R||0)+(m.U||0),2);
+  if(quotaExtra>0){
+    h+='<h2>Quota Extra</h2><table>';
+    if(m.R>0) h+=`<tr><td>Quota adicional (fator ${m.fator})</td><td class="right">${eur(m.R)}</td></tr>`;
+    if(m.U>0) h+=`<tr><td>Missão poupança</td><td class="right">${eur(m.U)}</td></tr>`;
+    h+=`<tr style="border-top:2px solid #ddd;font-weight:700"><td><b>Total</b></td><td class="right"><b>${eur(quotaExtra)}</b></td></tr>`;
+    h+='</table>';
+  }
+
+  // Despesas adiantadas
+  const totalPagoDesp=DATA.despesas.filter(x=>x.quem===m.nome).reduce((a,x)=>a+x.valor,0);
+  if(totalPagoDesp>0){
+    h+='<h2>Despesas Adiantadas</h2>';
+    h+='<table><tr><th>Data</th><th>Descrição</th><th>Tipo</th><th class="right">Valor</th></tr>';
+    DATA.despesas.filter(x=>x.quem===m.nome).forEach(d=>{
+      h+=`<tr><td>${d.dataDesp||d.dataValor||'—'}</td><td>${d.desc||'—'}</td><td>${d.tipo}</td><td class="right">${eur(d.valor)}</td></tr>`;
+    });
+    h+=`<tr style="border-top:2px solid #ddd;font-weight:700"><td colspan="3"><b>Total</b></td><td class="right pos"><b>${eur(rnd(totalPagoDesp,2))}</b></td></tr>`;
+    h+='</table>';
+  }
+
+  // Pagamentos
+  const pagAll=CALC.pagamentos;
+  const pagNonReemb=pagAll.filter(p=>!p.ref||!p.ref.startsWith('Reembolso'));
+  const myPags=pagAll.filter(p=>p.de===m.nome||p.para===m.nome);
+  if(myPags.length){
+    h+='<h2>Pagamentos</h2>';
+    h+='<table><tr><th>Data</th><th>De → Para</th><th>Ref</th><th class="right">Valor</th></tr>';
+    myPags.forEach(p=>{
+      h+=`<tr><td>${p.data||'—'}</td><td>${p.de} → ${p.para}</td><td>${(p.ref||'').slice(0,40)}</td><td class="right">${eur(p.valor)}</td></tr>`;
+    });
+    h+='</table>';
+  }
+
+  // Mealheiro
+  const mealTotal=rnd((m.W||0)+(m.X||0),2);
+  if(mealTotal>0){
+    h+='<h2>Mealheiro</h2>';
+    h+=`<table><tr><td>Créditos recebidos do mealheiro</td><td class="right">${eur(mealTotal)}</td></tr></table>`;
+  }
+
+  // Saldo final summary
+  h+='<h2>Resumo Final</h2>';
+  const pagAll2=CALC.pagamentos;
+  const reembolsosRecebidos=pagAll2.filter(p=>p.ref&&p.ref.startsWith('Reembolso')&&p.para===m.nome).reduce((a,p)=>a+p.valor,0);
+  const reembolsosFeitos=pagAll2.filter(p=>p.ref&&p.ref.startsWith('Reembolso')&&p.de===m.nome).reduce((a,p)=>a+p.valor,0);
+  const recebimentos=pagNonReemb.filter(p=>p.para===m.nome).reduce((a,p)=>a+p.valor,0);
+  const contribT=rnd(m.Sown+m.AA,2);
+
+  let totalCreditos=totalPagoDesp;
+  if(isTes) totalCreditos+=reembolsosFeitos;
+  if(!isTes){
+    totalCreditos+=rnd(m._payerOwnPortion,2);
+    (m._creditedBy||[]).filter(c=>c.payer!==m.nome).forEach(c=>{totalCreditos+=c.amount;});
+  }
+  totalCreditos=rnd(totalCreditos,2);
+  const totalDebitos=rnd(contribT+quotaExtra+mealTotal+recebimentos+reembolsosRecebidos,2);
+
+  h+='<table>';
+  h+=`<tr><td>Créditos</td><td class="right pos">${eur(totalCreditos)}</td></tr>`;
+  h+=`<tr><td>Débitos</td><td class="right neg">${eur(totalDebitos)}</td></tr>`;
+  h+=`<tr style="border-top:2px solid #ddd;font-weight:700"><td><b>Saldo Final</b></td><td class="right ${Math.abs(sf)<0.005?'zero':(sf>0?'pos':'neg')}"><b>${eur(sf)}</b></td></tr>`;
+  h+='</table>';
+
+  h+=`<div class="footer">Relatório gerado em ${new Date().toLocaleString('pt-PT')} · ${evNome} ${ano}</div>`;
+  return h;
 }
 
 /* GO */
