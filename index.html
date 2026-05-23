@@ -411,9 +411,12 @@ function calcular(data){
   const mByName={};for(const m of membros)mByName[m.nome]=m;
   const credited={};
   const creditedConv={};
+  const creditedBy={};  // creditedBy[nome] = [{payer, amount, type:'own'|'conv'}]
+  const payerOwnPortion={};  // payerOwnPortion[payerName] = total allocated to payer's own debts (own + conv)
+  const payerOthersPortion={};  // payerOthersPortion[payerName] = total allocated to other people's debts
   for(const p of pagNonReemb){
     if(!p.ref){
-      const m=mByName[p.de];if(m&&m.AC<0)credited[p.de]=(credited[p.de]||0)+p.valor;
+      const m=mByName[p.de];if(m&&m.AC<0){credited[p.de]=(credited[p.de]||0)+p.valor;payerOwnPortion[p.de]=(payerOwnPortion[p.de]||0)+p.valor;}
       continue;
     }
     const parts=p.ref.split(/,\s*/).map(x=>x.trim()).filter(Boolean);
@@ -434,6 +437,15 @@ function calcular(data){
         const alloc=totalItems>0?rnd(p.valor*it.v/totalItems,2):rnd(p.valor/items.length,2);
         if(it.type==='own')credited[it.nome]=(credited[it.nome]||0)+alloc;
         else creditedConv[it.nome]=(creditedConv[it.nome]||0)+alloc;
+        // Track who paid for whom
+        if(!creditedBy[it.nome])creditedBy[it.nome]=[];
+        creditedBy[it.nome].push({payer:p.de,amount:alloc,type:it.type});
+        // Track payer's own vs others portion
+        if(it.nome===p.de||(it.type==='conv'&&it.nome===p.de)){
+          payerOwnPortion[p.de]=(payerOwnPortion[p.de]||0)+alloc;
+        } else {
+          payerOthersPortion[p.de]=(payerOthersPortion[p.de]||0)+alloc;
+        }
       });
     } else {
       const covNames=parts.filter(x=>nomes.includes(x));
@@ -466,6 +478,11 @@ function calcular(data){
     m._pagouTotal=rnd(pagNonReemb.filter(p=>p.de===m.nome).reduce((a,p)=>a+p.valor,0),2);
     m._recebeuTotal=rnd(pagNonReemb.filter(p=>p.para===m.nome).reduce((a,p)=>a+p.valor,0),2);
     m._pagamentos=pagNonReemb.filter(p=>p.de===m.nome||p.para===m.nome);
+    m._ownCredit=credited[m.nome]||0;
+    m._convCredit=creditedConv[m.nome]||0;
+    m._creditedBy=creditedBy[m.nome]||[];
+    m._payerOwnPortion=payerOwnPortion[m.nome]||0;
+    m._payerOthersPortion=payerOthersPortion[m.nome]||0;
   }
 
   return{refeicoes,membros,BN3,F20,saldoGrupo,totRefMembros,tot,totReceitas,totDespesas:totalDesp,sumF,pagamentos:pag,sobrasTot,descontoTot,mealTot,quotaTot,missaoTot};
@@ -706,11 +723,19 @@ function openMember(nome){
     if(reembolsosFeitos>0){h+=`<div class="li"><span class="lbl">Reembolsos que fizeste<small>dinheiro devolvido a quem adiantou</small></span><span class="val plus">${eur(rnd(reembolsosFeitos,2))}</span></div>`;totalCreditos+=reembolsosFeitos;}
   }
 
-  // 1d) Pagamentos para saldar dívida = crédito
+  // 1d) Pagamentos para saldar dívida = crédito (only the payer's own portion)
   if(!isTes){
-    const pagNonReemb=CALC.pagamentos.filter(p=>!p.ref||!p.ref.startsWith('Reembolso'));
-    const pagouSaldar=pagNonReemb.filter(p=>p.de===m.nome).reduce((a,p)=>a+p.valor,0);
-    if(pagouSaldar>0){h+=`<div class="li"><span class="lbl">Pagamentos para saldar dívida</span><span class="val plus">${eur(rnd(pagouSaldar,2))}</span></div>`;totalCreditos+=pagouSaldar;}
+    // What this person paid that covers their OWN debts (own: + conv: for themselves)
+    const ownPortion=rnd(m._payerOwnPortion,2);
+    if(ownPortion>0){h+=`<div class="li"><span class="lbl">Pagamentos para saldar dívida<small>parte referente às tuas contas</small></span><span class="val plus">${eur(ownPortion)}</span></div>`;totalCreditos+=ownPortion;}
+    // What someone else paid on behalf of this person
+    const paidByOthers=m._creditedBy.filter(c=>c.payer!==m.nome);
+    if(paidByOthers.length){
+      const byPayer={};paidByOthers.forEach(c=>{byPayer[c.payer]=(byPayer[c.payer]||0)+c.amount;});
+      for(const[payer,amt] of Object.entries(byPayer)){
+        if(amt>0){h+=`<div class="li"><span class="lbl">Pago por ${payer}<small>saldou a tua dívida</small></span><span class="val plus">${eur(rnd(amt,2))}</span></div>`;totalCreditos+=amt;}
+      }
+    }
   }
 
   totalCreditos=rnd(totalCreditos,2);
