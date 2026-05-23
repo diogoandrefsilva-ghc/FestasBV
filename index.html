@@ -161,6 +161,13 @@ body.no-scroll{overflow:hidden;position:fixed;width:100%;}
 .toast.ok{border-color:var(--green)}.toast.bad{border-color:var(--red)}
 .sf,.eyebrow,.syncpill,.hero .cell .k,.tabs,.tab,.mrow .nm small,.card .meta,.chip,.sec-title,.back-btn,.bd-title,.li .lbl small,.meal,.sheet .final .k,.sheet .verdict,.empty,.fab,.modal,.modal h3,.modal p,.modal label,.modal input,.modal select,.modal textarea,.btn,.note,.seg-btn,.toast,.badge,.year-nav,.yr-btn,.yr-label,.cf-opt,.cf-lbl,.sd-chip,.card-act,.inline-row{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
 header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+
+/* Cash-flow filters */
+.cf-filters{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap}
+.cf-filter{position:relative;flex:1;min-width:0}
+.cf-filter select{width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:9px 32px 9px 11px;color:var(--ink);font-size:13px;font-weight:600;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;-webkit-appearance:none;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238a93a2' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;cursor:pointer;transition:.15s}
+.cf-filter select:focus{outline:none;border-color:var(--gold)}
+.cf-filter select option{background:var(--panel);color:var(--ink)}
 </style>
 </head>
 <body>
@@ -186,12 +193,10 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
   <div class="tabs">
     <div class="tab on" data-tab="saldos" onclick="setTab('saldos')">Saldos</div>
     <div class="tab" data-tab="refeicoes" onclick="setTab('refeicoes')">Refeições</div>
-    <div class="tab" data-tab="despesas" onclick="setTab('despesas')">Despesas</div>
     <div class="tab" data-tab="cashflows" onclick="setTab('cashflows')">Cash-Flows</div>
   </div>
   <div id="view-saldos"></div>
   <div id="view-refeicoes" style="display:none"></div>
-  <div id="view-despesas" style="display:none"></div>
   <div id="view-cashflows" style="display:none"></div>
 </div>
 
@@ -461,7 +466,7 @@ const AVCOL=['#e8b04b','#5aa9ff','#3ecf8e','#ff6b6b','#b98cff','#ff9f5a','#4fd1c
 function av(nome,i){return`<div class="av" style="background:${AVCOL[i%AVCOL.length]}">${nome.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase()}</div>`;}
 
 function setTab(t){TAB=t;document.querySelectorAll('.tab').forEach(e=>e.classList.toggle('on',e.dataset.tab===t));
-  ['saldos','refeicoes','despesas','cashflows'].forEach(v=>document.getElementById('view-'+v).style.display=v===t?'':'none');}
+  ['saldos','refeicoes','cashflows'].forEach(v=>document.getElementById('view-'+v).style.display=v===t?'':'none');}
 
 /* ── Classify a cash-flow entry ── */
 function cfType(p){
@@ -512,20 +517,15 @@ function renderAll(){
       }${x.Q?`<span class="chip t">conv. ${eur(x.Q)}</span>`:''}<span class="chip">total ${eur(rnd(x.D*x.L,2))}</span></div></div>`;
   });document.getElementById('view-refeicoes').innerHTML=r;
 
-  // DESPESAS
-  let dd='<div class="sec-title sf">Todas as despesas ('+DATA.despesas.length+')</div>';
-  [...DATA.despesas].sort((a,b)=>(a.dataValor||'').localeCompare(b.dataValor||'')).forEach(x=>{
-    dd+=`<div class="card"><div class="top"><div class="desc">${x.desc||'(sem descrição)'}</div>
-      <div class="v">${eur(x.valor)}</div></div>
-      <div class="meta"><span class="chip t">${x.tipo}</span><span class="chip">pagou ${x.quem}</span></div></div>`;
-  });document.getElementById('view-despesas').innerHTML=dd;
-
   // CASH-FLOWS — merge all 5 types into one list
   renderCashFlows();
 
   // Populate payment modal selects
   updateCfForm();
 }
+
+let cfFilterType='all';
+let cfFilterPerson='all';
 
 function renderCashFlows(){
   // Build unified list of all cash-flows
@@ -534,30 +534,76 @@ function renderCashFlows(){
   // 1) Pagamentos (reembolso, recebimento, saldar)
   (DATA.pagamentos||[]).forEach((p,i)=>{
     const t=cfType(p);
+    const people=[p.de,p.para].filter(Boolean);
     allCf.push({type:t,date:p.data||'',label:cfLabel(t),icon:cfIcon(t),
       line1: t==='reembolso'? `${p.de} → ${p.para}` : t==='saldar'? `${p.de} → ${p.para}` : `${p.de} → ${p.para}`,
-      line2: p.ref||'',valor:p.valor,source:'pagamentos',idx:i});
+      line2: p.ref||'',valor:p.valor,source:'pagamentos',idx:i,people});
   });
 
   // 2) Despesas
   (DATA.despesas||[]).forEach((d,i)=>{
     allCf.push({type:'despesa',date:d.dataDesp||d.dataValor||'',label:'Despesa',icon:'🛒',
-      line1:d.desc||'(sem descrição)',line2:`${d.tipo} · pagou ${d.quem}`,valor:d.valor,source:'despesas',idx:i});
+      line1:d.desc||'(sem descrição)',line2:`${d.tipo} · pagou ${d.quem}`,valor:d.valor,source:'despesas',idx:i,people:[d.quem]});
   });
 
   // 3) Mealheiros
   (DATA.mealheiros||[]).forEach((m,i)=>{
     allCf.push({type:'mealheiro',date:m.data||'',label:'Mealheiro',icon:'🐷',
-      line1:`${m.quem} recebeu`,line2:'',valor:m.valor,source:'mealheiros',idx:i});
+      line1:`${m.quem} recebeu`,line2:'',valor:m.valor,source:'mealheiros',idx:i,people:[m.quem]});
   });
 
   // Sort by date desc
   allCf.sort((a,b)=>(b.date||'').localeCompare(a.date||''));
 
-  let pp=`<div class="sec-title sf">Histórico de Cash-Flows (${allCf.length})</div>`;
-  if(!allCf.length) pp+='<div class="empty">Nenhum cash-flow registado</div>';
+  // Build person list for filter (including guests' members)
+  const personSet=new Set();
+  allCf.forEach(cf=>(cf.people||[]).forEach(p=>personSet.add(p)));
+  // Also add members' convidados associations
+  const guestToMember={};
+  (DATA.convidados||[]).forEach(g=>{guestToMember[g.nome]=g.membro;});
+  const personList=[...personSet].sort((a,b)=>a.localeCompare(b,'pt'));
 
-  allCf.forEach(cf=>{
+  // Filters
+  let pp=`<div class="cf-filters">
+    <div class="cf-filter"><select onchange="cfFilterType=this.value;renderCashFlows()">
+      <option value="all"${cfFilterType==='all'?' selected':''}>Todos os tipos</option>
+      <option value="despesa"${cfFilterType==='despesa'?' selected':''}>🛒 Despesa</option>
+      <option value="reembolso"${cfFilterType==='reembolso'?' selected':''}>💸 Reembolso</option>
+      <option value="recebimento"${cfFilterType==='recebimento'?' selected':''}>📥 Recebimento</option>
+      <option value="mealheiro"${cfFilterType==='mealheiro'?' selected':''}>🐷 Mealheiro</option>
+      <option value="saldar"${cfFilterType==='saldar'?' selected':''}>🤝 Saldar Dívida</option>
+    </select></div>
+    <div class="cf-filter"><select onchange="cfFilterPerson=this.value;renderCashFlows()">
+      <option value="all"${cfFilterPerson==='all'?' selected':''}>Todas as pessoas</option>
+      ${personList.map(p=>`<option value="${p}"${cfFilterPerson===p?' selected':''}>${p}</option>`).join('')}
+    </select></div>
+  </div>`;
+
+  // Apply filters
+  let filtered=allCf;
+  if(cfFilterType!=='all') filtered=filtered.filter(cf=>cf.type===cfFilterType);
+  if(cfFilterPerson!=='all'){
+    // Match if person is directly involved or if person is a member whose guest is referenced
+    const memberGuests=(DATA.convidados||[]).filter(g=>g.membro===cfFilterPerson).map(g=>g.nome);
+    filtered=filtered.filter(cf=>{
+      if((cf.people||[]).includes(cfFilterPerson)) return true;
+      // For saldar/recebimento, check if ref includes this person's debts
+      if(cf.source==='pagamentos'){
+        const p=DATA.pagamentos[cf.idx];
+        if(p.ref && (p.ref.includes('own:'+cfFilterPerson) || p.ref.includes('conv:'+cfFilterPerson))) return true;
+      }
+      // Check if any of this person's guests are involved
+      if(memberGuests.length && cf.people){
+        if(cf.people.some(pp=>memberGuests.includes(pp))) return true;
+      }
+      return false;
+    });
+  }
+
+  pp+=`<div class="sec-title sf">Cash-Flows (${filtered.length}${filtered.length!==allCf.length?' de '+allCf.length:''})</div>`;
+  if(!filtered.length) pp+='<div class="empty sf">Nenhum cash-flow encontrado</div>';
+
+  filtered.forEach(cf=>{
     const escSrc=cf.source;const escIdx=cf.idx;
     pp+=`<div class="card"><div class="top"><div class="desc">${cf.icon} ${cf.line1}</div>
       <div class="v">${eur(cf.valor)}</div></div>
@@ -577,38 +623,78 @@ function openMember(nome){
   const m=CALC.membros.find(x=>x.nome===nome);if(!m)return;
   const sf=m.saldoFinal;const cls=Math.abs(sf)<0.005?'':(sf>0?'pos':'neg');
   const verd=sf>0.005?`O grupo deve-te ${eur(sf)}`:(sf<-0.005?`Deves ${eur(-sf)} ao grupo`:'Estás saldado 👌');
-  let h=``;
+  const tes=DATA.evento.tesoureiro;
+  const isTes=m.nome===tes;
+  let h='';
 
-  // Contribuição
-  h+='<div class="bd-title sf">Contribuição</div>';
-  if(m._refs.length){h+='<div class="meals">';m._refs.forEach(r=>h+=`<div class="meal"><span class="d">${r.dia} · ${r.ref}</span><span class="p">${eur(r.p)}</span></div>`);
-    h+=`</div><div class="li tot"><span class="lbl">Total refeições</span><span class="val">${eur(m.Sown)}</span></div>`;}
-  else h+='<div class="empty sf">Sem refeições</div>';
-  if(m.R>0)h+=`<div class="li"><span class="lbl">Quota adicional<small>fator ${m.fator}</small></span><span class="val">${eur(m.R)}</span></div>`;
-  if(m.U>0)h+=`<div class="li"><span class="lbl">Missão poupança</span><span class="val">${eur(m.U)}</span></div>`;
-  h+=`<div class="li tot"><span class="lbl">Total contribuição</span><span class="val">${eur(m.V)}</span></div>`;
+  // ─── DÉBITOS (custos para a pessoa) ───
+  h+='<div class="bd-title sf">Débitos (custos)</div>';
+  let totalDebitos=0;
 
+  // 1a) Contribuição MEO: refeições, quota, missão poupança
+  if(m._refs.length){
+    h+='<div class="meals">';
+    m._refs.forEach(r=>h+=`<div class="meal"><span class="d">${r.dia} · ${r.ref}</span><span class="p">${eur(r.p)}</span></div>`);
+    h+=`</div><div class="li tot"><span class="lbl">Total refeições</span><span class="val">${eur(m.Sown)}</span></div>`;
+  }
+  totalDebitos+=m.Sown;
+
+  if(m.R>0){h+=`<div class="li"><span class="lbl">Quota adicional<small>fator ${m.fator}</small></span><span class="val">${eur(m.R)}</span></div>`;totalDebitos+=m.R;}
+  if(m.U>0){h+=`<div class="li"><span class="lbl">Missão poupança</span><span class="val">${eur(m.U)}</span></div>`;totalDebitos+=m.U;}
+
+  // 1c) Valores que recebeu (reembolsos recebidos, mealheiro) — é custo
+  const reembolsosRecebidos=CALC.pagamentos.filter(p=>p.ref&&p.ref.startsWith('Reembolso')&&p.para===m.nome).reduce((a,p)=>a+p.valor,0);
+  if(reembolsosRecebidos>0){h+=`<div class="li"><span class="lbl">Reembolsos recebidos<small>dinheiro do grupo que ficou contigo</small></span><span class="val">${eur(rnd(reembolsosRecebidos,2))}</span></div>`;totalDebitos+=reembolsosRecebidos;}
+  if(m.W>0){h+=`<div class="li"><span class="lbl">Mealheiro<small>dinheiro recebido do mealheiro</small></span><span class="val">${eur(m.W)}</span></div>`;totalDebitos+=m.W;}
+
+  // 2b/2c) Tesoureiro: recebimentos e saldar dívida entram como débito
+  if(isTes){
+    if(m.X>0){h+=`<div class="li"><span class="lbl">Sobras ano anterior</span><span class="val">${eur(m.X)}</span></div>`;totalDebitos+=m.X;}
+    // Recebimentos (dinheiro que recebeu dos outros para saldar)
+    const pagNonReemb=CALC.pagamentos.filter(p=>!p.ref||!p.ref.startsWith('Reembolso'));
+    const recebimentosTes=pagNonReemb.filter(p=>p.para===m.nome).reduce((a,p)=>a+p.valor,0);
+    if(recebimentosTes>0){h+=`<div class="li"><span class="lbl">Recebimentos<small>pagamentos que recebeste dos membros</small></span><span class="val">${eur(rnd(recebimentosTes,2))}</span></div>`;totalDebitos+=recebimentosTes;}
+  }
+
+  // Non-tesoureiro: received saldar payments are debits
+  if(!isTes){
+    const pagNonReemb=CALC.pagamentos.filter(p=>!p.ref||!p.ref.startsWith('Reembolso'));
+    const recebimentos=pagNonReemb.filter(p=>p.para===m.nome).reduce((a,p)=>a+p.valor,0);
+    if(recebimentos>0){h+=`<div class="li"><span class="lbl">Recebimentos<small>pagamentos recebidos</small></span><span class="val">${eur(rnd(recebimentos,2))}</span></div>`;totalDebitos+=recebimentos;}
+  }
+
+  totalDebitos=rnd(totalDebitos,2);
+  h+=`<div class="li tot"><span class="lbl">Total débitos</span><span class="val minus">${eur(totalDebitos)}</span></div>`;
+
+  // ─── CRÉDITOS (a favor da pessoa) ───
+  h+='<div class="bd-title sf">Créditos (a teu favor)</div>';
+  let totalCreditos=0;
+
+  // 1b) Valores que adiantou (despesas que pagou do próprio bolso)
+  const totalPagoDespesas=DATA.despesas.filter(x=>x.quem===m.nome).reduce((a,x)=>a+x.valor,0);
+  if(totalPagoDespesas>0){h+=`<div class="li"><span class="lbl">Despesas que adiantaste</span><span class="val plus">${eur(rnd(totalPagoDespesas,2))}</span></div>`;totalCreditos+=totalPagoDespesas;}
+
+  // 2a) Tesoureiro: reembolsos que fez = crédito
+  if(isTes){
+    const reembolsosFeitos=CALC.pagamentos.filter(p=>p.ref&&p.ref.startsWith('Reembolso')&&p.de===m.nome).reduce((a,p)=>a+p.valor,0);
+    if(reembolsosFeitos>0){h+=`<div class="li"><span class="lbl">Reembolsos que fizeste<small>dinheiro devolvido a quem adiantou</small></span><span class="val plus">${eur(rnd(reembolsosFeitos,2))}</span></div>`;totalCreditos+=reembolsosFeitos;}
+  }
+
+  // 1d) Pagamentos para saldar dívida = crédito
+  if(!isTes){
+    const pagNonReemb=CALC.pagamentos.filter(p=>!p.ref||!p.ref.startsWith('Reembolso'));
+    const pagouSaldar=pagNonReemb.filter(p=>p.de===m.nome).reduce((a,p)=>a+p.valor,0);
+    if(pagouSaldar>0){h+=`<div class="li"><span class="lbl">Pagamentos para saldar dívida</span><span class="val plus">${eur(rnd(pagouSaldar,2))}</span></div>`;totalCreditos+=pagouSaldar;}
+  }
+
+  totalCreditos=rnd(totalCreditos,2);
+  if(totalCreditos===0) h+='<div class="empty sf">Sem créditos</div>';
+  h+=`<div class="li tot"><span class="lbl">Total créditos</span><span class="val plus">${eur(totalCreditos)}</span></div>`;
+
+  // ─── CONVIDADOS ───
   if(m._convs.length){h+='<div class="bd-title sf">Convidados</div><div class="meals">';
     m._convs.forEach(c=>h+=`<div class="meal"><span class="d">${c.nome} · ${c.dia} ${c.ref}</span><span class="p">${eur(c.q)}</span></div>`);
-    h+=`</div><div class="li tot"><span class="lbl">Total convidados</span><span class="val">${eur(m.AA)}</span></div>`;}
-
-  // Crédito
-  h+='<div class="bd-title sf">O que adiantaste</div>';
-  if(m._pago>0)h+=`<div class="li"><span class="lbl">Despesas que pagaste</span><span class="val plus">${eur(m._pago)}</span></div>`;
-  // Mealheiro = recebimento (dinheiro com que fiquei e não é meu)
-  if(m.W>0)h+=`<div class="li"><span class="lbl">Mealheiro (recebimento)</span><span class="val plus">${eur(m.W)}</span></div>`;
-  if(m.X>0)h+=`<div class="li"><span class="lbl">Sobras ano anterior</span><span class="val plus">${eur(m.X)}</span></div>`;
-  if(!m._pago&&!m.W&&!m.X)h+='<div class="empty sf">Sem adiantamentos</div>';
-  // Sobras do grupo do ano corrente NÃO entram na conta da pessoa (req #4)
-  // m.AB is only used in AC calculation for tesoureiro but we don't show it as personal credit
-  h+=`<div class="li tot"><span class="lbl">Saldo base</span><span class="val ${m.AC>=0?'plus':'minus'}">${eur(m.AC)}</span></div>`;
-
-  // Pagamentos
-  if(m._pagamentos.length){h+='<div class="bd-title sf">Pagamentos</div>';
-    m._pagamentos.forEach(p=>{const sent=p.de===m.nome;
-      h+=`<div class="li"><span class="lbl">${sent?'Pagaste a '+p.para:'Recebeste de '+p.de}<small>${p.data||''}${p.ref?' · '+truncRef(p.ref):''}</small></span>
-        <span class="val ${sent?'minus':'plus'}">${sent?'−':''}${eur(p.valor)}</span></div>`;});
-    h+=`<div class="li tot"><span class="lbl">Saldo após pagamentos</span><span class="val ${sf>=0?'plus':'minus'}">${eur(sf)}</span></div>`;}
+    h+=`</div><div class="li tot"><span class="lbl">Total convidados (a receber)</span><span class="val">${eur(m.AA)}</span></div>`;}
 
   document.getElementById('sheet-hdr').innerHTML=`
     <div class="grab"></div>
