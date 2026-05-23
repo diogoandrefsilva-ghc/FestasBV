@@ -424,7 +424,7 @@ function calcular(data){
       parts.forEach(pt=>{
         if(pt.startsWith('own:')){
           const nome=pt.slice(4);const m=mByName[nome];
-          if(m){const v=Math.max(0,rnd(m.V-m.Y-m.W-m.X,2));items.push({type:'own',nome,v});totalItems+=v;}
+          if(m){const v=rnd(m.V-m.Y-m.W-m.X,2);items.push({type:'own',nome,v});totalItems+=v;}
         } else if(pt.startsWith('conv:')){
           const nome=pt.slice(5);const m=mByName[nome];
           if(m){const v=Math.max(0,m.AA);items.push({type:'conv',nome,v});totalItems+=v;}
