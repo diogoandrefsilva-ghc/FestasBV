@@ -178,7 +178,7 @@ body.no-scroll{overflow:hidden;position:fixed;width:100%;}
 .pl-item .pl-del{width:26px;height:26px;border-radius:7px;border:1px solid var(--line);background:transparent;color:var(--red);font-size:14px;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:.12s;flex-shrink:0;opacity:.6}
 .pl-item .pl-del:hover{opacity:1;background:rgba(255,107,107,.1)}
 .modal label input[type="checkbox"]{width:auto!important;display:inline;vertical-align:middle}
-.sf,.eyebrow,.syncpill,.hero .cell .k,.tabs,.tab,.mrow .nm small,.card .meta,.chip,.sec-title,.back-btn,.bd-title,.li .lbl small,.meal,.sheet .final .k,.sheet .verdict,.empty,.fab,.modal,.modal h3,.modal p,.modal label,.modal input,.modal select,.modal textarea,.btn,.note,.seg-btn,.toast,.badge,.year-nav,.yr-btn,.yr-label,.cf-opt,.cf-lbl,.sd-chip,.card-act,.inline-row,.pl-item,.pl-name,.pl-fator{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+.sf,.eyebrow,.syncpill,.hero .cell .k,.tabs,.tab,.mrow .nm small,.card .meta,.chip,.sec-title,.back-btn,.bd-title,.li .lbl small,.meal,.sheet .final .k,.sheet .verdict,.empty,.fab,.modal,.modal h3,.modal p,.modal label,.modal input,.modal select,.modal textarea,.btn,.note,.seg-btn,.toast,.badge,.year-nav,.yr-btn,.yr-label,.cf-opt,.cf-lbl,.sd-chip,.card-act,.inline-row,.pl-item,.pl-name,.pl-fator,.refdef-modal-grid,.refdef-modal-grid label,.refdef-modal-grid input,.refdef-modal-grid select{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
 header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
 
 /* Cash-flow filters */
@@ -187,6 +187,77 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .cf-filter select{width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:9px 32px 9px 11px;color:var(--ink);font-size:13px;font-weight:600;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;-webkit-appearance:none;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238a93a2' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;cursor:pointer;transition:.15s}
 .cf-filter select:focus{outline:none;border-color:var(--gold)}
 .cf-filter select option{background:var(--panel);color:var(--ink)}
+
+/* ═══ PRESENÇAS GRID ═══ */
+.pres-section{margin-top:4px;margin-bottom:22px}
+.pres-legend{display:flex;gap:12px;margin:10px 0 8px;font-size:11px;color:var(--faint);align-items:center;flex-wrap:wrap}
+.pres-legend-item{display:flex;align-items:center;gap:5px}
+.pres-legend-dot{width:12px;height:12px;border-radius:4px;flex-shrink:0}
+.pres-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding-bottom:6px}
+.pres-scroll::-webkit-scrollbar{display:none}
+.pres-table{border-collapse:separate;border-spacing:0;min-width:100%}
+.pres-table th,.pres-table td{padding:0;text-align:center;vertical-align:middle}
+.pres-table thead th{position:sticky;top:0;z-index:2;background:var(--panel);padding:0 2px}
+.pres-corner{min-width:90px;position:sticky;left:0;z-index:3;background:var(--panel)!important}
+.pres-day-hdr{padding:6px 2px 2px!important;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--gold);font-weight:700;border-bottom:2px solid var(--gold);white-space:nowrap}
+.pres-ref-hdr{padding:4px 3px 7px!important;font-size:9.5px;color:var(--muted);font-weight:600;white-space:nowrap;min-width:36px}
+.pres-ref-hdr .ref-icon{display:block;font-size:14px;line-height:1;margin-bottom:1px}
+.pres-name{position:sticky;left:0;z-index:1;background:var(--panel);text-align:left!important;padding:0 10px 0 0!important;white-space:nowrap}
+.pres-name-inner{display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--line)}
+.pres-name-av{width:26px;height:26px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:10px;color:#1a1205;flex-shrink:0}
+.pres-name-txt{font-size:12.5px;font-weight:600;max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pres-cell{padding:3px 2px!important;border-bottom:1px solid rgba(42,49,60,.4)}
+.pres-btn{width:32px;height:32px;border-radius:8px;border:1.5px solid var(--line);background:var(--panel2);cursor:pointer;transition:.15s;display:flex;align-items:center;justify-content:center;margin:0 auto;position:relative;overflow:hidden}
+.pres-btn:active{transform:scale(.88)}
+.pres-btn.on{border-color:var(--green);background:rgba(62,207,142,.12)}
+.pres-btn.on::after{content:"✓";color:var(--green);font-size:14px;font-weight:800}
+.pres-btn:not(.on)::after{content:"";display:block;width:8px;height:8px;border-radius:50%;background:var(--line)}
+.pres-btn.saving{pointer-events:none;opacity:.5}
+.pres-btn.on.saving::after{content:"";border:2px solid var(--green);border-top-color:transparent;border-radius:50%;width:12px;height:12px;background:none;animation:sp .5s linear infinite}
+.pres-count{font-size:10px;font-weight:700;color:var(--faint);text-align:center;padding:4px 0;border-top:2px solid var(--line)}
+.pres-count.has{color:var(--green)}
+.pres-member-count{font-size:11px;font-weight:700;color:var(--muted);padding:3px 0;text-align:right;min-width:30px;border-bottom:1px solid rgba(42,49,60,.4)}
+.pres-member-count.full{color:var(--green)}
+
+/* Stats row at bottom */
+.pres-stats{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+.pres-stat{flex:1;min-width:70px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:9px 10px;text-align:center}
+.pres-stat .ps-val{font-size:20px;font-weight:700;color:var(--ink)}
+.pres-stat .ps-lbl{font-size:10px;color:var(--faint);text-transform:uppercase;letter-spacing:.06em;margin-top:2px}
+
+/* Select all row */
+.pres-selall{padding:3px 2px!important;border-bottom:2px solid var(--line)}
+.pres-selall-btn{width:32px;height:26px;border-radius:6px;border:1px dashed var(--faint);background:transparent;cursor:pointer;transition:.15s;display:flex;align-items:center;justify-content:center;margin:0 auto;font-size:10px;color:var(--faint);font-weight:700}
+.pres-selall-btn:active{transform:scale(.9);background:rgba(232,176,75,.08)}
+.pres-selall-btn.all{border-style:solid;border-color:var(--green);color:var(--green)}
+
+/* ═══ REFEIÇÕES DEF ═══ */
+.refdef-section{margin-bottom:22px}
+.refdef-cards{display:flex;flex-direction:column;gap:6px;margin-top:8px}
+.refdef-day{margin-bottom:4px}
+.refdef-day-hdr{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--gold);font-weight:700;margin:12px 0 6px;display:flex;align-items:center;gap:8px}
+.refdef-day-hdr::after{content:"";flex:1;height:1px;background:linear-gradient(90deg,var(--gold),transparent 60%)}
+.refdef-row{display:flex;align-items:center;gap:8px;padding:9px 12px;background:var(--panel2);border:1px solid var(--line);border-radius:10px}
+.refdef-icon{font-size:18px;flex-shrink:0}
+.refdef-info{flex:1;min-width:0}
+.refdef-ref{font-size:14px;font-weight:600;color:var(--ink)}
+.refdef-date{font-size:11px;color:var(--faint)}
+.refdef-params{display:flex;gap:6px;font-size:10.5px;color:var(--muted);margin-top:2px;flex-wrap:wrap}
+.refdef-params span{background:var(--panel);padding:1px 6px;border-radius:4px}
+.refdef-actions{display:flex;gap:4px;flex-shrink:0}
+.refdef-del{width:26px;height:26px;border-radius:7px;border:1px solid var(--line);background:transparent;color:var(--red);font-size:13px;display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:.5;transition:.12s}
+.refdef-del:active{opacity:1;background:rgba(255,107,107,.1);transform:scale(.9)}
+.refdef-edit{width:26px;height:26px;border-radius:7px;border:1px solid var(--line);background:transparent;color:var(--muted);font-size:12px;display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:.5;transition:.12s}
+.refdef-edit:active{opacity:1;background:rgba(232,176,75,.1);transform:scale(.9)}
+.refdef-empty{text-align:center;padding:20px;color:var(--faint);font-size:13px;border:1px dashed var(--line);border-radius:10px}
+.refdef-add-bar{margin-top:10px;display:flex;gap:8px;align-items:center}
+.refdef-add-btn{display:flex;align-items:center;gap:6px;padding:10px 16px;border-radius:10px;border:1.5px dashed var(--line);background:transparent;color:var(--gold);font-size:13px;font-weight:600;cursor:pointer;transition:.15s;flex:1;justify-content:center}
+.refdef-add-btn:active{background:rgba(232,176,75,.06);transform:scale(.97)}
+
+/* Ref def modal */
+.refdef-modal-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.refdef-modal-grid>div{min-width:0}
+.refdef-modal-full{grid-column:1/-1}
 </style>
 </head>
 <body>
@@ -270,6 +341,50 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
     <div class="mbtns">
       <button class="btn ghost" onclick="closeEditCf()">Cancelar</button>
       <button class="btn prim" id="edit-cf-save" onclick="saveEditCf()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Refeição Definition modal -->
+<div class="modal-bg" id="refdef-bg">
+  <div class="modal" id="refdef-modal">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <h3 style="margin-bottom:0" id="refdef-title">Adicionar Refeição</h3>
+      <button onclick="closeRefdefModal()" style="background:var(--panel2);border:1px solid var(--line);color:var(--muted);border-radius:9px;width:32px;height:32px;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0">✕</button>
+    </div>
+    <div class="refdef-modal-grid">
+      <div>
+        <label>Data</label>
+        <input type="date" id="rd-data">
+      </div>
+      <div>
+        <label>Refeição</label>
+        <select id="rd-ref">
+          <option value="Almoço">🍳 Almoço</option>
+          <option value="Jantar" selected>🍖 Jantar</option>
+          <option value="Lanche">☕ Lanche</option>
+        </select>
+      </div>
+      <div>
+        <label>Peso indireto</label>
+        <input type="number" id="rd-peso" step="0.05" min="0" max="1" value="0" placeholder="0" inputmode="decimal">
+      </div>
+      <div>
+        <label>Mín. MEO (€)</label>
+        <input type="number" id="rd-minmeo" step="0.5" min="0" value="0" placeholder="0" inputmode="decimal">
+      </div>
+      <div>
+        <label>Mín. Convidado (€)</label>
+        <input type="number" id="rd-minconv" step="0.5" min="0" value="10" placeholder="10" inputmode="decimal">
+      </div>
+      <div>
+        <label>Extra conv. (€)</label>
+        <input type="number" id="rd-extraconv" step="0.5" min="0" value="2" placeholder="2" inputmode="decimal">
+      </div>
+    </div>
+    <div class="mbtns">
+      <button class="btn ghost" onclick="closeRefdefModal()">Cancelar</button>
+      <button class="btn prim" id="rd-save" onclick="saveRefdef()">Guardar</button>
     </div>
   </div>
 </div>
@@ -649,13 +764,67 @@ function renderAll(){
   h+='</div>';document.getElementById('view-saldos').innerHTML=h;
 
   // REFEIÇÕES
-  let r='<div class="sec-title sf">Custo por pessoa em cada refeição</div>';
-  CALC.refeicoes.filter(x=>x.D>0).forEach(x=>{
+  let r='';
+  
+  // ── Section 1: Definição de Refeições ──
+  r+='<div class="refdef-section">';
+  r+='<div class="sec-title sf">Calendário de Refeições</div>';
+  if(!DATA.refeicoesDef||!DATA.refeicoesDef.length){
+    r+='<div class="refdef-empty sf">Nenhuma refeição definida para este ano.<br>Adiciona dias e refeições para começar.</div>';
+  } else {
+    // Group by day
+    const dayOrder=[];const dayMap={};
+    DATA.refeicoesDef.forEach((rd,i)=>{
+      if(!dayMap[rd.dia]){dayMap[rd.dia]={dia:rd.dia,data:rd.data,refs:[]};dayOrder.push(rd.dia);}
+      dayMap[rd.dia].refs.push({...rd,_idx:i});
+    });
+    r+='<div class="refdef-cards">';
+    dayOrder.forEach(dia=>{
+      const dg=dayMap[dia];
+      r+=`<div class="refdef-day">`;
+      r+=`<div class="refdef-day-hdr sf">${dia} · ${dg.data}</div>`;
+      dg.refs.forEach(rd=>{
+        const icon=rd.ref==='Almoço'?'🍳':rd.ref==='Jantar'?'🍖':'☕';
+        r+=`<div class="refdef-row">
+          <span class="refdef-icon">${icon}</span>
+          <div class="refdef-info">
+            <div class="refdef-ref sf">${rd.ref}</div>
+            <div class="refdef-params sf">
+              <span>peso ${rd.peso??0}</span>
+              <span>mín €${rd.minMEO||0}</span>
+              <span>conv €${rd.minConv||0}+${rd.extraConv||0}</span>
+            </div>
+          </div>
+          <div class="refdef-actions">
+            <button class="refdef-edit" onclick="editRefdef(${rd._idx})" title="Editar">✎</button>
+            <button class="refdef-del" onclick="deleteRefdef(${rd._idx})" title="Remover">✕</button>
+          </div>
+        </div>`;
+      });
+      r+='</div>';
+    });
+    r+='</div>';
+  }
+  r+=`<div class="refdef-add-bar"><button class="refdef-add-btn sf" onclick="openRefdefModal()">＋ Adicionar Refeição</button></div>`;
+  r+='</div>';
+
+  // ── Section 2: Custo por pessoa ──
+  r+='<div class="sec-title sf">Custo por pessoa em cada refeição</div>';
+  const refsWithPeople=CALC.refeicoes.filter(x=>x.D>0);
+  if(!refsWithPeople.length){
+    r+='<div class="empty sf">Sem refeições com presenças registadas</div>';
+  }
+  refsWithPeople.forEach(x=>{
     r+=`<div class="card"><div class="top"><div class="desc">${x.dia} · ${x.ref}</div>
       <div class="v">${eur(x.P)}<span style="color:var(--faint);font-weight:400;font-size:12px">/membro</span></div></div>
       <div class="meta"><span class="chip">${x.D} pessoas</span>${x.E?`<span class="chip">${x.E} convidados</span>`:''
       }${x.Q?`<span class="chip t">conv. ${eur(x.Q)}</span>`:''}<span class="chip">total ${eur(rnd(x.D*x.L,2))}</span></div></div>`;
-  });document.getElementById('view-refeicoes').innerHTML=r;
+  });
+
+  // ── Section 3: Grelha de Presenças ──
+  r+=renderPresencaGrid();
+
+  document.getElementById('view-refeicoes').innerHTML=r;
 
   // CASH-FLOWS — merge all 5 types into one list
   renderCashFlows();
@@ -1593,12 +1762,251 @@ async function updateFator(idx,val){
   }
 }
 
+/* ═══ PRESENÇAS GRID ═══ */
+function renderPresencaGrid(){
+  if(!DATA||!DATA.refeicoesDef||!DATA.refeicoesDef.length||!DATA.membros||!DATA.membros.length)
+    return '<div class="sec-title sf" style="margin-top:18px">Presenças</div><div class="empty sf">Define refeições e membros primeiro</div>';
+
+  const refs=DATA.refeicoesDef;
+  const mbrs=DATA.membros;
+
+  // Build columns: group by day
+  const days=[];const dayIdx={};
+  refs.forEach((rd,i)=>{
+    if(dayIdx[rd.dia]===undefined){dayIdx[rd.dia]=days.length;days.push({dia:rd.dia,data:rd.data,slots:[]});}
+    // Slot key used in presencas: "Dia|Ref" but Lanche is stored as "Dia|Tarde"
+    const slotKey=rd.dia+'|'+(rd.ref==='Lanche'?'Tarde':rd.ref);
+    days[dayIdx[rd.dia]].slots.push({ref:rd.ref,key:slotKey,idx:i});
+  });
+
+  const totalSlots=refs.length;
+
+  let h='<div class="pres-section">';
+  h+='<div class="sec-title sf" style="margin-top:18px">Presenças</div>';
+  h+='<div class="pres-legend sf">';
+  h+='<div class="pres-legend-item"><div class="pres-legend-dot" style="background:var(--green)"></div> Presente</div>';
+  h+='<div class="pres-legend-item"><div class="pres-legend-dot" style="background:var(--line)"></div> Ausente</div>';
+  h+='</div>';
+
+  h+='<div class="pres-scroll">';
+  h+='<table class="pres-table">';
+
+  // Header row 1: day names spanning their slots
+  h+='<thead><tr><th class="pres-corner"></th>';
+  days.forEach(d=>{
+    h+=`<th class="pres-day-hdr sf" colspan="${d.slots.length}">${d.dia}<div style="font-size:9px;font-weight:500;color:var(--faint);letter-spacing:0;text-transform:none;margin-top:1px">${d.data.slice(5)}</div></th>`;
+  });
+  h+='<th class="pres-day-hdr sf" style="border-bottom-color:var(--muted)">Σ</th></tr>';
+
+  // Header row 2: ref names
+  h+='<tr><th class="pres-corner"></th>';
+  days.forEach(d=>{
+    d.slots.forEach(s=>{
+      const icon=s.ref==='Almoço'?'🍳':s.ref==='Jantar'?'🍖':'☕';
+      h+=`<th class="pres-ref-hdr sf"><span class="ref-icon">${icon}</span>${s.ref.slice(0,3)}</th>`;
+    });
+  });
+  h+='<th class="pres-ref-hdr sf" style="color:var(--muted)">Total</th></tr>';
+
+  // Select-all row
+  h+='<tr><td class="pres-name" style="border-bottom:2px solid var(--line)"><span class="sf" style="font-size:10px;color:var(--faint);padding-left:2px">Sel. todos</span></td>';
+  days.forEach(d=>{
+    d.slots.forEach(s=>{
+      const allOn=mbrs.every(m=>(m.presencas||[]).includes(s.key));
+      h+=`<td class="pres-selall"><button class="pres-selall-btn sf${allOn?' all':''}" onclick="toggleAllSlot('${s.key}',this)" title="Selecionar/desselecionar todos">${allOn?'✓':'∀'}</button></td>`;
+    });
+  });
+  h+='<td class="pres-selall"></td></tr></thead>';
+
+  // Member rows
+  h+='<tbody>';
+  mbrs.forEach((m,mi)=>{
+    const pres=m.presencas||[];
+    const memberCount=pres.length;
+    h+='<tr>';
+    h+=`<td class="pres-name"><div class="pres-name-inner"><div class="pres-name-av" style="background:${AVCOL[mi%AVCOL.length]}">${m.nome.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase()}</div><span class="pres-name-txt sf">${m.nome}</span></div></td>`;
+    days.forEach(d=>{
+      d.slots.forEach(s=>{
+        const isOn=pres.includes(s.key);
+        h+=`<td class="pres-cell"><button class="pres-btn${isOn?' on':''}" data-member="${mi}" data-slot="${s.key}" onclick="togglePresenca(${mi},'${s.key}',this)"></button></td>`;
+      });
+    });
+    h+=`<td class="pres-member-count sf${memberCount===totalSlots?' full':''}">${memberCount}/${totalSlots}</td>`;
+    h+='</tr>';
+  });
+  h+='</tbody>';
+
+  // Footer: count per slot
+  h+='<tfoot><tr><td class="pres-name" style="border-bottom:none"><span class="sf" style="font-size:10px;color:var(--faint);padding-left:2px">Total</span></td>';
+  days.forEach(d=>{
+    d.slots.forEach(s=>{
+      const count=mbrs.filter(m=>(m.presencas||[]).includes(s.key)).length;
+      h+=`<td class="pres-count sf${count>0?' has':''}">${count}</td>`;
+    });
+  });
+  const totalPres=mbrs.reduce((a,m)=>a+(m.presencas||[]).length,0);
+  h+=`<td class="pres-count sf has">${totalPres}</td>`;
+  h+='</tr></tfoot></table></div>';
+
+  // Stats
+  const avgPerMember=mbrs.length?rnd(totalPres/mbrs.length,1):0;
+  const fullMembers=mbrs.filter(m=>(m.presencas||[]).length===totalSlots).length;
+  h+='<div class="pres-stats sf">';
+  h+=`<div class="pres-stat"><div class="ps-val">${totalPres}</div><div class="ps-lbl">Presenças</div></div>`;
+  h+=`<div class="pres-stat"><div class="ps-val">${avgPerMember}</div><div class="ps-lbl">Média/pessoa</div></div>`;
+  h+=`<div class="pres-stat"><div class="ps-val">${fullMembers}</div><div class="ps-lbl">Presença total</div></div>`;
+  h+='</div></div>';
+  return h;
+}
+
+let presDebounce=null;
+async function togglePresenca(memberIdx,slotKey,btn){
+  if(btn.classList.contains('saving'))return;
+  const m=DATA.membros[memberIdx];
+  if(!m.presencas)m.presencas=[];
+  const idx=m.presencas.indexOf(slotKey);
+  if(idx>=0){m.presencas.splice(idx,1);btn.classList.remove('on');}
+  else{m.presencas.push(slotKey);btn.classList.add('on');}
+  btn.classList.add('saving');
+
+  // Debounce: wait 600ms of inactivity before pushing
+  clearTimeout(presDebounce);
+  presDebounce=setTimeout(async()=>{
+    const ok=await pushToGitHub('Atualizar presenças');
+    document.querySelectorAll('.pres-btn.saving').forEach(b=>b.classList.remove('saving'));
+    if(ok){
+      CALC=calcular(JSON.parse(JSON.stringify(DATA)));
+      renderAll();
+      toast('Presenças atualizadas ✓','ok');
+    }
+  },600);
+}
+
+async function toggleAllSlot(slotKey,btn){
+  const mbrs=DATA.membros;
+  const allOn=mbrs.every(m=>(m.presencas||[]).includes(slotKey));
+  mbrs.forEach(m=>{
+    if(!m.presencas)m.presencas=[];
+    const idx=m.presencas.indexOf(slotKey);
+    if(allOn){if(idx>=0)m.presencas.splice(idx,1);}
+    else{if(idx<0)m.presencas.push(slotKey);}
+  });
+
+  const ok=await pushToGitHub('Presenças em massa: '+slotKey);
+  if(ok){
+    CALC=calcular(JSON.parse(JSON.stringify(DATA)));
+    renderAll();
+    toast('Presenças atualizadas ✓','ok');
+  }
+}
+
+/* ═══ REFEIÇÕES DEF CRUD ═══ */
+let editingRefdef=null;
+
+function openRefdefModal(editIdx){
+  editingRefdef=typeof editIdx==='number'?editIdx:null;
+  const isEdit=editingRefdef!==null;
+  document.getElementById('refdef-title').textContent=isEdit?'Editar Refeição':'Adicionar Refeição';
+
+  if(isEdit){
+    const rd=DATA.refeicoesDef[editingRefdef];
+    document.getElementById('rd-data').value=rd.data||'';
+    document.getElementById('rd-ref').value=rd.ref||'Jantar';
+    document.getElementById('rd-peso').value=rd.peso??0;
+    document.getElementById('rd-minmeo').value=rd.minMEO||0;
+    document.getElementById('rd-minconv').value=rd.minConv||10;
+    document.getElementById('rd-extraconv').value=rd.extraConv||2;
+  } else {
+    document.getElementById('rd-data').value='';
+    document.getElementById('rd-ref').value='Jantar';
+    document.getElementById('rd-peso').value='0';
+    document.getElementById('rd-minmeo').value='0';
+    document.getElementById('rd-minconv').value='10';
+    document.getElementById('rd-extraconv').value='2';
+  }
+  document.getElementById('refdef-bg').classList.add('show');
+  document.body.classList.add('no-scroll');
+}
+
+function closeRefdefModal(){
+  document.getElementById('refdef-bg').classList.remove('show');
+  document.body.classList.remove('no-scroll');
+  editingRefdef=null;
+}
+
+function editRefdef(idx){openRefdefModal(idx);}
+
+function dataToDia(dateStr){
+  const d=new Date(dateStr+'T12:00:00');
+  return['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'][d.getDay()];
+}
+
+async function saveRefdef(){
+  const data=document.getElementById('rd-data').value;
+  const ref=document.getElementById('rd-ref').value;
+  const peso=parseFloat(document.getElementById('rd-peso').value)||0;
+  const minMEO=parseFloat(document.getElementById('rd-minmeo').value)||0;
+  const minConv=parseFloat(document.getElementById('rd-minconv').value)||0;
+  const extraConv=parseFloat(document.getElementById('rd-extraconv').value)||0;
+
+  if(!data){toast('Seleciona uma data','bad');return;}
+  const dia=dataToDia(data);
+  if(!dia){toast('Data inválida','bad');return;}
+
+  // Check duplicate (same date + ref), exclude current if editing
+  const dup=DATA.refeicoesDef.findIndex((rd,i)=>rd.data===data&&rd.ref===ref&&i!==editingRefdef);
+  if(dup>=0){toast(`${dia} ${ref} já existe`,'bad');return;}
+
+  const entry={data,dia,ref,peso:ref==='Lanche'?null:peso,minMEO,minConv,extraConv};
+
+  document.getElementById('rd-save').disabled=true;
+  if(editingRefdef!==null){
+    DATA.refeicoesDef[editingRefdef]=entry;
+  } else {
+    if(!DATA.refeicoesDef)DATA.refeicoesDef=[];
+    DATA.refeicoesDef.push(entry);
+  }
+
+  // Sort by date then by ref order (Almoço < Lanche < Jantar)
+  const refOrd={Almoço:0,Lanche:1,Jantar:2};
+  DATA.refeicoesDef.sort((a,b)=>a.data.localeCompare(b.data)||(refOrd[a.ref]||0)-(refOrd[b.ref]||0));
+
+  const ok=await pushToGitHub((editingRefdef!==null?'Editar':'Adicionar')+' refeição: '+dia+' '+ref);
+  document.getElementById('rd-save').disabled=false;
+  if(ok){
+    closeRefdefModal();
+    CALC=calcular(JSON.parse(JSON.stringify(DATA)));
+    renderAll();
+    toast((editingRefdef!==null?'Refeição editada':'Refeição adicionada')+' ✓','ok');
+  }
+}
+
+async function deleteRefdef(idx){
+  const rd=DATA.refeicoesDef[idx];
+  if(!confirm(`Remover ${rd.dia} ${rd.ref}?`))return;
+  // Also clean up presencas that reference this slot
+  const slotKey=rd.dia+'|'+(rd.ref==='Lanche'?'Tarde':rd.ref);
+  DATA.membros.forEach(m=>{
+    if(!m.presencas)return;
+    const pi=m.presencas.indexOf(slotKey);
+    if(pi>=0)m.presencas.splice(pi,1);
+  });
+  DATA.refeicoesDef.splice(idx,1);
+  const ok=await pushToGitHub('Remover refeição: '+rd.dia+' '+rd.ref);
+  if(ok){
+    CALC=calcular(JSON.parse(JSON.stringify(DATA)));
+    renderAll();
+    toast('Refeição removida ✓','ok');
+  }
+}
+
 /* GO */
 carregar();
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)carregar();});
 document.getElementById('admin-bg').addEventListener('click',e=>{if(e.target.id==='admin-bg')closeAdmin();});
 document.getElementById('pay-bg').addEventListener('click',e=>{if(e.target.id==='pay-bg')closePayModal();});
 document.getElementById('edit-cf-bg').addEventListener('click',e=>{if(e.target.id==='edit-cf-bg')closeEditCf();});
+document.getElementById('refdef-bg').addEventListener('click',e=>{if(e.target.id==='refdef-bg')closeRefdefModal();});
 </script>
 </body>
 </html>
