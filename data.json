@@ -4,8 +4,8 @@
    "nome": "MEO 2025",
    "ano": 2025,
    "tesoureiro": "Diogo",
-   "descontoTshirts": 44,
-   "saldoAnoAnterior": 0
+   "descontoTshirts": 0,
+   "saldoAnoAnterior": 68.88
   },
   "membros": [
    {
@@ -1043,18 +1043,21 @@
    {
     "quem": "Diogo",
     "data": "2025-01-01",
-    "valor": 68.88,
-    "subtipo": "sobras_ano_anterior"
+    "valor": 44,
+    "subtipo": "outros",
+    "desc": "Desconto t-shirts"
    },
    {
     "quem": "Diogo",
     "data": "2025-08-11",
-    "valor": 84
+    "valor": 84,
+    "subtipo": "lata"
    },
    {
     "quem": "Diogo",
     "data": "2025-08-13",
-    "valor": 19
+    "valor": 19,
+    "subtipo": "lata"
    }
   ],
   "pagamentos": [

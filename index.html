@@ -371,7 +371,7 @@ function calcular(data){
   const totRefMembros=rnd(membros.reduce((a,m)=>a+m.Sown,0),2);
   const totGuestPayments=rnd(membros.reduce((a,m)=>a+m.AA,0),2);
   const sobrasTot=rnd(evento.saldoAnoAnterior||0,2);
-  const descontoTot=rnd(evento.descontoTshirts||0,2);
+  const descontoTot=0; // migrado para mealheiros com subtipo 'outros'
   const mealTot=mealheiros.reduce((a,x)=>a+x.valor,0);
 
   const baseQuota=totalDesp-(totRefMembros+totGuestPayments+sobrasTot+descontoTot+mealTot);
@@ -386,7 +386,7 @@ function calcular(data){
     m.U=rnd(roundup(m.Sown+m.R,0)-m.R-m.Sown+1+m.T,2);
     m.V=rnd(m.Sown+m.R+m.U,2);
     m.W=mealBy[m.nome]||0;
-    m.X=m.nome===evento.tesoureiro?rnd(sobrasTot+descontoTot,2):0;
+    m.X=m.nome===evento.tesoureiro?rnd(sobrasTot,2):0;
     const totalPago=despesas.filter(x=>x.quem===m.nome).reduce((a,x)=>a+x.valor,0);
     const reembolsadas=pag.filter(p=>p.ref&&p.ref.startsWith('Reembolso')&&p.para===m.nome).reduce((a,p)=>a+p.valor,0);
     const recebeuReemb=pag.filter(p=>p.ref&&p.ref.startsWith('Reembolso')&&p.de===m.nome).reduce((a,p)=>a+p.valor,0);
@@ -576,10 +576,9 @@ function renderCashFlows(){
 
   // 3) Mealheiros
   (DATA.mealheiros||[]).forEach((m,i)=>{
-    const isSobras=m.subtipo==='sobras_ano_anterior';
-    allCf.push({type:'mealheiro',date:m.data||'',
-      label:isSobras?'Sobras Ano Anterior':'Mealheiro',
-      icon:isSobras?'🏦':'🐷',
+    const subIcons={'sobras_ano_anterior':['🏦','Sobras Ano Anterior'],'outros':['🎁','Outros']};
+    const [mIcon,mLabel]=subIcons[m.subtipo]||['🐷','Lata'];
+    allCf.push({type:'mealheiro',date:m.data||'',label:mLabel,icon:mIcon,
       line1:`${m.quem} recebeu`,line2:'',valor:m.valor,source:'mealheiros',idx:i,people:[m.quem]});
   });
 
@@ -865,8 +864,9 @@ function updateCfForm(){
     f.innerHTML=`
       <label>Tipo de mealheiro</label>
       <div class="cf-wheel" id="meal-subtype-wheel" style="margin-bottom:4px">
-        <div class="cf-opt on" data-sub="corrente" onclick="setMealSubtype(this,'corrente')"><span class="cf-icon">📅</span><span class="cf-lbl">Ano Corrente</span></div>
-        <div class="cf-opt" data-sub="sobras" onclick="setMealSubtype(this,'sobras')"><span class="cf-icon">🏦</span><span class="cf-lbl">Sobras Ano Anterior</span></div>
+        <div class="cf-opt on" data-sub="corrente" onclick="setMealSubtype(this,'corrente')"><span class="cf-icon">🐷</span><span class="cf-lbl">Lata</span></div>
+        <div class="cf-opt" data-sub="sobras" onclick="setMealSubtype(this,'sobras')"><span class="cf-icon">🏦</span><span class="cf-lbl">Sobras Ano Ant.</span></div>
+        <div class="cf-opt" data-sub="outros" onclick="setMealSubtype(this,'outros')"><span class="cf-icon">🎁</span><span class="cf-lbl">Outros</span></div>
       </div>
       <div id="meal-corrente-fields">
         <label>Quem recebeu?</label>
@@ -903,7 +903,14 @@ function updateCfForm(){
 function setMealSubtype(el, sub){
   document.querySelectorAll('#meal-subtype-wheel .cf-opt').forEach(e=>e.classList.toggle('on',e.dataset.sub===sub));
   document.getElementById('meal-corrente-fields').style.display = sub==='corrente' ? '' : 'none';
-  document.getElementById('meal-sobras-fields').style.display = sub==='sobras' ? '' : 'none';
+  document.getElementById('meal-sobras-fields').style.display = (sub==='sobras'||sub==='outros') ? '' : 'none';
+  const lbl=sub==='outros'?'Que tipo de entrada é esta?':'Quem recebeu as sobras?';
+  const note=sub==='outros'?'Regista entradas avulsas que reduzem a quota do grupo (ex: desconto t-shirts, patrocínios).':'Regista o valor das sobras do ano anterior recebidas. Este valor é somado ao saldo inicial do grupo.';
+  const el2=document.getElementById('meal-sobras-fields');
+  if(el2){
+    el2.querySelector('label')&&(el2.querySelector('label').textContent=lbl);
+    el2.querySelector('p')&&(el2.querySelector('p').textContent=note);
+  }
 }
 
 function updateSdChips(){
@@ -1020,11 +1027,13 @@ async function saveCashFlow(){
       if(!whoSobras){toast('Seleciona a pessoa','bad');document.getElementById('pay-save').disabled=false;return;}
       if(!valSobras||valSobras<=0){toast('Valor inválido','bad');document.getElementById('pay-save').disabled=false;return;}
       // Store as mealheiro with a special subtype flag
-      DATA.mealheiros.push({quem:whoSobras,data:dateSobras,valor:rnd(valSobras,2),subtipo:'sobras_ano_anterior'});
-      commitMsg=`Sobras ano anterior: ${whoSobras} ${eur(valSobras)}`;
+      const realSub=mealSub==='sobras'?'sobras_ano_anterior':'outros';
+      DATA.mealheiros.push({quem:whoSobras,data:dateSobras,valor:rnd(valSobras,2),subtipo:realSub});
+      const realLabel=mealSub==='sobras'?'Sobras ano anterior':'Outros';
+      commitMsg=`${realLabel}: ${whoSobras} ${eur(valSobras)}`;
     } else {
-      DATA.mealheiros.push({quem:who,data:date,valor:rnd(val,2)});
-      commitMsg=`Mealheiro: ${who} ${eur(val)}`;
+      DATA.mealheiros.push({quem:who,data:date,valor:rnd(val,2),subtipo:'lata'});
+      commitMsg=`Lata: ${who} ${eur(val)}`;
     }
   } else if(cfDir==='saldar'){
     const covParts=[];
