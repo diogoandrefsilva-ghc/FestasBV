@@ -627,7 +627,12 @@ function renderCashFlows(){
     });
   }
 
-  pp+=`<div class="sec-title sf">Cash-Flows (${filtered.length}${filtered.length!==allCf.length?' de '+allCf.length:''})</div>`;
+  const filteredTotal=filtered.reduce((a,cf)=>a+cf.valor,0);
+  const showTotal=(cfFilterType!=='all'||cfFilterPerson!=='all')&&filtered.length>0;
+  pp+=`<div class="sec-title sf" style="display:flex;justify-content:space-between;align-items:center">
+    <span>Cash-Flows (${filtered.length}${filtered.length!==allCf.length?' de '+allCf.length:''})</span>
+    ${showTotal?`<span style="color:var(--gold);font-size:12px;font-weight:700;letter-spacing:0">${eur(filteredTotal)}</span>`:''}
+  </div>`;
   if(!filtered.length) pp+='<div class="empty sf">Nenhum cash-flow encontrado</div>';
 
   filtered.forEach(cf=>{
