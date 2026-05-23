@@ -1289,15 +1289,6 @@
    {
     "data": "2025-08-13",
     "dia": "Qua",
-    "ref": "Almoço",
-    "peso": 0,
-    "minMEO": 0,
-    "minConv": 7.5,
-    "extraConv": 0
-   },
-   {
-    "data": "2025-08-13",
-    "dia": "Qua",
     "ref": "Jantar",
     "peso": 0.05,
     "minMEO": 0,
