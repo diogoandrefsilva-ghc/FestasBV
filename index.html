@@ -234,13 +234,15 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
   </div>
 </div>
 
-<!-- Edit Cash Flow modal -->
+<!-- Edit Cash Flow modal — reuses same layout as creation -->
 <div class="modal-bg" id="edit-cf-bg">
   <div class="modal" id="edit-cf-modal">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-      <h3 style="margin-bottom:0" id="edit-cf-title">Editar</h3>
+      <h3 style="margin-bottom:0" id="edit-cf-title">Editar Cash Flow</h3>
       <button onclick="closeEditCf()" style="background:var(--panel2);border:1px solid var(--line);color:var(--muted);border-radius:9px;width:32px;height:32px;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0">✕</button>
     </div>
+    <!-- Same wheel as creation, but for type display -->
+    <div class="cf-wheel" id="ecf-wheel"></div>
     <div id="edit-cf-form"></div>
     <div class="mbtns">
       <button class="btn ghost" onclick="closeEditCf()">Cancelar</button>
@@ -767,17 +769,21 @@ function updateSdChips(){
   if(!debtors.length){container.innerHTML='<div class="empty sf" style="width:100%">Sem dívidas por saldar</div>';recalcSdVal();return;}
 
   let html='';
+  // Convidados first, then próprio
+  debtors.forEach(m=>{
+    const guestDebt=Math.max(0,m.AA);
+    const isDefault=m.nome===who;
+    if(guestDebt>0.005){
+      html+=`<div class="sd-chip${isDefault?' on':''}" onclick="toggleSdChip(this)" data-key="conv:${m.nome}">
+        <span class="sd-dot"></span>${m.nome} <span style="font-size:10px;opacity:.6">conv.</span><span class="sd-amt">${eur(guestDebt)}</span></div>`;
+    }
+  });
   debtors.forEach(m=>{
     const ownDebt=Math.max(0,rnd(m.V-m.Y-m.W-m.X,2));
-    const guestDebt=Math.max(0,m.AA);
     const isDefault=m.nome===who;
     if(ownDebt>0.005){
       html+=`<div class="sd-chip${isDefault?' on':''}" onclick="toggleSdChip(this)" data-key="own:${m.nome}">
         <span class="sd-dot"></span>${m.nome}<span class="sd-amt">${eur(ownDebt)}</span></div>`;
-    }
-    if(guestDebt>0.005){
-      html+=`<div class="sd-chip${isDefault?' on':''}" onclick="toggleSdChip(this)" data-key="conv:${m.nome}">
-        <span class="sd-dot"></span>${m.nome} <span style="font-size:10px;opacity:.6">conv.</span><span class="sd-amt">${eur(guestDebt)}</span></div>`;
     }
   });
   container.innerHTML=html;
@@ -876,24 +882,73 @@ function editCfEntry(source,idx){
   editingCf={source,idx};
   const f=document.getElementById('edit-cf-form');
   const title=document.getElementById('edit-cf-title');
+  const wheel=document.getElementById('ecf-wheel');
+  title.textContent='Editar Cash Flow';
 
-  if(source==='pagamentos'){
+  // Determine the type for this entry
+  let editType='';
+  if(source==='despesas') editType='despesa';
+  else if(source==='mealheiros') editType='mealheiro';
+  else if(source==='pagamentos'){
     const p=DATA.pagamentos[idx];
-    title.textContent='Editar Pagamento';
+    editType=cfType(p);
+  }
+  editingCf.editType=editType;
+
+  // Build wheel showing selected type (read-only highlight)
+  const types=[
+    {key:'reembolso',icon:'💸',label:'Reembolso'},
+    {key:'recebimento',icon:'📥',label:'Recebimento'},
+    {key:'despesa',icon:'🛒',label:'Despesa'},
+    {key:'mealheiro',icon:'🐷',label:'Mealheiro'},
+    {key:'saldar',icon:'🤝',label:'Saldar Dívida'}
+  ];
+  wheel.innerHTML=types.map(t=>`<div class="cf-opt${t.key===editType?' on':''}" style="pointer-events:none;opacity:${t.key===editType?'1':'.35'}"><span class="cf-icon">${t.icon}</span><span class="cf-lbl">${t.label}</span></div>`).join('');
+
+  // Build form matching the creation layout for this type
+  if(editType==='reembolso'){
+    const p=DATA.pagamentos[idx];
     f.innerHTML=`
-      <label>De</label><select id="ecf-de">${memberOptions(p.de)}</select>
-      <label>Para</label><select id="ecf-para">${memberOptions(p.para)}</select>
+      <label>A quem reembolsaste?</label>
+      <select id="ecf-who">${memberOptions(p.para)}</select>
       <div class="inline-row" style="margin-top:14px">
         <div><label>Valor (€)</label><input type="number" id="ecf-val" step="0.01" value="${p.valor}" inputmode="decimal"></div>
         <div><label>Data</label><input type="date" id="ecf-date" value="${p.data||''}"></div>
       </div>
-      <label>Referência / Descrição</label>
-      <textarea id="ecf-ref" rows="2">${p.ref||''}</textarea>`;
-  } else if(source==='despesas'){
-    const d=DATA.despesas[idx];
-    title.textContent='Editar Despesa';
+      <label>Descrição</label>
+      <textarea id="ecf-desc" rows="2">${(p.ref||'').replace(/^Reembolso:\s*/,'').replace(/^Reembolso$/,'')}</textarea>`;
+  } else if(editType==='recebimento'){
+    const p=DATA.pagamentos[idx];
     f.innerHTML=`
-      <label>Quem pagou</label><select id="ecf-who">${memberOptions(d.quem)}</select>
+      <label>Quem te pagou?</label>
+      <select id="ecf-who">${memberOptions(p.de)}</select>
+      <div class="inline-row" style="margin-top:14px">
+        <div><label>Valor (€)</label><input type="number" id="ecf-val" step="0.01" value="${p.valor}" inputmode="decimal"></div>
+        <div><label>Data</label><input type="date" id="ecf-date" value="${p.data||''}"></div>
+      </div>
+      <label>Descrição</label>
+      <textarea id="ecf-desc" rows="2">${p.ref||''}</textarea>`;
+  } else if(editType==='saldar'){
+    const p=DATA.pagamentos[idx];
+    // Parse existing ref to know which chips are selected
+    const selectedKeys=(p.ref||'').split(/,\s*/).map(x=>x.trim()).filter(Boolean);
+    f.innerHTML=`
+      <label>Quem saldou?</label>
+      <select id="ecf-who" onchange="updateEditSdChips()">${memberOptions(p.de)}</select>
+      <label>Que dívidas saldou?</label>
+      <div class="sd-list" id="esd-chips"></div>
+      <div class="inline-row" style="margin-top:14px">
+        <div><label>Valor (€)</label><input type="number" id="ecf-val" step="0.01" value="${p.valor}" inputmode="decimal"></div>
+        <div><label>Data</label><input type="date" id="ecf-date" value="${p.data||''}"></div>
+      </div>
+      <div class="note" id="ecf-val-hint"></div>`;
+    editingCf.selectedKeys=selectedKeys;
+    setTimeout(()=>updateEditSdChips(),10);
+  } else if(editType==='despesa'){
+    const d=DATA.despesas[idx];
+    f.innerHTML=`
+      <label>Quem pagou?</label>
+      <select id="ecf-who">${memberOptions(d.quem)}</select>
       <div class="inline-row" style="margin-top:14px">
         <div><label>Data Despesa</label><input type="date" id="ecf-date" value="${d.dataDesp||''}"></div>
         <div><label>Data-Valor</label><input type="date" id="ecf-date2" value="${d.dataValor||''}"></div>
@@ -908,11 +963,11 @@ function editCfEntry(source,idx){
       </div>
       <label>Descritivo</label>
       <textarea id="ecf-desc" rows="2">${d.desc||''}</textarea>`;
-  } else if(source==='mealheiros'){
+  } else if(editType==='mealheiro'){
     const m=DATA.mealheiros[idx];
-    title.textContent='Editar Mealheiro';
     f.innerHTML=`
-      <label>Quem recebeu</label><select id="ecf-who">${memberOptions(m.quem)}</select>
+      <label>Quem recebeu?</label>
+      <select id="ecf-who">${memberOptions(m.quem)}</select>
       <div class="inline-row" style="margin-top:14px">
         <div><label>Valor (€)</label><input type="number" id="ecf-val" step="0.01" value="${m.valor}" inputmode="decimal"></div>
         <div><label>Data</label><input type="date" id="ecf-date" value="${m.data||''}"></div>
@@ -923,6 +978,74 @@ function editCfEntry(source,idx){
   document.body.classList.add('no-scroll');
 }
 
+/* Saldar dívida chips for edit modal */
+function updateEditSdChips(){
+  if(!CALC)return;
+  const container=document.getElementById('esd-chips');
+  if(!container)return;
+  const who=document.getElementById('ecf-who')?.value||'';
+  const ms=CALC.membros;
+  const selKeys=editingCf?.selectedKeys||[];
+  const debtors=ms.filter(m=>{
+    const ownDebt=Math.max(0,rnd(m.V-m.Y-m.W-m.X,2));
+    const guestDebt=Math.max(0,m.AA);
+    return ownDebt>0.005||guestDebt>0.005;
+  });
+  if(!debtors.length){container.innerHTML='<div class="empty sf" style="width:100%">Sem dívidas por saldar</div>';return;}
+  let html='';
+  // Convidados first, then próprio
+  debtors.forEach(m=>{
+    const guestDebt=Math.max(0,m.AA);
+    const key='conv:'+m.nome;
+    const isOn=selKeys.includes(key)||(m.nome===who&&!selKeys.length);
+    if(guestDebt>0.005){
+      html+=`<div class="sd-chip${isOn?' on':''}" onclick="toggleEditSdChip(this)" data-key="${key}">
+        <span class="sd-dot"></span>${m.nome} <span style="font-size:10px;opacity:.6">conv.</span><span class="sd-amt">${eur(guestDebt)}</span></div>`;
+    }
+  });
+  debtors.forEach(m=>{
+    const ownDebt=Math.max(0,rnd(m.V-m.Y-m.W-m.X,2));
+    const key='own:'+m.nome;
+    const isOn=selKeys.includes(key)||(m.nome===who&&!selKeys.length);
+    if(ownDebt>0.005){
+      html+=`<div class="sd-chip${isOn?' on':''}" onclick="toggleEditSdChip(this)" data-key="${key}">
+        <span class="sd-dot"></span>${m.nome}<span class="sd-amt">${eur(ownDebt)}</span></div>`;
+    }
+  });
+  container.innerHTML=html;
+  recalcEditSdVal();
+}
+function toggleEditSdChip(el){
+  el.classList.toggle('on');
+  // Update selectedKeys
+  if(editingCf){
+    const keys=[];
+    document.querySelectorAll('#esd-chips .sd-chip.on').forEach(c=>keys.push(c.dataset.key));
+    editingCf.selectedKeys=keys;
+  }
+  recalcEditSdVal();
+}
+function recalcEditSdVal(){
+  if(!CALC)return;
+  const ms=CALC.membros;
+  let total=0;
+  document.querySelectorAll('#esd-chips .sd-chip.on').forEach(chip=>{
+    const key=chip.dataset.key;
+    if(key.startsWith('own:')){
+      const nome=key.slice(4);const m=ms.find(x=>x.nome===nome);
+      if(m)total+=Math.max(0,rnd(m.V-m.Y-m.W-m.X,2));
+    } else if(key.startsWith('conv:')){
+      const nome=key.slice(5);const m=ms.find(x=>x.nome===nome);
+      if(m)total+=Math.max(0,m.AA);
+    }
+  });
+  total=rnd(total,2);
+  const valEl=document.getElementById('ecf-val');
+  const hint=document.getElementById('ecf-val-hint');
+  if(valEl&&total>0&&hint){hint.textContent='Calculado pelas dívidas selecionadas';}
+  else if(hint){hint.textContent='';}
+}
+
 function closeEditCf(){
   document.getElementById('edit-cf-bg').classList.remove('show');
   document.body.classList.remove('no-scroll');
@@ -931,16 +1054,34 @@ function closeEditCf(){
 
 async function saveEditCf(){
   if(!editingCf)return;
-  const{source,idx}=editingCf;
+  const{source,idx,editType}=editingCf;
   document.getElementById('edit-cf-save').disabled=true;
 
   if(source==='pagamentos'){
     const p=DATA.pagamentos[idx];
-    p.de=document.getElementById('ecf-de').value;
-    p.para=document.getElementById('ecf-para').value;
-    p.valor=parseFloat(document.getElementById('ecf-val').value)||p.valor;
-    p.data=document.getElementById('ecf-date').value;
-    p.ref=document.getElementById('ecf-ref').value.trim();
+    const tes=DATA.evento.tesoureiro;
+    if(editType==='reembolso'){
+      p.para=document.getElementById('ecf-who').value;
+      p.de=tes;
+      p.valor=parseFloat(document.getElementById('ecf-val').value)||p.valor;
+      p.data=document.getElementById('ecf-date').value;
+      const desc=(document.getElementById('ecf-desc')?.value||'').trim();
+      p.ref=desc?`Reembolso: ${desc}`:'Reembolso';
+    } else if(editType==='recebimento'){
+      p.de=document.getElementById('ecf-who').value;
+      p.para=tes;
+      p.valor=parseFloat(document.getElementById('ecf-val').value)||p.valor;
+      p.data=document.getElementById('ecf-date').value;
+      p.ref=(document.getElementById('ecf-desc')?.value||'').trim();
+    } else if(editType==='saldar'){
+      p.de=document.getElementById('ecf-who').value;
+      p.para=tes;
+      p.valor=parseFloat(document.getElementById('ecf-val').value)||p.valor;
+      p.data=document.getElementById('ecf-date').value;
+      const covParts=[];
+      document.querySelectorAll('#esd-chips .sd-chip.on').forEach(chip=>{covParts.push(chip.dataset.key);});
+      p.ref=covParts.join(', ');
+    }
   } else if(source==='despesas'){
     const d=DATA.despesas[idx];
     d.quem=document.getElementById('ecf-who').value;
@@ -948,7 +1089,7 @@ async function saveEditCf(){
     d.dataValor=document.getElementById('ecf-date2').value;
     d.tipo=document.getElementById('ecf-tipo').value;
     d.valor=parseFloat(document.getElementById('ecf-val').value)||d.valor;
-    d.desc=document.getElementById('ecf-desc').value.trim();
+    d.desc=(document.getElementById('ecf-desc')?.value||'').trim();
   } else if(source==='mealheiros'){
     const m=DATA.mealheiros[idx];
     m.quem=document.getElementById('ecf-who').value;
