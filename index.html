@@ -223,7 +223,6 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
     <!-- Wheel selector -->
     <div class="cf-wheel" id="cf-wheel">
       <div class="cf-opt on" data-cf="reembolso" onclick="setCfType('reembolso')"><span class="cf-icon">💸</span><span class="cf-lbl">Reembolso</span></div>
-      <div class="cf-opt" data-cf="recebimento" onclick="setCfType('recebimento')"><span class="cf-icon">📥</span><span class="cf-lbl">Recebimento</span></div>
       <div class="cf-opt" data-cf="despesa" onclick="setCfType('despesa')"><span class="cf-icon">🛒</span><span class="cf-lbl">Despesa</span></div>
       <div class="cf-opt" data-cf="mealheiro" onclick="setCfType('mealheiro')"><span class="cf-icon">🐷</span><span class="cf-lbl">Mealheiro</span></div>
       <div class="cf-opt" data-cf="saldar" onclick="setCfType('saldar')"><span class="cf-icon">🤝</span><span class="cf-lbl">Saldar Dívida</span></div>
@@ -473,16 +472,16 @@ function cfType(p){
   if(p._cfType) return p._cfType; // explicitly set
   if(p.ref && p.ref.startsWith('Reembolso')) return 'reembolso';
   if(p.ref && (p.ref.includes('own:') || p.ref.includes('conv:'))) return 'saldar';
-  // generic payment without ref
+  // generic payment without ref — now treated as saldar
   const tes=DATA.evento.tesoureiro;
   if(p.de===tes) return 'reembolso';
-  return 'recebimento';
+  return 'saldar';
 }
 function cfLabel(t){
-  return{reembolso:'Reembolso',recebimento:'Recebimento',despesa:'Despesa',mealheiro:'Mealheiro',saldar:'Saldar Dívida'}[t]||t;
+  return{reembolso:'Reembolso',despesa:'Despesa',mealheiro:'Mealheiro',saldar:'Saldar Dívida'}[t]||t;
 }
 function cfIcon(t){
-  return{reembolso:'💸',recebimento:'📥',despesa:'🛒',mealheiro:'🐷',saldar:'🤝'}[t]||'💰';
+  return{reembolso:'💸',despesa:'🛒',mealheiro:'🐷',saldar:'🤝'}[t]||'💰';
 }
 
 function renderAll(){
@@ -569,7 +568,6 @@ function renderCashFlows(){
       <option value="all"${cfFilterType==='all'?' selected':''}>Todos os tipos</option>
       <option value="despesa"${cfFilterType==='despesa'?' selected':''}>🛒 Despesa</option>
       <option value="reembolso"${cfFilterType==='reembolso'?' selected':''}>💸 Reembolso</option>
-      <option value="recebimento"${cfFilterType==='recebimento'?' selected':''}>📥 Recebimento</option>
       <option value="mealheiro"${cfFilterType==='mealheiro'?' selected':''}>🐷 Mealheiro</option>
       <option value="saldar"${cfFilterType==='saldar'?' selected':''}>🤝 Saldar Dívida</option>
     </select></div>
@@ -642,6 +640,9 @@ function openMember(nome){
   if(m.R>0){h+=`<div class="li"><span class="lbl">Quota adicional<small>fator ${m.fator}</small></span><span class="val">${eur(m.R)}</span></div>`;totalDebitos+=m.R;}
   if(m.U>0){h+=`<div class="li"><span class="lbl">Missão poupança</span><span class="val">${eur(m.U)}</span></div>`;totalDebitos+=m.U;}
 
+  // 1b) Convidados — dívida dos convidados é débito do membro
+  if(m.AA>0){h+=`<div class="li"><span class="lbl">Convidados<small>valor que tens de cobrar/entregar</small></span><span class="val">${eur(m.AA)}</span></div>`;totalDebitos+=m.AA;}
+
   // 1c) Valores que recebeu (reembolsos recebidos, mealheiro) — é custo
   const reembolsosRecebidos=CALC.pagamentos.filter(p=>p.ref&&p.ref.startsWith('Reembolso')&&p.para===m.nome).reduce((a,p)=>a+p.valor,0);
   if(reembolsosRecebidos>0){h+=`<div class="li"><span class="lbl">Reembolsos recebidos<small>dinheiro do grupo que ficou contigo</small></span><span class="val">${eur(rnd(reembolsosRecebidos,2))}</span></div>`;totalDebitos+=reembolsosRecebidos;}
@@ -692,9 +693,10 @@ function openMember(nome){
   h+=`<div class="li tot"><span class="lbl">Total créditos</span><span class="val plus">${eur(totalCreditos)}</span></div>`;
 
   // ─── CONVIDADOS ───
-  if(m._convs.length){h+='<div class="bd-title sf">Convidados</div><div class="meals">';
+  if(m._convs.length){
+    h+='<div class="bd-title sf">Detalhe Convidados</div><div class="meals">';
     m._convs.forEach(c=>h+=`<div class="meal"><span class="d">${c.nome} · ${c.dia} ${c.ref}</span><span class="p">${eur(c.q)}</span></div>`);
-    h+=`</div><div class="li tot"><span class="lbl">Total convidados (a receber)</span><span class="val">${eur(m.AA)}</span></div>`;}
+    h+=`</div><div class="li tot"><span class="lbl">Total convidados</span><span class="val">${eur(m.AA)}</span></div>`;}
 
   document.getElementById('sheet-hdr').innerHTML=`
     <div class="grab"></div>
@@ -779,16 +781,6 @@ function updateCfForm(){
   if(cfDir==='reembolso'){
     f.innerHTML=`
       <label>A quem reembolsaste?</label>
-      <select id="cf-who">${memberOptions()}</select>
-      <div class="inline-row" style="margin-top:14px">
-        <div><label>Valor (€)</label><input type="number" id="cf-val" step="0.01" min="0.01" placeholder="0,00" inputmode="decimal"></div>
-        <div><label>Data</label><input type="date" id="cf-date" value="${today}"></div>
-      </div>
-      <label>Descrição</label>
-      <textarea id="cf-desc" placeholder="Opcional" rows="2"></textarea>`;
-  } else if(cfDir==='recebimento'){
-    f.innerHTML=`
-      <label>Quem te pagou?</label>
       <select id="cf-who">${memberOptions()}</select>
       <div class="inline-row" style="margin-top:14px">
         <div><label>Valor (€)</label><input type="number" id="cf-val" step="0.01" min="0.01" placeholder="0,00" inputmode="decimal"></div>
@@ -882,7 +874,8 @@ function recalcSdVal(){
   if(!CALC)return;
   const ms=CALC.membros;
   let total=0;
-  document.querySelectorAll('#sd-chips .sd-chip.on').forEach(chip=>{
+  const onChips=document.querySelectorAll('#sd-chips .sd-chip.on');
+  onChips.forEach(chip=>{
     const key=chip.dataset.key;
     if(key.startsWith('own:')){
       const nome=key.slice(4);const m=ms.find(x=>x.nome===nome);
@@ -895,8 +888,17 @@ function recalcSdVal(){
   total=rnd(total,2);
   const valEl=document.getElementById('cf-val');
   const hint=document.getElementById('cf-val-hint');
-  if(valEl && total>0){valEl.value=total.toFixed(2);if(hint)hint.textContent='Calculado pelas dívidas selecionadas';}
-  else if(valEl){valEl.value='';if(hint)hint.textContent='';}
+  if(valEl && total>0){
+    valEl.value=total.toFixed(2);
+    // If multiple chips selected, lock value to total (can't partial-pay multiple debts)
+    if(onChips.length>1){
+      valEl.readOnly=true;valEl.style.opacity='.6';
+      if(hint)hint.textContent='Valor fixo (múltiplas dívidas selecionadas)';
+    } else {
+      valEl.readOnly=false;valEl.style.opacity='1';
+      if(hint)hint.textContent='Podes ajustar o valor para pagamento parcial';
+    }
+  } else if(valEl){valEl.value='';valEl.readOnly=false;valEl.style.opacity='1';if(hint)hint.textContent='';}
 }
 
 function openPayModal(){
@@ -926,10 +928,6 @@ async function saveCashFlow(){
     const ref=desc?`Reembolso: ${desc}`:'Reembolso';
     DATA.pagamentos.push({de:tes,para:who,valor:rnd(val,2),ref,data:date});
     commitMsg=`Reembolso: ${tes} → ${who} ${eur(val)}`;
-  } else if(cfDir==='recebimento'){
-    const ref=desc||'';
-    DATA.pagamentos.push({de:who,para:tes,valor:rnd(val,2),ref,data:date});
-    commitMsg=`Recebimento: ${who} → ${tes} ${eur(val)}`;
   } else if(cfDir==='despesa'){
     const tipo=document.getElementById('cf-tipo')?.value||'Gerais';
     const date2=document.getElementById('cf-date2')?.value||date;
@@ -941,6 +939,17 @@ async function saveCashFlow(){
   } else if(cfDir==='saldar'){
     const covParts=[];
     document.querySelectorAll('#sd-chips .sd-chip.on').forEach(chip=>{covParts.push(chip.dataset.key);});
+    if(!covParts.length){toast('Seleciona pelo menos uma dívida','bad');document.getElementById('pay-save').disabled=false;return;}
+    // If multiple chips selected, enforce total value (no partial across multiple debts)
+    if(covParts.length>1){
+      let expectedTotal=0;
+      covParts.forEach(key=>{
+        if(key.startsWith('own:')){const nome=key.slice(4);const m=CALC.membros.find(x=>x.nome===nome);if(m)expectedTotal+=Math.max(0,rnd(m.V-m.Y-m.W-m.X,2));}
+        else if(key.startsWith('conv:')){const nome=key.slice(5);const m=CALC.membros.find(x=>x.nome===nome);if(m)expectedTotal+=Math.max(0,m.AA);}
+      });
+      expectedTotal=rnd(expectedTotal,2);
+      if(Math.abs(val-expectedTotal)>0.01){toast('Com múltiplas dívidas, o valor tem de ser o total','bad');document.getElementById('pay-save').disabled=false;return;}
+    }
     const ref=covParts.join(', ');
     DATA.pagamentos.push({de:who,para:tes,valor:rnd(val,2),ref,data:date});
     commitMsg=`Saldar: ${who} → ${tes} ${eur(val)}`;
@@ -984,7 +993,6 @@ function editCfEntry(source,idx){
   // Build wheel showing selected type (read-only highlight)
   const types=[
     {key:'reembolso',icon:'💸',label:'Reembolso'},
-    {key:'recebimento',icon:'📥',label:'Recebimento'},
     {key:'despesa',icon:'🛒',label:'Despesa'},
     {key:'mealheiro',icon:'🐷',label:'Mealheiro'},
     {key:'saldar',icon:'🤝',label:'Saldar Dívida'}
@@ -1003,17 +1011,6 @@ function editCfEntry(source,idx){
       </div>
       <label>Descrição</label>
       <textarea id="ecf-desc" rows="2">${(p.ref||'').replace(/^Reembolso:\s*/,'').replace(/^Reembolso$/,'')}</textarea>`;
-  } else if(editType==='recebimento'){
-    const p=DATA.pagamentos[idx];
-    f.innerHTML=`
-      <label>Quem te pagou?</label>
-      <select id="ecf-who">${memberOptions(p.de)}</select>
-      <div class="inline-row" style="margin-top:14px">
-        <div><label>Valor (€)</label><input type="number" id="ecf-val" step="0.01" value="${p.valor}" inputmode="decimal"></div>
-        <div><label>Data</label><input type="date" id="ecf-date" value="${p.data||''}"></div>
-      </div>
-      <label>Descrição</label>
-      <textarea id="ecf-desc" rows="2">${p.ref||''}</textarea>`;
   } else if(editType==='saldar'){
     const p=DATA.pagamentos[idx];
     // Parse existing ref to know which chips are selected
@@ -1115,7 +1112,8 @@ function recalcEditSdVal(){
   if(!CALC)return;
   const ms=CALC.membros;
   let total=0;
-  document.querySelectorAll('#esd-chips .sd-chip.on').forEach(chip=>{
+  const onChips=document.querySelectorAll('#esd-chips .sd-chip.on');
+  onChips.forEach(chip=>{
     const key=chip.dataset.key;
     if(key.startsWith('own:')){
       const nome=key.slice(4);const m=ms.find(x=>x.nome===nome);
@@ -1128,8 +1126,17 @@ function recalcEditSdVal(){
   total=rnd(total,2);
   const valEl=document.getElementById('ecf-val');
   const hint=document.getElementById('ecf-val-hint');
-  if(valEl&&total>0&&hint){hint.textContent='Calculado pelas dívidas selecionadas';}
-  else if(hint){hint.textContent='';}
+  if(valEl&&total>0){
+    valEl.value=total.toFixed(2);
+    if(onChips.length>1){
+      valEl.readOnly=true;valEl.style.opacity='.6';
+      if(hint)hint.textContent='Valor fixo (múltiplas dívidas selecionadas)';
+    } else {
+      valEl.readOnly=false;valEl.style.opacity='1';
+      if(hint)hint.textContent='Podes ajustar o valor para pagamento parcial';
+    }
+  }
+  else if(valEl){valEl.value='';valEl.readOnly=false;valEl.style.opacity='1';if(hint)hint.textContent='';}
 }
 
 function closeEditCf(){
@@ -1153,12 +1160,6 @@ async function saveEditCf(){
       p.data=document.getElementById('ecf-date').value;
       const desc=(document.getElementById('ecf-desc')?.value||'').trim();
       p.ref=desc?`Reembolso: ${desc}`:'Reembolso';
-    } else if(editType==='recebimento'){
-      p.de=document.getElementById('ecf-who').value;
-      p.para=tes;
-      p.valor=parseFloat(document.getElementById('ecf-val').value)||p.valor;
-      p.data=document.getElementById('ecf-date').value;
-      p.ref=(document.getElementById('ecf-desc')?.value||'').trim();
     } else if(editType==='saldar'){
       p.de=document.getElementById('ecf-who').value;
       p.para=tes;
