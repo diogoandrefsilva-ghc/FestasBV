@@ -342,8 +342,8 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
     <div class="cf-wheel" id="cf-wheel">
       <div class="cf-opt on" data-cf="reembolso" onclick="setCfType('reembolso')"><span class="cf-icon">💸</span><span class="cf-lbl">Reembolso</span></div>
       <div class="cf-opt" data-cf="despesa" onclick="setCfType('despesa')"><span class="cf-icon">🛒</span><span class="cf-lbl">Despesa</span></div>
-      <div class="cf-opt" data-cf="mealheiro" onclick="setCfType('mealheiro')"><span class="cf-icon">🐷</span><span class="cf-lbl">Mealheiro</span></div>
-      <div class="cf-opt" data-cf="saldar" onclick="setCfType('saldar')"><span class="cf-icon">🤝</span><span class="cf-lbl">Saldar Dívida</span></div>
+      <div class="cf-opt" data-cf="mealheiro" onclick="setCfType('mealheiro')"><span class="cf-icon" style="font-size:20px">🥫</span><span class="cf-lbl">Mealheiro</span></div>
+      <div class="cf-opt" data-cf="saldar" onclick="setCfType('saldar')"><span class="cf-icon">🤝</span><span class="cf-lbl">Pagar Dívida</span></div>
     </div>
 
     <!-- Dynamic form area -->
@@ -774,10 +774,10 @@ function cfType(p){
   return 'saldar';
 }
 function cfLabel(t){
-  return{reembolso:'Reembolso',despesa:'Despesa',mealheiro:'Mealheiro',saldar:'Saldar Dívida'}[t]||t;
+  return{reembolso:'Reembolso',despesa:'Despesa',mealheiro:'Mealheiro',saldar:'Pagar Dívida'}[t]||t;
 }
 function cfIcon(t){
-  return{reembolso:'💸',despesa:'🛒',mealheiro:'🐷',saldar:'🤝'}[t]||'💰';
+  return{reembolso:'💸',despesa:'🛒',mealheiro:'🥫',saldar:'🤝'}[t]||'💰';
 }
 
 function renderAll(){
@@ -919,9 +919,10 @@ function renderCashFlows(){
   // 3) Mealheiros
   (DATA.mealheiros||[]).forEach((m,i)=>{
     const subIcons={'sobras_ano_anterior':['🏦','Sobras Ano Anterior'],'outros':['🎁','Outros']};
-    const [mIcon,mLabel]=subIcons[m.subtipo]||['🐷','Lata'];
+    const [mIcon,mLabel]=subIcons[m.subtipo]||['🥫','Lata'];
+    const descText=m.desc?` · ${m.desc}`:'';
     allCf.push({type:'mealheiro',date:m.data||'',label:mLabel,icon:mIcon,
-      line1:`${m.quem} recebeu`,line2:'',valor:m.valor,source:'mealheiros',idx:i,people:[m.quem]});
+      line1:`${m.quem} recebeu`,line2:descText,valor:m.valor,source:'mealheiros',idx:i,people:[m.quem]});
   });
 
   // Sort by date desc
@@ -941,8 +942,8 @@ function renderCashFlows(){
       <option value="all"${cfFilterType==='all'?' selected':''}>Todos os tipos</option>
       <option value="despesa"${cfFilterType==='despesa'?' selected':''}>🛒 Despesa</option>
       <option value="reembolso"${cfFilterType==='reembolso'?' selected':''}>💸 Reembolso</option>
-      <option value="mealheiro"${cfFilterType==='mealheiro'?' selected':''}>🐷 Mealheiro</option>
-      <option value="saldar"${cfFilterType==='saldar'?' selected':''}>🤝 Saldar Dívida</option>
+      <option value="mealheiro"${cfFilterType==='mealheiro'?' selected':''}>🥫 Mealheiro</option>
+      <option value="saldar"${cfFilterType==='saldar'?' selected':''}>🤝 Pagar Dívida</option>
     </select></div>
     <div class="cf-filter"><select onchange="cfFilterPerson=this.value;renderCashFlows()">
       <option value="all"${cfFilterPerson==='all'?' selected':''}>Todas as pessoas</option>
@@ -1235,13 +1236,13 @@ function updateCfForm(){
     f.innerHTML=`
       <label>Tipo de mealheiro</label>
       <div class="cf-wheel" id="meal-subtype-wheel" style="margin-bottom:4px">
-        <div class="cf-opt on" data-sub="corrente" onclick="setMealSubtype(this,'corrente')"><span class="cf-icon">🐷</span><span class="cf-lbl">Lata</span></div>
+        <div class="cf-opt on" data-sub="corrente" onclick="setMealSubtype(this,'corrente')"><span class="cf-icon" style="font-size:20px">🥫</span><span class="cf-lbl">Lata</span></div>
         <div class="cf-opt" data-sub="sobras" onclick="setMealSubtype(this,'sobras')"><span class="cf-icon">🏦</span><span class="cf-lbl">Sobras Ano Ant.</span></div>
         <div class="cf-opt" data-sub="outros" onclick="setMealSubtype(this,'outros')"><span class="cf-icon">🎁</span><span class="cf-lbl">Outros</span></div>
       </div>
       <div id="meal-corrente-fields">
-        <label>Quem recebeu?</label>
-        <select id="cf-who">${memberOptions()}</select>
+        <label>Quem recolheu?</label>
+        <select id="cf-who">${memberOptions(tes)}</select>
         <div class="inline-row" style="margin-top:14px">
           <div><label>Valor (€)</label><input type="number" id="cf-val" step="0.01" min="0.01" placeholder="0,00" inputmode="decimal"></div>
           <div><label>Data</label><input type="date" id="cf-date" value="${today}"></div>
@@ -1250,17 +1251,28 @@ function updateCfForm(){
       <div id="meal-sobras-fields" style="display:none">
         <p style="font-size:12.5px;color:var(--muted);margin-top:8px;line-height:1.5">Regista o valor das sobras do ano anterior recebidas. Este valor é somado ao saldo inicial do grupo.</p>
         <label>Quem recebeu as sobras?</label>
-        <select id="cf-who-sobras">${memberOptions(DATA.evento.tesoureiro)}</select>
+        <select id="cf-who-sobras">${memberOptions(tes)}</select>
         <div class="inline-row" style="margin-top:14px">
           <div><label>Valor (€)</label><input type="number" id="cf-val-sobras" step="0.01" min="0.01" placeholder="0,00" inputmode="decimal"></div>
           <div><label>Data</label><input type="date" id="cf-date-sobras" value="${today}"></div>
         </div>
+      </div>
+      <div id="meal-outros-fields" style="display:none">
+        <p style="font-size:12.5px;color:var(--muted);margin-top:8px;line-height:1.5">Regista entradas avulsas que reduzem a quota do grupo (ex: desconto t-shirts, patrocínios).</p>
+        <label>Quem recebeu?</label>
+        <select id="cf-who-outros">${memberOptions(tes)}</select>
+        <label>Descrição</label>
+        <textarea id="cf-desc-outros" placeholder="Ex: Desconto t-shirts, patrocínio..." rows="2"></textarea>
+        <div class="inline-row" style="margin-top:14px">
+          <div><label>Valor (€)</label><input type="number" id="cf-val-outros" step="0.01" min="0.01" placeholder="0,00" inputmode="decimal"></div>
+          <div><label>Data</label><input type="date" id="cf-date-outros" value="${today}"></div>
+        </div>
       </div>`;
   } else if(cfDir==='saldar'){
     f.innerHTML=`
-      <label>Quem saldou?</label>
+      <label>Quem pagou?</label>
       <select id="cf-who" onchange="updateSdChips()">${memberOptions()}</select>
-      <label>Que dívidas saldou?</label>
+      <label>Que dívidas paga?</label>
       <div class="sd-list" id="sd-chips"></div>
       <div class="inline-row" style="margin-top:14px">
         <div><label>Valor (€)</label><input type="number" id="cf-val" step="0.01" min="0.01" placeholder="0,00" inputmode="decimal"></div>
@@ -1274,14 +1286,8 @@ function updateCfForm(){
 function setMealSubtype(el, sub){
   document.querySelectorAll('#meal-subtype-wheel .cf-opt').forEach(e=>e.classList.toggle('on',e.dataset.sub===sub));
   document.getElementById('meal-corrente-fields').style.display = sub==='corrente' ? '' : 'none';
-  document.getElementById('meal-sobras-fields').style.display = (sub==='sobras'||sub==='outros') ? '' : 'none';
-  const lbl=sub==='outros'?'Que tipo de entrada é esta?':'Quem recebeu as sobras?';
-  const note=sub==='outros'?'Regista entradas avulsas que reduzem a quota do grupo (ex: desconto t-shirts, patrocínios).':'Regista o valor das sobras do ano anterior recebidas. Este valor é somado ao saldo inicial do grupo.';
-  const el2=document.getElementById('meal-sobras-fields');
-  if(el2){
-    el2.querySelector('label')&&(el2.querySelector('label').textContent=lbl);
-    el2.querySelector('p')&&(el2.querySelector('p').textContent=note);
-  }
+  document.getElementById('meal-sobras-fields').style.display = sub==='sobras' ? '' : 'none';
+  document.getElementById('meal-outros-fields').style.display = sub==='outros' ? '' : 'none';
 }
 
 function updateSdChips(){
@@ -1290,13 +1296,15 @@ function updateSdChips(){
   if(!container)return;
   const who=document.getElementById('cf-who')?.value||'';
   const ms=CALC.membros;
+  // Only show members with active (unsettled) debts — saldoFinal < 0
   const debtors=ms.filter(m=>{
+    if(m.saldoFinal>=- 0.005) return false; // already settled
     const ownDebt=Math.max(0,rnd(m.V-m.Y-m.W-m.X,2));
     const guestDebt=Math.max(0,m.AA);
     return ownDebt>0.005||guestDebt>0.005;
   });
 
-  if(!debtors.length){container.innerHTML='<div class="empty sf" style="width:100%">Sem dívidas por saldar</div>';recalcSdVal();return;}
+  if(!debtors.length){container.innerHTML='<div class="empty sf" style="width:100%">Sem dívidas ativas por pagar</div>';recalcSdVal();return;}
 
   let html='';
   // Convidados first, then próprio
@@ -1368,7 +1376,7 @@ async function saveCashFlow(){
   const val=parseFloat(document.getElementById('cf-val')?.value);
   const date=document.getElementById('cf-date')?.value;
   // For mealheiro sobras, who/val come from separate fields — skip generic validation
-  const mealSubCheck=cfDir==='mealheiro'&&(document.querySelector('#meal-subtype-wheel .cf-opt.on')?.dataset?.sub||'corrente')==='sobras';
+  const mealSubCheck=cfDir==='mealheiro'&&(document.querySelector('#meal-subtype-wheel .cf-opt.on')?.dataset?.sub||'corrente')!=='corrente';
   if(!mealSubCheck){
     if(!who){toast('Seleciona a pessoa','bad');return;}
     if(!val||val<=0){toast('Valor inválido','bad');return;}
@@ -1397,11 +1405,17 @@ async function saveCashFlow(){
       const dateSobras=document.getElementById('cf-date-sobras')?.value;
       if(!whoSobras){toast('Seleciona a pessoa','bad');document.getElementById('pay-save').disabled=false;return;}
       if(!valSobras||valSobras<=0){toast('Valor inválido','bad');document.getElementById('pay-save').disabled=false;return;}
-      // Store as mealheiro with a special subtype flag
-      const realSub=mealSub==='sobras'?'sobras_ano_anterior':'outros';
-      DATA.mealheiros.push({quem:whoSobras,data:dateSobras,valor:rnd(valSobras,2),subtipo:realSub});
-      const realLabel=mealSub==='sobras'?'Sobras ano anterior':'Outros';
-      commitMsg=`${realLabel}: ${whoSobras} ${eur(valSobras)}`;
+      DATA.mealheiros.push({quem:whoSobras,data:dateSobras,valor:rnd(valSobras,2),subtipo:'sobras_ano_anterior'});
+      commitMsg=`Sobras ano anterior: ${whoSobras} ${eur(valSobras)}`;
+    } else if(mealSub==='outros'){
+      const whoOutros=document.getElementById('cf-who-outros')?.value;
+      const valOutros=parseFloat(document.getElementById('cf-val-outros')?.value);
+      const dateOutros=document.getElementById('cf-date-outros')?.value;
+      const descOutros=(document.getElementById('cf-desc-outros')?.value||'').trim();
+      if(!whoOutros){toast('Seleciona a pessoa','bad');document.getElementById('pay-save').disabled=false;return;}
+      if(!valOutros||valOutros<=0){toast('Valor inválido','bad');document.getElementById('pay-save').disabled=false;return;}
+      DATA.mealheiros.push({quem:whoOutros,data:dateOutros,valor:rnd(valOutros,2),subtipo:'outros',desc:descOutros});
+      commitMsg=`Outros: ${whoOutros} ${eur(valOutros)}${descOutros?' ('+descOutros+')':''}`;
     } else {
       DATA.mealheiros.push({quem:who,data:date,valor:rnd(val,2),subtipo:'lata'});
       commitMsg=`Lata: ${who} ${eur(val)}`;
@@ -1464,8 +1478,8 @@ function editCfEntry(source,idx){
   const types=[
     {key:'reembolso',icon:'💸',label:'Reembolso'},
     {key:'despesa',icon:'🛒',label:'Despesa'},
-    {key:'mealheiro',icon:'🐷',label:'Mealheiro'},
-    {key:'saldar',icon:'🤝',label:'Saldar Dívida'}
+    {key:'mealheiro',icon:'🥫',label:'Mealheiro'},
+    {key:'saldar',icon:'🤝',label:'Pagar Dívida'}
   ];
   wheel.innerHTML=types.map(t=>`<div class="cf-opt${t.key===editType?' on':''}" style="pointer-events:none;opacity:${t.key===editType?'1':'.35'}"><span class="cf-icon">${t.icon}</span><span class="cf-lbl">${t.label}</span></div>`).join('');
 
@@ -1486,9 +1500,9 @@ function editCfEntry(source,idx){
     // Parse existing ref to know which chips are selected
     const selectedKeys=(p.ref||'').split(/,\s*/).map(x=>x.trim()).filter(Boolean);
     f.innerHTML=`
-      <label>Quem saldou?</label>
+      <label>Quem pagou?</label>
       <select id="ecf-who" onchange="updateEditSdChips()">${memberOptions(p.de)}</select>
-      <label>Que dívidas saldou?</label>
+      <label>Que dívidas pagou?</label>
       <div class="sd-list" id="esd-chips"></div>
       <div class="inline-row" style="margin-top:14px">
         <div><label>Valor (€)</label><input type="number" id="ecf-val" step="0.01" value="${p.valor}" inputmode="decimal"></div>
@@ -1540,11 +1554,12 @@ function updateEditSdChips(){
   const ms=CALC.membros;
   const selKeys=editingCf?.selectedKeys||[];
   const debtors=ms.filter(m=>{
+    if(m.saldoFinal>=-0.005 && !selKeys.some(k=>k.includes(m.nome))) return false;
     const ownDebt=Math.max(0,rnd(m.V-m.Y-m.W-m.X,2));
     const guestDebt=Math.max(0,m.AA);
     return ownDebt>0.005||guestDebt>0.005;
   });
-  if(!debtors.length){container.innerHTML='<div class="empty sf" style="width:100%">Sem dívidas por saldar</div>';return;}
+  if(!debtors.length){container.innerHTML='<div class="empty sf" style="width:100%">Sem dívidas ativas por pagar</div>';return;}
   let html='';
   // Convidados first, then próprio
   debtors.forEach(m=>{
