@@ -84,11 +84,20 @@ body.no-scroll{overflow:hidden;position:fixed;width:100%;}
 .back-btn{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;font-size:16px;color:var(--muted);cursor:pointer;border:1px solid var(--line);background:var(--panel2);border-radius:9px;flex-shrink:0}
 .back-btn:active{opacity:.6}
 .sheet h2{font-size:26px;font-weight:700;letter-spacing:-.4px;display:flex;align-items:center;gap:12px;justify-content:space-between}
-.sheet .final{margin:14px 0;padding:16px;border-radius:14px;text-align:center;background:rgba(0,0,0,.22)}
-.sheet .final .k{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
-.sheet .final .v{font-size:38px;font-weight:700;letter-spacing:-1px;margin-top:2px}
+.sheet .final{margin:10px 0;padding:10px 14px;border-radius:11px;text-align:center;background:rgba(0,0,0,.22)}
+.sheet .final .k{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+.sheet .final .v{font-size:26px;font-weight:700;letter-spacing:-1px;margin-top:1px}
 .sheet .verdict{font-size:13px;margin-top:6px;color:var(--muted)}
-.bd-title{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--gold);margin:20px 2px 9px}
+.bd-title{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--gold);margin:20px 2px 9px;position:relative;z-index:1}
+/* Collapsible sections */
+.collapse-toggle{display:flex;align-items:center;justify-content:space-between;padding:9px 12px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;cursor:pointer;margin-top:6px;transition:.15s;user-select:none}
+.collapse-toggle:active{transform:scale(.985);background:rgba(232,176,75,.06)}
+.collapse-toggle .ct-label{font-size:13px;font-weight:600;color:var(--ink);display:flex;align-items:center;gap:8px}
+.collapse-toggle .ct-val{font-size:14px;font-weight:700;color:var(--ink)}
+.collapse-toggle .ct-arrow{font-size:12px;color:var(--faint);transition:transform .2s;margin-left:6px}
+.collapse-toggle.open .ct-arrow{transform:rotate(180deg)}
+.collapse-body{max-height:0;overflow:hidden;transition:max-height .3s ease}
+.collapse-body.open{max-height:2000px}
 .li{display:flex;justify-content:space-between;align-items:baseline;padding:9px 0;border-bottom:1px solid var(--line);font-size:15px}
 .li:last-child{border-bottom:none}
 .li .lbl{color:var(--ink)}.li .lbl small{display:block;font-size:11px;color:var(--faint)}
@@ -442,9 +451,12 @@ function calcular(data){
   }
   const tes=evento.tesoureiro;
   const recvTes=pagNonReemb.filter(p=>p.para===tes).reduce((a,p)=>a+p.valor,0);
+  // Total credits already distributed to other members (these reduce their debts,
+  // so they must also reduce the tesoureiro's receivable to avoid double-counting)
+  const totalCredited=rnd(Object.values(credited).reduce((a,v)=>a+v,0)+Object.values(creditedConv).reduce((a,v)=>a+v,0),2);
   for(const m of membros){
     if(m.nome===tes){
-      m.saldoFinal=rnd(m.AC+recvTes,2);
+      m.saldoFinal=rnd(m.AC+recvTes-totalCredited,2);
     } else {
       const ownCredit=credited[m.nome]||0;
       const convCredit=creditedConv[m.nome]||0;
@@ -629,19 +641,32 @@ function openMember(nome){
   h+='<div class="bd-title sf">Débitos (custos)</div>';
   let totalDebitos=0;
 
-  // 1a) Contribuição MEO: refeições, quota, missão poupança
+  // 1a) Contribuição MEO: refeições (collapsible)
   if(m._refs.length){
-    h+='<div class="meals">';
+    h+=`<div class="collapse-toggle" onclick="this.classList.toggle('open');this.nextElementSibling.classList.toggle('open')">
+      <span class="ct-label">🍽 Refeições (${m._refs.length})</span>
+      <span><span class="ct-val">${eur(m.Sown)}</span><span class="ct-arrow">▼</span></span>
+    </div>`;
+    h+='<div class="collapse-body"><div class="meals">';
     m._refs.forEach(r=>h+=`<div class="meal"><span class="d">${r.dia} · ${r.ref}</span><span class="p">${eur(r.p)}</span></div>`);
-    h+=`</div><div class="li tot"><span class="lbl">Total refeições</span><span class="val">${eur(m.Sown)}</span></div>`;
+    h+=`</div></div>`;
   }
   totalDebitos+=m.Sown;
 
+  // 1b) Convidados — right after meals (collapsible)
+  if(m._convs.length){
+    h+=`<div class="collapse-toggle" onclick="this.classList.toggle('open');this.nextElementSibling.classList.toggle('open')" style="margin-top:6px">
+      <span class="ct-label">👥 Convidados (${m._convs.length})</span>
+      <span><span class="ct-val">${eur(m.AA)}</span><span class="ct-arrow">▼</span></span>
+    </div>`;
+    h+='<div class="collapse-body"><div class="meals">';
+    m._convs.forEach(c=>h+=`<div class="meal"><span class="d">${c.nome} · ${c.dia} ${c.ref}</span><span class="p">${eur(c.q)}</span></div>`);
+    h+=`</div></div>`;
+    totalDebitos+=m.AA;
+  }
+
   if(m.R>0){h+=`<div class="li"><span class="lbl">Quota adicional<small>fator ${m.fator}</small></span><span class="val">${eur(m.R)}</span></div>`;totalDebitos+=m.R;}
   if(m.U>0){h+=`<div class="li"><span class="lbl">Missão poupança</span><span class="val">${eur(m.U)}</span></div>`;totalDebitos+=m.U;}
-
-  // 1b) Convidados — dívida dos convidados é débito do membro
-  if(m.AA>0){h+=`<div class="li"><span class="lbl">Convidados<small>valor que tens de cobrar/entregar</small></span><span class="val">${eur(m.AA)}</span></div>`;totalDebitos+=m.AA;}
 
   // 1c) Valores que recebeu (reembolsos recebidos, mealheiro) — é custo
   const reembolsosRecebidos=CALC.pagamentos.filter(p=>p.ref&&p.ref.startsWith('Reembolso')&&p.para===m.nome).reduce((a,p)=>a+p.valor,0);
@@ -691,12 +716,6 @@ function openMember(nome){
   totalCreditos=rnd(totalCreditos,2);
   if(totalCreditos===0) h+='<div class="empty sf">Sem créditos</div>';
   h+=`<div class="li tot"><span class="lbl">Total créditos</span><span class="val plus">${eur(totalCreditos)}</span></div>`;
-
-  // ─── CONVIDADOS ───
-  if(m._convs.length){
-    h+='<div class="bd-title sf">Detalhe Convidados</div><div class="meals">';
-    m._convs.forEach(c=>h+=`<div class="meal"><span class="d">${c.nome} · ${c.dia} ${c.ref}</span><span class="p">${eur(c.q)}</span></div>`);
-    h+=`</div><div class="li tot"><span class="lbl">Total convidados</span><span class="val">${eur(m.AA)}</span></div>`;}
 
   document.getElementById('sheet-hdr').innerHTML=`
     <div class="grab"></div>
