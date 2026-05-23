@@ -67,7 +67,7 @@ header .sub{font-size:12.5px;color:var(--muted);margin-top:7px}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:13px 14px;margin-bottom:8px}
 .card .top{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
 .card .desc{font-size:15px;font-weight:600;flex:1}.card .v{font-weight:700;font-size:15px;white-space:nowrap}
-.card .meta{font-size:11.5px;color:var(--faint);margin-top:5px;display:flex;gap:8px;flex-wrap:wrap}
+.card .meta{font-size:11.5px;color:var(--faint);margin-top:5px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .chip{background:var(--panel2);padding:2px 8px;border-radius:6px;color:var(--muted)}.chip.t{color:var(--gold)}
 
 /* Sheet (detail) */
@@ -114,61 +114,52 @@ body.no-scroll{overflow:hidden;position:fixed;width:100%;}
 .modal h3{font-size:18px;margin-bottom:14px}
 .modal p{font-size:12.5px;color:var(--muted);margin-bottom:14px;line-height:1.5}
 .modal label{display:block;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--faint);margin:14px 0 5px;font-weight:700}
-.modal input,.modal select{width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:12px;color:var(--ink);font-size:15px;-webkit-appearance:none;appearance:none}
-.modal input:focus,.modal select:focus{outline:none;border-color:var(--gold)}
+.modal input,.modal select,.modal textarea{width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:12px;color:var(--ink);font-size:15px;-webkit-appearance:none;appearance:none;font-family:inherit}
+.modal textarea{resize:vertical;min-height:44px;max-height:120px;line-height:1.4}
+.modal input:focus,.modal select:focus,.modal textarea:focus{outline:none;border-color:var(--gold)}
 .modal select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238a93a2' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;padding-right:34px}
 .mbtns{display:flex;gap:9px;margin-top:18px}
 .btn{flex:1;padding:13px;border-radius:10px;border:none;font-size:14px;font-weight:700;cursor:pointer}
 .btn.prim{background:var(--gold);color:#1a1205}.btn.ghost{background:var(--panel2);color:var(--ink);border:1px solid var(--line)}
 .btn:disabled{opacity:.4}
 .note{font-size:11px;color:var(--faint);margin-top:10px;line-height:1.5}
-.seg{display:flex;border:1px solid var(--line);border-radius:9px;overflow:hidden;margin-top:4px}
-.seg-btn{flex:1;text-align:center;padding:10px 4px;font-size:13px;font-weight:600;color:var(--muted);background:var(--panel2);cursor:pointer;border:none;transition:.15s}
-.seg-btn.on{background:var(--gold);color:#1a1205}
-.debt-item{display:flex;align-items:center;gap:10px;background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:10px 12px;cursor:pointer;transition:.15s;user-select:none}
-.debt-item.on{border-color:var(--gold);background:rgba(232,176,75,.08)}
-.debt-item input[type=checkbox]{width:16px;height:16px;accent-color:var(--gold);flex-shrink:0;cursor:pointer}
-.debt-item .di-name{flex:1;font-size:13px;font-weight:600;color:var(--ink)}
-.debt-item .di-val{font-size:13px;font-weight:700;color:var(--red)}
-.debt-item.on .di-val{color:var(--green)}
-.debt-group{border:1px solid var(--line);border-radius:11px;overflow:hidden;margin-bottom:2px}
-.debt-group-header{display:flex;align-items:center;gap:10px;background:var(--panel2);padding:11px 13px;cursor:pointer;user-select:none;transition:.15s}
-.debt-group-header.on{background:rgba(232,176,75,.08);border-bottom:1px solid rgba(232,176,75,.25)}
-.debt-group-header input[type=checkbox]{width:16px;height:16px;accent-color:var(--gold);flex-shrink:0;cursor:pointer}
-.debt-group-name{flex:1;font-size:14px;font-weight:700;color:var(--ink)}
-.debt-group-total{font-size:13px;font-weight:700;color:var(--red)}
-.debt-group-header.on .debt-group-total{color:var(--green)}
-.debt-group-body{padding:6px 8px;display:flex;flex-direction:column;gap:4px;background:rgba(0,0,0,.12)}
-.debt-sub{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:8px;background:var(--panel2);border:1px solid var(--line);cursor:pointer;user-select:none;transition:.12s}
-.debt-sub.on{border-color:rgba(232,176,75,.5);background:rgba(232,176,75,.06)}
-.debt-sub input[type=checkbox]{width:14px;height:14px;accent-color:var(--gold);flex-shrink:0;cursor:pointer}
-.debt-sub-name{flex:1;font-size:12px;font-weight:500;color:var(--muted)}
-.debt-sub.on .debt-sub-name{color:var(--ink)}
-.debt-sub-val{font-size:12px;font-weight:700;color:var(--red)}
-.debt-sub.on .debt-sub-val{color:var(--green)}
 
-/* Redesigned debt rows — single card per person, inline own+guest */
-.debt-row{background:var(--panel2);border:1.5px solid var(--line);border-radius:14px;overflow:hidden;transition:.18s;cursor:default}
-.debt-row.any-on{border-color:rgba(232,176,75,.5);box-shadow:0 0 0 3px rgba(232,176,75,.08)}
-.debt-row-name{font-size:14px;font-weight:700;color:var(--ink);padding:12px 14px 8px;letter-spacing:-.1px;display:flex;align-items:center;gap:8px}
-.debt-row-name::before{content:'';width:8px;height:8px;border-radius:50%;background:var(--red);flex-shrink:0}
-.debt-row.any-on .debt-row-name::before{background:var(--green)}
-.debt-row-checks{display:flex;gap:0;border-top:1px solid var(--line)}
-.debt-check-cell{flex:1;display:flex;align-items:center;gap:10px;padding:11px 14px;cursor:pointer;user-select:none;transition:.15s;border-right:1px solid var(--line)}
-.debt-check-cell:last-child{border-right:none}
-.debt-check-cell.on{background:rgba(232,176,75,.09)}
-.debt-check-cell input[type=checkbox]{width:16px;height:16px;accent-color:var(--gold);flex-shrink:0;cursor:pointer;margin:0}
-.dcc-info{display:flex;flex-direction:column;gap:1px}
-.dcc-label{font-size:11px;font-weight:700;color:var(--faint);text-transform:uppercase;letter-spacing:.08em;line-height:1.2}
-.dcc-val{font-size:15px;font-weight:700;color:var(--red);line-height:1.2;margin-top:1px}
-.debt-check-cell.on .dcc-label{color:var(--gold)}
-.debt-check-cell.on .dcc-val{color:var(--green)}
+/* Cash Flow wheel/carousel */
+.cf-wheel{display:flex;gap:6px;margin-top:6px;overflow-x:auto;padding-bottom:4px;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.cf-wheel::-webkit-scrollbar{display:none}
+.cf-opt{flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 12px;border-radius:12px;border:1.5px solid var(--line);background:var(--panel2);cursor:pointer;transition:.18s;min-width:72px;user-select:none}
+.cf-opt:active{transform:scale(.95)}
+.cf-opt.on{border-color:var(--gold);background:rgba(232,176,75,.1)}
+.cf-opt .cf-icon{font-size:22px;line-height:1}
+.cf-opt .cf-lbl{font-size:10.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;text-align:center;line-height:1.2}
+.cf-opt.on .cf-lbl{color:var(--gold)}
+
+/* Inline row (value + date on same line) */
+.inline-row{display:flex;gap:10px;align-items:flex-start}
+.inline-row>div{flex:1;min-width:0}
+.inline-row>div.narrow{flex:0 0 48%}
+
+/* Saldar dívida — compact toggle chips */
+.sd-list{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.sd-chip{display:inline-flex;align-items:center;gap:6px;padding:7px 12px;border-radius:20px;border:1.5px solid var(--line);background:var(--panel2);cursor:pointer;transition:.15s;user-select:none;font-size:13px;font-weight:600;color:var(--muted)}
+.sd-chip:active{transform:scale(.96)}
+.sd-chip.on{border-color:var(--gold);background:rgba(232,176,75,.12);color:var(--ink)}
+.sd-chip .sd-dot{width:8px;height:8px;border-radius:50%;background:var(--line);transition:.15s;flex-shrink:0}
+.sd-chip.on .sd-dot{background:var(--gold);box-shadow:0 0 6px rgba(232,176,75,.5)}
+.sd-chip .sd-amt{font-size:11px;font-weight:700;color:var(--red);margin-left:2px}
+.sd-chip.on .sd-amt{color:var(--green)}
+
+/* Card action buttons (edit/delete) */
+.card-actions{display:flex;gap:4px;margin-left:auto;flex-shrink:0}
+.card-act{width:28px;height:28px;border-radius:7px;border:1px solid var(--line);background:var(--panel2);color:var(--muted);font-size:13px;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:.12s}
+.card-act:active{transform:scale(.9);background:rgba(232,176,75,.1)}
+.card-act.del:active{background:rgba(255,107,107,.12)}
 
 /* Toast */
 .toast{position:fixed;left:50%;bottom:84px;transform:translateX(-50%) translateY(20px);background:#222a36;border:1px solid var(--line);color:var(--ink);padding:11px 18px;border-radius:11px;font-size:13px;opacity:0;pointer-events:none;transition:.25s;z-index:80;box-shadow:var(--shadow);max-width:90%;text-align:center}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 .toast.ok{border-color:var(--green)}.toast.bad{border-color:var(--red)}
-.sf,.eyebrow,.syncpill,.hero .cell .k,.tabs,.tab,.mrow .nm small,.card .meta,.chip,.sec-title,.back-btn,.bd-title,.li .lbl small,.meal,.sheet .final .k,.sheet .verdict,.empty,.fab,.modal,.modal h3,.modal p,.modal label,.modal input,.modal select,.btn,.note,.seg-btn,.toast,.badge,.year-nav,.yr-btn,.yr-label{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+.sf,.eyebrow,.syncpill,.hero .cell .k,.tabs,.tab,.mrow .nm small,.card .meta,.chip,.sec-title,.back-btn,.bd-title,.li .lbl small,.meal,.sheet .final .k,.sheet .verdict,.empty,.fab,.modal,.modal h3,.modal p,.modal label,.modal input,.modal select,.modal textarea,.btn,.note,.seg-btn,.toast,.badge,.year-nav,.yr-btn,.yr-label,.cf-opt,.cf-lbl,.sd-chip,.card-act,.inline-row{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
 header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
 </style>
 </head>
@@ -196,16 +187,16 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
     <div class="tab on" data-tab="saldos" onclick="setTab('saldos')">Saldos</div>
     <div class="tab" data-tab="refeicoes" onclick="setTab('refeicoes')">Refeições</div>
     <div class="tab" data-tab="despesas" onclick="setTab('despesas')">Despesas</div>
-    <div class="tab" data-tab="pagamentos" onclick="setTab('pagamentos')">Pagam.</div>
+    <div class="tab" data-tab="cashflows" onclick="setTab('cashflows')">Cash-Flows</div>
   </div>
   <div id="view-saldos"></div>
   <div id="view-refeicoes" style="display:none"></div>
   <div id="view-despesas" style="display:none"></div>
-  <div id="view-pagamentos" style="display:none"></div>
+  <div id="view-cashflows" style="display:none"></div>
 </div>
 
 <div class="fabs">
-  <button class="fab gold" onclick="openPayModal()" title="Registar pagamento">💰</button>
+  <button class="fab gold" onclick="openPayModal()" title="Registar Cash Flow">💰</button>
   <button class="fab dark" onclick="openAdmin()" title="Definições">⚙</button>
 </div>
 
@@ -217,36 +208,44 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
   <div class="sheet-body" id="sheet-in"></div>
 </div>
 
-<!-- Payment modal -->
+<!-- Cash Flow modal -->
 <div class="modal-bg" id="pay-bg">
   <div class="modal" id="pay-modal">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
-      <h3 style="margin-bottom:0">Registar pagamento</h3>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <h3 style="margin-bottom:0">Cash Flows</h3>
       <button onclick="closePayModal()" style="background:var(--panel2);border:1px solid var(--line);color:var(--muted);border-radius:9px;width:32px;height:32px;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0">✕</button>
     </div>
-    <div class="seg" id="pay-dir-seg">
-      <button class="seg-btn" onclick="setPayDir('paguei')">Paguei a alguém</button>
-      <button class="seg-btn" onclick="setPayDir('receber')">Recebi de alguém</button>
-      <button class="seg-btn on" onclick="setPayDir('saldar')">Saldar dívida</button>
-    </div>
-    <label id="pay-who-lbl">Quem saldou?</label>
-    <select id="pay-who" onchange="updateDebtList()"></select>
-
-    <div id="pay-debts-wrap">
-      <label>Que dívidas saldou?</label>
-      <div id="pay-debts" style="display:flex;flex-direction:column;gap:6px;margin-top:4px"></div>
+    <!-- Wheel selector -->
+    <div class="cf-wheel" id="cf-wheel">
+      <div class="cf-opt on" data-cf="reembolso" onclick="setCfType('reembolso')"><span class="cf-icon">💸</span><span class="cf-lbl">Reembolso</span></div>
+      <div class="cf-opt" data-cf="recebimento" onclick="setCfType('recebimento')"><span class="cf-icon">📥</span><span class="cf-lbl">Recebimento</span></div>
+      <div class="cf-opt" data-cf="despesa" onclick="setCfType('despesa')"><span class="cf-icon">🛒</span><span class="cf-lbl">Despesa</span></div>
+      <div class="cf-opt" data-cf="mealheiro" onclick="setCfType('mealheiro')"><span class="cf-icon">🐷</span><span class="cf-lbl">Mealheiro</span></div>
+      <div class="cf-opt" data-cf="saldar" onclick="setCfType('saldar')"><span class="cf-icon">🤝</span><span class="cf-lbl">Saldar Dívida</span></div>
     </div>
 
-    <label style="margin-top:16px">Valor total (€)</label>
-    <input type="number" id="pay-val" step="0.01" min="0.01" placeholder="0,00" inputmode="decimal">
-    <div class="note" id="pay-val-hint"></div>
+    <!-- Dynamic form area -->
+    <div id="cf-form"></div>
 
-    <label>Data</label>
-    <input type="date" id="pay-date">
     <div class="mbtns">
-      <button class="btn prim" id="pay-save" onclick="savePayment()">Guardar</button>
+      <button class="btn prim" id="pay-save" onclick="saveCashFlow()">Guardar</button>
     </div>
     <div class="note">Isto faz commit no GitHub. Precisas do token configurado (⚙).</div>
+  </div>
+</div>
+
+<!-- Edit Cash Flow modal -->
+<div class="modal-bg" id="edit-cf-bg">
+  <div class="modal" id="edit-cf-modal">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <h3 style="margin-bottom:0" id="edit-cf-title">Editar</h3>
+      <button onclick="closeEditCf()" style="background:var(--panel2);border:1px solid var(--line);color:var(--muted);border-radius:9px;width:32px;height:32px;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0">✕</button>
+    </div>
+    <div id="edit-cf-form"></div>
+    <div class="mbtns">
+      <button class="btn ghost" onclick="closeEditCf()">Cancelar</button>
+      <button class="btn prim" id="edit-cf-save" onclick="saveEditCf()">Guardar</button>
+    </div>
   </div>
 </div>
 
@@ -275,8 +274,8 @@ const TOKEN_KEY='meo_gh_token';
 function getToken(){return localStorage.getItem(TOKEN_KEY)||'';}
 
 /* STATE */
-let ALL_YEARS=[];   // array completo do JSON (cada elemento = 1 ano)
-let YEAR_IDX=0;     // índice do ano selecionado
+let ALL_YEARS=[];
+let YEAR_IDX=0;
 let DATA=null,CALC=null,TAB='saldos',GH_SHA=null;
 
 function changeYear(delta){
@@ -297,6 +296,7 @@ function updateYearUI(){
   document.getElementById('yr-prev').disabled=YEAR_IDX<=0;
   document.getElementById('yr-next').disabled=YEAR_IDX>=ALL_YEARS.length-1;
 }
+
 /* MOTOR */
 function rnd(x,n=2){const f=Math.pow(10,n);return Math.floor(Math.abs(x)*f+0.5)/f*(x>=0?1:-1);}
 function roundup(x,n=0){const f=Math.pow(10,n);return Math.ceil(Math.abs(x)*f-1e-9)/f*(x>=0?1:-1);}
@@ -308,24 +308,19 @@ function calcular(data){
   const slotday={};for(const rd of refeicoesDef)slotday[rd.dia]=rd.data;
   const day2slot={};for(const k in slotday)day2slot[slotday[k]]=k;
 
-  /* ── Despesas por tipo ── */
   const tot={};for(const x of despesas)tot[x.tipo]=(tot[x.tipo]||0)+x.valor;
   const totalDesp=rnd(sumv(tot),2);
 
-  /* ── F20: Despesas indiretas = (tudo menos Almoço e Jantar) × 50% ── */
   const F20=rnd((totalDesp-(tot['Almoço']||0)-(tot['Jantar']||0))*0.5,2);
 
-  /* ── Presenças → membros por refeição ── */
   const cmemb=(d,ref)=>{const rs=ref==='Lanche'?'Tarde':ref;const s=day2slot[d]+'|'+rs;return membros.filter(m=>m.presencas.includes(s)).length;};
 
-  /* ── Calcular custo por refeição ── */
   const refeicoes=[];let prevIndirectPerPerson=0;
   for(const rd of refeicoesDef){
     const Ec=convidados.filter(g=>g.dia===rd.dia&&g.ref===rd.ref&&g.pagante==='Sim').length;
     const D=cmemb(rd.data,rd.ref)+Ec;
     let Fdir=0,I=0,L=0;
     if(rd.ref==='Lanche'){
-      /* Lanche: sem despesa direta, custo = indirect per person do almoço anterior */
       L=rnd(prevIndirectPerPerson,2);
     } else {
       Fdir=despesas.filter(x=>x.tipo===rd.ref&&x.dataValor===rd.data).reduce((a,x)=>a+x.valor,0);
@@ -341,7 +336,6 @@ function calcular(data){
     refeicoes.push({...rd,D,E:Ec,Fdir:rnd(Fdir,2),I,L,P,Q});
   }
 
-  /* ── Mapear refeições e calcular custos por membro ── */
   const rmap={};for(const r of refeicoes)rmap[r.data+'|'+r.ref]=r;
   const reffor=(dia,ref)=>{if(ref==='Tarde')ref='Lanche';return rmap[slotday[dia]+'|'+ref];};
   for(const m of membros){
@@ -359,79 +353,57 @@ function calcular(data){
     m.AA=rnd(m._convs.reduce((a,x)=>a+x.q,0),2);
   }
 
-  /* ── Totais para BN3 ── */
-  const totRefMembros=rnd(membros.reduce((a,m)=>a+m.Sown,0),2); /* só refeições membros */
-  const totGuestPayments=rnd(membros.reduce((a,m)=>a+m.AA,0),2); /* pagamentos convidados */
+  const totRefMembros=rnd(membros.reduce((a,m)=>a+m.Sown,0),2);
+  const totGuestPayments=rnd(membros.reduce((a,m)=>a+m.AA,0),2);
   const sobrasTot=rnd(evento.saldoAnoAnterior||0,2);
   const descontoTot=rnd(evento.descontoTshirts||0,2);
   const mealTot=mealheiros.reduce((a,x)=>a+x.valor,0);
 
-  /* ── BN3: valor de referência para quota adicional ── */
-  /* BN3 = totalDesp - (refeições membros + convidados + sobras + desconto + mealheiro) + 100 */
   const baseQuota=totalDesp-(totRefMembros+totGuestPayments+sobrasTot+descontoTot+mealTot);
   const BN3=baseQuota<=0?0:rnd(baseQuota+100,2);
   const sumF=membros.reduce((a,m)=>a+m.fator,0);
 
-  /* ── Mealheiro por pessoa ── */
   const mealBy={};for(const x of mealheiros)mealBy[x.quem]=(mealBy[x.quem]||0)+x.valor;
 
-  /* ── Contribuições e saldo por membro ── */
   for(const m of membros){
-    /* R = Quota adicional */
     m.R=sumF>0?Math.max(rnd(BN3*m.fator/sumF,2),0):0;
-    /* T = Outras contribuições */
     m.T=m.outras||0;
-    /* U = Missão poupança: arredondamento + 1€ + outras */
     m.U=rnd(roundup(m.Sown+m.R,0)-m.R-m.Sown+1+m.T,2);
-    /* V = Total contribuição */
     m.V=rnd(m.Sown+m.R+m.U,2);
-    /* W = Mealheiro recolhido */
     m.W=mealBy[m.nome]||0;
-    /* X = Sobras ano anterior (só tesoureiro recebe sobras + desconto) */
     m.X=m.nome===evento.tesoureiro?rnd(sobrasTot+descontoTot,2):0;
-    /* Y = Crédito despesas: total pago - reembolsadas + recebeu reembolsos */
     const totalPago=despesas.filter(x=>x.quem===m.nome).reduce((a,x)=>a+x.valor,0);
     const reembolsadas=pag.filter(p=>p.ref&&p.ref.startsWith('Reembolso')&&p.para===m.nome).reduce((a,p)=>a+p.valor,0);
     const recebeuReemb=pag.filter(p=>p.ref&&p.ref.startsWith('Reembolso')&&p.de===m.nome).reduce((a,p)=>a+p.valor,0);
     m.Y=rnd(totalPago-reembolsadas+recebeuReemb,2);
     m._pago=m.Y;
-    /* Z = Saldo antes convidados (positivo = adiantaste mais do que deves = tens a receber) */
     m.Z=rnd(m.Y+m.W+m.X-m.V,2);
   }
 
-  /* ── Saldo do grupo = totalReceitas - totalDesp ── */
   const missaoTot=rnd(membros.reduce((a,m)=>a+m.U,0),2);
   const quotaTot=rnd(membros.reduce((a,m)=>a+m.R,0),2);
   const totRefAll=rnd(membros.reduce((a,m)=>a+m.Sown,0),2);
   const totReceitas=rnd(quotaTot+totRefAll+totGuestPayments+sobrasTot+descontoTot+mealTot+missaoTot,2);
   const saldoGrupo=rnd(totReceitas-totalDesp,2);
 
-  /* ── Saldo final por membro (com convidados, sobras grupo, pagamentos) ── */
   const pagNonReemb=pag.filter(p=>!p.ref||!p.ref.startsWith('Reembolso'));
   const nomes=membros.map(m=>m.nome);
   for(const m of membros){
     m.AB=m.nome===evento.tesoureiro?saldoGrupo:0;
-    /* AC = saldo base: Z - convidados (dívida) + sobras grupo (crédito tesoureiro) */
     m.AC=rnd(m.Z-m.AA+m.AB,2);
   }
-  /* ── saldoFinal: AC ajustado pelos pagamentos recebidos/feitos ── */
-  /* Para cada pagamento, distribuir o valor pelas dívidas cobertas */
-  /* ref pode ser: "own:Nome, conv:Nome" (novo) ou "Nome1, Nome2" (legacy) */
+
   const mByName={};for(const m of membros)mByName[m.nome]=m;
-  const credited={};       // credited[nome] = valor abatido ao membro
-  const creditedConv={};   // creditedConv[nome] = valor abatido aos convidados do membro
+  const credited={};
+  const creditedConv={};
   for(const p of pagNonReemb){
     if(!p.ref){
-      // sem ref: cobre o pagador inteiro
       const m=mByName[p.de];if(m&&m.AC<0)credited[p.de]=(credited[p.de]||0)+p.valor;
       continue;
     }
     const parts=p.ref.split(/,\s*/).map(x=>x.trim()).filter(Boolean);
-    // Detectar formato novo (own:/conv:) vs legacy (nomes simples)
     const isNew=parts.some(x=>x.startsWith('own:')||x.startsWith('conv:'));
     if(isNew){
-      // Novo formato: alocar explicitamente
-      // Primeiro calcular total dos itens para distribuir o valor proporcionalmente
       let totalItems=0;
       const items=[];
       parts.forEach(pt=>{
@@ -449,16 +421,15 @@ function calcular(data){
         else creditedConv[it.nome]=(creditedConv[it.nome]||0)+alloc;
       });
     } else {
-      // Legacy: nomes simples → cobrir AC inteiro proporcionalmente
       const covNames=parts.filter(x=>nomes.includes(x));
       if(!covNames.length){const m=mByName[p.de];if(m&&m.AC<0)credited[p.de]=(credited[p.de]||0)+p.valor;continue;}
       const totalDebtCov=covNames.reduce((a,cn)=>{const mm=mByName[cn];return a+(mm&&mm.AC<0?Math.abs(mm.AC):0);},0);
       covNames.forEach(cn=>{
         const mm=mByName[cn];if(!mm)return;
         let alloc;
-        if(totalDebtCov>0&&mm.AC<0){alloc=rnd(p.valor*Math.abs(mm.AC)/totalDebtCov,2);}
-        else if(covNames.length===1){alloc=p.valor;}
-        else{alloc=rnd(p.valor/covNames.length,2);}
+        if(totalDebtCov>0&&mm.AC<0)alloc=rnd(p.valor*Math.abs(mm.AC)/totalDebtCov,2);
+        else if(covNames.length===1)alloc=p.valor;
+        else alloc=rnd(p.valor/covNames.length,2);
         credited[cn]=(credited[cn]||0)+alloc;
       });
     }
@@ -469,10 +440,6 @@ function calcular(data){
     if(m.nome===tes){
       m.saldoFinal=rnd(m.AC+recvTes,2);
     } else {
-      /* AC = Z - AA + AB. Z já inclui crédito de despesas.
-         credited = pagamentos que cobrem a dívida própria (m.V)
-         creditedConv = pagamentos que cobrem os convidados (m.AA)
-         saldoFinal = AC + credited[próprio] + creditedConv[convidados] */
       const ownCredit=credited[m.nome]||0;
       const convCredit=creditedConv[m.nome]||0;
       m.saldoFinal=rnd(m.AC+ownCredit+convCredit,2);
@@ -492,7 +459,24 @@ const AVCOL=['#e8b04b','#5aa9ff','#3ecf8e','#ff6b6b','#b98cff','#ff9f5a','#4fd1c
 function av(nome,i){return`<div class="av" style="background:${AVCOL[i%AVCOL.length]}">${nome.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase()}</div>`;}
 
 function setTab(t){TAB=t;document.querySelectorAll('.tab').forEach(e=>e.classList.toggle('on',e.dataset.tab===t));
-  ['saldos','refeicoes','despesas','pagamentos'].forEach(v=>document.getElementById('view-'+v).style.display=v===t?'':'none');}
+  ['saldos','refeicoes','despesas','cashflows'].forEach(v=>document.getElementById('view-'+v).style.display=v===t?'':'none');}
+
+/* ── Classify a cash-flow entry ── */
+function cfType(p){
+  if(p._cfType) return p._cfType; // explicitly set
+  if(p.ref && p.ref.startsWith('Reembolso')) return 'reembolso';
+  if(p.ref && (p.ref.includes('own:') || p.ref.includes('conv:'))) return 'saldar';
+  // generic payment without ref
+  const tes=DATA.evento.tesoureiro;
+  if(p.de===tes) return 'reembolso';
+  return 'recebimento';
+}
+function cfLabel(t){
+  return{reembolso:'Reembolso',recebimento:'Recebimento',despesa:'Despesa',mealheiro:'Mealheiro',saldar:'Saldar Dívida'}[t]||t;
+}
+function cfIcon(t){
+  return{reembolso:'💸',recebimento:'📥',despesa:'🛒',mealheiro:'🐷',saldar:'🤝'}[t]||'💰';
+}
 
 function renderAll(){
   if(!CALC)return;const ms=CALC.membros;
@@ -503,7 +487,7 @@ function renderAll(){
   document.getElementById('tot-rec').textContent=eur(CALC.totReceitas);
   document.getElementById('tot-desp').textContent=eur(CALC.totDespesas);
 
-  // SALDOS (sorted by saldoFinal desc)
+  // SALDOS
   const sorted=[...ms].sort((a,b)=>b.saldoFinal-a.saldoFinal);
   let h='<div class="sec-title sf">Quem recebe / quem deve</div><div class="mlist">';
   sorted.forEach((m,i)=>{
@@ -534,20 +518,58 @@ function renderAll(){
       <div class="meta"><span class="chip t">${x.tipo}</span><span class="chip">pagou ${x.quem}</span></div></div>`;
   });document.getElementById('view-despesas').innerHTML=dd;
 
-  // PAGAMENTOS
-  let pp='<div class="sec-title sf">Histórico de pagamentos ('+CALC.pagamentos.length+')</div>';
-  if(!CALC.pagamentos.length)pp+='<div class="empty">Nenhum pagamento registado</div>';
-  [...CALC.pagamentos].sort((a,b)=>(b.data||'').localeCompare(a.data||'')).forEach(p=>{
-    pp+=`<div class="card"><div class="top"><div class="desc">${p.de} → ${p.para}</div>
-      <div class="v">${eur(p.valor)}</div></div>
-      <div class="meta"><span class="chip">${p.data||'—'}</span>${p.ref?`<span class="chip">${p.ref}</span>`:''}</div></div>`;
-  });document.getElementById('view-pagamentos').innerHTML=pp;
+  // CASH-FLOWS — merge all 5 types into one list
+  renderCashFlows();
 
   // Populate payment modal selects
-  const sel=document.getElementById('pay-who');sel.innerHTML='<option value="">Seleciona…</option>';
-  ms.forEach(m=>{sel.innerHTML+=`<option value="${m.nome}">${m.nome}</option>`;});
-  updateDebtList();
+  updateCfForm();
 }
+
+function renderCashFlows(){
+  // Build unified list of all cash-flows
+  const allCf=[];
+
+  // 1) Pagamentos (reembolso, recebimento, saldar)
+  (DATA.pagamentos||[]).forEach((p,i)=>{
+    const t=cfType(p);
+    allCf.push({type:t,date:p.data||'',label:cfLabel(t),icon:cfIcon(t),
+      line1: t==='reembolso'? `${p.de} → ${p.para}` : t==='saldar'? `${p.de} → ${p.para}` : `${p.de} → ${p.para}`,
+      line2: p.ref||'',valor:p.valor,source:'pagamentos',idx:i});
+  });
+
+  // 2) Despesas
+  (DATA.despesas||[]).forEach((d,i)=>{
+    allCf.push({type:'despesa',date:d.dataDesp||d.dataValor||'',label:'Despesa',icon:'🛒',
+      line1:d.desc||'(sem descrição)',line2:`${d.tipo} · pagou ${d.quem}`,valor:d.valor,source:'despesas',idx:i});
+  });
+
+  // 3) Mealheiros
+  (DATA.mealheiros||[]).forEach((m,i)=>{
+    allCf.push({type:'mealheiro',date:m.data||'',label:'Mealheiro',icon:'🐷',
+      line1:`${m.quem} recebeu`,line2:'',valor:m.valor,source:'mealheiros',idx:i});
+  });
+
+  // Sort by date desc
+  allCf.sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+
+  let pp=`<div class="sec-title sf">Histórico de Cash-Flows (${allCf.length})</div>`;
+  if(!allCf.length) pp+='<div class="empty">Nenhum cash-flow registado</div>';
+
+  allCf.forEach(cf=>{
+    const escSrc=cf.source;const escIdx=cf.idx;
+    pp+=`<div class="card"><div class="top"><div class="desc">${cf.icon} ${cf.line1}</div>
+      <div class="v">${eur(cf.valor)}</div></div>
+      <div class="meta"><span class="chip t">${cf.label}</span><span class="chip">${cf.date||'—'}</span>${cf.line2?`<span class="chip">${truncRef(cf.line2)}</span>`:''}
+      <div class="card-actions">
+        <button class="card-act" onclick="editCfEntry('${escSrc}',${escIdx})" title="Editar">✎</button>
+        <button class="card-act del" onclick="deleteCfEntry('${escSrc}',${escIdx})" title="Remover">✕</button>
+      </div>
+      </div></div>`;
+  });
+  document.getElementById('view-cashflows').innerHTML=pp;
+}
+
+function truncRef(s){return s.length>40?s.slice(0,37)+'…':s;}
 
 function openMember(nome){
   const m=CALC.membros.find(x=>x.nome===nome);if(!m)return;
@@ -571,16 +593,18 @@ function openMember(nome){
   // Crédito
   h+='<div class="bd-title sf">O que adiantaste</div>';
   if(m._pago>0)h+=`<div class="li"><span class="lbl">Despesas que pagaste</span><span class="val plus">${eur(m._pago)}</span></div>`;
-  if(m.W>0)h+=`<div class="li"><span class="lbl">Mealheiro recolhido</span><span class="val plus">${eur(m.W)}</span></div>`;
+  // Mealheiro = recebimento (dinheiro com que fiquei e não é meu)
+  if(m.W>0)h+=`<div class="li"><span class="lbl">Mealheiro (recebimento)</span><span class="val plus">${eur(m.W)}</span></div>`;
   if(m.X>0)h+=`<div class="li"><span class="lbl">Sobras ano anterior</span><span class="val plus">${eur(m.X)}</span></div>`;
   if(!m._pago&&!m.W&&!m.X)h+='<div class="empty sf">Sem adiantamentos</div>';
-  if(m.AB>0)h+=`<div class="li"><span class="lbl">Sobras do grupo (tesoureiro)</span><span class="val plus">${eur(m.AB)}</span></div>`;
+  // Sobras do grupo do ano corrente NÃO entram na conta da pessoa (req #4)
+  // m.AB is only used in AC calculation for tesoureiro but we don't show it as personal credit
   h+=`<div class="li tot"><span class="lbl">Saldo base</span><span class="val ${m.AC>=0?'plus':'minus'}">${eur(m.AC)}</span></div>`;
 
   // Pagamentos
   if(m._pagamentos.length){h+='<div class="bd-title sf">Pagamentos</div>';
     m._pagamentos.forEach(p=>{const sent=p.de===m.nome;
-      h+=`<div class="li"><span class="lbl">${sent?'Pagaste a '+p.para:'Recebeste de '+p.de}<small>${p.data||''}${p.ref?' · '+p.ref:''}</small></span>
+      h+=`<div class="li"><span class="lbl">${sent?'Pagaste a '+p.para:'Recebeste de '+p.de}<small>${p.data||''}${p.ref?' · '+truncRef(p.ref):''}</small></span>
         <span class="val ${sent?'minus':'plus'}">${sent?'−':''}${eur(p.valor)}</span></div>`;});
     h+=`<div class="li tot"><span class="lbl">Saldo após pagamentos</span><span class="val ${sf>=0?'plus':'minus'}">${eur(sf)}</span></div>`;}
 
@@ -620,15 +644,11 @@ async function carregar(){
     if(!res.ok)throw new Error('HTTP '+res.status);
     const json=await res.json();GH_SHA=json.sha;
     const raw=json.content.replace(/\n/g,'');
-    /* Decode base64 → UTF-8 properly */
     const bytes=Uint8Array.from(atob(raw),c=>c.charCodeAt(0));
     const decoded=new TextDecoder('utf-8').decode(bytes);
     const parsed=JSON.parse(decoded);
-    // Suportar formato antigo (objeto) e novo (array)
     ALL_YEARS=Array.isArray(parsed)?parsed:[parsed];
-    // Ordenar por ano
     ALL_YEARS.sort((a,b)=>(a.evento.ano||0)-(b.evento.ano||0));
-    // Selecionar o ano mais recente
     YEAR_IDX=ALL_YEARS.length-1;
     selectYear();
     setSync('live','sincronizado · '+new Date().toLocaleTimeString('pt-PT',{hour:'2-digit',minute:'2-digit'}));
@@ -638,7 +658,6 @@ async function carregar(){
 async function pushToGitHub(msg){
   const tk=getToken();if(!tk){toast('Configura o token primeiro (⚙)','bad');return false;}
   try{
-    // Sincronizar o DATA editado de volta para o array
     ALL_YEARS[YEAR_IDX]=JSON.parse(JSON.stringify(DATA));
     const payload=ALL_YEARS.length===1?ALL_YEARS[0]:ALL_YEARS;
     const body=JSON.stringify({message:msg,content:btoa(unescape(encodeURIComponent(JSON.stringify(payload,null,1)))),sha:GH_SHA,branch:GH.branch});
@@ -648,29 +667,96 @@ async function pushToGitHub(msg){
   }catch(e){toast('Erro ao guardar: '+e.message,'bad');return false;}
 }
 
-/* PAYMENT MODAL */
-let payDir='saldar';
-function setPayDir(d){
-  payDir=d;
-  const btns=document.querySelectorAll('#pay-dir-seg .seg-btn');
-  btns.forEach((b,i)=>b.classList.toggle('on',['paguei','receber','saldar'][i]===d));
-  const whoLbl=document.getElementById('pay-who-lbl');
-  const debtsWrap=document.getElementById('pay-debts-wrap');
-  if(d==='paguei'){whoLbl.textContent='A quem pagaste?';debtsWrap.style.display='none';}
-  else if(d==='receber'){whoLbl.textContent='Quem te pagou?';debtsWrap.style.display='none';}
-  else{whoLbl.textContent='Quem saldou?';debtsWrap.style.display='';}
-  document.getElementById('pay-val').value='';
-  document.getElementById('pay-val-hint').textContent='';
-  updateDebtList();
+/* ═══ CASH FLOW MODAL ═══ */
+let cfDir='reembolso';
+
+function setCfType(t){
+  cfDir=t;
+  document.querySelectorAll('.cf-opt').forEach(el=>el.classList.toggle('on',el.dataset.cf===t));
+  updateCfForm();
 }
 
-function updateDebtList(){
-  if(!CALC)return;
-  if(payDir!=='saldar')return;
-  const who=document.getElementById('pay-who').value;
-  const container=document.getElementById('pay-debts');
-  if(!who){container.innerHTML='<div class="empty sf">Seleciona quem pagou primeiro</div>';recalcPayVal();return;}
+function memberOptions(sel){
+  if(!CALC)return'<option value="">Seleciona…</option>';
+  let o='<option value="">Seleciona…</option>';
+  CALC.membros.forEach(m=>{o+=`<option value="${m.nome}"${sel===m.nome?' selected':''}>${m.nome}</option>`;});
+  return o;
+}
 
+function updateCfForm(){
+  const f=document.getElementById('cf-form');if(!f)return;
+  const today=new Date().toISOString().slice(0,10);
+  const tes=DATA?DATA.evento.tesoureiro:'';
+
+  if(cfDir==='reembolso'){
+    f.innerHTML=`
+      <label>A quem reembolsaste?</label>
+      <select id="cf-who">${memberOptions()}</select>
+      <div class="inline-row" style="margin-top:14px">
+        <div><label>Valor (€)</label><input type="number" id="cf-val" step="0.01" min="0.01" placeholder="0,00" inputmode="decimal"></div>
+        <div><label>Data</label><input type="date" id="cf-date" value="${today}"></div>
+      </div>
+      <label>Descrição</label>
+      <textarea id="cf-desc" placeholder="Opcional" rows="2"></textarea>`;
+  } else if(cfDir==='recebimento'){
+    f.innerHTML=`
+      <label>Quem te pagou?</label>
+      <select id="cf-who">${memberOptions()}</select>
+      <div class="inline-row" style="margin-top:14px">
+        <div><label>Valor (€)</label><input type="number" id="cf-val" step="0.01" min="0.01" placeholder="0,00" inputmode="decimal"></div>
+        <div><label>Data</label><input type="date" id="cf-date" value="${today}"></div>
+      </div>
+      <label>Descrição</label>
+      <textarea id="cf-desc" placeholder="Opcional" rows="2"></textarea>`;
+  } else if(cfDir==='despesa'){
+    f.innerHTML=`
+      <label>Quem pagou?</label>
+      <select id="cf-who">${memberOptions()}</select>
+      <div class="inline-row" style="margin-top:14px">
+        <div><label>Data Despesa</label><input type="date" id="cf-date" value="${today}"></div>
+        <div><label>Data-Valor</label><input type="date" id="cf-date2" value="${today}"></div>
+      </div>
+      <div class="inline-row" style="margin-top:14px">
+        <div><label>Tipo</label>
+          <select id="cf-tipo">
+            <option value="Gerais">Gerais</option>
+            <option value="Bebidas">Bebidas</option>
+            <option value="Almoço">Almoço</option>
+            <option value="Jantar">Jantar</option>
+          </select>
+        </div>
+        <div><label>Valor (€)</label><input type="number" id="cf-val" step="0.01" min="0.01" placeholder="0,00" inputmode="decimal"></div>
+      </div>
+      <label>Descritivo</label>
+      <textarea id="cf-desc" placeholder="Ex: Continente — Bacalhau" rows="2"></textarea>`;
+  } else if(cfDir==='mealheiro'){
+    f.innerHTML=`
+      <label>Quem recebeu?</label>
+      <select id="cf-who">${memberOptions()}</select>
+      <div class="inline-row" style="margin-top:14px">
+        <div><label>Valor (€)</label><input type="number" id="cf-val" step="0.01" min="0.01" placeholder="0,00" inputmode="decimal"></div>
+        <div><label>Data</label><input type="date" id="cf-date" value="${today}"></div>
+      </div>`;
+  } else if(cfDir==='saldar'){
+    f.innerHTML=`
+      <label>Quem saldou?</label>
+      <select id="cf-who" onchange="updateSdChips()">${memberOptions()}</select>
+      <label>Que dívidas saldou?</label>
+      <div class="sd-list" id="sd-chips"></div>
+      <div class="inline-row" style="margin-top:14px">
+        <div><label>Valor (€)</label><input type="number" id="cf-val" step="0.01" min="0.01" placeholder="0,00" inputmode="decimal"></div>
+        <div><label>Data</label><input type="date" id="cf-date" value="${today}"></div>
+      </div>
+      <div class="note" id="cf-val-hint"></div>`;
+    setTimeout(updateSdChips,10);
+  }
+}
+
+function updateSdChips(){
+  if(!CALC)return;
+  const container=document.getElementById('sd-chips');
+  if(!container)return;
+  const who=document.getElementById('cf-who')?.value||'';
   const ms=CALC.membros;
   const debtors=ms.filter(m=>{
     const ownDebt=Math.max(0,rnd(m.V-m.Y-m.W-m.X,2));
@@ -678,135 +764,201 @@ function updateDebtList(){
     return ownDebt>0.005||guestDebt>0.005;
   });
 
-  if(!debtors.length){container.innerHTML='<div class="empty sf">Sem dívidas por saldar</div>';recalcPayVal();return;}
+  if(!debtors.length){container.innerHTML='<div class="empty sf" style="width:100%">Sem dívidas por saldar</div>';recalcSdVal();return;}
 
-  container.innerHTML=debtors.map(m=>{
-    const gid=m.nome.replace(/[^a-z0-9]/gi,'_');
-    const isDefault=m.nome===who;
+  let html='';
+  debtors.forEach(m=>{
     const ownDebt=Math.max(0,rnd(m.V-m.Y-m.W-m.X,2));
     const guestDebt=Math.max(0,m.AA);
-    const hasGuests=guestDebt>0.005;
-
-    if(!hasGuests){
-      // Single full-width check cell
-      return`<div class="debt-row${isDefault?' any-on':''}" id="dr-${gid}">
-        <div class="debt-row-name">${m.nome}</div>
-        <div class="debt-row-checks">
-          <label class="debt-check-cell${isDefault?' on':''}" id="dcc-own-${gid}" onclick="event.stopPropagation()">
-            <input type="checkbox" value="own:${m.nome}" onchange="onDebtCheck(this,'${gid}')"${isDefault?' checked':''}>
-            <div class="dcc-info"><div class="dcc-label">Próprio</div><div class="dcc-val">${eur(ownDebt)}</div></div>
-          </label>
-        </div>
-      </div>`;
+    const isDefault=m.nome===who;
+    if(ownDebt>0.005){
+      html+=`<div class="sd-chip${isDefault?' on':''}" onclick="toggleSdChip(this)" data-key="own:${m.nome}">
+        <span class="sd-dot"></span>${m.nome}<span class="sd-amt">${eur(ownDebt)}</span></div>`;
     }
-
-    // Two cells: own + guests
-    return`<div class="debt-row${isDefault?' any-on':''}" id="dr-${gid}">
-      <div class="debt-row-name">${m.nome}</div>
-      <div class="debt-row-checks">
-        <label class="debt-check-cell${isDefault?' on':''}" id="dcc-own-${gid}" onclick="event.stopPropagation()">
-          <input type="checkbox" value="own:${m.nome}" onchange="onDebtCheck(this,'${gid}')"${isDefault?' checked':''}>
-          <div class="dcc-info"><div class="dcc-label">Próprio</div><div class="dcc-val">${eur(ownDebt)}</div></div>
-        </label>
-        <label class="debt-check-cell${isDefault?' on':''}" id="dcc-conv-${gid}" onclick="event.stopPropagation()">
-          <input type="checkbox" value="conv:${m.nome}" onchange="onDebtCheck(this,'${gid}')"${isDefault?' checked':''}>
-          <div class="dcc-info"><div class="dcc-label">Convidados</div><div class="dcc-val">${eur(guestDebt)}</div></div>
-        </label>
-      </div>
-    </div>`;
-  }).join('');
-  recalcPayVal();
+    if(guestDebt>0.005){
+      html+=`<div class="sd-chip${isDefault?' on':''}" onclick="toggleSdChip(this)" data-key="conv:${m.nome}">
+        <span class="sd-dot"></span>${m.nome} <span style="font-size:10px;opacity:.6">conv.</span><span class="sd-amt">${eur(guestDebt)}</span></div>`;
+    }
+  });
+  container.innerHTML=html;
+  recalcSdVal();
 }
 
-function onDebtCheck(cb,gid){
-  const cell=cb.closest('.debt-check-cell');
-  if(cell)cell.classList.toggle('on',cb.checked);
-  // Update parent row highlight
-  if(gid){
-    const row=document.getElementById('dr-'+gid);
-    if(row){
-      const anyChecked=row.querySelectorAll('input[type=checkbox]:checked').length>0;
-      row.classList.toggle('any-on',anyChecked);
-    }
-  }
-  recalcPayVal();
-}
+function toggleSdChip(el){el.classList.toggle('on');recalcSdVal();}
 
-function recalcPayVal(){
+function recalcSdVal(){
   if(!CALC)return;
-  if(payDir!=='saldar'){return;}
   const ms=CALC.membros;
   let total=0;
-  document.querySelectorAll('#pay-debts input[type=checkbox]:checked').forEach(cb=>{
-    const key=cb.value;
-    if(key.startsWith('group:'))return; // skip parent group checkbox
+  document.querySelectorAll('#sd-chips .sd-chip.on').forEach(chip=>{
+    const key=chip.dataset.key;
     if(key.startsWith('own:')){
       const nome=key.slice(4);const m=ms.find(x=>x.nome===nome);
-      if(m){total+=Math.max(0,rnd(m.V-m.Y-m.W-m.X,2));}
+      if(m)total+=Math.max(0,rnd(m.V-m.Y-m.W-m.X,2));
     } else if(key.startsWith('conv:')){
       const nome=key.slice(5);const m=ms.find(x=>x.nome===nome);
       if(m)total+=Math.max(0,m.AA);
     }
   });
   total=rnd(total,2);
-  const valEl=document.getElementById('pay-val');
-  const hint=document.getElementById('pay-val-hint');
-  if(total>0){valEl.value=total.toFixed(2);hint.textContent='Calculado automaticamente pelas dívidas selecionadas';}
-  else{valEl.value='';hint.textContent='';}
+  const valEl=document.getElementById('cf-val');
+  const hint=document.getElementById('cf-val-hint');
+  if(valEl && total>0){valEl.value=total.toFixed(2);if(hint)hint.textContent='Calculado pelas dívidas selecionadas';}
+  else if(valEl){valEl.value='';if(hint)hint.textContent='';}
 }
 
 function openPayModal(){
   document.getElementById('pay-bg').classList.add('show');
   document.body.classList.add('no-scroll');
-  document.getElementById('pay-date').value=new Date().toISOString().slice(0,10);
-  setPayDir('saldar');
+  setCfType('reembolso');
 }
 function closePayModal(){
   document.getElementById('pay-bg').classList.remove('show');
   document.body.classList.remove('no-scroll');
 }
 
-async function savePayment(){
-  const who=document.getElementById('pay-who').value;
-  const val=parseFloat(document.getElementById('pay-val').value);
-  const date=document.getElementById('pay-date').value;
+async function saveCashFlow(){
+  const who=document.getElementById('cf-who')?.value;
+  const val=parseFloat(document.getElementById('cf-val')?.value);
+  const date=document.getElementById('cf-date')?.value;
   if(!who){toast('Seleciona a pessoa','bad');return;}
   if(!val||val<=0){toast('Valor inválido','bad');return;}
 
   const tes=DATA.evento.tesoureiro;
-  let pag;
+  const desc=document.getElementById('cf-desc')?.value?.trim()||'';
+  document.getElementById('pay-save').disabled=true;
 
-  if(payDir==='paguei'){
-    // Tesoureiro pagou a alguém (reembolso ou outro)
-    pag={de:tes,para:who,valor:rnd(val,2),ref:'',data:date};
-  } else if(payDir==='receber'){
-    // Tesoureiro recebeu de alguém (entrada genérica sem saldar dívida específica)
-    pag={de:who,para:tes,valor:rnd(val,2),ref:'',data:date};
-  } else {
-    // saldar — build structured ref from checked items
+  let commitMsg='';
+
+  if(cfDir==='reembolso'){
+    const ref=desc?`Reembolso: ${desc}`:'Reembolso';
+    DATA.pagamentos.push({de:tes,para:who,valor:rnd(val,2),ref,data:date});
+    commitMsg=`Reembolso: ${tes} → ${who} ${eur(val)}`;
+  } else if(cfDir==='recebimento'){
+    const ref=desc||'';
+    DATA.pagamentos.push({de:who,para:tes,valor:rnd(val,2),ref,data:date});
+    commitMsg=`Recebimento: ${who} → ${tes} ${eur(val)}`;
+  } else if(cfDir==='despesa'){
+    const tipo=document.getElementById('cf-tipo')?.value||'Gerais';
+    const date2=document.getElementById('cf-date2')?.value||date;
+    DATA.despesas.push({quem:who,dataDesp:date,dataValor:date2,desc:desc||'(sem descrição)',tipo,valor:rnd(val,2)});
+    commitMsg=`Despesa: ${who} ${eur(val)} (${tipo})`;
+  } else if(cfDir==='mealheiro'){
+    DATA.mealheiros.push({quem:who,data:date,valor:rnd(val,2)});
+    commitMsg=`Mealheiro: ${who} ${eur(val)}`;
+  } else if(cfDir==='saldar'){
     const covParts=[];
-    // Process group-based items
-    document.querySelectorAll('#pay-debts input[type=checkbox]:checked').forEach(cb=>{
-      const key=cb.value;
-      if(key.startsWith('group:'))return;
-      if(key.startsWith('own:')){const nome=key.slice(4);covParts.push('own:'+nome);}
-      else if(key.startsWith('conv:')){const nome=key.slice(5);covParts.push('conv:'+nome);}
-    });
-    // Also simple items (no-guest members)
-    document.querySelectorAll('#pay-debts .debt-item input[type=checkbox]:checked').forEach(cb=>{
-      const key=cb.value;
-      if(key.startsWith('own:')){const k='own:'+key.slice(4);if(!covParts.includes(k))covParts.push(k);}
-    });
+    document.querySelectorAll('#sd-chips .sd-chip.on').forEach(chip=>{covParts.push(chip.dataset.key);});
     const ref=covParts.join(', ');
-    pag={de:who,para:tes,valor:rnd(val,2),ref,data:date};
+    DATA.pagamentos.push({de:who,para:tes,valor:rnd(val,2),ref,data:date});
+    commitMsg=`Saldar: ${who} → ${tes} ${eur(val)}`;
   }
 
-  document.getElementById('pay-save').disabled=true;
-  DATA.pagamentos.push(pag);
-  const ok=await pushToGitHub(`Pagamento: ${pag.de} → ${pag.para} ${eur(pag.valor)}`);
+  const ok=await pushToGitHub(commitMsg);
   document.getElementById('pay-save').disabled=false;
-  if(ok){closePayModal();CALC=calcular(JSON.parse(JSON.stringify(DATA)));renderAll();toast('Pagamento registado ✓','ok');}
-  else{DATA.pagamentos.pop();}
+  if(ok){closePayModal();CALC=calcular(JSON.parse(JSON.stringify(DATA)));renderAll();toast('Cash-flow registado ✓','ok');}
+}
+
+/* ═══ EDIT / DELETE CASH FLOW ═══ */
+let editingCf=null;
+
+function deleteCfEntry(source,idx){
+  if(!confirm('Tens a certeza que queres remover este registo?'))return;
+  if(source==='pagamentos')DATA.pagamentos.splice(idx,1);
+  else if(source==='despesas')DATA.despesas.splice(idx,1);
+  else if(source==='mealheiros')DATA.mealheiros.splice(idx,1);
+  pushToGitHub('Remover cash-flow').then(ok=>{
+    if(ok){CALC=calcular(JSON.parse(JSON.stringify(DATA)));renderAll();toast('Removido ✓','ok');}
+  });
+}
+
+function editCfEntry(source,idx){
+  editingCf={source,idx};
+  const f=document.getElementById('edit-cf-form');
+  const title=document.getElementById('edit-cf-title');
+
+  if(source==='pagamentos'){
+    const p=DATA.pagamentos[idx];
+    title.textContent='Editar Pagamento';
+    f.innerHTML=`
+      <label>De</label><select id="ecf-de">${memberOptions(p.de)}</select>
+      <label>Para</label><select id="ecf-para">${memberOptions(p.para)}</select>
+      <div class="inline-row" style="margin-top:14px">
+        <div><label>Valor (€)</label><input type="number" id="ecf-val" step="0.01" value="${p.valor}" inputmode="decimal"></div>
+        <div><label>Data</label><input type="date" id="ecf-date" value="${p.data||''}"></div>
+      </div>
+      <label>Referência / Descrição</label>
+      <textarea id="ecf-ref" rows="2">${p.ref||''}</textarea>`;
+  } else if(source==='despesas'){
+    const d=DATA.despesas[idx];
+    title.textContent='Editar Despesa';
+    f.innerHTML=`
+      <label>Quem pagou</label><select id="ecf-who">${memberOptions(d.quem)}</select>
+      <div class="inline-row" style="margin-top:14px">
+        <div><label>Data Despesa</label><input type="date" id="ecf-date" value="${d.dataDesp||''}"></div>
+        <div><label>Data-Valor</label><input type="date" id="ecf-date2" value="${d.dataValor||''}"></div>
+      </div>
+      <div class="inline-row" style="margin-top:14px">
+        <div><label>Tipo</label>
+          <select id="ecf-tipo">
+            ${['Gerais','Bebidas','Almoço','Jantar','Renda','Cerveja'].map(t=>`<option value="${t}"${t===d.tipo?' selected':''}>${t}</option>`).join('')}
+          </select>
+        </div>
+        <div><label>Valor (€)</label><input type="number" id="ecf-val" step="0.01" value="${d.valor}" inputmode="decimal"></div>
+      </div>
+      <label>Descritivo</label>
+      <textarea id="ecf-desc" rows="2">${d.desc||''}</textarea>`;
+  } else if(source==='mealheiros'){
+    const m=DATA.mealheiros[idx];
+    title.textContent='Editar Mealheiro';
+    f.innerHTML=`
+      <label>Quem recebeu</label><select id="ecf-who">${memberOptions(m.quem)}</select>
+      <div class="inline-row" style="margin-top:14px">
+        <div><label>Valor (€)</label><input type="number" id="ecf-val" step="0.01" value="${m.valor}" inputmode="decimal"></div>
+        <div><label>Data</label><input type="date" id="ecf-date" value="${m.data||''}"></div>
+      </div>`;
+  }
+
+  document.getElementById('edit-cf-bg').classList.add('show');
+  document.body.classList.add('no-scroll');
+}
+
+function closeEditCf(){
+  document.getElementById('edit-cf-bg').classList.remove('show');
+  document.body.classList.remove('no-scroll');
+  editingCf=null;
+}
+
+async function saveEditCf(){
+  if(!editingCf)return;
+  const{source,idx}=editingCf;
+  document.getElementById('edit-cf-save').disabled=true;
+
+  if(source==='pagamentos'){
+    const p=DATA.pagamentos[idx];
+    p.de=document.getElementById('ecf-de').value;
+    p.para=document.getElementById('ecf-para').value;
+    p.valor=parseFloat(document.getElementById('ecf-val').value)||p.valor;
+    p.data=document.getElementById('ecf-date').value;
+    p.ref=document.getElementById('ecf-ref').value.trim();
+  } else if(source==='despesas'){
+    const d=DATA.despesas[idx];
+    d.quem=document.getElementById('ecf-who').value;
+    d.dataDesp=document.getElementById('ecf-date').value;
+    d.dataValor=document.getElementById('ecf-date2').value;
+    d.tipo=document.getElementById('ecf-tipo').value;
+    d.valor=parseFloat(document.getElementById('ecf-val').value)||d.valor;
+    d.desc=document.getElementById('ecf-desc').value.trim();
+  } else if(source==='mealheiros'){
+    const m=DATA.mealheiros[idx];
+    m.quem=document.getElementById('ecf-who').value;
+    m.valor=parseFloat(document.getElementById('ecf-val').value)||m.valor;
+    m.data=document.getElementById('ecf-date').value;
+  }
+
+  const ok=await pushToGitHub('Editar cash-flow');
+  document.getElementById('edit-cf-save').disabled=false;
+  if(ok){closeEditCf();CALC=calcular(JSON.parse(JSON.stringify(DATA)));renderAll();toast('Editado ✓','ok');}
 }
 
 /* ADMIN */
@@ -824,6 +976,7 @@ carregar();
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)carregar();});
 document.getElementById('admin-bg').addEventListener('click',e=>{if(e.target.id==='admin-bg')closeAdmin();});
 document.getElementById('pay-bg').addEventListener('click',e=>{if(e.target.id==='pay-bg')closePayModal();});
+document.getElementById('edit-cf-bg').addEventListener('click',e=>{if(e.target.id==='edit-cf-bg')closeEditCf();});
 </script>
 </body>
 </html>
