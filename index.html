@@ -522,11 +522,29 @@ function renderAll(){
   document.getElementById('tot-rec').textContent=eur(CALC.totReceitas);
   document.getElementById('tot-desp').textContent=eur(CALC.totDespesas);
 
-  // SALDOS
-  const sorted=[...ms].sort((a,b)=>b.saldoFinal-a.saldoFinal);
+  // SALDOS — usar cálculo consistente com o ecrã de detalhe
+  const pAll=CALC.pagamentos;
+  const pNR=pAll.filter(p=>!p.ref||!p.ref.startsWith('Reembolso'));
+  ms.forEach(m=>{
+    const isTes=m.nome===DATA.evento.tesoureiro;
+    const totalPagoDesp=DATA.despesas.filter(x=>x.quem===m.nome).reduce((a,x)=>a+x.valor,0);
+    const reembFeitos=pAll.filter(p=>p.ref&&p.ref.startsWith('Reembolso')&&p.de===m.nome).reduce((a,p)=>a+p.valor,0);
+    const reembRecebidos=pAll.filter(p=>p.ref&&p.ref.startsWith('Reembolso')&&p.para===m.nome).reduce((a,p)=>a+p.valor,0);
+    const receb=pNR.filter(p=>p.para===m.nome).reduce((a,p)=>a+p.valor,0);
+    const mealT=rnd((m.W||0)+(m.X||0),2);
+    const contribT=rnd(m.Sown+m.AA,2);
+    const quotaE=rnd((m.R||0)+(m.U||0),2);
+    let cred=totalPagoDesp;
+    if(isTes) cred+=reembFeitos;
+    if(!isTes){cred+=rnd(m._payerOwnPortion,2);(m._creditedBy||[]).filter(c=>c.payer!==m.nome).forEach(c=>{cred+=c.amount;});}
+    cred=rnd(cred,2);
+    const deb=rnd(contribT+quotaE+mealT+receb+reembRecebidos,2);
+    m._sfEcra=rnd(cred-deb,2);
+  });
+  const sorted=[...ms].sort((a,b)=>b._sfEcra-a._sfEcra);
   let h='<div class="sec-title sf">Quem recebe / quem deve</div><div class="mlist">';
   sorted.forEach((m,i)=>{
-    const sf=m.saldoFinal;const cls=Math.abs(sf)<0.005?'zero':(sf>0?'pos':'neg');
+    const sf=m._sfEcra;const cls=Math.abs(sf)<0.005?'zero':(sf>0?'pos':'neg');
     const sign=sf>0.005?'a receber':(sf<-0.005?'a pagar':'saldado');
     const badge=Math.abs(sf)<0.005?'<span class="badge paid">saldado</span>':'';
     const tag=m.nome===DATA.evento.tesoureiro?' · tesoureiro':'';
@@ -655,113 +673,138 @@ function truncRef(s){return s.length>40?s.slice(0,37)+'…':s;}
 
 function openMember(nome){
   const m=CALC.membros.find(x=>x.nome===nome);if(!m)return;
-  const sf=m.saldoFinal;const cls=Math.abs(sf)<0.005?'':(sf>0?'pos':'neg');
-  const verd=sf>0.005?`O grupo deve-te ${eur(sf)}`:(sf<-0.005?`Deves ${eur(-sf)} ao grupo`:'Estás saldado 👌');
   const tes=DATA.evento.tesoureiro;
   const isTes=m.nome===tes;
   let h='';
 
-  // ─── DÉBITOS (custos para a pessoa) ───
-  h+='<div class="bd-title sf">Débitos (custos)</div>';
-  let totalDebitos=0;
-
-  // 1a) Contribuição MEO: refeições (collapsible)
-  if(m._refs.length){
-    h+=`<div class="collapse-toggle" onclick="this.classList.toggle('open');this.nextElementSibling.classList.toggle('open')">
-      <span class="ct-label">🍽 Refeições (${m._refs.length})</span>
-      <span><span class="ct-val">${eur(m.Sown)}</span><span class="ct-arrow">▼</span></span>
-    </div>`;
-    h+='<div class="collapse-body"><div class="meals">';
-    m._refs.forEach(r=>h+=`<div class="meal"><span class="d">${r.dia} · ${r.ref}</span><span class="p">${eur(r.p)}</span></div>`);
-    h+=`</div></div>`;
-  }
-  totalDebitos+=m.Sown;
-
-  // 1b) Convidados — right after meals (collapsible)
-  if(m._convs.length){
-    h+=`<div class="collapse-toggle" onclick="this.classList.toggle('open');this.nextElementSibling.classList.toggle('open')" style="margin-top:6px">
-      <span class="ct-label">👥 Convidados (${m._convs.length})</span>
-      <span><span class="ct-val">${eur(m.AA)}</span><span class="ct-arrow">▼</span></span>
-    </div>`;
-    h+='<div class="collapse-body"><div class="meals">';
-    m._convs.forEach(c=>h+=`<div class="meal"><span class="d">${c.nome} · ${c.dia} ${c.ref}</span><span class="p">${eur(c.q)}</span></div>`);
-    h+=`</div></div>`;
-    totalDebitos+=m.AA;
-  }
-
-  if(m.R>0){h+=`<div class="li"><span class="lbl">Quota adicional<small>fator ${m.fator}</small></span><span class="val">${eur(m.R)}</span></div>`;totalDebitos+=m.R;}
-  if(m.U>0){h+=`<div class="li"><span class="lbl">Missão poupança</span><span class="val">${eur(m.U)}</span></div>`;totalDebitos+=m.U;}
-
-  // 1c) Valores que recebeu (reembolsos recebidos, mealheiro) — é custo
-  const reembolsosRecebidos=CALC.pagamentos.filter(p=>p.ref&&p.ref.startsWith('Reembolso')&&p.para===m.nome).reduce((a,p)=>a+p.valor,0);
-  if(reembolsosRecebidos>0){h+=`<div class="li"><span class="lbl">Reembolsos recebidos<small>dinheiro do grupo que ficou contigo</small></span><span class="val">${eur(rnd(reembolsosRecebidos,2))}</span></div>`;totalDebitos+=reembolsosRecebidos;}
-  const mealTotal=rnd((m.W||0)+(m.X||0),2);
-  if(mealTotal>0){h+=`<div class="li"><span class="lbl">Mealheiro<small>Lata, sobras e outros créditos</small></span><span class="val">${eur(mealTotal)}</span></div>`;totalDebitos+=mealTotal;}
-
-  // 2b/2c) Tesoureiro: recebimentos e saldar dívida entram como débito
-  if(isTes){
-    // Recebimentos (dinheiro que recebeu dos outros para saldar)
-    const pagNonReemb=CALC.pagamentos.filter(p=>!p.ref||!p.ref.startsWith('Reembolso'));
-    const recebimentosTes=pagNonReemb.filter(p=>p.para===m.nome).reduce((a,p)=>a+p.valor,0);
-    if(recebimentosTes>0){h+=`<div class="li"><span class="lbl">Recebimentos<small>pagamentos que recebeste dos membros</small></span><span class="val">${eur(rnd(recebimentosTes,2))}</span></div>`;totalDebitos+=recebimentosTes;}
-  }
-
-  // Non-tesoureiro: received saldar payments are debits
-  if(!isTes){
-    const pagNonReemb=CALC.pagamentos.filter(p=>!p.ref||!p.ref.startsWith('Reembolso'));
-    const recebimentos=pagNonReemb.filter(p=>p.para===m.nome).reduce((a,p)=>a+p.valor,0);
-    if(recebimentos>0){h+=`<div class="li"><span class="lbl">Recebimentos<small>pagamentos recebidos</small></span><span class="val">${eur(rnd(recebimentos,2))}</span></div>`;totalDebitos+=recebimentos;}
-  }
-
-  totalDebitos=rnd(totalDebitos,2);
-  h+=`<div class="li tot"><span class="lbl">Total débitos</span><span class="val minus">${eur(totalDebitos)}</span></div>`;
-
-  // ─── CRÉDITOS (a favor da pessoa) ───
-  h+='<div class="bd-title sf">Créditos (a teu favor)</div>';
-  let totalCreditos=0;
-
-  // 1b) Valores que adiantou (despesas que pagou do próprio bolso)
+  // ── Helper: calcular valores ──
+  const pagAll=CALC.pagamentos;
+  const pagNonReemb=pagAll.filter(p=>!p.ref||!p.ref.startsWith('Reembolso'));
+  const reembolsosRecebidos=pagAll.filter(p=>p.ref&&p.ref.startsWith('Reembolso')&&p.para===m.nome).reduce((a,p)=>a+p.valor,0);
+  const reembolsosFeitos=pagAll.filter(p=>p.ref&&p.ref.startsWith('Reembolso')&&p.de===m.nome).reduce((a,p)=>a+p.valor,0);
   const totalPagoDespesas=DATA.despesas.filter(x=>x.quem===m.nome).reduce((a,x)=>a+x.valor,0);
-  if(totalPagoDespesas>0){h+=`<div class="li"><span class="lbl">Despesas que adiantaste</span><span class="val plus">${eur(rnd(totalPagoDespesas,2))}</span></div>`;totalCreditos+=totalPagoDespesas;}
+  const recebimentos=pagNonReemb.filter(p=>p.para===m.nome).reduce((a,p)=>a+p.valor,0);
+  const mealTotal=rnd((m.W||0)+(m.X||0),2);
 
-  // 2a) Tesoureiro: reembolsos que fez = crédito
-  if(isTes){
-    const reembolsosFeitos=CALC.pagamentos.filter(p=>p.ref&&p.ref.startsWith('Reembolso')&&p.de===m.nome).reduce((a,p)=>a+p.valor,0);
-    if(reembolsosFeitos>0){h+=`<div class="li"><span class="lbl">Reembolsos que fizeste<small>dinheiro devolvido a quem adiantou</small></span><span class="val plus">${eur(rnd(reembolsosFeitos,2))}</span></div>`;totalCreditos+=reembolsosFeitos;}
+  // ═══════════════════════════════════════
+  // 1. CONTRIBUIÇÕES (débito — vermelho)
+  // ═══════════════════════════════════════
+  const contribTotal=rnd(m.Sown+m.AA,2);
+  if(contribTotal>0){
+    h+='<div class="bd-title sf">Contribuições</div>';
+    if(m._refs.length){
+      h+=`<div class="collapse-toggle" onclick="this.classList.toggle('open');this.nextElementSibling.classList.toggle('open')">
+        <span class="ct-label">🍽 Refeições (${m._refs.length})</span>
+        <span><span class="ct-val minus">${eur(m.Sown)}</span><span class="ct-arrow">▼</span></span>
+      </div>`;
+      h+='<div class="collapse-body"><div class="meals">';
+      m._refs.forEach(r=>h+=`<div class="meal"><span class="d">${r.dia} · ${r.ref}</span><span class="p">${eur(r.p)}</span></div>`);
+      h+='</div></div>';
+    }
+    if(m._convs.length){
+      h+=`<div class="collapse-toggle" onclick="this.classList.toggle('open');this.nextElementSibling.classList.toggle('open')" style="margin-top:6px">
+        <span class="ct-label">👥 Convidados (${m._convs.length})</span>
+        <span><span class="ct-val minus">${eur(m.AA)}</span><span class="ct-arrow">▼</span></span>
+      </div>`;
+      h+='<div class="collapse-body"><div class="meals">';
+      m._convs.forEach(c=>h+=`<div class="meal"><span class="d">${c.nome} · ${c.dia} ${c.ref}</span><span class="p">${eur(c.q)}</span></div>`);
+      h+='</div></div>';
+    }
   }
 
-  // 1d) Pagamentos para saldar dívida = crédito (only the payer's own portion)
-  if(!isTes){
-    // What this person paid that covers their OWN debts (own: + conv: for themselves)
-    const ownPortion=rnd(m._payerOwnPortion,2);
-    if(ownPortion>0){h+=`<div class="li"><span class="lbl">Pagamentos para saldar dívida<small>parte referente às tuas contas</small></span><span class="val plus">${eur(ownPortion)}</span></div>`;totalCreditos+=ownPortion;}
-    // What someone else paid on behalf of this person
-    const paidByOthers=m._creditedBy.filter(c=>c.payer!==m.nome);
-    if(paidByOthers.length){
-      const byPayer={};paidByOthers.forEach(c=>{byPayer[c.payer]=(byPayer[c.payer]||0)+c.amount;});
-      for(const[payer,amt] of Object.entries(byPayer)){
-        if(amt>0){h+=`<div class="li"><span class="lbl">Pago por ${payer}<small>saldou a tua dívida</small></span><span class="val plus">${eur(rnd(amt,2))}</span></div>`;totalCreditos+=amt;}
+  // ═══════════════════════════════════════
+  // 2. QUOTA EXTRA (débito — vermelho)
+  // ═══════════════════════════════════════
+  const quotaExtra=rnd((m.R||0)+(m.U||0),2);
+  if(quotaExtra>0){
+    h+='<div class="bd-title sf">Quota Extra</div>';
+    if(m.R>0){h+=`<div class="li"><span class="lbl">Quota adicional<small>fator ${m.fator}</small></span><span class="val minus">${eur(m.R)}</span></div>`;}
+    if(m.U>0){h+=`<div class="li"><span class="lbl">Missão poupança</span><span class="val minus">${eur(m.U)}</span></div>`;}
+  }
+
+  // ═══════════════════════════════════════
+  // 3. DESPESAS ADIANTADAS (crédito — verde)
+  // ═══════════════════════════════════════
+  if(totalPagoDespesas>0){
+    h+='<div class="bd-title sf">Despesas Adiantadas</div>';
+    h+=`<div class="li"><span class="lbl">Despesas que pagaste<small>do teu bolso para o grupo</small></span><span class="val plus">${eur(rnd(totalPagoDespesas,2))}</span></div>`;
+  }
+
+  // ═══════════════════════════════════════
+  // 4. REEMBOLSOS DE DESPESAS
+  // ═══════════════════════════════════════
+  if(reembolsosFeitos>0||reembolsosRecebidos>0){
+    h+='<div class="bd-title sf">Reembolsos de Despesas</div>';
+    if(reembolsosFeitos>0){h+=`<div class="li"><span class="lbl">Reembolsos que fizeste<small>dinheiro devolvido a quem adiantou</small></span><span class="val minus">${eur(rnd(reembolsosFeitos,2))}</span></div>`;}
+    if(reembolsosRecebidos>0){h+=`<div class="li"><span class="lbl">Reembolsos recebidos<small>dinheiro que te devolveram</small></span><span class="val plus">${eur(rnd(reembolsosRecebidos,2))}</span></div>`;}
+  }
+
+  // ═══════════════════════════════════════
+  // 5. MEALHEIRO (débito para quem recebeu)
+  // ═══════════════════════════════════════
+  if(mealTotal>0){
+    h+='<div class="bd-title sf">Mealheiro</div>';
+    h+=`<div class="li"><span class="lbl">Lata, sobras e outros<small>créditos recebidos do mealheiro</small></span><span class="val minus">${eur(mealTotal)}</span></div>`;
+  }
+
+  // ═══════════════════════════════════════
+  // 6. PAGAMENTOS RECEBIDOS
+  // ═══════════════════════════════════════
+  if(recebimentos>0||(!isTes&&m._payerOwnPortion>0)){
+    h+='<div class="bd-title sf">Pagamentos Recebidos</div>';
+    if(recebimentos>0){h+=`<div class="li"><span class="lbl">Recebimentos<small>${isTes?'pagamentos dos membros':'pagamentos recebidos'}</small></span><span class="val minus">${eur(rnd(recebimentos,2))}</span></div>`;}
+    if(!isTes){
+      const ownPortion=rnd(m._payerOwnPortion,2);
+      if(ownPortion>0){h+=`<div class="li"><span class="lbl">Pagaste para saldar<small>parte referente às tuas contas</small></span><span class="val plus">${eur(ownPortion)}</span></div>`;}
+      const paidByOthers=m._creditedBy.filter(c=>c.payer!==m.nome);
+      if(paidByOthers.length){
+        const byPayer={};paidByOthers.forEach(c=>{byPayer[c.payer]=(byPayer[c.payer]||0)+c.amount;});
+        for(const[payer,amt] of Object.entries(byPayer)){
+          if(amt>0){h+=`<div class="li"><span class="lbl">Pago por ${payer}<small>saldou a tua dívida</small></span><span class="val plus">${eur(rnd(amt,2))}</span></div>`;}
+        }
       }
     }
   }
 
+  // ═══════════════════════════════════════
+  // SALDO FINAL
+  // ═══════════════════════════════════════
+  // Créditos = despesas adiantadas + reembolsos feitos (tesoureiro) + pagamentos próprios (não tesoureiro) + pago por outros
+  let totalCreditos=0;
+  totalCreditos+=totalPagoDespesas;
+  if(isTes) totalCreditos+=reembolsosFeitos;
+  if(!isTes){
+    totalCreditos+=rnd(m._payerOwnPortion,2);
+    const paidByOthers=m._creditedBy.filter(c=>c.payer!==m.nome);
+    paidByOthers.forEach(c=>{totalCreditos+=c.amount;});
+  }
   totalCreditos=rnd(totalCreditos,2);
-  if(totalCreditos===0) h+='<div class="empty sf">Sem créditos</div>';
-  h+=`<div class="li tot"><span class="lbl">Total créditos</span><span class="val plus">${eur(totalCreditos)}</span></div>`;
 
-  // Saldo do ecrã = créditos - débitos (baseado nos items apresentados)
+  // Débitos = contribuições + quota extra + mealheiro + recebimentos + reembolsos recebidos
+  let totalDebitos=rnd(contribTotal+quotaExtra+mealTotal+recebimentos+reembolsosRecebidos,2);
+  // Reembolsos feitos pelo tesoureiro são débito (saiu dinheiro dele)
+  // Não — reembolsos feitos são crédito (ele pagou para devolver). Já está em créditos.
+  // Reembolsos recebidos são débito (ficou com dinheiro). Já está.
+
   const sfEcra=rnd(totalCreditos-totalDebitos,2);
   const clsE=Math.abs(sfEcra)<0.005?'':(sfEcra>0?'pos':'neg');
-  const verdE=sfEcra>0.005?`O grupo deve-te ${eur(sfEcra)}`:(sfEcra<-0.005?`Deves ${eur(-sfEcra)} ao grupo`:'Estás saldado 👌');
+  const saldoLabel=sfEcra>0.005?'a receber':(sfEcra<-0.005?'a pagar':'saldado');
+
+  h+='<div class="bd-title sf">Saldo Final</div>';
+  h+=`<div class="li"><span class="lbl">Créditos</span><span class="val plus">${eur(totalCreditos)}</span></div>`;
+  h+=`<div class="li"><span class="lbl">Débitos</span><span class="val minus">${eur(totalDebitos)}</span></div>`;
+  h+=`<div class="li tot"><span class="lbl">Saldo <small>${saldoLabel}</small></span><span class="val ${clsE}">${eur(sfEcra)}</span></div>`;
+
+  // ── Guardar saldo para uso no resumo ──
+  m._sfEcra=sfEcra;
+
   document.getElementById('sheet-hdr').innerHTML=`
     <div class="grab"></div>
     <div class="sheet-header-row">
       ${av(nome,CALC.membros.indexOf(m))}
       <span class="sheet-header-name">${nome}</span>
       <button class="back-btn" onclick="closeSheet()">✕</button>
-    </div>
-    <div class="final"><div class="k sf">Saldo atual</div><div class="v ${clsE}">${eur(sfEcra)}</div>
-    <div class="verdict sf">${verdE}</div></div>`;
+    </div>`;
   document.getElementById('sheet-in').innerHTML=h;
   document.getElementById('sheet-bg').classList.add('show');document.getElementById('sheet').classList.add('show');
   document.body.classList.add('no-scroll');
