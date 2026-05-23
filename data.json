@@ -1280,15 +1280,6 @@
    {
     "data": "2025-08-12",
     "dia": "Ter",
-    "ref": "Almoço",
-    "peso": 0,
-    "minMEO": 0,
-    "minConv": 7.5,
-    "extraConv": 0
-   },
-   {
-    "data": "2025-08-12",
-    "dia": "Ter",
     "ref": "Jantar",
     "peso": 0.1,
     "minMEO": 0,
