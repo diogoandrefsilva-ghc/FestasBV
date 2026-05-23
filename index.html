@@ -576,7 +576,10 @@ function renderCashFlows(){
 
   // 3) Mealheiros
   (DATA.mealheiros||[]).forEach((m,i)=>{
-    allCf.push({type:'mealheiro',date:m.data||'',label:'Mealheiro',icon:'🐷',
+    const isSobras=m.subtipo==='sobras_ano_anterior';
+    allCf.push({type:'mealheiro',date:m.data||'',
+      label:isSobras?'Sobras Ano Anterior':'Mealheiro',
+      icon:isSobras?'🏦':'🐷',
       line1:`${m.quem} recebeu`,line2:'',valor:m.valor,source:'mealheiros',idx:i,people:[m.quem]});
   });
 
@@ -860,11 +863,27 @@ function updateCfForm(){
       <textarea id="cf-desc" placeholder="Ex: Continente — Bacalhau" rows="2"></textarea>`;
   } else if(cfDir==='mealheiro'){
     f.innerHTML=`
-      <label>Quem recebeu?</label>
-      <select id="cf-who">${memberOptions()}</select>
-      <div class="inline-row" style="margin-top:14px">
-        <div><label>Valor (€)</label><input type="number" id="cf-val" step="0.01" min="0.01" placeholder="0,00" inputmode="decimal"></div>
-        <div><label>Data</label><input type="date" id="cf-date" value="${today}"></div>
+      <label>Tipo de mealheiro</label>
+      <div class="cf-wheel" id="meal-subtype-wheel" style="margin-bottom:4px">
+        <div class="cf-opt on" data-sub="corrente" onclick="setMealSubtype(this,'corrente')"><span class="cf-icon">📅</span><span class="cf-lbl">Ano Corrente</span></div>
+        <div class="cf-opt" data-sub="sobras" onclick="setMealSubtype(this,'sobras')"><span class="cf-icon">🏦</span><span class="cf-lbl">Sobras Ano Anterior</span></div>
+      </div>
+      <div id="meal-corrente-fields">
+        <label>Quem recebeu?</label>
+        <select id="cf-who">${memberOptions()}</select>
+        <div class="inline-row" style="margin-top:14px">
+          <div><label>Valor (€)</label><input type="number" id="cf-val" step="0.01" min="0.01" placeholder="0,00" inputmode="decimal"></div>
+          <div><label>Data</label><input type="date" id="cf-date" value="${today}"></div>
+        </div>
+      </div>
+      <div id="meal-sobras-fields" style="display:none">
+        <p style="font-size:12.5px;color:var(--muted);margin-top:8px;line-height:1.5">Regista o valor das sobras do ano anterior recebidas. Este valor é somado ao saldo inicial do grupo.</p>
+        <label>Quem recebeu as sobras?</label>
+        <select id="cf-who-sobras">${memberOptions(DATA.evento.tesoureiro)}</select>
+        <div class="inline-row" style="margin-top:14px">
+          <div><label>Valor (€)</label><input type="number" id="cf-val-sobras" step="0.01" min="0.01" placeholder="0,00" inputmode="decimal"></div>
+          <div><label>Data</label><input type="date" id="cf-date-sobras" value="${today}"></div>
+        </div>
       </div>`;
   } else if(cfDir==='saldar'){
     f.innerHTML=`
@@ -879,6 +898,12 @@ function updateCfForm(){
       <div class="note" id="cf-val-hint"></div>`;
     setTimeout(updateSdChips,10);
   }
+}
+
+function setMealSubtype(el, sub){
+  document.querySelectorAll('#meal-subtype-wheel .cf-opt').forEach(e=>e.classList.toggle('on',e.dataset.sub===sub));
+  document.getElementById('meal-corrente-fields').style.display = sub==='corrente' ? '' : 'none';
+  document.getElementById('meal-sobras-fields').style.display = sub==='sobras' ? '' : 'none';
 }
 
 function updateSdChips(){
@@ -964,8 +989,12 @@ async function saveCashFlow(){
   const who=document.getElementById('cf-who')?.value;
   const val=parseFloat(document.getElementById('cf-val')?.value);
   const date=document.getElementById('cf-date')?.value;
-  if(!who){toast('Seleciona a pessoa','bad');return;}
-  if(!val||val<=0){toast('Valor inválido','bad');return;}
+  // For mealheiro sobras, who/val come from separate fields — skip generic validation
+  const mealSubCheck=cfDir==='mealheiro'&&(document.querySelector('#meal-subtype-wheel .cf-opt.on')?.dataset?.sub||'corrente')==='sobras';
+  if(!mealSubCheck){
+    if(!who){toast('Seleciona a pessoa','bad');return;}
+    if(!val||val<=0){toast('Valor inválido','bad');return;}
+  }
 
   const tes=DATA.evento.tesoureiro;
   const desc=document.getElementById('cf-desc')?.value?.trim()||'';
@@ -983,8 +1012,20 @@ async function saveCashFlow(){
     DATA.despesas.push({quem:who,dataDesp:date,dataValor:date2,desc:desc||'(sem descrição)',tipo,valor:rnd(val,2)});
     commitMsg=`Despesa: ${who} ${eur(val)} (${tipo})`;
   } else if(cfDir==='mealheiro'){
-    DATA.mealheiros.push({quem:who,data:date,valor:rnd(val,2)});
-    commitMsg=`Mealheiro: ${who} ${eur(val)}`;
+    const mealSub=document.querySelector('#meal-subtype-wheel .cf-opt.on')?.dataset?.sub||'corrente';
+    if(mealSub==='sobras'){
+      const whoSobras=document.getElementById('cf-who-sobras')?.value;
+      const valSobras=parseFloat(document.getElementById('cf-val-sobras')?.value);
+      const dateSobras=document.getElementById('cf-date-sobras')?.value;
+      if(!whoSobras){toast('Seleciona a pessoa','bad');document.getElementById('pay-save').disabled=false;return;}
+      if(!valSobras||valSobras<=0){toast('Valor inválido','bad');document.getElementById('pay-save').disabled=false;return;}
+      // Store as mealheiro with a special subtype flag
+      DATA.mealheiros.push({quem:whoSobras,data:dateSobras,valor:rnd(valSobras,2),subtipo:'sobras_ano_anterior'});
+      commitMsg=`Sobras ano anterior: ${whoSobras} ${eur(valSobras)}`;
+    } else {
+      DATA.mealheiros.push({quem:who,data:date,valor:rnd(val,2)});
+      commitMsg=`Mealheiro: ${who} ${eur(val)}`;
+    }
   } else if(cfDir==='saldar'){
     const covParts=[];
     document.querySelectorAll('#sd-chips .sd-chip.on').forEach(chip=>{covParts.push(chip.dataset.key);});
