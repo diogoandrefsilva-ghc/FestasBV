@@ -5,7 +5,7 @@
    "ano": 2025,
    "tesoureiro": "Diogo",
    "descontoTshirts": 44,
-   "saldoAnoAnterior": 68.88
+   "saldoAnoAnterior": 0
   },
   "membros": [
    {
@@ -1040,6 +1040,12 @@
    }
   ],
   "mealheiros": [
+   {
+    "quem": "Diogo",
+    "data": "2025-01-01",
+    "valor": 68.88,
+    "subtipo": "sobras_ano_anterior"
+   },
    {
     "quem": "Diogo",
     "data": "2025-08-11",
