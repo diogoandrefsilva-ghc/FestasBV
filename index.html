@@ -188,6 +188,34 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .cf-filter select:focus{outline:none;border-color:var(--gold)}
 .cf-filter select option{background:var(--panel);color:var(--ink)}
 
+/* ═══ REFEIÇÕES SUB-TABS ═══ */
+.sub-tabs{display:flex;gap:0;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:3px;margin-bottom:14px}
+.sub-tab{flex:1;text-align:center;font-size:12px;font-weight:600;color:var(--muted);padding:8px 4px;border-radius:7px;cursor:pointer;transition:.18s}
+.sub-tab.on{background:var(--gold);color:#1a1205}
+
+/* Guest attendance in presenças */
+.pres-guest-section{margin-top:18px}
+.pres-guest-card{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:6px;display:flex;align-items:center;gap:10px}
+.pres-guest-card .pg-info{flex:1;min-width:0}
+.pres-guest-card .pg-name{font-size:13px;font-weight:600;color:var(--ink)}
+.pres-guest-card .pg-meta{font-size:11px;color:var(--faint)}
+.pres-guest-card .pg-badge{font-size:10px;font-weight:700;padding:2px 8px;border-radius:6px}
+.pres-guest-card .pg-badge.pays{background:rgba(62,207,142,.12);color:var(--green)}
+.pres-guest-card .pg-badge.free{background:rgba(90,169,255,.12);color:var(--blue)}
+.pres-guest-add{display:flex;align-items:center;gap:6px;padding:10px 16px;border-radius:10px;border:1.5px dashed var(--line);background:transparent;color:var(--gold);font-size:13px;font-weight:600;cursor:pointer;transition:.15s;width:100%;justify-content:center;margin-top:8px}
+.pres-guest-add:active{background:rgba(232,176,75,.06);transform:scale(.97)}
+
+/* Settings collapsible blocks */
+.settings-block{border:1px solid var(--line);border-radius:12px;margin-bottom:10px;overflow:hidden}
+.settings-block-hdr{display:flex;align-items:center;gap:10px;padding:14px 16px;cursor:pointer;transition:.15s;user-select:none}
+.settings-block-hdr:active{background:rgba(232,176,75,.04)}
+.settings-block-hdr .sb-icon{font-size:16px;flex-shrink:0}
+.settings-block-hdr .sb-title{flex:1;font-size:14px;font-weight:700;color:var(--gold);letter-spacing:.04em}
+.settings-block-hdr .sb-arrow{font-size:12px;color:var(--faint);transition:transform .2s}
+.settings-block-hdr.open .sb-arrow{transform:rotate(180deg)}
+.settings-block-body{max-height:0;overflow:hidden;transition:max-height .3s ease;padding:0 16px}
+.settings-block-body.open{max-height:2000px;padding:0 16px 16px}
+
 /* ═══ PRESENÇAS GRID ═══ */
 .pres-section{margin-top:4px;margin-bottom:22px}
 .pres-legend{display:flex;gap:12px;margin:10px 0 8px;font-size:11px;color:var(--faint);align-items:center;flex-wrap:wrap}
@@ -362,7 +390,7 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
         <select id="rd-ref">
           <option value="Almoço">🍳 Almoço</option>
           <option value="Jantar" selected>🍖 Jantar</option>
-          <option value="Lanche">☕ Lanche</option>
+          <option value="Lanche">🍺 Lanche</option>
         </select>
       </div>
       <div>
@@ -392,93 +420,118 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 <!-- Admin modal -->
 <div class="modal-bg" id="admin-bg">
   <div class="modal">
-    <h3>Definições</h3>
-
-    <!-- Token section -->
-    <div style="border-bottom:1px solid var(--line);padding-bottom:16px;margin-bottom:16px">
-      <p>Os dados são lidos do GitHub ao abrir. Só quem tem o <b>token</b> pode guardar alterações.</p>
-      <label>Token GitHub (ghp_…)</label>
-      <input type="password" id="adm-token" placeholder="ghp_xxxxxxxxxxxx" autocomplete="off">
-      <div class="note" id="adm-repo-note"></div>
-      <div class="mbtns" style="margin-top:10px">
-        <button class="btn prim" onclick="saveToken()">Guardar token</button>
-      </div>
-      <div class="note">Sem token, a app mostra tudo em modo leitura.</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+      <h3 style="margin-bottom:0">Definições</h3>
+      <button onclick="closeAdmin()" style="background:var(--panel2);border:1px solid var(--line);color:var(--muted);border-radius:9px;width:32px;height:32px;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0">✕</button>
     </div>
 
-    <!-- Add Year section -->
-    <div style="border-bottom:1px solid var(--line);padding-bottom:16px;margin-bottom:16px">
-      <label style="margin-top:0;font-size:13px;letter-spacing:.06em;color:var(--gold)">➕ Adicionar Novo Ano</label>
-      <p style="font-size:12px">Cria um novo ano MEO com plantel vazio, pronto para configurar.</p>
-      <div class="inline-row">
-        <div>
-          <label>Ano</label>
-          <input type="number" id="adm-new-year" placeholder="2026" min="2000" max="2099" inputmode="numeric">
-        </div>
-        <div>
-          <label>Tesoureiro</label>
-          <input type="text" id="adm-new-tes" placeholder="Nome">
-        </div>
+    <!-- 1. Parametrizações -->
+    <div class="settings-block">
+      <div class="settings-block-hdr" onclick="toggleSettingsBlock(this)">
+        <span class="sb-icon">⚙️</span>
+        <span class="sb-title sf">Parametrizações <span id="adm-params-year" style="color:var(--ink)"></span></span>
+        <span class="sb-arrow sf">▼</span>
       </div>
-      <div style="margin-top:8px">
-        <label><input type="checkbox" id="adm-copy-plantel" style="width:auto;margin-right:6px;vertical-align:middle"> Copiar plantel do ano atual</label>
-      </div>
-      <div class="mbtns" style="margin-top:10px">
-        <button class="btn prim" onclick="addNewYear()">Criar Ano</button>
-      </div>
-    </div>
+      <div class="settings-block-body">
+        <p style="font-size:12px;color:var(--muted);margin-bottom:12px;line-height:1.5">Configurações que afetam o cálculo das quotas e saldo final deste ano.</p>
 
-    <!-- Manage Plantel section -->
-    <div style="border-bottom:1px solid var(--line);padding-bottom:16px;margin-bottom:16px">
-      <label style="margin-top:0;font-size:13px;letter-spacing:.06em;color:var(--gold)">⚙️ Parametrizações <span id="adm-params-year" style="color:var(--ink)"></span></label>
-      <p style="font-size:12px">Configurações que afetam o cálculo das quotas e saldo final deste ano.</p>
-
-      <div style="display:flex;align-items:center;gap:10px;margin-top:12px;padding:10px 12px;background:var(--panel2);border:1px solid var(--line);border-radius:10px">
-        <div style="flex:1">
-          <div style="font-size:13px;font-weight:600">Arredonda Total</div>
-          <div style="font-size:11px;color:var(--faint)">Arredonda o total por pessoa para a unidade acima</div>
+        <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--panel2);border:1px solid var(--line);border-radius:10px">
+          <div style="flex:1">
+            <div style="font-size:13px;font-weight:600">Arredonda Total</div>
+            <div style="font-size:11px;color:var(--faint)">Arredonda o total por pessoa para a unidade acima</div>
+          </div>
+          <label style="position:relative;width:44px;height:24px;margin:0;flex-shrink:0">
+            <input type="checkbox" id="adm-arredonda" onchange="saveParams()" style="opacity:0;width:0;height:0;position:absolute">
+            <span style="position:absolute;inset:0;background:var(--line);border-radius:12px;cursor:pointer;transition:.2s"></span>
+            <span id="adm-arredonda-knob" style="position:absolute;top:2px;left:2px;width:20px;height:20px;background:var(--ink);border-radius:50%;transition:.2s"></span>
+          </label>
         </div>
-        <label style="position:relative;width:44px;height:24px;margin:0;flex-shrink:0">
-          <input type="checkbox" id="adm-arredonda" onchange="saveParams()" style="opacity:0;width:0;height:0;position:absolute">
-          <span style="position:absolute;inset:0;background:var(--line);border-radius:12px;cursor:pointer;transition:.2s"></span>
-          <span id="adm-arredonda-knob" style="position:absolute;top:2px;left:2px;width:20px;height:20px;background:var(--ink);border-radius:50%;transition:.2s"></span>
-        </label>
-      </div>
 
-      <div class="inline-row" style="margin-top:10px">
-        <div style="background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px 12px">
-          <div style="font-size:13px;font-weight:600">Missão Poupança</div>
-          <div style="font-size:11px;color:var(--faint);margin-bottom:6px">Valor extra por pessoa (€)</div>
-          <input type="number" id="adm-missao" step="0.5" min="0" placeholder="0" onchange="saveParams()" style="font-size:14px;padding:8px 10px" inputmode="decimal">
-        </div>
-        <div style="background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px 12px">
-          <div style="font-size:13px;font-weight:600">Fundo de Reserva</div>
-          <div style="font-size:11px;color:var(--faint);margin-bottom:6px">Valor total a guardar (€)</div>
-          <input type="number" id="adm-fundo" step="10" min="0" placeholder="0" onchange="saveParams()" style="font-size:14px;padding:8px 10px" inputmode="decimal">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px">
+          <div style="background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px 12px">
+            <div style="font-size:13px;font-weight:600">Missão Poupança</div>
+            <div style="font-size:11px;color:var(--faint);margin-bottom:6px">Valor extra/pessoa (€)</div>
+            <input type="number" id="adm-missao" step="0.5" min="0" placeholder="0" onchange="saveParams()" style="font-size:14px;padding:8px 10px" inputmode="decimal">
+          </div>
+          <div style="background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px 12px">
+            <div style="font-size:13px;font-weight:600">Fundo de Reserva</div>
+            <div style="font-size:11px;color:var(--faint);margin-bottom:6px">Valor total a guardar (€)</div>
+            <input type="number" id="adm-fundo" step="10" min="0" placeholder="0" onchange="saveParams()" style="font-size:14px;padding:8px 10px" inputmode="decimal">
+          </div>
         </div>
       </div>
     </div>
 
-    <!-- Plantel section -->
-    <div>
-      <label style="margin-top:0;font-size:13px;letter-spacing:.06em;color:var(--gold)">👥 Plantel MEO <span id="adm-plantel-year" style="color:var(--ink)"></span></label>
-      <p style="font-size:12px">Gere os membros do ano selecionado. Adiciona ou remove pessoas do plantel.</p>
-      <div id="adm-plantel-list" style="margin:10px 0"></div>
-      <div style="border:1px dashed var(--line);border-radius:10px;padding:12px;margin-top:8px">
-        <label style="margin-top:0;font-size:11px;color:var(--faint)">Adicionar Membro</label>
-        <div class="inline-row">
-          <div style="flex:2"><input type="text" id="adm-new-member" placeholder="Nome"></div>
-          <div style="flex:1"><input type="number" id="adm-new-fator" placeholder="Fator" step="0.05" value="1" min="0" inputmode="decimal"></div>
-        </div>
-        <div class="mbtns" style="margin-top:8px">
-          <button class="btn prim" onclick="addMember()">Adicionar</button>
+    <!-- 2. Plantel -->
+    <div class="settings-block">
+      <div class="settings-block-hdr" onclick="toggleSettingsBlock(this)">
+        <span class="sb-icon">👥</span>
+        <span class="sb-title sf">Plantel MEO <span id="adm-plantel-year" style="color:var(--ink)"></span></span>
+        <span class="sb-arrow sf">▼</span>
+      </div>
+      <div class="settings-block-body">
+        <p style="font-size:12px;color:var(--muted);margin-bottom:12px;line-height:1.5">Gere os membros do ano selecionado. Adiciona ou remove pessoas do plantel.</p>
+        <div id="adm-plantel-list" style="margin-bottom:10px"></div>
+        <div style="border:1px dashed var(--line);border-radius:10px;padding:12px">
+          <div style="font-size:11px;color:var(--faint);text-transform:uppercase;letter-spacing:.08em;font-weight:700;margin-bottom:8px" class="sf">Adicionar Membro</div>
+          <div style="display:grid;grid-template-columns:2fr 1fr;gap:8px">
+            <input type="text" id="adm-new-member" placeholder="Nome" style="width:100%">
+            <input type="number" id="adm-new-fator" placeholder="Fator" step="0.05" value="1" min="0" inputmode="decimal" style="width:100%">
+          </div>
+          <div class="mbtns" style="margin-top:8px">
+            <button class="btn prim" onclick="addMember()">Adicionar</button>
+          </div>
         </div>
       </div>
     </div>
 
-    <div class="mbtns" style="margin-top:18px">
-      <button class="btn ghost" onclick="closeAdmin()">Fechar</button>
+    <!-- 3. Adicionar Novo Ano -->
+    <div class="settings-block">
+      <div class="settings-block-hdr" onclick="toggleSettingsBlock(this)">
+        <span class="sb-icon">➕</span>
+        <span class="sb-title sf">Adicionar Novo Ano</span>
+        <span class="sb-arrow sf">▼</span>
+      </div>
+      <div class="settings-block-body">
+        <p style="font-size:12px;color:var(--muted);margin-bottom:12px;line-height:1.5">Cria um novo ano MEO com plantel vazio, pronto para configurar.</p>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div>
+            <label style="margin-top:0">Ano</label>
+            <input type="number" id="adm-new-year" placeholder="2026" min="2000" max="2099" inputmode="numeric">
+          </div>
+          <div>
+            <label style="margin-top:0">Tesoureiro</label>
+            <input type="text" id="adm-new-tes" placeholder="Nome">
+          </div>
+        </div>
+        <div style="margin-top:10px">
+          <label style="margin-top:0"><input type="checkbox" id="adm-copy-plantel" style="width:auto;margin-right:6px;vertical-align:middle"> Copiar plantel do ano atual</label>
+        </div>
+        <div class="mbtns" style="margin-top:10px">
+          <button class="btn prim" onclick="addNewYear()">Criar Ano</button>
+        </div>
+      </div>
     </div>
+
+    <!-- 4. Token GitHub (last, collapsed) -->
+    <div class="settings-block">
+      <div class="settings-block-hdr" onclick="toggleSettingsBlock(this)">
+        <span class="sb-icon">🔑</span>
+        <span class="sb-title sf">Token GitHub</span>
+        <span class="sb-arrow sf">▼</span>
+      </div>
+      <div class="settings-block-body">
+        <p style="font-size:12px;color:var(--muted);margin-bottom:10px;line-height:1.5">Os dados são lidos do GitHub ao abrir. Só quem tem o <b>token</b> pode guardar alterações.</p>
+        <label style="margin-top:0">Token GitHub (ghp_…)</label>
+        <input type="password" id="adm-token" placeholder="ghp_xxxxxxxxxxxx" autocomplete="off">
+        <div class="note" id="adm-repo-note"></div>
+        <div class="mbtns" style="margin-top:10px">
+          <button class="btn prim" onclick="saveToken()">Guardar token</button>
+        </div>
+        <div class="note">Sem token, a app mostra tudo em modo leitura.</div>
+      </div>
+    </div>
+
   </div>
 </div>
 
@@ -705,6 +758,11 @@ function av(nome,i){return`<div class="av" style="background:${AVCOL[i%AVCOL.len
 function setTab(t){TAB=t;document.querySelectorAll('.tab').forEach(e=>e.classList.toggle('on',e.dataset.tab===t));
   ['saldos','refeicoes','cashflows'].forEach(v=>document.getElementById('view-'+v).style.display=v===t?'':'none');}
 
+let REF_SUB='calendario';
+function setRefSub(s){REF_SUB=s;document.querySelectorAll('.sub-tab').forEach(e=>e.classList.toggle('on',e.dataset.sub===s));
+  document.getElementById('ref-sub-calendario').style.display=s==='calendario'?'':'none';
+  document.getElementById('ref-sub-presencas').style.display=s==='presencas'?'':'none';}
+
 /* ── Classify a cash-flow entry ── */
 function cfType(p){
   if(p._cfType) return p._cfType; // explicitly set
@@ -763,12 +821,12 @@ function renderAll(){
   });
   h+='</div>';document.getElementById('view-saldos').innerHTML=h;
 
-  // REFEIÇÕES
+  // REFEIÇÕES — sub-tabbed: Calendário + Presenças
   let r='';
-  
-  // ── Section 1: Definição de Refeições ──
-  r+='<div class="refdef-section">';
-  r+='<div class="sec-title sf">Calendário de Refeições</div>';
+  r+='<div class="sub-tabs sf"><div class="sub-tab'+(REF_SUB==='calendario'?' on':'')+'" data-sub="calendario" onclick="setRefSub(\'calendario\')">📅 Calendário</div><div class="sub-tab'+(REF_SUB==='presencas'?' on':'')+'" data-sub="presencas" onclick="setRefSub(\'presencas\')">✋ Presenças</div></div>';
+
+  // ── SUB 1: Calendário (merged: definição + custo por pessoa) ──
+  r+='<div id="ref-sub-calendario" style="'+(REF_SUB==='calendario'?'':'display:none')+'">';
   if(!DATA.refeicoesDef||!DATA.refeicoesDef.length){
     r+='<div class="refdef-empty sf">Nenhuma refeição definida para este ano.<br>Adiciona dias e refeições para começar.</div>';
   } else {
@@ -784,13 +842,16 @@ function renderAll(){
       r+=`<div class="refdef-day">`;
       r+=`<div class="refdef-day-hdr sf">${dia} · ${dg.data}</div>`;
       dg.refs.forEach(rd=>{
-        const icon=rd.ref==='Almoço'?'🍳':rd.ref==='Jantar'?'🍖':'☕';
-        r+=`<div class="refdef-row">
+        const icon=rd.ref==='Almoço'?'🍳':rd.ref==='Jantar'?'🍖':'🍺';
+        // Find calculated data for this meal
+        const calcRef=CALC.refeicoes.find(x=>x.data===rd.data&&x.ref===rd.ref);
+        const pesoDisplay=rd.peso!=null?Math.round((rd.peso||0)*100)+'%':'—';
+        r+=`<div class="refdef-row" style="flex-wrap:wrap">
           <span class="refdef-icon">${icon}</span>
           <div class="refdef-info">
             <div class="refdef-ref sf">${rd.ref}</div>
             <div class="refdef-params sf">
-              <span>peso ${rd.peso??0}</span>
+              <span>peso ${pesoDisplay}</span>
               <span>mín €${rd.minMEO||0}</span>
               <span>conv €${rd.minConv||0}+${rd.extraConv||0}</span>
             </div>
@@ -798,8 +859,18 @@ function renderAll(){
           <div class="refdef-actions">
             <button class="refdef-edit" onclick="editRefdef(${rd._idx})" title="Editar">✎</button>
             <button class="refdef-del" onclick="deleteRefdef(${rd._idx})" title="Remover">✕</button>
-          </div>
-        </div>`;
+          </div>`;
+        // Merged: custo info if there are people
+        if(calcRef&&calcRef.D>0){
+          r+=`<div style="width:100%;margin-top:6px;padding:7px 10px;background:rgba(0,0,0,.18);border-radius:8px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:12px" class="sf">
+            <span style="font-weight:700;color:var(--ink)">${eur(calcRef.P)}<span style="color:var(--faint);font-weight:400">/membro</span></span>
+            <span style="color:var(--muted)">${calcRef.D} pessoas</span>
+            ${calcRef.E?`<span style="color:var(--muted)">${calcRef.E} convid.</span>`:''}
+            ${calcRef.Q?`<span style="color:var(--gold)">conv. ${eur(calcRef.Q)}</span>`:''}
+            <span style="color:var(--faint)">total ${eur(rnd(calcRef.D*calcRef.L,2))}</span>
+          </div>`;
+        }
+        r+=`</div>`;
       });
       r+='</div>';
     });
@@ -808,21 +879,11 @@ function renderAll(){
   r+=`<div class="refdef-add-bar"><button class="refdef-add-btn sf" onclick="openRefdefModal()">＋ Adicionar Refeição</button></div>`;
   r+='</div>';
 
-  // ── Section 2: Custo por pessoa ──
-  r+='<div class="sec-title sf">Custo por pessoa em cada refeição</div>';
-  const refsWithPeople=CALC.refeicoes.filter(x=>x.D>0);
-  if(!refsWithPeople.length){
-    r+='<div class="empty sf">Sem refeições com presenças registadas</div>';
-  }
-  refsWithPeople.forEach(x=>{
-    r+=`<div class="card"><div class="top"><div class="desc">${x.dia} · ${x.ref}</div>
-      <div class="v">${eur(x.P)}<span style="color:var(--faint);font-weight:400;font-size:12px">/membro</span></div></div>
-      <div class="meta"><span class="chip">${x.D} pessoas</span>${x.E?`<span class="chip">${x.E} convidados</span>`:''
-      }${x.Q?`<span class="chip t">conv. ${eur(x.Q)}</span>`:''}<span class="chip">total ${eur(rnd(x.D*x.L,2))}</span></div></div>`;
-  });
-
-  // ── Section 3: Grelha de Presenças ──
+  // ── SUB 2: Presenças ──
+  r+='<div id="ref-sub-presencas" style="'+(REF_SUB==='presencas'?'':'display:none')+'">';
   r+=renderPresencaGrid();
+  r+=renderGuestSection();
+  r+='</div>';
 
   document.getElementById('view-refeicoes').innerHTML=r;
 
@@ -1599,6 +1660,11 @@ async function saveEditCf(){
 }
 
 /* ADMIN */
+function toggleSettingsBlock(hdr){
+  hdr.classList.toggle('open');
+  const body=hdr.nextElementSibling;
+  body.classList.toggle('open');
+}
 function openAdmin(){
   document.getElementById('adm-token').value=getToken();
   document.getElementById('adm-repo-note').textContent=`Repo: ${GH.owner}/${GH.repo}`;
@@ -1802,7 +1868,7 @@ function renderPresencaGrid(){
   h+='<tr><th class="pres-corner"></th>';
   days.forEach(d=>{
     d.slots.forEach(s=>{
-      const icon=s.ref==='Almoço'?'🍳':s.ref==='Jantar'?'🍖':'☕';
+      const icon=s.ref==='Almoço'?'🍳':s.ref==='Jantar'?'🍖':'🍺';
       h+=`<th class="pres-ref-hdr sf"><span class="ref-icon">${icon}</span>${s.ref.slice(0,3)}</th>`;
     });
   });
@@ -1847,16 +1913,115 @@ function renderPresencaGrid(){
   const totalPres=mbrs.reduce((a,m)=>a+(m.presencas||[]).length,0);
   h+=`<td class="pres-count sf has">${totalPres}</td>`;
   h+='</tr></tfoot></table></div>';
-
-  // Stats
-  const avgPerMember=mbrs.length?rnd(totalPres/mbrs.length,1):0;
-  const fullMembers=mbrs.filter(m=>(m.presencas||[]).length===totalSlots).length;
-  h+='<div class="pres-stats sf">';
-  h+=`<div class="pres-stat"><div class="ps-val">${totalPres}</div><div class="ps-lbl">Presenças</div></div>`;
-  h+=`<div class="pres-stat"><div class="ps-val">${avgPerMember}</div><div class="ps-lbl">Média/pessoa</div></div>`;
-  h+=`<div class="pres-stat"><div class="ps-val">${fullMembers}</div><div class="ps-lbl">Presença total</div></div>`;
-  h+='</div></div>';
+  h+='</div>';
   return h;
+}
+
+/* ═══ GUEST SECTION IN PRESENÇAS ═══ */
+function renderGuestSection(){
+  if(!DATA||!DATA.convidados)return'';
+  let h='<div class="pres-guest-section">';
+  h+='<div class="sec-title sf" style="margin-top:18px">Convidados</div>';
+  if(!DATA.convidados.length){
+    h+='<div class="empty sf">Nenhum convidado registado</div>';
+  } else {
+    // Group by member
+    const byMember={};
+    DATA.convidados.forEach((g,i)=>{
+      if(!byMember[g.membro])byMember[g.membro]=[];
+      byMember[g.membro].push({...g,_idx:i});
+    });
+    Object.keys(byMember).sort().forEach(membro=>{
+      const guests=byMember[membro];
+      h+=`<div style="font-size:11px;color:var(--gold);font-weight:700;letter-spacing:.1em;text-transform:uppercase;margin:12px 0 6px" class="sf">${membro}</div>`;
+      guests.forEach(g=>{
+        const icon=g.ref==='Almoço'?'🍳':g.ref==='Jantar'?'🍖':'🍺';
+        const paysBadge=g.pagante==='Sim'?'<span class="pg-badge pays sf">Paga</span>':'<span class="pg-badge free sf">Oferta</span>';
+        h+=`<div class="pres-guest-card">
+          <span style="font-size:18px">${icon}</span>
+          <div class="pg-info">
+            <div class="pg-name sf">${g.nome}</div>
+            <div class="pg-meta sf">${g.dia} · ${g.ref}</div>
+          </div>
+          ${paysBadge}
+          <div class="card-actions">
+            <button class="card-act del" onclick="deleteGuest(${g._idx})" title="Remover">✕</button>
+          </div>
+        </div>`;
+      });
+    });
+  }
+  h+=`<button class="pres-guest-add sf" onclick="openGuestModal()">＋ Adicionar Convidado</button>`;
+  h+='</div>';
+  return h;
+}
+
+function openGuestModal(){
+  // Build a simple modal for adding guests
+  const days=[...new Set((DATA.refeicoesDef||[]).map(r=>r.dia))];
+  const refs=[...new Set((DATA.refeicoesDef||[]).map(r=>r.ref))];
+  let html=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+    <h3 style="margin-bottom:0">Adicionar Convidado</h3>
+    <button onclick="this.closest('.modal-bg').classList.remove('show');document.body.classList.remove('no-scroll')" style="background:var(--panel2);border:1px solid var(--line);color:var(--muted);border-radius:9px;width:32px;height:32px;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0">✕</button>
+  </div>
+  <label>Nome do convidado</label>
+  <input type="text" id="guest-nome" placeholder="Nome">
+  <label>Trazido por</label>
+  <select id="guest-membro">${memberOptions()}</select>
+  <div class="inline-row" style="margin-top:14px">
+    <div><label>Dia</label>
+      <select id="guest-dia">${days.map(d=>`<option value="${d}">${d}</option>`).join('')}</select>
+    </div>
+    <div><label>Refeição</label>
+      <select id="guest-ref">${refs.map(r=>`<option value="${r}">${r}</option>`).join('')}</select>
+    </div>
+  </div>
+  <label>Pagante?</label>
+  <select id="guest-pagante"><option value="Sim">Sim — paga a quota</option><option value="Não">Não — é oferta</option></select>
+  <div class="mbtns"><button class="btn prim" onclick="saveGuest()">Guardar</button></div>`;
+  // Reuse a dynamic modal
+  let bg=document.getElementById('guest-modal-bg');
+  if(!bg){
+    bg=document.createElement('div');bg.id='guest-modal-bg';bg.className='modal-bg';
+    bg.innerHTML='<div class="modal" id="guest-modal-inner"></div>';
+    document.body.appendChild(bg);
+    bg.addEventListener('click',e=>{if(e.target===bg){bg.classList.remove('show');document.body.classList.remove('no-scroll');}});
+  }
+  document.getElementById('guest-modal-inner').innerHTML=html;
+  bg.classList.add('show');
+  document.body.classList.add('no-scroll');
+}
+
+async function saveGuest(){
+  const nome=(document.getElementById('guest-nome').value||'').trim();
+  const membro=document.getElementById('guest-membro').value;
+  const dia=document.getElementById('guest-dia').value;
+  const ref=document.getElementById('guest-ref').value;
+  const pagante=document.getElementById('guest-pagante').value;
+  if(!nome){toast('Indica o nome do convidado','bad');return;}
+  if(!membro){toast('Seleciona quem traz o convidado','bad');return;}
+  if(!DATA.convidados)DATA.convidados=[];
+  DATA.convidados.push({nome,membro,dia,ref,pagante});
+  const ok=await pushToGitHub('Adicionar convidado: '+nome);
+  if(ok){
+    const bg=document.getElementById('guest-modal-bg');
+    if(bg){bg.classList.remove('show');document.body.classList.remove('no-scroll');}
+    CALC=calcular(JSON.parse(JSON.stringify(DATA)));
+    renderAll();
+    toast('Convidado adicionado ✓','ok');
+  }
+}
+
+async function deleteGuest(idx){
+  const g=DATA.convidados[idx];
+  if(!confirm('Remover convidado '+g.nome+'?'))return;
+  DATA.convidados.splice(idx,1);
+  const ok=await pushToGitHub('Remover convidado: '+g.nome);
+  if(ok){
+    CALC=calcular(JSON.parse(JSON.stringify(DATA)));
+    renderAll();
+    toast('Convidado removido ✓','ok');
+  }
 }
 
 let presDebounce=null;
