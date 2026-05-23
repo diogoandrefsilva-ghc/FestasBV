@@ -370,8 +370,8 @@ function calcular(data){
 
   const totRefMembros=rnd(membros.reduce((a,m)=>a+m.Sown,0),2);
   const totGuestPayments=rnd(membros.reduce((a,m)=>a+m.AA,0),2);
-  const sobrasTot=rnd(evento.saldoAnoAnterior||0,2);
-  const descontoTot=0; // migrado para mealheiros com subtipo 'outros'
+  const sobrasTot=0; // migrado para mealheiros
+  const descontoTot=0; // migrado para mealheiros
   const mealTot=mealheiros.reduce((a,x)=>a+x.valor,0);
 
   const baseQuota=totalDesp-(totRefMembros+totGuestPayments+sobrasTot+descontoTot+mealTot);
@@ -386,7 +386,7 @@ function calcular(data){
     m.U=rnd(roundup(m.Sown+m.R,0)-m.R-m.Sown+1+m.T,2);
     m.V=rnd(m.Sown+m.R+m.U,2);
     m.W=mealBy[m.nome]||0;
-    m.X=m.nome===evento.tesoureiro?rnd(sobrasTot,2):0;
+    m.X=0; // sobras e outros migrados para mealheiros
     const totalPago=despesas.filter(x=>x.quem===m.nome).reduce((a,x)=>a+x.valor,0);
     const reembolsadas=pag.filter(p=>p.ref&&p.ref.startsWith('Reembolso')&&p.para===m.nome).reduce((a,p)=>a+p.valor,0);
     const recebeuReemb=pag.filter(p=>p.ref&&p.ref.startsWith('Reembolso')&&p.de===m.nome).reduce((a,p)=>a+p.valor,0);
@@ -695,11 +695,11 @@ function openMember(nome){
   // 1c) Valores que recebeu (reembolsos recebidos, mealheiro) — é custo
   const reembolsosRecebidos=CALC.pagamentos.filter(p=>p.ref&&p.ref.startsWith('Reembolso')&&p.para===m.nome).reduce((a,p)=>a+p.valor,0);
   if(reembolsosRecebidos>0){h+=`<div class="li"><span class="lbl">Reembolsos recebidos<small>dinheiro do grupo que ficou contigo</small></span><span class="val">${eur(rnd(reembolsosRecebidos,2))}</span></div>`;totalDebitos+=reembolsosRecebidos;}
-  if(m.W>0){h+=`<div class="li"><span class="lbl">Mealheiro<small>dinheiro recebido do mealheiro</small></span><span class="val">${eur(m.W)}</span></div>`;totalDebitos+=m.W;}
+  const mealTotal=rnd((m.W||0)+(m.X||0),2);
+  if(mealTotal>0){h+=`<div class="li"><span class="lbl">Mealheiro<small>Lata, sobras e outros créditos</small></span><span class="val">${eur(mealTotal)}</span></div>`;totalDebitos+=mealTotal;}
 
   // 2b/2c) Tesoureiro: recebimentos e saldar dívida entram como débito
   if(isTes){
-    if(m.X>0){h+=`<div class="li"><span class="lbl">Sobras ano anterior</span><span class="val">${eur(m.X)}</span></div>`;totalDebitos+=m.X;}
     // Recebimentos (dinheiro que recebeu dos outros para saldar)
     const pagNonReemb=CALC.pagamentos.filter(p=>!p.ref||!p.ref.startsWith('Reembolso'));
     const recebimentosTes=pagNonReemb.filter(p=>p.para===m.nome).reduce((a,p)=>a+p.valor,0);
@@ -749,6 +749,10 @@ function openMember(nome){
   if(totalCreditos===0) h+='<div class="empty sf">Sem créditos</div>';
   h+=`<div class="li tot"><span class="lbl">Total créditos</span><span class="val plus">${eur(totalCreditos)}</span></div>`;
 
+  // Saldo do ecrã = créditos - débitos (baseado nos items apresentados)
+  const sfEcra=rnd(totalCreditos-totalDebitos,2);
+  const clsE=Math.abs(sfEcra)<0.005?'':(sfEcra>0?'pos':'neg');
+  const verdE=sfEcra>0.005?`O grupo deve-te ${eur(sfEcra)}`:(sfEcra<-0.005?`Deves ${eur(-sfEcra)} ao grupo`:'Estás saldado 👌');
   document.getElementById('sheet-hdr').innerHTML=`
     <div class="grab"></div>
     <div class="sheet-header-row">
@@ -756,8 +760,8 @@ function openMember(nome){
       <span class="sheet-header-name">${nome}</span>
       <button class="back-btn" onclick="closeSheet()">✕</button>
     </div>
-    <div class="final"><div class="k sf">Saldo atual</div><div class="v ${cls}">${eur(sf)}</div>
-    <div class="verdict sf">${verd}</div></div>`;
+    <div class="final"><div class="k sf">Saldo atual</div><div class="v ${clsE}">${eur(sfEcra)}</div>
+    <div class="verdict sf">${verdE}</div></div>`;
   document.getElementById('sheet-in').innerHTML=h;
   document.getElementById('sheet-bg').classList.add('show');document.getElementById('sheet').classList.add('show');
   document.body.classList.add('no-scroll');

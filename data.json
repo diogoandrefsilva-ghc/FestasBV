@@ -3,9 +3,7 @@
   "evento": {
    "nome": "MEO 2025",
    "ano": 2025,
-   "tesoureiro": "Diogo",
-   "descontoTshirts": 0,
-   "saldoAnoAnterior": 68.88
+   "tesoureiro": "Diogo"
   },
   "membros": [
    {
@@ -1040,6 +1038,13 @@
    }
   ],
   "mealheiros": [
+   {
+    "quem": "Diogo",
+    "data": "2025-01-01",
+    "valor": 68.88,
+    "subtipo": "sobras_ano_anterior",
+    "desc": "Sobras ano anterior"
+   },
    {
     "quem": "Diogo",
     "data": "2025-01-01",
