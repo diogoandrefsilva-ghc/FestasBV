@@ -3,7 +3,10 @@
   "evento": {
    "nome": "MEO 2025",
    "ano": 2025,
-   "tesoureiro": "Diogo"
+   "tesoureiro": "Diogo",
+   "arredondaTotal": true,
+   "missaoPoupanca": 1,
+   "fundoReserva": 100
   },
   "membros": [
    {

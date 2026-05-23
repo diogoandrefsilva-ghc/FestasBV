@@ -168,7 +168,17 @@ body.no-scroll{overflow:hidden;position:fixed;width:100%;}
 .toast{position:fixed;left:50%;bottom:84px;transform:translateX(-50%) translateY(20px);background:#222a36;border:1px solid var(--line);color:var(--ink);padding:11px 18px;border-radius:11px;font-size:13px;opacity:0;pointer-events:none;transition:.25s;z-index:80;box-shadow:var(--shadow);max-width:90%;text-align:center}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 .toast.ok{border-color:var(--green)}.toast.bad{border-color:var(--red)}
-.sf,.eyebrow,.syncpill,.hero .cell .k,.tabs,.tab,.mrow .nm small,.card .meta,.chip,.sec-title,.back-btn,.bd-title,.li .lbl small,.meal,.sheet .final .k,.sheet .verdict,.empty,.fab,.modal,.modal h3,.modal p,.modal label,.modal input,.modal select,.modal textarea,.btn,.note,.seg-btn,.toast,.badge,.year-nav,.yr-btn,.yr-label,.cf-opt,.cf-lbl,.sd-chip,.card-act,.inline-row{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+
+/* Plantel member items */
+.pl-item{display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;margin-bottom:6px}
+.pl-item .pl-name{flex:1;font-size:14px;font-weight:600;color:var(--ink)}
+.pl-item .pl-fator{font-size:12px;color:var(--muted);font-weight:600;min-width:50px;text-align:center}
+.pl-item .pl-fator input{width:60px;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:4px 6px;color:var(--ink);font-size:12px;text-align:center;font-family:inherit}
+.pl-item .pl-fator input:focus{outline:none;border-color:var(--gold)}
+.pl-item .pl-del{width:26px;height:26px;border-radius:7px;border:1px solid var(--line);background:transparent;color:var(--red);font-size:14px;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:.12s;flex-shrink:0;opacity:.6}
+.pl-item .pl-del:hover{opacity:1;background:rgba(255,107,107,.1)}
+.modal label input[type="checkbox"]{width:auto!important;display:inline;vertical-align:middle}
+.sf,.eyebrow,.syncpill,.hero .cell .k,.tabs,.tab,.mrow .nm small,.card .meta,.chip,.sec-title,.back-btn,.bd-title,.li .lbl small,.meal,.sheet .final .k,.sheet .verdict,.empty,.fab,.modal,.modal h3,.modal p,.modal label,.modal input,.modal select,.modal textarea,.btn,.note,.seg-btn,.toast,.badge,.year-nav,.yr-btn,.yr-label,.cf-opt,.cf-lbl,.sd-chip,.card-act,.inline-row,.pl-item,.pl-name,.pl-fator{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
 header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
 
 /* Cash-flow filters */
@@ -268,15 +278,92 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 <div class="modal-bg" id="admin-bg">
   <div class="modal">
     <h3>Definições</h3>
-    <p>Os dados são lidos do GitHub ao abrir. Só quem tem o <b>token</b> pode guardar alterações.</p>
-    <label>Token GitHub (ghp_…)</label>
-    <input type="password" id="adm-token" placeholder="ghp_xxxxxxxxxxxx" autocomplete="off">
-    <div class="note" id="adm-repo-note"></div>
-    <div class="mbtns">
-      <button class="btn ghost" onclick="closeAdmin()">Fechar</button>
-      <button class="btn prim" onclick="saveToken()">Guardar token</button>
+
+    <!-- Token section -->
+    <div style="border-bottom:1px solid var(--line);padding-bottom:16px;margin-bottom:16px">
+      <p>Os dados são lidos do GitHub ao abrir. Só quem tem o <b>token</b> pode guardar alterações.</p>
+      <label>Token GitHub (ghp_…)</label>
+      <input type="password" id="adm-token" placeholder="ghp_xxxxxxxxxxxx" autocomplete="off">
+      <div class="note" id="adm-repo-note"></div>
+      <div class="mbtns" style="margin-top:10px">
+        <button class="btn prim" onclick="saveToken()">Guardar token</button>
+      </div>
+      <div class="note">Sem token, a app mostra tudo em modo leitura.</div>
     </div>
-    <div class="note">Sem token, a app mostra tudo em modo leitura.</div>
+
+    <!-- Add Year section -->
+    <div style="border-bottom:1px solid var(--line);padding-bottom:16px;margin-bottom:16px">
+      <label style="margin-top:0;font-size:13px;letter-spacing:.06em;color:var(--gold)">➕ Adicionar Novo Ano</label>
+      <p style="font-size:12px">Cria um novo ano MEO com plantel vazio, pronto para configurar.</p>
+      <div class="inline-row">
+        <div>
+          <label>Ano</label>
+          <input type="number" id="adm-new-year" placeholder="2026" min="2000" max="2099" inputmode="numeric">
+        </div>
+        <div>
+          <label>Tesoureiro</label>
+          <input type="text" id="adm-new-tes" placeholder="Nome">
+        </div>
+      </div>
+      <div style="margin-top:8px">
+        <label><input type="checkbox" id="adm-copy-plantel" style="width:auto;margin-right:6px;vertical-align:middle"> Copiar plantel do ano atual</label>
+      </div>
+      <div class="mbtns" style="margin-top:10px">
+        <button class="btn prim" onclick="addNewYear()">Criar Ano</button>
+      </div>
+    </div>
+
+    <!-- Manage Plantel section -->
+    <div style="border-bottom:1px solid var(--line);padding-bottom:16px;margin-bottom:16px">
+      <label style="margin-top:0;font-size:13px;letter-spacing:.06em;color:var(--gold)">⚙️ Parametrizações <span id="adm-params-year" style="color:var(--ink)"></span></label>
+      <p style="font-size:12px">Configurações que afetam o cálculo das quotas e saldo final deste ano.</p>
+
+      <div style="display:flex;align-items:center;gap:10px;margin-top:12px;padding:10px 12px;background:var(--panel2);border:1px solid var(--line);border-radius:10px">
+        <div style="flex:1">
+          <div style="font-size:13px;font-weight:600">Arredonda Total</div>
+          <div style="font-size:11px;color:var(--faint)">Arredonda o total por pessoa para a unidade acima</div>
+        </div>
+        <label style="position:relative;width:44px;height:24px;margin:0;flex-shrink:0">
+          <input type="checkbox" id="adm-arredonda" onchange="saveParams()" style="opacity:0;width:0;height:0;position:absolute">
+          <span style="position:absolute;inset:0;background:var(--line);border-radius:12px;cursor:pointer;transition:.2s"></span>
+          <span id="adm-arredonda-knob" style="position:absolute;top:2px;left:2px;width:20px;height:20px;background:var(--ink);border-radius:50%;transition:.2s"></span>
+        </label>
+      </div>
+
+      <div class="inline-row" style="margin-top:10px">
+        <div style="background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px 12px">
+          <div style="font-size:13px;font-weight:600">Missão Poupança</div>
+          <div style="font-size:11px;color:var(--faint);margin-bottom:6px">Valor extra por pessoa (€)</div>
+          <input type="number" id="adm-missao" step="0.5" min="0" placeholder="0" onchange="saveParams()" style="font-size:14px;padding:8px 10px" inputmode="decimal">
+        </div>
+        <div style="background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px 12px">
+          <div style="font-size:13px;font-weight:600">Fundo de Reserva</div>
+          <div style="font-size:11px;color:var(--faint);margin-bottom:6px">Valor total a guardar (€)</div>
+          <input type="number" id="adm-fundo" step="10" min="0" placeholder="0" onchange="saveParams()" style="font-size:14px;padding:8px 10px" inputmode="decimal">
+        </div>
+      </div>
+    </div>
+
+    <!-- Plantel section -->
+    <div>
+      <label style="margin-top:0;font-size:13px;letter-spacing:.06em;color:var(--gold)">👥 Plantel MEO <span id="adm-plantel-year" style="color:var(--ink)"></span></label>
+      <p style="font-size:12px">Gere os membros do ano selecionado. Adiciona ou remove pessoas do plantel.</p>
+      <div id="adm-plantel-list" style="margin:10px 0"></div>
+      <div style="border:1px dashed var(--line);border-radius:10px;padding:12px;margin-top:8px">
+        <label style="margin-top:0;font-size:11px;color:var(--faint)">Adicionar Membro</label>
+        <div class="inline-row">
+          <div style="flex:2"><input type="text" id="adm-new-member" placeholder="Nome"></div>
+          <div style="flex:1"><input type="number" id="adm-new-fator" placeholder="Fator" step="0.05" value="1" min="0" inputmode="decimal"></div>
+        </div>
+        <div class="mbtns" style="margin-top:8px">
+          <button class="btn prim" onclick="addMember()">Adicionar</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="mbtns" style="margin-top:18px">
+      <button class="btn ghost" onclick="closeAdmin()">Fechar</button>
+    </div>
   </div>
 </div>
 
@@ -375,7 +462,10 @@ function calcular(data){
   const mealTot=mealheiros.reduce((a,x)=>a+x.valor,0);
 
   const baseQuota=totalDesp-(totRefMembros+totGuestPayments+sobrasTot+descontoTot+mealTot);
-  const BN3=baseQuota<=0?0:rnd(baseQuota+100,2);
+  const fundoReserva=evento.fundoReserva||0;
+  const missaoPoupanca=evento.missaoPoupanca||0;
+  const arredondaTotal=evento.arredondaTotal!==undefined?evento.arredondaTotal:false;
+  const BN3=baseQuota<=0?0:rnd(baseQuota+fundoReserva,2);
   const sumF=membros.reduce((a,m)=>a+m.fator,0);
 
   const mealBy={};for(const x of mealheiros)mealBy[x.quem]=(mealBy[x.quem]||0)+x.valor;
@@ -383,7 +473,11 @@ function calcular(data){
   for(const m of membros){
     m.R=sumF>0?Math.max(rnd(BN3*m.fator/sumF,2),0):0;
     m.T=m.outras||0;
-    m.U=rnd(roundup(m.Sown+m.R,0)-m.R-m.Sown+1+m.T,2);
+    if(arredondaTotal){
+      m.U=rnd(roundup(m.Sown+m.R,0)-m.R-m.Sown+missaoPoupanca+m.T,2);
+    } else {
+      m.U=rnd(missaoPoupanca+m.T,2);
+    }
     m.V=rnd(m.Sown+m.R+m.U,2);
     m.W=mealBy[m.nome]||0;
     m.X=0; // sobras e outros migrados para mealheiros
@@ -847,7 +941,7 @@ async function pushToGitHub(msg){
   const tk=getToken();if(!tk){toast('Configura o token primeiro (⚙)','bad');return false;}
   try{
     ALL_YEARS[YEAR_IDX]=JSON.parse(JSON.stringify(DATA));
-    const payload=ALL_YEARS.length===1?ALL_YEARS[0]:ALL_YEARS;
+    const payload=ALL_YEARS;
     const body=JSON.stringify({message:msg,content:btoa(unescape(encodeURIComponent(JSON.stringify(payload,null,1)))),sha:GH_SHA,branch:GH.branch});
     const res=await fetch(`https://api.github.com/repos/${GH.owner}/${GH.repo}/contents/${GH.path}`,{method:'PUT',headers:{'Content-Type':'application/json',Authorization:'token '+tk,Accept:'application/vnd.github.v3+json'},body});
     if(!res.ok){const e=await res.json();throw new Error(e.message||res.status);}
@@ -1336,14 +1430,168 @@ async function saveEditCf(){
 }
 
 /* ADMIN */
-function openAdmin(){document.getElementById('adm-token').value=getToken();
+function openAdmin(){
+  document.getElementById('adm-token').value=getToken();
   document.getElementById('adm-repo-note').textContent=`Repo: ${GH.owner}/${GH.repo}`;
+  loadParams();
+  renderPlantel();
   document.getElementById('admin-bg').classList.add('show');
-  document.body.classList.add('no-scroll');}
+  document.body.classList.add('no-scroll');
+}
 function closeAdmin(){document.getElementById('admin-bg').classList.remove('show');document.body.classList.remove('no-scroll');}
 function saveToken(){const t=document.getElementById('adm-token').value.trim();
   if(t)localStorage.setItem(TOKEN_KEY,t);else localStorage.removeItem(TOKEN_KEY);
-  closeAdmin();toast(t?'Token guardado ✓':'Token removido','ok');}
+  toast(t?'Token guardado ✓':'Token removido','ok');}
+
+/* ── Parametrizações ── */
+function loadParams(){
+  if(!DATA)return;
+  document.getElementById('adm-params-year').textContent=DATA.evento.ano||'';
+  const arredonda=DATA.evento.arredondaTotal||false;
+  const missao=DATA.evento.missaoPoupanca||0;
+  const fundo=DATA.evento.fundoReserva||0;
+  document.getElementById('adm-arredonda').checked=arredonda;
+  updateToggleKnob(arredonda);
+  document.getElementById('adm-missao').value=missao||'';
+  document.getElementById('adm-fundo').value=fundo||'';
+}
+function updateToggleKnob(on){
+  const knob=document.getElementById('adm-arredonda-knob');
+  const track=knob?.previousElementSibling;
+  if(knob){knob.style.left=on?'22px':'2px';}
+  if(track){track.style.background=on?'var(--gold)':'var(--line)';}
+}
+async function saveParams(){
+  if(!DATA)return;
+  const arredonda=document.getElementById('adm-arredonda').checked;
+  updateToggleKnob(arredonda);
+  DATA.evento.arredondaTotal=arredonda;
+  DATA.evento.missaoPoupanca=parseFloat(document.getElementById('adm-missao').value)||0;
+  DATA.evento.fundoReserva=parseFloat(document.getElementById('adm-fundo').value)||0;
+  const ok=await pushToGitHub('Atualizar parametrizações '+DATA.evento.ano);
+  if(ok){
+    CALC=calcular(JSON.parse(JSON.stringify(DATA)));
+    renderAll();
+    toast('Parametrizações guardadas ✓','ok');
+  }
+}
+
+/* ── Add New Year ── */
+async function addNewYear(){
+  const yearVal=parseInt(document.getElementById('adm-new-year').value);
+  const tesVal=(document.getElementById('adm-new-tes').value||'').trim();
+  if(!yearVal||yearVal<2000||yearVal>2099){toast('Ano inválido','bad');return;}
+  if(!tesVal){toast('Indica o tesoureiro','bad');return;}
+  // Check duplicate
+  if(ALL_YEARS.some(y=>y.evento.ano===yearVal)){toast('Ano '+yearVal+' já existe','bad');return;}
+
+  const copyPlantel=document.getElementById('adm-copy-plantel').checked;
+  let membros=[];
+  if(copyPlantel&&DATA&&DATA.membros){
+    membros=DATA.membros.map(m=>({nome:m.nome,fator:m.fator,presencas:[],sobras:0,outras:0}));
+  }
+  // Ensure tesoureiro is in the plantel
+  if(!membros.find(m=>m.nome===tesVal)){
+    membros.unshift({nome:tesVal,fator:1,presencas:[],sobras:0,outras:0});
+  }
+
+  const newYear={
+    evento:{nome:'MEO '+yearVal,ano:yearVal,tesoureiro:tesVal,arredondaTotal:false,missaoPoupanca:0,fundoReserva:0},
+    membros,
+    despesas:[],
+    convidados:[],
+    mealheiros:[],
+    pagamentos:[],
+    refeicoesDef:[]
+  };
+
+  ALL_YEARS.push(newYear);
+  ALL_YEARS.sort((a,b)=>(a.evento.ano||0)-(b.evento.ano||0));
+  YEAR_IDX=ALL_YEARS.findIndex(y=>y.evento.ano===yearVal);
+  DATA=JSON.parse(JSON.stringify(ALL_YEARS[YEAR_IDX]));
+  CALC=calcular(JSON.parse(JSON.stringify(DATA)));
+  updateYearUI();renderAll();
+
+  const ok=await pushToGitHub('Criar ano '+yearVal);
+  if(ok){
+    toast('Ano '+yearVal+' criado ✓','ok');
+    document.getElementById('adm-new-year').value='';
+    document.getElementById('adm-new-tes').value='';
+    renderPlantel();
+  }
+}
+
+/* ── Plantel Management ── */
+function renderPlantel(){
+  if(!DATA)return;
+  document.getElementById('adm-plantel-year').textContent=DATA.evento.ano||'';
+  const list=document.getElementById('adm-plantel-list');
+  if(!DATA.membros||!DATA.membros.length){
+    list.innerHTML='<div class="empty sf">Sem membros neste ano</div>';
+    return;
+  }
+  let h='';
+  DATA.membros.forEach((m,i)=>{
+    const isTes=m.nome===DATA.evento.tesoureiro;
+    h+=`<div class="pl-item">
+      <span class="pl-name">${m.nome}${isTes?' <span style="font-size:10px;color:var(--gold)">tesoureiro</span>':''}</span>
+      <span class="pl-fator"><input type="number" value="${m.fator}" step="0.05" min="0" onchange="updateFator(${i},this.value)" title="Fator"></span>
+      <button class="pl-del" onclick="removeMember(${i})" title="Remover"${isTes?' disabled style="opacity:.2;cursor:default"':''}>✕</button>
+    </div>`;
+  });
+  list.innerHTML=h;
+}
+
+async function addMember(){
+  const nome=(document.getElementById('adm-new-member').value||'').trim();
+  const fator=parseFloat(document.getElementById('adm-new-fator').value)||1;
+  if(!nome){toast('Indica o nome','bad');return;}
+  if(DATA.membros.find(m=>m.nome===nome)){toast(nome+' já existe no plantel','bad');return;}
+  DATA.membros.push({nome,fator,presencas:[],sobras:0,outras:0});
+  const ok=await pushToGitHub('Adicionar '+nome+' ao plantel');
+  if(ok){
+    CALC=calcular(JSON.parse(JSON.stringify(DATA)));
+    renderAll();renderPlantel();
+    document.getElementById('adm-new-member').value='';
+    document.getElementById('adm-new-fator').value='1';
+    toast(nome+' adicionado ✓','ok');
+  }
+}
+
+async function removeMember(idx){
+  const nome=DATA.membros[idx].nome;
+  if(nome===DATA.evento.tesoureiro){toast('Não podes remover o tesoureiro','bad');return;}
+  // Check if member has ANY data in this year
+  const hasDespesas=DATA.despesas.some(d=>d.quem===nome);
+  const hasConvidados=DATA.convidados.some(c=>c.membro===nome);
+  const hasPagamentos=(DATA.pagamentos||[]).some(p=>p.de===nome||p.para===nome);
+  const hasMealheiros=(DATA.mealheiros||[]).some(m=>m.quem===nome);
+  const hasPresencas=(DATA.membros[idx].presencas||[]).length>0;
+  if(hasDespesas||hasConvidados||hasPagamentos||hasMealheiros||hasPresencas){
+    toast(nome+' tem dados associados neste ano — não pode ser removido','bad');
+    return;
+  }
+  if(!confirm('Remover '+nome+' do plantel?'))return;
+  DATA.membros.splice(idx,1);
+  const ok=await pushToGitHub('Remover '+nome+' do plantel');
+  if(ok){
+    CALC=calcular(JSON.parse(JSON.stringify(DATA)));
+    renderAll();renderPlantel();
+    toast(nome+' removido ✓','ok');
+  }
+}
+
+async function updateFator(idx,val){
+  const fator=parseFloat(val);
+  if(isNaN(fator)||fator<0){toast('Fator inválido','bad');renderPlantel();return;}
+  DATA.membros[idx].fator=fator;
+  const ok=await pushToGitHub('Atualizar fator de '+DATA.membros[idx].nome);
+  if(ok){
+    CALC=calcular(JSON.parse(JSON.stringify(DATA)));
+    renderAll();
+    toast('Fator atualizado ✓','ok');
+  }
+}
 
 /* GO */
 carregar();
