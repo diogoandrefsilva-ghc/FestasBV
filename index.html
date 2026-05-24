@@ -925,12 +925,16 @@ function renderAll(){
           </div>`;
         // Merged: custo info if there are people
         if(calcRef&&calcRef.D>0){
-          r+=`<div style="width:100%;margin-top:6px;padding:7px 10px;background:rgba(0,0,0,.18);border-radius:8px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:12px" class="sf">
-            <span style="font-weight:700;color:var(--ink)">${eur(calcRef.P)}<span style="color:var(--faint);font-weight:400">/membro</span></span>
-            <span style="color:var(--muted)">${calcRef.D} pessoas</span>
-            ${calcRef.E?`<span style="color:var(--muted)">${calcRef.E} convid.</span>`:''}
-            ${calcRef.Q?`<span style="color:var(--gold)">conv. ${eur(calcRef.Q)}</span>`:''}
-            <span style="color:var(--faint)">total ${eur(rnd(calcRef.D*calcRef.L,2))}</span>
+          const membrosCount=calcRef.D-calcRef.E;
+          r+=`<div style="width:100%;margin-top:6px;padding:8px 12px;background:rgba(0,0,0,.18);border-radius:8px;display:flex;justify-content:space-between;align-items:center;font-size:12px" class="sf">
+            <div style="display:flex;flex-direction:column;gap:2px">
+              <span style="color:var(--muted)"><span style="font-weight:700;color:var(--ink)">${membrosCount}</span> membros</span>
+              ${calcRef.E?`<span style="color:var(--muted)"><span style="font-weight:700;color:var(--ink)">${calcRef.E}</span> convidados</span>`:'<span style="color:var(--faint);font-size:11px">sem convidados</span>'}
+            </div>
+            <div style="display:flex;flex-direction:column;gap:2px;text-align:right">
+              <span style="font-weight:700;color:var(--ink)">${eur(calcRef.P)}<span style="color:var(--faint);font-weight:400;font-size:10px"> /membro</span></span>
+              ${calcRef.Q?`<span style="font-weight:700;color:var(--gold)">${eur(calcRef.Q)}<span style="color:var(--faint);font-weight:400;font-size:10px"> /conv.</span></span>`:''}
+            </div>
           </div>`;
         }
         r+=`</div>`;
@@ -1982,16 +1986,51 @@ function renderPresencaGrid(){
   });
   h+='</tbody>';
 
-  // Footer: count per slot
-  h+='<tfoot><tr><td class="pres-name" style="border-bottom:none"><span class="sf" style="font-size:10px;color:var(--faint);padding-left:2px">Total</span></td>';
+  // Footer: count per slot — membros
+  h+='<tfoot><tr><td class="pres-name" style="border-bottom:none"><span class="sf" style="font-size:10px;color:var(--faint);padding-left:2px">Membros</span></td>';
   days.forEach(d=>{
     d.slots.forEach(s=>{
       const count=mbrs.filter(m=>(m.presencas||[]).includes(s.key)).length;
       h+=`<td class="pres-count sf${count>0?' has':''}">${count}</td>`;
     });
   });
-  const totalPres=mbrs.reduce((a,m)=>a+(m.presencas||[]).length,0);
-  h+=`<td class="pres-count sf has">${totalPres}</td>`;
+  const totalMemPres=mbrs.reduce((a,m)=>a+(m.presencas||[]).length,0);
+  h+=`<td class="pres-count sf has">${totalMemPres}</td>`;
+  h+='</tr>';
+
+  // Footer: convidados per slot
+  h+='<tr><td class="pres-name" style="border-bottom:none"><span class="sf" style="font-size:10px;color:var(--faint);padding-left:2px">Convid.</span></td>';
+  let totalGuestAll=0;
+  days.forEach(d=>{
+    d.slots.forEach(s=>{
+      // Map slot key back to dia/ref for convidados lookup
+      const parts=s.key.split('|');
+      const slotDia=parts[0];
+      const slotRef=parts[1]==='Tarde'?'Lanche':parts[1];
+      const guestCount=(DATA.convidados||[]).filter(g=>g.dia===slotDia&&g.ref===slotRef).length;
+      totalGuestAll+=guestCount;
+      h+=`<td class="pres-count sf${guestCount>0?' has':''}" style="${guestCount>0?'color:var(--gold)':''}">${guestCount||'—'}</td>`;
+    });
+  });
+  h+=`<td class="pres-count sf${totalGuestAll>0?' has':''}" style="${totalGuestAll>0?'color:var(--gold)':''}">${totalGuestAll}</td>`;
+  h+='</tr>';
+
+  // Footer: total people (membros + convidados)
+  h+='<tr><td class="pres-name" style="border-bottom:none;border-top:2px solid var(--line)"><span class="sf" style="font-size:10px;font-weight:700;color:var(--muted);padding-left:2px">Total</span></td>';
+  let totalPeopleAll=0;
+  days.forEach(d=>{
+    d.slots.forEach(s=>{
+      const memCount=mbrs.filter(m=>(m.presencas||[]).includes(s.key)).length;
+      const parts=s.key.split('|');
+      const slotDia=parts[0];
+      const slotRef=parts[1]==='Tarde'?'Lanche':parts[1];
+      const gCount=(DATA.convidados||[]).filter(g=>g.dia===slotDia&&g.ref===slotRef).length;
+      const total=memCount+gCount;
+      totalPeopleAll+=total;
+      h+=`<td class="pres-count sf${total>0?' has':''}" style="border-top:2px solid var(--line);font-weight:700">${total}</td>`;
+    });
+  });
+  h+=`<td class="pres-count sf has" style="border-top:2px solid var(--line);font-weight:700">${totalPeopleAll}</td>`;
   h+='</tr></tfoot></table></div>';
   h+='</div>';
   return h;
