@@ -54,6 +54,7 @@ header .sub{font-size:12.5px;color:var(--muted);margin-top:5px}
 .tabs{display:flex;gap:6px;background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:5px;margin-bottom:16px;position:sticky;top:8px;z-index:20;backdrop-filter:blur(8px)}
 .tab{flex:1;text-align:center;font-size:12.5px;font-weight:600;color:var(--muted);padding:9px 4px;border-radius:9px;cursor:pointer;transition:.18s}
 .tab.on{background:var(--gold);color:#1a1205}
+.tab[data-tab="definicoes"]{flex:0 0 38px;font-size:15px;padding:7px 0}
 
 /* Member rows */
 .sec-title{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--faint);margin:4px 2px 10px}
@@ -332,6 +333,7 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
     <div class="tab" data-tab="refeicoes" onclick="setTab('refeicoes')">Refeições</div>
     <div class="tab" data-tab="cashflows" onclick="setTab('cashflows')">Cash-Flows</div>
     <div class="tab" data-tab="relatorios" onclick="setTab('relatorios')">Relatórios</div>
+    <div class="tab" data-tab="definicoes" onclick="openAdmin()">⚙</div>
   </div>
   <div class="hero" id="hero-card">
     <div class="lbl sf">Saldo do Grupo</div>
@@ -349,7 +351,6 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 
 <div class="fabs" id="fab-container">
   <button class="fab gold write-action" onclick="openPayModal()" title="Registar Cash Flow">💰</button>
-  <button class="fab dark" onclick="openAdmin()" title="Definições">⚙</button>
   <div class="fab-drag-handle" id="fab-drag">⋮⋮</div>
 </div>
 
@@ -594,7 +595,9 @@ function updateYearUI(){
   if(!ALL_YEARS.length)return;
   const ano=DATA.evento.ano||'—';
   document.getElementById('yr-label').textContent=ano;
-  document.getElementById('ev-nome').textContent=DATA.evento.nome||'MEO';
+  // Strip year from nome to avoid "MEO 2025 2025"
+  let nomeLimpo=(DATA.evento.nome||'MEO').replace(/\s*\d{4}\s*/g,'').trim()||'MEO';
+  document.getElementById('ev-nome').textContent=nomeLimpo;
   document.getElementById('yr-prev').disabled=YEAR_IDX<=0;
   document.getElementById('yr-next').disabled=YEAR_IDX>=ALL_YEARS.length-1;
 }
@@ -820,7 +823,8 @@ function cfIcon(t){
 
 function renderAll(){
   if(!CALC)return;const ms=CALC.membros;
-  document.getElementById('ev-nome').textContent=DATA.evento.nome;
+  let nomeLimpo=(DATA.evento.nome||'MEO').replace(/\s*\d{4}\s*/g,'').trim()||'MEO';
+  document.getElementById('ev-nome').textContent=nomeLimpo;
   document.getElementById('ev-sub').textContent=DATA.evento.datas||DATA.evento.local||'';
   const sg=CALC.saldoGrupo;const sgEl=document.getElementById('saldo-grupo');
   sgEl.textContent=eur(sg);sgEl.className='big '+(sg>=0?'pos':'neg');
@@ -1004,7 +1008,8 @@ function renderCashFlows(){
   const personList=[...personSet].sort((a,b)=>a.localeCompare(b,'pt'));
 
   // Filters
-  let pp=`<div class="cf-filters">
+  let pp=`<button class="btn prim write-action sf" onclick="openPayModal()" style="display:flex;align-items:center;justify-content:center;gap:8px;padding:13px;margin-bottom:14px;width:100%">💰 Novo Cash-Flow</button>`;
+  pp+=`<div class="cf-filters">
     <div class="cf-filter"><select onchange="cfFilterType=this.value;renderCashFlows()">
       <option value="all"${cfFilterType==='all'?' selected':''}>Todos os tipos</option>
       <option value="despesa"${cfFilterType==='despesa'?' selected':''}>🛒 Despesa</option>
