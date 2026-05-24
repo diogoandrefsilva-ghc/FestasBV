@@ -936,8 +936,8 @@ function renderAll(){
               ${calcRef.E?`<span style="color:var(--muted)"><span style="font-weight:700;color:var(--ink)">${calcRef.E}</span> convidados</span>`:'<span style="color:var(--faint);font-size:11px">sem convidados</span>'}
             </div>
             <div style="display:flex;flex-direction:column;gap:2px;text-align:right">
-              <span style="font-weight:700;color:var(--ink)">${eur(calcRef.P)}<span style="color:var(--faint);font-weight:400;font-size:10px"> /membro</span></span>
-              ${calcRef.Q?`<span style="font-weight:700;color:var(--gold)">${eur(calcRef.Q)}<span style="color:var(--faint);font-weight:400;font-size:10px"> /conv.</span></span>`:''}
+              <span style="font-size:10px;color:var(--faint);font-weight:400">membro <span style="font-weight:700;color:var(--gold);font-size:12px">${eur(calcRef.P)}</span></span>
+              ${calcRef.Q?`<span style="font-size:10px;color:var(--faint);font-weight:400">convidado <span style="font-weight:700;color:var(--ink);font-size:12px">${eur(calcRef.Q)}</span></span>`:''}
             </div>
           </div>`;
         }
