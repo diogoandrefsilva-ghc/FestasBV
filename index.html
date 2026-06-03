@@ -1229,14 +1229,11 @@ function toast(msg,kind){const t=document.getElementById('toast');t.textContent=
 async function carregar(){
   setSync('load','a ler do GitHub…');
   try{
-    const apiUrl=`https://api.github.com/repos/${GH.owner}/${GH.repo}/contents/${GH.path}?ref=${GH.branch}&t=${Date.now()}`;
-    const hdrs={Accept:'application/vnd.github.v3+json'};const tk=getToken();if(tk)hdrs.Authorization='token '+tk;
-    const res=await fetch(apiUrl,{headers:hdrs,cache:'no-store'});
+    // Leitura pública via raw (CDN, sem limite de pedidos, sem token). O sha é obtido na gravação.
+    const rawUrl=`https://raw.githubusercontent.com/${GH.owner}/${GH.repo}/${GH.branch}/${GH.path}?t=${Date.now()}`;
+    const res=await fetch(rawUrl,{cache:'no-store'});
     if(!res.ok)throw new Error('HTTP '+res.status);
-    const json=await res.json();GH_SHA=json.sha;
-    const raw=json.content.replace(/\n/g,'');
-    const bytes=Uint8Array.from(atob(raw),c=>c.charCodeAt(0));
-    const decoded=new TextDecoder('utf-8').decode(bytes);
+    const decoded=await res.text();
     const parsed=JSON.parse(decoded);
     ALL_YEARS=Array.isArray(parsed)?parsed:[parsed];
     ALL_YEARS.sort((a,b)=>(a.evento.ano||0)-(b.evento.ano||0));
@@ -1252,6 +1249,8 @@ async function pushToGitHub(msg){
   try{
     ALL_YEARS[YEAR_IDX]=JSON.parse(JSON.stringify(DATA));
     const payload=ALL_YEARS;
+    // A leitura passou a ser por raw (sem sha); obter o sha mais recente antes de gravar
+    try{const chk=await fetch(`https://api.github.com/repos/${GH.owner}/${GH.repo}/contents/${GH.path}?ref=${GH.branch}&t=${Date.now()}`,{headers:{Authorization:'token '+tk,Accept:'application/vnd.github.v3+json'},cache:'no-store'});if(chk.ok){const cj=await chk.json();GH_SHA=cj.sha;}else if(chk.status===404){GH_SHA=null;}}catch(_){}
     const body=JSON.stringify({message:msg,content:btoa(unescape(encodeURIComponent(JSON.stringify(payload,null,1)))),sha:GH_SHA,branch:GH.branch});
     const res=await fetch(`https://api.github.com/repos/${GH.owner}/${GH.repo}/contents/${GH.path}`,{method:'PUT',headers:{'Content-Type':'application/json',Authorization:'token '+tk,Accept:'application/vnd.github.v3+json'},body});
     if(!res.ok){const e=await res.json();throw new Error(e.message||res.status);}
