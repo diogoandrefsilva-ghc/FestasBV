@@ -2737,7 +2737,7 @@ document.getElementById('refdef-bg').addEventListener('click',e=>{if(e.target.id
 
 <script>
 if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/sw.js', { scope: '/' })
+    navigator.serviceWorker.register('/FestasBV/sw.js', { scope: '/FestasBV/' })
         .then((reg) => { setInterval(() => reg.update().catch(() => {}), 60000); })
         .catch((err) => console.log('[SW] Registration failed:', err));
 }
