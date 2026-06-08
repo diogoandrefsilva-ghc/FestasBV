@@ -9,6 +9,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="apple-mobile-web-app-title" content="MEO">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="manifest" href="manifest.json">
 <style>
 :root{
   --bg:#0e1116;--panel:#171c24;--panel2:#1e242e;--line:#2a313c;
@@ -2458,7 +2459,19 @@ function generatePDF(type){
   }
 
   const win=window.open('','_blank');
-  win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${nome} ${ano} — Relatório</title><style>${css}</style></head><body>${body}</body></html>`);
+  win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${nome} ${ano} — Relatório</title><style>${css}</style></head><body>${body}<script>
+if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("/sw.js", { scope: "/" })
+        .then((reg) => {
+            setInterval(() => reg.update().catch(() => {}), 60000);
+        })
+        .catch((err) => console.log("[SW] Registration failed:", err));
+    navigator.serviceWorker.addEventListener("message", (e) => {
+        if (e.data </body></body> e.data.type === "RELOAD") window.location.reload();
+    });
+}
+</script>
+</body></html>`);
   win.document.close();
   setTimeout(()=>win.print(),400);
 }
@@ -2732,6 +2745,18 @@ document.getElementById('admin-bg').addEventListener('click',e=>{if(e.target.id=
 document.getElementById('pay-bg').addEventListener('click',e=>{if(e.target.id==='pay-bg')closePayModal();});
 document.getElementById('edit-cf-bg').addEventListener('click',e=>{if(e.target.id==='edit-cf-bg')closeEditCf();});
 document.getElementById('refdef-bg').addEventListener('click',e=>{if(e.target.id==='refdef-bg')closeRefdefModal();});
+</script>
+<script>
+if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("/sw.js", { scope: "/" })
+        .then((reg) => {
+            setInterval(() => reg.update().catch(() => {}), 60000);
+        })
+        .catch((err) => console.log("[SW] Registration failed:", err));
+    navigator.serviceWorker.addEventListener("message", (e) => {
+        if (e.data </body></body> e.data.type === "RELOAD") window.location.reload();
+    });
+}
 </script>
 </body>
 </html>
