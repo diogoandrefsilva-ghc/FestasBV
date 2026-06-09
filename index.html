@@ -2458,10 +2458,28 @@ function generatePDF(type){
     body=buildPersonReport(pessoa);
   }
 
-  const win=window.open('','_blank');
-  win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${nome} ${ano} — Relatório</title><style>${css}</style></head><body>${body}</body></html>`);
-  win.document.close();
-  setTimeout(()=>win.print(),400);
+  const docHtml=`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${nome} ${ano} — Relatório</title><style>${css}</style></head><body>${body}</body></html>`;
+
+  let ov=document.getElementById('pdfOverlay');
+  if(ov) ov.remove();
+  ov=document.createElement('div');
+  ov.id='pdfOverlay';
+  ov.style.cssText='position:fixed;inset:0;z-index:99999;background:#525659;display:flex;flex-direction:column';
+  ov.innerHTML=`
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:#1a1a2e;color:#fff;flex:0 0 auto">
+      <span style="font-weight:700;font-size:14px">${nome} ${ano} — Relatório</span>
+      <div style="display:flex;gap:8px">
+        <button id="pdfPrint" style="background:#e8b04b;border:none;color:#1a1a2e;font-weight:700;font-size:14px;padding:8px 14px;border-radius:6px;cursor:pointer">🖨 Imprimir / Guardar PDF</button>
+        <button id="pdfClose" style="background:rgba(255,255,255,.15);border:none;color:#fff;font-size:18px;padding:8px 14px;border-radius:6px;cursor:pointer">✕</button>
+      </div>
+    </div>
+    <iframe id="pdfFrame" style="flex:1 1 auto;border:0;width:100%;background:#fff"></iframe>`;
+  document.body.appendChild(ov);
+
+  const frame=ov.querySelector('#pdfFrame');
+  frame.srcdoc=docHtml;
+  ov.querySelector('#pdfClose').onclick=()=>ov.remove();
+  ov.querySelector('#pdfPrint').onclick=()=>{frame.contentWindow.focus();frame.contentWindow.print();};
 }
 
 function buildGeneralReport(){
