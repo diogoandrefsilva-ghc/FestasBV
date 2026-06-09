@@ -1020,8 +1020,7 @@ function renderCashFlows(){
   const personList=[...personSet].sort((a,b)=>a.localeCompare(b,'pt'));
 
   // Filters
-  let pp=`<button class="btn prim write-action sf" onclick="openPayModal()" style="display:flex;align-items:center;justify-content:center;gap:8px;padding:13px;margin-bottom:14px;width:100%">💰 Novo Cash-Flow</button>`;
-  pp+=`<div class="cf-filters">
+  let pp=`<div class="cf-filters">
     <div class="cf-filter"><select onchange="cfFilterType=this.value;renderCashFlows()">
       <option value="all"${cfFilterType==='all'?' selected':''}>Todos os tipos</option>
       <option value="despesa"${cfFilterType==='despesa'?' selected':''}>🛒 Despesa</option>
