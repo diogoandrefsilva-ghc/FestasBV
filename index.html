@@ -159,12 +159,16 @@ body.no-scroll{overflow:hidden;position:fixed;width:100%;}
 /* Cash Flow wheel/carousel */
 .cf-wheel{display:flex;gap:6px;margin-top:6px;overflow-x:auto;padding-bottom:4px;-webkit-overflow-scrolling:touch;scrollbar-width:none}
 .cf-wheel::-webkit-scrollbar{display:none}
+/* Seletor de tipo (#cf-wheel): grelha de colunas iguais — nunca corta o último ícone */
+#cf-wheel{display:grid;grid-template-columns:repeat(var(--cf-cols,4),1fr);gap:6px;overflow:visible}
+#cf-wheel .cf-opt{min-width:0;padding:10px 6px}
 .cf-opt{flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 12px;border-radius:12px;border:1.5px solid var(--line);background:var(--panel2);cursor:pointer;transition:.18s;min-width:72px;user-select:none}
 .cf-opt:active{transform:scale(.95)}
 .cf-opt.on{border-color:var(--gold);background:rgba(238,182,77,.1)}
 .cf-opt .cf-icon{font-size:22px;line-height:1}
 .cf-opt .cf-lbl{font-size:10.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;text-align:center;line-height:1.2}
 .cf-opt.on .cf-lbl{color:var(--gold)}
+@media (max-width:360px){#cf-wheel .cf-opt .cf-lbl{font-size:9px}}
 
 /* Inline row (value + date on same line) */
 .inline-row{display:flex;gap:10px;align-items:flex-start}
@@ -1219,8 +1223,14 @@ function renderCashFlows(){
   });
 
   (DATA.despesas||[]).forEach((d,i)=>{
+    // Para Almoço/Jantar, acrescenta o dia da semana abreviado da data-valor (ex: "Almoço · Sáb")
+    let tipoLbl=d.tipo;
+    if((d.tipo==='Almoço'||d.tipo==='Jantar')&&d.dataValor){
+      const dia=dataToDia(d.dataValor);
+      if(dia)tipoLbl=`${d.tipo} · ${dia}`;
+    }
     allCf.push({type:'despesa',date:d.dataDesp||d.dataValor||'',label:'Despesa',icon:'🛒',
-      line1:d.desc||'(sem descrição)',line2:`${d.tipo} · pagou ${d.quem}`,valor:d.valor,
+      line1:d.desc||'(sem descrição)',line2:`${tipoLbl} · pagou ${d.quem}`,valor:d.valor,
       sign:'neg',source:'despesas',idx:i,people:[d.quem]});
   });
 
@@ -1825,6 +1835,12 @@ function recalcSdVal(){
 function openPayModal(){
   document.getElementById('pay-bg').classList.add('show');
   document.body.classList.add('no-scroll');
+  // Nº de colunas da grelha = tipos visíveis (não-admin só vê "Despesa")
+  const wheel=document.getElementById('cf-wheel');
+  if(wheel){
+    const visiveis=[...wheel.querySelectorAll('.cf-opt')].filter(o=>getComputedStyle(o).display!=='none').length;
+    wheel.style.setProperty('--cf-cols',Math.max(1,visiveis));
+  }
   setCfType('despesa');
   const note=document.getElementById('cf-note');
   if(note)note.textContent=isAdmin()?'Guardado na base de dados do grupo.':'Podes registar despesas pagas por ti ou pelo teu cônjuge.';
