@@ -440,6 +440,7 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
   <div class="auth-sub" id="sem-acesso-email"></div>
   <div class="auth-card" style="text-align:center">
     <button class="auth-btn prim" id="btn-solicitar" onclick="sbSolicitarAcesso()">Solicitar acesso</button>
+    <button class="auth-btn prim" id="btn-verificar" style="display:none" onclick="sbVerificarAcesso()">🔄 Verificar acesso</button>
     <div class="auth-status" id="solicitar-status"></div>
     <button class="auth-btn ghost" onclick="sbLogout()" style="margin-top:10px">Terminar sessão</button>
   </div>
@@ -3445,6 +3446,7 @@ async function sbRegistarEmail(){
 async function sbSolicitarAcesso(){
   if(!_sbSession)return;
   const btn=document.getElementById('btn-solicitar');
+  const btnV=document.getElementById('btn-verificar');
   const status=document.getElementById('solicitar-status');
   btn.disabled=true;btn.textContent='A enviar…';
   try{
@@ -3460,6 +3462,7 @@ async function sbSolicitarAcesso(){
       status.style.display='block';status.style.color='var(--green)';
       status.textContent=r.status===409?'✓ O pedido já estava registado. Aguarda aprovação.':'✓ Pedido enviado! Aguarda aprovação.';
       btn.style.display='none';
+      btnV.style.display='';
       return;
     }
     let msg='HTTP '+r.status;
@@ -3473,6 +3476,17 @@ async function sbSolicitarAcesso(){
     status.textContent='Erro de ligação — tenta novamente.';
     btn.disabled=false;btn.textContent='Solicitar acesso';
   }
+}
+
+async function sbVerificarAcesso(){
+  const btn=document.getElementById('btn-verificar');
+  const status=document.getElementById('solicitar-status');
+  btn.disabled=true;btn.textContent='A verificar…';
+  await sbAposLogin();
+  // Se chegou aqui ainda está no ecrã sem-acesso — acesso ainda não aprovado
+  btn.disabled=false;btn.textContent='🔄 Verificar acesso';
+  status.style.display='block';status.style.color='var(--muted)';
+  status.textContent='Acesso ainda não aprovado. Tenta mais tarde.';
 }
 
 function sbLogout(){
