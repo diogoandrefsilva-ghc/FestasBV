@@ -7,15 +7,19 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="theme-color" content="#0c110d">
 <meta name="apple-mobile-web-app-title" content="MEO">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <style>
 :root{
-  --bg:#0e1116;--panel:#171c24;--panel2:#1e242e;--line:#2a313c;
-  --ink:#eef2f7;--muted:#8a93a2;--faint:#5b6472;
-  --gold:#e8b04b;--green:#3ecf8e;--red:#ff6b6b;--blue:#5aa9ff;
-  --shadow:0 8px 30px rgba(0,0,0,.35);
+  /* Paleta Festas do Barrete Verde e das Salinas (Alcochete):
+     verde do barrete · vermelho do colete do campino · branco-sal */
+  --bg:#0c110d;--panel:#141d16;--panel2:#1b271d;--line:#2a3a2d;
+  --ink:#f1efe4;--muted:#94a193;--faint:#5e6b60;
+  --gold:#50b96e;--green:#3ecf8e;--red:#e0533f;--blue:#5aa9ff;
+  --sal:#f1efe4;--campino:#e0533f;
+  --shadow:0 8px 30px rgba(0,0,0,.4);
 }
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 body{font-family:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;background:var(--bg);color:var(--ink);padding:0 0 90px;line-height:1.5;background-image:radial-gradient(circle at 50% -10%,#1c2533 0%,var(--bg) 55%);min-height:100vh}
@@ -24,12 +28,13 @@ body{font-family:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;ba
 
 /* Header */
 header{padding:20px 14px 14px;text-align:center}
+header::after{content:"";display:block;height:3px;margin:12px auto 0;max-width:170px;border-radius:2px;background:linear-gradient(90deg,var(--gold) 0 42%,var(--campino) 42% 72%,var(--sal) 72% 100%);opacity:.85}
 .header-title-row{display:flex;align-items:center;justify-content:center;gap:4px}
 header h1{font-size:36px;font-weight:700;letter-spacing:-.5px;line-height:1}
 header .sub{font-size:12.5px;color:var(--muted);margin-top:5px}
 .yr-label-inline{font-size:36px;font-weight:700;color:var(--ink);letter-spacing:-.5px;line-height:1}
 .yr-btn-inline{background:none;border:1px solid var(--line);color:var(--gold);font-size:20px;font-weight:700;width:32px;height:32px;border-radius:9px;cursor:pointer;transition:.15s;line-height:1;display:flex;align-items:center;justify-content:center;flex-shrink:0}
-.yr-btn-inline:active{background:rgba(232,176,75,.12);transform:scale(.92)}
+.yr-btn-inline:active{background:rgba(80,185,110,.12);transform:scale(.92)}
 .yr-btn-inline:disabled{color:var(--faint);opacity:.3;cursor:default;transform:none;background:none}
 .syncpill{display:inline-flex;align-items:center;gap:6px;margin-top:8px;font-size:11px;color:var(--muted);background:var(--panel);border:1px solid var(--line);padding:5px 11px;border-radius:20px}
 .dot{width:7px;height:7px;border-radius:50%;background:var(--faint)}.dot.live{background:var(--green);box-shadow:0 0 8px var(--green)}.dot.err{background:var(--red)}
@@ -38,7 +43,7 @@ header .sub{font-size:12.5px;color:var(--muted);margin-top:5px}
 
 /* Hero */
 .hero{background:linear-gradient(155deg,var(--panel2),var(--panel));border:1px solid var(--line);border-radius:18px;padding:22px;margin:12px 0 16px;box-shadow:var(--shadow);position:relative;overflow:hidden}
-.hero::before{content:"";position:absolute;inset:0;background:radial-gradient(circle at 85% 0%,rgba(232,176,75,.10),transparent 60%);pointer-events:none}
+.hero::before{content:"";position:absolute;inset:0;background:radial-gradient(circle at 85% 0%,rgba(80,185,110,.10),transparent 60%);pointer-events:none}
 .hero .lbl{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted)}
 .hero .big{font-size:46px;font-weight:700;letter-spacing:-1px;margin-top:2px}
 .hero .big.pos{color:var(--green)}.hero .big.neg{color:var(--red)}
@@ -59,7 +64,7 @@ header .sub{font-size:12.5px;color:var(--muted);margin-top:5px}
 /* Tabs */
 .tabs{display:flex;gap:6px;background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:5px;margin-bottom:16px;position:sticky;top:8px;z-index:20;backdrop-filter:blur(8px)}
 .tab{flex:1;text-align:center;font-size:12.5px;font-weight:600;color:var(--muted);padding:9px 4px;border-radius:9px;cursor:pointer;transition:.18s}
-.tab.on{background:var(--gold);color:#1a1205}
+.tab.on{background:var(--gold);color:#07130a}
 .tab[data-tab="definicoes"]{flex:0 0 38px;font-size:15px;padding:7px 0}
 
 /* Member rows */
@@ -67,7 +72,7 @@ header .sub{font-size:12.5px;color:var(--muted);margin-top:5px}
 .mlist{display:flex;flex-direction:column;gap:8px}
 .mrow{background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:14px 15px;display:flex;align-items:center;gap:13px;cursor:pointer;transition:.16s}
 .mrow:active{transform:scale(.985);background:var(--panel2)}
-.av{width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:15px;color:#1a1205;flex-shrink:0}
+.av{width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:15px;color:#07130a;flex-shrink:0}
 .mrow .nm{flex:1;font-size:17px;font-weight:600;letter-spacing:-.2px}
 .mrow .nm small{display:block;font-size:11px;font-weight:500;color:var(--faint);letter-spacing:0}
 .mrow .amt{font-size:18px;font-weight:700;text-align:right}
@@ -104,7 +109,7 @@ body.no-scroll{overflow:hidden;position:fixed;width:100%;}
 .bd-title{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--gold);margin:20px 2px 9px;position:relative;z-index:1}
 /* Collapsible sections */
 .collapse-toggle{display:flex;align-items:center;justify-content:space-between;padding:9px 12px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;cursor:pointer;margin-top:6px;transition:.15s;user-select:none}
-.collapse-toggle:active{transform:scale(.985);background:rgba(232,176,75,.06)}
+.collapse-toggle:active{transform:scale(.985);background:rgba(80,185,110,.06)}
 .collapse-toggle .ct-label{font-size:13px;font-weight:600;color:var(--ink);display:flex;align-items:center;gap:8px}
 .collapse-toggle .ct-val{font-size:14px;font-weight:700;color:var(--ink)}
 .collapse-toggle .ct-arrow{font-size:12px;color:var(--faint);transition:transform .2s;margin-left:6px}
@@ -127,8 +132,8 @@ body.no-scroll{overflow:hidden;position:fixed;width:100%;}
 .fab{width:54px;height:54px;border-radius:16px;border:none;font-size:22px;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 6px 20px rgba(0,0,0,.3)}
 .fab:active{transform:scale(.92)}
 .fab-drag-handle{width:54px;height:20px;border-radius:10px;background:var(--panel2);border:1px solid var(--line);color:var(--faint);font-size:11px;font-weight:700;letter-spacing:2px;display:flex;align-items:center;justify-content:center;cursor:grab;user-select:none;touch-action:none;opacity:.6;transition:.15s}
-.fab-drag-handle:active{cursor:grabbing;opacity:1;background:rgba(232,176,75,.1)}
-.fab.gold{background:var(--gold);color:#1a1205;box-shadow:0 6px 20px rgba(232,176,75,.4)}
+.fab-drag-handle:active{cursor:grabbing;opacity:1;background:rgba(80,185,110,.1)}
+.fab.gold{background:var(--gold);color:#07130a;box-shadow:0 6px 20px rgba(80,185,110,.4)}
 .fab.dark{background:var(--panel2);color:var(--muted);border:1px solid var(--line)}
 
 /* Modal */
@@ -145,7 +150,7 @@ body.no-scroll{overflow:hidden;position:fixed;width:100%;}
 .modal select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238a93a2' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;padding-right:34px}
 .mbtns{display:flex;gap:9px;margin-top:18px}
 .btn{flex:1;padding:13px;border-radius:10px;border:none;font-size:14px;font-weight:700;cursor:pointer}
-.btn.prim{background:var(--gold);color:#1a1205}.btn.ghost{background:var(--panel2);color:var(--ink);border:1px solid var(--line)}
+.btn.prim{background:var(--gold);color:#07130a}.btn.ghost{background:var(--panel2);color:var(--ink);border:1px solid var(--line)}
 .btn:disabled{opacity:.4}
 .note{font-size:11px;color:var(--faint);margin-top:10px;line-height:1.5}
 
@@ -154,7 +159,7 @@ body.no-scroll{overflow:hidden;position:fixed;width:100%;}
 .cf-wheel::-webkit-scrollbar{display:none}
 .cf-opt{flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 12px;border-radius:12px;border:1.5px solid var(--line);background:var(--panel2);cursor:pointer;transition:.18s;min-width:72px;user-select:none}
 .cf-opt:active{transform:scale(.95)}
-.cf-opt.on{border-color:var(--gold);background:rgba(232,176,75,.1)}
+.cf-opt.on{border-color:var(--gold);background:rgba(80,185,110,.1)}
 .cf-opt .cf-icon{font-size:22px;line-height:1}
 .cf-opt .cf-lbl{font-size:10.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;text-align:center;line-height:1.2}
 .cf-opt.on .cf-lbl{color:var(--gold)}
@@ -168,16 +173,16 @@ body.no-scroll{overflow:hidden;position:fixed;width:100%;}
 .sd-list{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
 .sd-chip{display:inline-flex;align-items:center;gap:6px;padding:7px 12px;border-radius:20px;border:1.5px solid var(--line);background:var(--panel2);cursor:pointer;transition:.15s;user-select:none;font-size:13px;font-weight:600;color:var(--muted)}
 .sd-chip:active{transform:scale(.96)}
-.sd-chip.on{border-color:var(--gold);background:rgba(232,176,75,.12);color:var(--ink)}
+.sd-chip.on{border-color:var(--gold);background:rgba(80,185,110,.12);color:var(--ink)}
 .sd-chip .sd-dot{width:8px;height:8px;border-radius:50%;background:var(--line);transition:.15s;flex-shrink:0}
-.sd-chip.on .sd-dot{background:var(--gold);box-shadow:0 0 6px rgba(232,176,75,.5)}
+.sd-chip.on .sd-dot{background:var(--gold);box-shadow:0 0 6px rgba(80,185,110,.5)}
 .sd-chip .sd-amt{font-size:11px;font-weight:700;color:var(--red);margin-left:2px}
 .sd-chip.on .sd-amt{color:var(--green)}
 
 /* Card action buttons (edit/delete) */
 .card-actions{display:flex;gap:4px;margin-left:auto;flex-shrink:0}
 .card-act{width:28px;height:28px;border-radius:7px;border:1px solid var(--line);background:var(--panel2);color:var(--muted);font-size:13px;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:.12s}
-.card-act:active{transform:scale(.9);background:rgba(232,176,75,.1)}
+.card-act:active{transform:scale(.9);background:rgba(80,185,110,.1)}
 .card-act.del:active{background:rgba(255,107,107,.12)}
 
 /* Toast */
@@ -224,7 +229,7 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 /* ═══ REFEIÇÕES SUB-TABS ═══ */
 .sub-tabs{display:flex;gap:0;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:3px;margin-bottom:14px}
 .sub-tab{flex:1;text-align:center;font-size:12px;font-weight:600;color:var(--muted);padding:8px 4px;border-radius:7px;cursor:pointer;transition:.18s}
-.sub-tab.on{background:var(--gold);color:#1a1205}
+.sub-tab.on{background:var(--gold);color:#07130a}
 
 /* Guest attendance in presenças */
 .pres-guest-section{margin-top:18px}
@@ -236,12 +241,12 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .pres-guest-card .pg-badge.pays{background:rgba(62,207,142,.12);color:var(--green)}
 .pres-guest-card .pg-badge.free{background:rgba(90,169,255,.12);color:var(--blue)}
 .pres-guest-add{display:flex;align-items:center;gap:6px;padding:10px 16px;border-radius:10px;border:1.5px dashed var(--line);background:transparent;color:var(--gold);font-size:13px;font-weight:600;cursor:pointer;transition:.15s;width:100%;justify-content:center;margin-top:8px}
-.pres-guest-add:active{background:rgba(232,176,75,.06);transform:scale(.97)}
+.pres-guest-add:active{background:rgba(80,185,110,.06);transform:scale(.97)}
 
 /* Settings collapsible blocks */
 .settings-block{border:1px solid var(--line);border-radius:12px;margin-bottom:10px;overflow:hidden}
 .settings-block-hdr{display:flex;align-items:center;gap:10px;padding:14px 16px;cursor:pointer;transition:.15s;user-select:none}
-.settings-block-hdr:active{background:rgba(232,176,75,.04)}
+.settings-block-hdr:active{background:rgba(80,185,110,.04)}
 .settings-block-hdr .sb-icon{font-size:16px;flex-shrink:0}
 .settings-block-hdr .sb-title{flex:1;font-size:14px;font-weight:700;color:var(--gold);letter-spacing:.04em}
 .settings-block-hdr .sb-arrow{font-size:12px;color:var(--faint);transition:transform .2s}
@@ -265,7 +270,7 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .pres-ref-hdr .ref-icon{display:block;font-size:14px;line-height:1;margin-bottom:1px}
 .pres-name{position:sticky;left:0;z-index:1;background:var(--panel);text-align:left!important;padding:0 10px 0 0!important;white-space:nowrap}
 .pres-name-inner{display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--line)}
-.pres-name-av{width:26px;height:26px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:10px;color:#1a1205;flex-shrink:0}
+.pres-name-av{width:26px;height:26px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:10px;color:#07130a;flex-shrink:0}
 .pres-name-txt{font-size:12.5px;font-weight:600;max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .pres-cell{padding:3px 2px!important;border-bottom:1px solid rgba(42,49,60,.4)}
 .pres-btn{width:32px;height:32px;border-radius:8px;border:1.5px solid var(--line);background:var(--panel2);cursor:pointer;transition:.15s;display:flex;align-items:center;justify-content:center;margin:0 auto;position:relative;overflow:hidden}
@@ -289,7 +294,7 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 /* Select all row */
 .pres-selall{padding:3px 2px!important;border-bottom:2px solid var(--line)}
 .pres-selall-btn{width:32px;height:26px;border-radius:6px;border:1px dashed var(--faint);background:transparent;cursor:pointer;transition:.15s;display:flex;align-items:center;justify-content:center;margin:0 auto;font-size:10px;color:var(--faint);font-weight:700}
-.pres-selall-btn:active{transform:scale(.9);background:rgba(232,176,75,.08)}
+.pres-selall-btn:active{transform:scale(.9);background:rgba(80,185,110,.08)}
 .pres-selall-btn.all{border-style:solid;border-color:var(--green);color:var(--green)}
 
 /* ═══ REFEIÇÕES DEF ═══ */
@@ -309,19 +314,90 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .refdef-del{width:26px;height:26px;border-radius:7px;border:1px solid var(--line);background:transparent;color:var(--red);font-size:13px;display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:.5;transition:.12s}
 .refdef-del:active{opacity:1;background:rgba(255,107,107,.1);transform:scale(.9)}
 .refdef-edit{width:26px;height:26px;border-radius:7px;border:1px solid var(--line);background:transparent;color:var(--muted);font-size:12px;display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:.5;transition:.12s}
-.refdef-edit:active{opacity:1;background:rgba(232,176,75,.1);transform:scale(.9)}
+.refdef-edit:active{opacity:1;background:rgba(80,185,110,.1);transform:scale(.9)}
 .refdef-empty{text-align:center;padding:20px;color:var(--faint);font-size:13px;border:1px dashed var(--line);border-radius:10px}
 .refdef-add-bar{margin-top:10px;display:flex;gap:8px;align-items:center}
 .refdef-add-btn{display:flex;align-items:center;gap:6px;padding:10px 16px;border-radius:10px;border:1.5px dashed var(--line);background:transparent;color:var(--gold);font-size:13px;font-weight:600;cursor:pointer;transition:.15s;flex:1;justify-content:center}
-.refdef-add-btn:active{background:rgba(232,176,75,.06);transform:scale(.97)}
+.refdef-add-btn:active{background:rgba(80,185,110,.06);transform:scale(.97)}
 
 /* Ref def modal */
 .refdef-modal-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .refdef-modal-grid>div{min-width:0}
 .refdef-modal-full{grid-column:1/-1}
+
+/* ═══ LOGIN (Supabase) ═══ */
+.auth-page{position:fixed;inset:0;z-index:200;display:none;flex-direction:column;align-items:center;justify-content:center;background:var(--bg);padding:28px;text-align:center}
+.auth-page .auth-faixa{width:120px;height:4px;border-radius:2px;margin:14px auto 22px;background:linear-gradient(90deg,var(--gold) 0 42%,var(--campino) 42% 72%,var(--sal) 72% 100%)}
+.auth-page h2{font-size:24px;font-weight:800;color:var(--ink);letter-spacing:.02em}
+.auth-page .auth-sub{font-size:13px;color:var(--muted);margin-top:6px;max-width:300px;line-height:1.5}
+.auth-card{width:100%;max-width:340px;margin-top:26px;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:20px;box-shadow:var(--shadow);text-align:left}
+.auth-card label{display:block;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin:12px 0 5px}
+.auth-card input{width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:11px 12px;color:var(--ink);font-size:14px;box-sizing:border-box;-webkit-appearance:none;appearance:none;min-width:0;max-width:100%}
+.auth-card input:focus{outline:none;border-color:var(--gold)}
+.auth-btn{width:100%;margin-top:14px;padding:12px;border-radius:11px;border:none;font-size:14px;font-weight:700;cursor:pointer;transition:.15s;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+.auth-btn:active{transform:scale(.97)}
+.auth-btn.google{background:var(--sal);color:#1c241d;display:flex;align-items:center;justify-content:center;gap:9px}
+.auth-btn.prim{background:var(--gold);color:#07130a}
+.auth-btn.ghost{background:transparent;border:1px solid var(--line);color:var(--muted)}
+.auth-divider{display:flex;align-items:center;gap:10px;margin:16px 0 2px;color:var(--faint);font-size:11px;text-transform:uppercase;letter-spacing:.08em}
+.auth-divider::before,.auth-divider::after{content:"";flex:1;height:1px;background:var(--line)}
+.auth-status{display:none;font-size:12.5px;margin-top:12px;line-height:1.5}
+
+/* ═══ CASH-FLOWS v2 ═══ */
+.cfs-strip{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
+.cfs-card{background:var(--panel2);border:1.5px solid var(--line);border-radius:12px;padding:10px 12px;cursor:pointer;transition:.15s;user-select:none;position:relative;overflow:hidden}
+.cfs-card:active{transform:scale(.97)}
+.cfs-card.on{border-color:var(--gold);background:rgba(80,185,110,.1)}
+.cfs-card .cfs-top{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.cfs-card.on .cfs-top{color:var(--gold)}
+.cfs-card .cfs-n{margin-left:auto;font-size:10px;font-weight:700;color:var(--faint);background:var(--panel);padding:1px 7px;border-radius:8px}
+.cfs-card .cfs-val{font-size:16px;font-weight:800;margin-top:4px;font-variant-numeric:tabular-nums}
+.cfs-card .cfs-val.neg{color:var(--red)}
+.cfs-card .cfs-val.pos{color:var(--green)}
+.cfs-card .cfs-val.mov{color:var(--blue)}
+.cfs-card .cfs-val.set{color:var(--gold)}
+.cf-group-hdr{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--gold);font-weight:700;margin:16px 0 6px;display:flex;align-items:center;gap:8px}
+.cf-group-hdr::after{content:"";flex:1;height:1px;background:linear-gradient(90deg,var(--line),transparent 70%)}
+.cf-group-hdr .cfg-sum{font-size:10px;color:var(--faint);letter-spacing:0;text-transform:none;font-weight:600}
+.card .v.cf-neg{color:var(--red)}
+.card .v.cf-pos{color:var(--green)}
+.card .v.cf-mov{color:var(--blue)}
+.card .v.cf-set{color:var(--gold)}
 </style>
 </head>
 <body>
+<!-- ═══ Páginas de autenticação (Supabase) ═══ -->
+<div class="auth-page" id="page-login">
+  <h2>Festas BV</h2>
+  <div class="auth-faixa"></div>
+  <div class="auth-sub">Despesas das Festas do Barrete Verde e das Salinas. Inicia sessão para continuar.</div>
+  <div class="auth-card">
+    <button class="auth-btn google" onclick="sbLoginGoogle()">
+      <svg width="17" height="17" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.1c-.22-.66-.35-1.36-.35-2.1s.13-1.44.35-2.1V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/></svg>
+      Entrar com Google
+    </button>
+    <div class="auth-divider">ou com email</div>
+    <label>Email</label>
+    <input type="email" id="login-email" autocomplete="email" placeholder="email@exemplo.com">
+    <label>Password</label>
+    <input type="password" id="login-password" autocomplete="current-password" placeholder="••••••••">
+    <button class="auth-btn prim" onclick="sbLoginEmail()">Entrar</button>
+    <button class="auth-btn ghost" onclick="sbRegistarEmail()">Criar conta</button>
+    <div class="auth-status" id="login-status"></div>
+  </div>
+</div>
+
+<div class="auth-page" id="page-sem-acesso">
+  <h2>Sem acesso</h2>
+  <div class="auth-faixa"></div>
+  <div class="auth-sub" id="sem-acesso-email"></div>
+  <div class="auth-card" style="text-align:center">
+    <button class="auth-btn prim" id="btn-solicitar" onclick="sbSolicitarAcesso()">Solicitar acesso</button>
+    <div class="auth-status" id="solicitar-status"></div>
+    <button class="auth-btn ghost" onclick="sbLogout()" style="margin-top:10px">Terminar sessão</button>
+  </div>
+</div>
+
 <header>
   <div class="header-title-row">
     <button class="yr-btn-inline" id="yr-prev" onclick="changeYear(-1)" title="Ano anterior">‹</button>
@@ -330,7 +406,7 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
     <button class="yr-btn-inline" id="yr-next" onclick="changeYear(1)" title="Ano seguinte">›</button>
   </div>
   <div class="sub" id="ev-sub"></div>
-  <div class="syncpill"><span class="dot" id="sync-dot"></span><span id="sync-txt">a ligar ao GitHub…</span></div>
+  <div class="syncpill"><span class="dot" id="sync-dot"></span><span id="sync-txt">a ligar…</span></div>
 </header>
 <div class="wrap">
   <div class="readonly-banner sf">🔒 Modo leitura — configura o token (⚙) para editar</div>
@@ -550,27 +626,23 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
       </div>
     </div>
 
-    <!-- 4. Token GitHub (last, collapsed) -->
+    <!-- 4. Conta (Supabase) -->
     <div class="settings-block">
       <div class="settings-block-hdr" onclick="toggleSettingsBlock(this)">
-        <span class="sb-icon">🔑</span>
-        <span class="sb-title sf">Token GitHub</span>
+        <span class="sb-icon">👤</span>
+        <span class="sb-title sf">Conta</span>
         <span class="sb-arrow sf">▼</span>
       </div>
       <div class="settings-block-body">
-        <p style="font-size:12px;color:var(--muted);margin-bottom:10px;line-height:1.5">Os dados são lidos do GitHub ao abrir. Só quem tem o <b>token</b> pode guardar alterações.</p>
-        <label style="margin-top:0">Token GitHub (ghp_…)</label>
-        <div style="display:flex;gap:8px;align-items:center">
-          <input type="password" id="adm-token" placeholder="ghp_xxxxxxxxxxxx" autocomplete="off" style="flex:1">
-          <a id="adm-repo-link" href="https://github.com/diogoandrefsilva-ghc/FestasBV" target="_blank" rel="noopener" title="Ver repositório no GitHub" style="width:40px;height:44px;border-radius:9px;border:1px solid var(--line);background:var(--panel2);color:var(--muted);font-size:17px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:.15s;text-decoration:none">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg>
-          </a>
+        <p style="font-size:12px;color:var(--muted);margin-bottom:4px;line-height:1.5">Sessão iniciada como</p>
+        <p id="adm-conta-email" style="font-size:14px;font-weight:700;color:var(--ink);margin-bottom:12px;word-break:break-all">—</p>
+        <div id="adm-pedidos-wrap" style="display:none;margin-bottom:12px">
+          <div style="font-size:12px;font-weight:700;color:var(--gold);letter-spacing:.04em;margin-bottom:6px">PEDIDOS DE ACESSO</div>
+          <div id="adm-pedidos-list"><div class="note">A carregar…</div></div>
         </div>
-        <div class="note" id="adm-repo-note"></div>
-        <div class="mbtns" style="margin-top:10px">
-          <button class="btn prim" onclick="saveToken()">Guardar token</button>
+        <div class="mbtns">
+          <button class="btn" onclick="sbLogout()" style="color:var(--red);border-color:var(--red)">Terminar sessão</button>
         </div>
-        <div class="note">Sem token, a app mostra tudo em modo leitura.</div>
       </div>
     </div>
 
@@ -580,10 +652,25 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 <div class="toast" id="toast"></div>
 
 <script>
-/* CONFIG */
-const GH={owner:'diogoandrefsilva-ghc',repo:'AppDataJSON',path:'festasbv-data.json',branch:'main'};
-const TOKEN_KEY='meo_gh_token';
-function getToken(){return localStorage.getItem(TOKEN_KEY)||'';}
+/* CONFIG — Supabase (mesmo projeto do SplitBill, schema dedicado 'festasbv') */
+const SB_URL = 'https://gjweqwfbnkgnibhajldc.supabase.co';
+const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdqd2Vxd2ZibmtnbmliaGFqbGRjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODExMDk4NzUsImV4cCI6MjA5NjY4NTg3NX0.h6st-RayGhQdsqH7E2Ko-rPWk2QZUpTevO6cbjvlSnk';
+const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
+const SESSION_KEY = 'festasbv_sb_session';
+let _sbSession = null;
+let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
+let _writeBusy = 0;
+
+function sbHeaders(extra = {}) {
+  const h = {
+    'Content-Type': 'application/json',
+    'apikey': SB_KEY,
+    'Authorization': `Bearer ${_sbSession?.access_token || SB_KEY}`,
+    'Accept-Profile': 'festasbv',     // schema dedicado: vai nos headers, NUNCA no URL
+    'Content-Profile': 'festasbv'
+  };
+  return Object.assign(h, extra);
+}
 
 
 /* STATE */
@@ -799,7 +886,7 @@ function calcular(data){
 
 /* RENDER */
 const eur=x=>new Intl.NumberFormat('pt-PT',{style:'currency',currency:'EUR'}).format(x);
-const AVCOL=['#e8b04b','#5aa9ff','#3ecf8e','#ff6b6b','#b98cff','#ff9f5a','#4fd1c5','#f06595'];
+const AVCOL=['#50b96e','#5aa9ff','#3ecf8e','#ff6b6b','#b98cff','#ff9f5a','#4fd1c5','#f06595'];
 function av(nome,i){return`<div class="av" style="background:${AVCOL[i%AVCOL.length]}">${nome.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase()}</div>`;}
 
 function setTab(t){TAB=t;document.querySelectorAll('.tab').forEach(e=>e.classList.toggle('on',e.dataset.tab===t));
@@ -981,75 +1068,77 @@ let cfFilterType='all';
 let cfFilterPerson='all';
 
 function renderCashFlows(){
-  // Build unified list of all cash-flows
+  // Lista unificada de cash-flows (semântica de sinal na perspetiva do grupo:
+  // despesa = sai dinheiro (−) · mealheiro = entra (+) · reembolso = transferência (→) · saldar = acerto (✓))
   const allCf=[];
 
-  // 1) Pagamentos (reembolso, recebimento, saldar)
   (DATA.pagamentos||[]).forEach((p,i)=>{
     const t=cfType(p);
-    const people=[p.de,p.para].filter(Boolean);
     allCf.push({type:t,date:p.data||'',label:cfLabel(t),icon:cfIcon(t),
-      line1: t==='reembolso'? `${p.de} → ${p.para}` : t==='saldar'? `${p.de} → ${p.para}` : `${p.de} → ${p.para}`,
-      line2: p.ref||'',valor:p.valor,source:'pagamentos',idx:i,people});
+      line1:`${p.de} → ${p.para}`,line2:p.ref||'',valor:p.valor,
+      sign:t==='reembolso'?'mov':'set',source:'pagamentos',idx:i,people:[p.de,p.para].filter(Boolean)});
   });
 
-  // 2) Despesas
   (DATA.despesas||[]).forEach((d,i)=>{
     allCf.push({type:'despesa',date:d.dataDesp||d.dataValor||'',label:'Despesa',icon:'🛒',
-      line1:d.desc||'(sem descrição)',line2:`${d.tipo} · pagou ${d.quem}`,valor:d.valor,source:'despesas',idx:i,people:[d.quem]});
+      line1:d.desc||'(sem descrição)',line2:`${d.tipo} · pagou ${d.quem}`,valor:d.valor,
+      sign:'neg',source:'despesas',idx:i,people:[d.quem]});
   });
 
-  // 3) Mealheiros
   (DATA.mealheiros||[]).forEach((m,i)=>{
     const subIcons={'sobras_ano_anterior':['🏦','Sobras Ano Anterior'],'outros':['🎁','Outros']};
     const [mIcon,mLabel]=subIcons[m.subtipo]||['🥫','Lata'];
-    const descText=m.desc?` · ${m.desc}`:'';
     allCf.push({type:'mealheiro',date:m.data||'',label:mLabel,icon:mIcon,
-      line1:`${m.quem} recebeu`,line2:descText,valor:m.valor,source:'mealheiros',idx:i,people:[m.quem]});
+      line1:`${m.quem} recebeu`,line2:m.desc||'',valor:m.valor,
+      sign:'pos',source:'mealheiros',idx:i,people:[m.quem]});
   });
 
-  // Sort by date desc
   allCf.sort((a,b)=>(b.date||'').localeCompare(a.date||''));
 
-  // Build person list for filter (including guests' members)
+  // Totais por tipo (sempre do conjunto completo — o resumo é o mapa, não o filtro)
+  const tot={despesa:0,reembolso:0,mealheiro:0,saldar:0};
+  const cnt={despesa:0,reembolso:0,mealheiro:0,saldar:0};
+  allCf.forEach(cf=>{tot[cf.type]=(tot[cf.type]||0)+cf.valor;cnt[cf.type]=(cnt[cf.type]||0)+1;});
+
+  // Pessoas para filtro
   const personSet=new Set();
   allCf.forEach(cf=>(cf.people||[]).forEach(p=>personSet.add(p)));
-  // Also add members' convidados associations
-  const guestToMember={};
-  (DATA.convidados||[]).forEach(g=>{guestToMember[g.nome]=g.membro;});
   const personList=[...personSet].sort((a,b)=>a.localeCompare(b,'pt'));
 
-  // Filters
-  let pp=`<div class="cf-filters">
-    <div class="cf-filter"><select onchange="cfFilterType=this.value;renderCashFlows()">
-      <option value="all"${cfFilterType==='all'?' selected':''}>Todos os tipos</option>
-      <option value="despesa"${cfFilterType==='despesa'?' selected':''}>🛒 Despesa</option>
-      <option value="reembolso"${cfFilterType==='reembolso'?' selected':''}>💸 Reembolso</option>
-      <option value="mealheiro"${cfFilterType==='mealheiro'?' selected':''}>🥫 Mealheiro</option>
-      <option value="saldar"${cfFilterType==='saldar'?' selected':''}>🤝 Pagar Dívida</option>
-    </select></div>
-    <div class="cf-filter"><select onchange="cfFilterPerson=this.value;renderCashFlows()">
+  // Resumo: 4 cartões clicáveis que funcionam como filtro de tipo
+  const card=(t,icon,lbl,cls,sgn)=>`
+    <div class="cfs-card${cfFilterType===t?' on':''}" onclick="cfFilterType=cfFilterType==='${t}'?'all':'${t}';renderCashFlows()">
+      <div class="cfs-top sf">${icon} ${lbl}<span class="cfs-n">${cnt[t]||0}</span></div>
+      <div class="cfs-val ${cls}">${sgn}${eur(tot[t]||0)}</div>
+    </div>`;
+  let pp=`<div class="cfs-strip">
+    ${card('despesa','🛒','Despesas','neg','−')}
+    ${card('mealheiro','🥫','Mealheiro','pos','+')}
+    ${card('reembolso','💸','Reembolsos','mov','')}
+    ${card('saldar','🤝','Dívidas Pagas','set','')}
+  </div>`;
+
+  // Filtro de pessoa (mantém-se em select — 19+ nomes)
+  pp+=`<div class="cf-filters">
+    <div class="cf-filter" style="flex:1"><select onchange="cfFilterPerson=this.value;renderCashFlows()">
       <option value="all"${cfFilterPerson==='all'?' selected':''}>Todas as pessoas</option>
       ${personList.map(p=>`<option value="${p}"${cfFilterPerson===p?' selected':''}>${p}</option>`).join('')}
     </select></div>
   </div>`;
 
-  // Apply filters
+  // Aplicar filtros
   let filtered=allCf;
   if(cfFilterType!=='all') filtered=filtered.filter(cf=>cf.type===cfFilterType);
   if(cfFilterPerson!=='all'){
-    // Match if person is directly involved or if person is a member whose guest is referenced
     const memberGuests=(DATA.convidados||[]).filter(g=>g.membro===cfFilterPerson).map(g=>g.nome);
     filtered=filtered.filter(cf=>{
       if((cf.people||[]).includes(cfFilterPerson)) return true;
-      // For saldar/recebimento, check if ref includes this person's debts
       if(cf.source==='pagamentos'){
         const p=DATA.pagamentos[cf.idx];
         if(p.ref && (p.ref.includes('own:'+cfFilterPerson) || p.ref.includes('conv:'+cfFilterPerson))) return true;
       }
-      // Check if any of this person's guests are involved
       if(memberGuests.length && cf.people){
-        if(cf.people.some(pp=>memberGuests.includes(pp))) return true;
+        if(cf.people.some(x=>memberGuests.includes(x))) return true;
       }
       return false;
     });
@@ -1058,19 +1147,32 @@ function renderCashFlows(){
   const filteredTotal=filtered.reduce((a,cf)=>a+cf.valor,0);
   const showTotal=(cfFilterType!=='all'||cfFilterPerson!=='all')&&filtered.length>0;
   pp+=`<div class="sec-title sf" style="display:flex;justify-content:space-between;align-items:center">
-    <span>Cash-Flows (${filtered.length}${filtered.length!==allCf.length?' de '+allCf.length:''})</span>
+    <span>Movimentos (${filtered.length}${filtered.length!==allCf.length?' de '+allCf.length:''})</span>
     ${showTotal?`<span style="color:var(--gold);font-size:12px;font-weight:700;letter-spacing:0">${eur(filteredTotal)}</span>`:''}
   </div>`;
-  if(!filtered.length) pp+='<div class="empty sf">Nenhum cash-flow encontrado</div>';
+  if(!filtered.length) pp+='<div class="empty sf">Nenhum movimento encontrado</div>';
 
+  // Agrupar por data, com cabeçalho legível e subtotal do dia
+  const fmtDia=ds=>{
+    if(!ds) return 'Sem data';
+    const dt=new Date(ds+'T12:00:00');
+    if(isNaN(dt)) return ds;
+    return dt.toLocaleDateString('pt-PT',{weekday:'short',day:'numeric',month:'short'}).replace(/\./g,'');
+  };
+  let lastDate=undefined;
   filtered.forEach(cf=>{
-    const escSrc=cf.source;const escIdx=cf.idx;
+    if(cf.date!==lastDate){
+      lastDate=cf.date;
+      const dayItems=filtered.filter(x=>x.date===cf.date);
+      pp+=`<div class="cf-group-hdr sf">${fmtDia(cf.date)}<span class="cfg-sum">${dayItems.length} mov.</span></div>`;
+    }
+    const sgn=cf.sign==='neg'?'−':cf.sign==='pos'?'+':'';
     pp+=`<div class="card"><div class="top"><div class="desc">${cf.icon} ${cf.line1}</div>
-      <div class="v">${eur(cf.valor)}</div></div>
-      <div class="meta"><span class="chip t">${cf.label}</span><span class="chip">${cf.date||'—'}</span>${cf.line2?`<span class="chip">${truncRef(cf.line2)}</span>`:''}
+      <div class="v cf-${cf.sign}">${sgn}${eur(cf.valor)}</div></div>
+      <div class="meta"><span class="chip t">${cf.label}</span>${cf.line2?`<span class="chip">${truncRef(cf.line2)}</span>`:''}
       <div class="card-actions">
-        <button class="card-act write-action" onclick="editCfEntry('${escSrc}',${escIdx})" title="Editar">✎</button>
-        <button class="card-act del write-action" onclick="deleteCfEntry('${escSrc}',${escIdx})" title="Remover">✕</button>
+        <button class="card-act write-action" onclick="editCfEntry('${cf.source}',${cf.idx})" title="Editar">✎</button>
+        <button class="card-act del write-action" onclick="deleteCfEntry('${cf.source}',${cf.idx})" title="Remover">✕</button>
       </div>
       </div></div>`;
   });
@@ -1232,15 +1334,26 @@ function setSync(st,txt){const d=document.getElementById('sync-dot');const t=doc
 function toast(msg,kind){const t=document.getElementById('toast');t.textContent=msg;t.className='toast show '+(kind||'');setTimeout(()=>t.className='toast',3000);}
 
 async function carregar(){
-  setSync('load','a ler do GitHub…');
+  setSync('load','a sincronizar…');
   try{
-    // Leitura pública via raw (CDN, sem limite de pedidos, sem token). O sha é obtido na gravação.
-    const rawUrl=`https://raw.githubusercontent.com/${GH.owner}/${GH.repo}/${GH.branch}/${GH.path}?t=${Date.now()}`;
-    const res=await fetch(rawUrl,{cache:'no-store'});
+    const sel='*,membros(*,presencas(*)),refeicoes_def(*),despesas(*),convidados(*),mealheiros(*),pagamentos(*)';
+    const res=await fetch(`${SB_URL}/rest/v1/eventos?select=${encodeURIComponent(sel)}&order=ano.asc`,{headers:sbHeaders(),cache:'no-store'});
     if(!res.ok)throw new Error('HTTP '+res.status);
-    const decoded=await res.text();
-    const parsed=JSON.parse(decoded);
-    ALL_YEARS=Array.isArray(parsed)?parsed:[parsed];
+    const rows=await res.json();
+    const N=v=>v==null?0:Number(v);
+    ALL_YEARS=rows.map(ev=>({
+      _sbId: ev.id,
+      evento:{nome:ev.nome,ano:ev.ano,tesoureiro:ev.tesoureiro,arredondaTotal:!!ev.arredonda_total,missaoPoupanca:N(ev.missao_poupanca),fundoReserva:N(ev.fundo_reserva)},
+      membros:(ev.membros||[]).sort((a,b)=>a.nome.localeCompare(b.nome,'pt')).map(m=>({
+        nome:m.nome,fator:N(m.fator),sobras:N(m.sobras),outras:N(m.outras),
+        presencas:(m.presencas||[]).map(p=>`${p.dia}|${p.ref}`)
+      })),
+      refeicoesDef:(ev.refeicoes_def||[]).map(r=>({data:r.data,dia:r.dia,ref:r.ref,peso:N(r.peso),minMEO:N(r.min_meo),minConv:N(r.min_conv),extraConv:N(r.extra_conv)})),
+      despesas:(ev.despesas||[]).map(d=>({quem:d.quem,dataDesp:d.data_desp,dataValor:d.data_valor,desc:d.descricao,tipo:d.tipo,valor:N(d.valor)})),
+      convidados:(ev.convidados||[]).map(c=>({membro:c.membro,nome:c.nome,data:c.data,dia:c.dia,ref:c.ref,pagante:c.pagante?'Sim':'Não',preco:N(c.preco)})),
+      mealheiros:(ev.mealheiros||[]).map(m=>({quem:m.quem,data:m.data,valor:N(m.valor),subtipo:m.subtipo,desc:m.descricao})),
+      pagamentos:(ev.pagamentos||[]).map(p=>({de:p.de,para:p.para,valor:N(p.valor),ref:p.ref,data:p.data}))
+    }));
     ALL_YEARS.sort((a,b)=>(a.evento.ano||0)-(b.evento.ano||0));
     YEAR_IDX=ALL_YEARS.length-1;
     selectYear();
@@ -1250,17 +1363,67 @@ async function carregar(){
 }
 
 async function pushToGitHub(msg){
-  const tk=getToken();if(!tk){toast('Configura o token primeiro (⚙)','bad');return false;}
+  if(!_sbSession){toast('Sessão expirada — volta a entrar','bad');return false;}
+  ALL_YEARS[YEAR_IDX]=Object.assign(JSON.parse(JSON.stringify(DATA)),{_sbId:DATA._sbId});
+  const snap=JSON.parse(JSON.stringify(ALL_YEARS[YEAR_IDX]));
+  const slot=YEAR_IDX;
+  _writeBusy++;
+  _writeChain=_writeChain.then(()=>sbGuardarEvento(snap,slot)).catch(()=>false).finally(()=>{_writeBusy--;});
+  return _writeChain;
+}
+
+async function sbReq(method,path,body,extra){
+  const opt={method,headers:sbHeaders(extra||{})};
+  if(body!==undefined)opt.body=JSON.stringify(body);
+  const r=await fetch(`${SB_URL}/rest/v1/${path}`,opt);
+  if(!r.ok){let m='HTTP '+r.status;try{const j=await r.json();m=j.message||m;}catch(_){ }throw new Error(m);}
+  const tx=await r.text();
+  return tx?JSON.parse(tx):null;
+}
+
+async function sbGuardarEvento(y,slot){
   try{
-    ALL_YEARS[YEAR_IDX]=JSON.parse(JSON.stringify(DATA));
-    const payload=ALL_YEARS;
-    // A leitura passou a ser por raw (sem sha); obter o sha mais recente antes de gravar
-    try{const chk=await fetch(`https://api.github.com/repos/${GH.owner}/${GH.repo}/contents/${GH.path}?ref=${GH.branch}&t=${Date.now()}`,{headers:{Authorization:'token '+tk,Accept:'application/vnd.github.v3+json'},cache:'no-store'});if(chk.ok){const cj=await chk.json();GH_SHA=cj.sha;}else if(chk.status===404){GH_SHA=null;}}catch(_){}
-    const body=JSON.stringify({message:msg,content:btoa(unescape(encodeURIComponent(JSON.stringify(payload,null,1)))),sha:GH_SHA,branch:GH.branch});
-    const res=await fetch(`https://api.github.com/repos/${GH.owner}/${GH.repo}/contents/${GH.path}`,{method:'PUT',headers:{'Content-Type':'application/json',Authorization:'token '+tk,Accept:'application/vnd.github.v3+json'},body});
-    if(!res.ok){const e=await res.json();throw new Error(e.message||res.status);}
-    const r=await res.json();GH_SHA=r.content.sha;return true;
-  }catch(e){toast('Erro ao guardar: '+e.message,'bad');return false;}
+    setSync('load','a guardar…');
+    const ev=y.evento;
+    const evRow={nome:ev.nome,ano:ev.ano,tesoureiro:ev.tesoureiro,arredonda_total:!!ev.arredondaTotal,missao_poupanca:ev.missaoPoupanca||0,fundo_reserva:ev.fundoReserva||0};
+    let eid=y._sbId;
+    if(!eid){
+      const ins=await sbReq('POST','eventos',evRow,{Prefer:'return=representation'});
+      eid=ins[0].id;
+      y._sbId=eid;
+      if(ALL_YEARS[slot])ALL_YEARS[slot]._sbId=eid;
+      if(DATA&&DATA.evento.ano===ev.ano)DATA._sbId=eid;
+    }else{
+      await sbReq('PATCH',`eventos?id=eq.${eid}`,evRow);
+    }
+    // Substituir filhas (DELETE membros faz cascade às presenças)
+    for(const t of ['membros','refeicoes_def','despesas','convidados','mealheiros','pagamentos'])
+      await sbReq('DELETE',`${t}?evento_id=eq.${eid}`);
+    // membros com return=representation para mapear nome -> id (FK das presenças)
+    if(y.membros.length){
+      const mres=await sbReq('POST','membros',y.membros.map(m=>({evento_id:eid,nome:m.nome,fator:m.fator||0,sobras:m.sobras||0,outras:m.outras||0})),{Prefer:'return=representation'});
+      const idByNome={};mres.forEach(r=>idByNome[r.nome]=r.id);
+      const pres=[];
+      y.membros.forEach(m=>(m.presencas||[]).forEach(p=>{const[dia,ref]=p.split('|');pres.push({membro_id:idByNome[m.nome],dia,ref});}));
+      if(pres.length)await sbReq('POST','presencas',pres);
+    }
+    if(y.refeicoesDef&&y.refeicoesDef.length)
+      await sbReq('POST','refeicoes_def',y.refeicoesDef.map(r=>({evento_id:eid,data:r.data,dia:r.dia,ref:r.ref,peso:r.peso||0,min_meo:r.minMEO||0,min_conv:r.minConv||0,extra_conv:r.extraConv||0})));
+    if(y.despesas&&y.despesas.length)
+      await sbReq('POST','despesas',y.despesas.map(d=>({evento_id:eid,quem:d.quem,data_desp:d.dataDesp||null,data_valor:d.dataValor||null,descricao:d.desc||'',tipo:d.tipo,valor:d.valor})));
+    if(y.convidados&&y.convidados.length)
+      await sbReq('POST','convidados',y.convidados.map(c=>({evento_id:eid,membro:c.membro,nome:c.nome,data:c.data||null,dia:c.dia,ref:c.ref,pagante:c.pagante==='Sim',preco:c.preco||0})));
+    if(y.mealheiros&&y.mealheiros.length)
+      await sbReq('POST','mealheiros',y.mealheiros.map(m=>({evento_id:eid,quem:m.quem,data:m.data||null,valor:m.valor,subtipo:m.subtipo||'lata',descricao:m.desc||''})));
+    if(y.pagamentos&&y.pagamentos.length)
+      await sbReq('POST','pagamentos',y.pagamentos.map(p=>({evento_id:eid,de:p.de,para:p.para,valor:p.valor,ref:p.ref||'',data:p.data||null})));
+    setSync('live','guardado · '+new Date().toLocaleTimeString('pt-PT',{hour:'2-digit',minute:'2-digit'}));
+    return true;
+  }catch(e){
+    setSync('err','erro ao guardar');
+    toast('Erro ao guardar: '+e.message,'bad');
+    return false;
+  }
 }
 
 /* ═══ CASH FLOW MODAL ═══ */
@@ -1764,18 +1927,18 @@ function toggleSettingsBlock(hdr){
   body.classList.toggle('open');
 }
 function openAdmin(){
-  document.getElementById('adm-token').value=getToken();
-  document.getElementById('adm-repo-note').textContent=`Repo: ${GH.owner}/${GH.repo}`;
+  const em=document.getElementById('adm-conta-email');
+  if(em)em.textContent=_sbSession?_sbSession.user.email:'—';
+  const adm=document.getElementById('adm-pedidos-wrap');
+  if(adm)adm.style.display=(_sbSession&&_sbSession.user.email===ADMIN_EMAIL)?'':'none';
+  if(_sbSession&&_sbSession.user.email===ADMIN_EMAIL)sbRenderPedidos();
   loadParams();
   renderPlantel();
   document.getElementById('admin-bg').classList.add('show');
   document.body.classList.add('no-scroll');
 }
 function closeAdmin(){document.getElementById('admin-bg').classList.remove('show');document.body.classList.remove('no-scroll');}
-function saveToken(){const t=document.getElementById('adm-token').value.trim();
-  if(t)localStorage.setItem(TOKEN_KEY,t);else localStorage.removeItem(TOKEN_KEY);
-  updateReadOnlyMode();
-  toast(t?'Token guardado ✓':'Token removido','ok');}
+
 
 /* ── Parametrizações ── */
 function loadParams(){
@@ -2427,7 +2590,7 @@ function generatePDF(type){
     *{margin:0;padding:0;box-sizing:border-box}
     body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;color:#1a1a2e;padding:28px;font-size:11px;line-height:1.5;max-width:800px;margin:0 auto}
     h1{font-size:22px;font-weight:700;color:#1a1a2e;margin-bottom:2px}
-    h2{font-size:15px;font-weight:700;color:#e8b04b;margin:18px 0 8px;border-bottom:2px solid #e8b04b;padding-bottom:4px}
+    h2{font-size:15px;font-weight:700;color:#50b96e;margin:18px 0 8px;border-bottom:2px solid #50b96e;padding-bottom:4px}
     h3{font-size:13px;font-weight:700;color:#333;margin:12px 0 6px}
     .subtitle{font-size:12px;color:#666;margin-bottom:16px}
     .hero-row{display:flex;gap:16px;margin:14px 0 10px}
@@ -2468,7 +2631,7 @@ function generatePDF(type){
     <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:#1a1a2e;color:#fff;flex:0 0 auto">
       <span style="font-weight:700;font-size:14px">${nome} ${ano} — Relatório</span>
       <div style="display:flex;gap:8px">
-        <button id="pdfPrint" style="background:#e8b04b;border:none;color:#1a1a2e;font-weight:700;font-size:14px;padding:8px 14px;border-radius:6px;cursor:pointer">🖨 Imprimir / Guardar PDF</button>
+        <button id="pdfPrint" style="background:#50b96e;border:none;color:#1a1a2e;font-weight:700;font-size:14px;padding:8px 14px;border-radius:6px;cursor:pointer">🖨 Imprimir / Guardar PDF</button>
         <button id="pdfClose" style="background:rgba(255,255,255,.15);border:none;color:#fff;font-size:18px;padding:8px 14px;border-radius:6px;cursor:pointer">✕</button>
       </div>
     </div>
@@ -2664,8 +2827,7 @@ function buildPersonReport(pessoa){
 
 /* ═══ READ-ONLY MODE ═══ */
 function updateReadOnlyMode(){
-  const hasToken=!!getToken();
-  document.body.classList.toggle('read-only',!hasToken);
+  document.body.classList.toggle('read-only',!_sbSession);
 }
 
 /* ═══ RELATÓRIOS TAB (inline) ═══ */
@@ -2743,9 +2905,145 @@ function renderRelatoriosTab(){
   document.addEventListener('mouseup',onEnd);
 })();
 
+
+/* ═══ AUTH (Supabase — mesmo padrão do SplitBill) ═══ */
+async function sbInit(){
+  const stored=localStorage.getItem(SESSION_KEY);
+  if(stored){
+    try{
+      const s=JSON.parse(stored);
+      const r=await fetch(`${SB_URL}/auth/v1/user`,{headers:{'apikey':SB_KEY,'Authorization':`Bearer ${s.access_token}`}});
+      if(r.ok){const u=await r.json();_sbSession={...s,user:u};await sbAposLogin();return;}
+    }catch(e){}
+    localStorage.removeItem(SESSION_KEY);
+  }
+  const hash=window.location.hash;
+  if(hash.includes('access_token')){
+    const params=new URLSearchParams(hash.substring(1));
+    const access_token=params.get('access_token');
+    const refresh_token=params.get('refresh_token');
+    if(access_token){
+      const r=await fetch(`${SB_URL}/auth/v1/user`,{headers:{'apikey':SB_KEY,'Authorization':`Bearer ${access_token}`}});
+      if(r.ok){
+        const u=await r.json();
+        _sbSession={access_token,refresh_token,user:u};
+        localStorage.setItem(SESSION_KEY,JSON.stringify(_sbSession));
+        window.history.replaceState({},document.title,window.location.pathname);
+        await sbAposLogin();return;
+      }
+    }
+  }
+  sbMostrarLogin();
+}
+
+function sbMostrarLogin(){
+  document.getElementById('page-login').style.display='flex';
+  document.getElementById('page-sem-acesso').style.display='none';
+}
+
+async function sbAposLogin(){
+  document.getElementById('page-login').style.display='none';
+  const email=_sbSession.user.email;
+  let data=null;
+  try{
+    const r=await fetch(`${SB_URL}/rest/v1/allowed_users?email=eq.${encodeURIComponent(email)}&select=email`,{headers:sbHeaders()});
+    if(r.ok)data=await r.json();
+  }catch(e){}
+  if(!Array.isArray(data)||data.length===0){
+    document.getElementById('page-sem-acesso').style.display='flex';
+    document.getElementById('sem-acesso-email').textContent=`Sessão iniciada como ${email}. Esta conta não tem acesso à app.`;
+    return;
+  }
+  document.getElementById('page-sem-acesso').style.display='none';
+  updateReadOnlyMode();
+  await carregar();
+}
+
+async function sbLoginGoogle(){
+  window.location.href=`${SB_URL}/auth/v1/authorize?provider=google&redirect_to=${encodeURIComponent(window.location.href.split('#')[0])}`;
+}
+
+async function sbLoginEmail(){
+  const email=document.getElementById('login-email').value.trim();
+  const password=document.getElementById('login-password').value;
+  const status=document.getElementById('login-status');
+  status.style.display='block';status.textContent='A entrar…';status.style.color='var(--muted)';
+  try{
+    const r=await fetch(`${SB_URL}/auth/v1/token?grant_type=password`,{method:'POST',headers:{'apikey':SB_KEY,'Content-Type':'application/json'},body:JSON.stringify({email,password})});
+    const d=await r.json();
+    if(!r.ok){status.style.color='var(--red)';status.textContent=d.error_description||d.msg||'Erro ao entrar.';return;}
+    _sbSession={access_token:d.access_token,refresh_token:d.refresh_token,user:d.user};
+    localStorage.setItem(SESSION_KEY,JSON.stringify(_sbSession));
+    await sbAposLogin();
+  }catch(e){status.style.color='var(--red)';status.textContent='Erro de ligação.';}
+}
+
+async function sbRegistarEmail(){
+  const email=document.getElementById('login-email').value.trim();
+  const password=document.getElementById('login-password').value;
+  const status=document.getElementById('login-status');
+  status.style.display='block';status.textContent='A criar conta…';status.style.color='var(--muted)';
+  try{
+    const r=await fetch(`${SB_URL}/auth/v1/signup`,{method:'POST',headers:{'apikey':SB_KEY,'Content-Type':'application/json'},body:JSON.stringify({email,password})});
+    const d=await r.json();
+    if(!r.ok){status.style.color='var(--red)';status.textContent=d.error_description||d.msg||'Erro ao criar conta.';return;}
+    status.style.color='var(--green)';status.textContent='Conta criada! Confirma o email e volta a entrar.';
+  }catch(e){status.style.color='var(--red)';status.textContent='Erro de ligação.';}
+}
+
+async function sbSolicitarAcesso(){
+  if(!_sbSession)return;
+  const btn=document.getElementById('btn-solicitar');
+  const status=document.getElementById('solicitar-status');
+  btn.disabled=true;btn.textContent='A enviar…';
+  try{
+    await fetch(`${SB_URL}/rest/v1/access_requests`,{method:'POST',headers:sbHeaders({'Prefer':'resolution=merge-duplicates'}),body:JSON.stringify({email:_sbSession.user.email})});
+    status.style.display='block';status.style.color='var(--green)';status.textContent='✓ Pedido enviado! Aguarda aprovação.';
+    btn.style.display='none';
+  }catch(e){status.style.display='block';status.style.color='var(--red)';status.textContent='Erro ao enviar pedido.';btn.disabled=false;btn.textContent='Solicitar acesso';}
+}
+
+function sbLogout(){
+  localStorage.removeItem(SESSION_KEY);
+  _sbSession=null;
+  window.location.reload();
+}
+
+async function sbRenderPedidos(){
+  const box=document.getElementById('adm-pedidos-list');
+  if(!box)return;
+  try{
+    const reqs=await sbReq('GET','access_requests?select=email,requested_at&order=requested_at.asc');
+    if(!reqs||!reqs.length){box.innerHTML='<div class="note">Sem pedidos pendentes.</div>';return;}
+    box.innerHTML=reqs.map(r=>`
+      <div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;margin-bottom:6px">
+        <span style="flex:1;font-size:12.5px;color:var(--ink);word-break:break-all">${r.email}</span>
+        <button class="card-act" style="color:var(--green)" title="Aprovar" onclick="sbAprovarAcesso('${r.email.replace(/'/g,"\\'")}')">✓</button>
+        <button class="card-act del" title="Recusar" onclick="sbRecusarAcesso('${r.email.replace(/'/g,"\\'")}')">✕</button>
+      </div>`).join('');
+  }catch(e){box.innerHTML='<div class="note">Erro a carregar pedidos.</div>';}
+}
+
+async function sbAprovarAcesso(email){
+  try{
+    await sbReq('POST','allowed_users',{email},{Prefer:'resolution=merge-duplicates'});
+    await sbReq('DELETE',`access_requests?email=eq.${encodeURIComponent(email)}`);
+    toast('Acesso aprovado ✓','ok');
+    sbRenderPedidos();
+  }catch(e){toast('Erro: '+e.message,'bad');}
+}
+
+async function sbRecusarAcesso(email){
+  try{
+    await sbReq('DELETE',`access_requests?email=eq.${encodeURIComponent(email)}`);
+    toast('Pedido removido','ok');
+    sbRenderPedidos();
+  }catch(e){toast('Erro: '+e.message,'bad');}
+}
+
 /* GO */
-carregar();
-document.addEventListener('visibilitychange',()=>{if(!document.hidden)carregar();});
+sbInit();
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&_sbSession&&!_writeBusy)carregar();});
 document.getElementById('admin-bg').addEventListener('click',e=>{if(e.target.id==='admin-bg')closeAdmin();});
 document.getElementById('pay-bg').addEventListener('click',e=>{if(e.target.id==='pay-bg')closePayModal();});
 document.getElementById('edit-cf-bg').addEventListener('click',e=>{if(e.target.id==='edit-cf-bg')closeEditCf();});
