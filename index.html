@@ -192,6 +192,16 @@ body.no-scroll{overflow:hidden;position:fixed;width:100%;}
 
 /* Read-only mode */
 body.read-only .write-action{display:none!important}
+body.no-admin .admin-only{display:none!important}
+body.no-write .write-action{display:none!important}
+.pres-btn.locked{opacity:.4;cursor:default;pointer-events:none}
+.pres-day-hdr.past{opacity:.55}
+.pres-day-hdr.today{color:var(--gold)}
+.pres-cell.today{background:rgba(80,185,110,.07)}
+.mine-dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--gold);margin-left:5px;box-shadow:0 0 6px rgba(80,185,110,.7);flex-shrink:0}
+.perm-hint{font-size:12px;color:var(--muted);background:var(--panel);border:1px dashed var(--line);border-radius:10px;padding:10px 12px;margin:12px 0 4px;line-height:1.5}
+.lig-row{display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;margin-bottom:6px}
+.lig-row select{flex:0 0 47%;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:7px 8px;color:var(--ink);font-size:12px;-webkit-appearance:none;appearance:none;min-width:0;max-width:100%}
 body.read-only .card-act{display:none!important}
 body.read-only .refdef-edit,body.read-only .refdef-del{display:none!important}
 body.read-only .refdef-add-btn{display:none!important}
@@ -409,7 +419,7 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
   <div class="syncpill"><span class="dot" id="sync-dot"></span><span id="sync-txt">a ligar…</span></div>
 </header>
 <div class="wrap">
-  <div class="readonly-banner sf">🔒 Modo leitura — configura o token (⚙) para editar</div>
+  <div class="readonly-banner sf">🔒 Modo leitura — inicia sessão para editar</div>
   <div class="tabs">
     <div class="tab on" data-tab="saldos" onclick="setTab('saldos')">Saldos</div>
     <div class="tab" data-tab="refeicoes" onclick="setTab('refeicoes')">Refeições</div>
@@ -453,10 +463,10 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
     </div>
     <!-- Wheel selector -->
     <div class="cf-wheel" id="cf-wheel">
-      <div class="cf-opt on" data-cf="reembolso" onclick="setCfType('reembolso')"><span class="cf-icon">💸</span><span class="cf-lbl">Reembolso</span></div>
+      <div class="cf-opt on admin-only" data-cf="reembolso" onclick="setCfType('reembolso')"><span class="cf-icon">💸</span><span class="cf-lbl">Reembolso</span></div>
       <div class="cf-opt" data-cf="despesa" onclick="setCfType('despesa')"><span class="cf-icon">🛒</span><span class="cf-lbl">Despesa</span></div>
-      <div class="cf-opt" data-cf="mealheiro" onclick="setCfType('mealheiro')"><span class="cf-icon" style="font-size:20px">🥫</span><span class="cf-lbl">Mealheiro</span></div>
-      <div class="cf-opt" data-cf="saldar" onclick="setCfType('saldar')"><span class="cf-icon">🤝</span><span class="cf-lbl">Pagar Dívida</span></div>
+      <div class="cf-opt admin-only" data-cf="mealheiro" onclick="setCfType('mealheiro')"><span class="cf-icon" style="font-size:20px">🥫</span><span class="cf-lbl">Mealheiro</span></div>
+      <div class="cf-opt admin-only" data-cf="saldar" onclick="setCfType('saldar')"><span class="cf-icon">🤝</span><span class="cf-lbl">Pagar Dívida</span></div>
     </div>
 
     <!-- Dynamic form area -->
@@ -465,7 +475,7 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
     <div class="mbtns">
       <button class="btn prim" id="pay-save" onclick="saveCashFlow()">Guardar</button>
     </div>
-    <div class="note">Isto faz commit no GitHub. Precisas do token configurado (⚙).</div>
+    <div class="note" id="cf-note">Guardado na base de dados do grupo.</div>
   </div>
 </div>
 
@@ -538,8 +548,8 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
       <button onclick="closeAdmin()" style="background:var(--panel2);border:1px solid var(--line);color:var(--muted);border-radius:9px;width:32px;height:32px;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0">✕</button>
     </div>
 
-    <!-- 1. Parametrizações -->
-    <div class="settings-block">
+    <!-- 1. Parametrizações (só admin) -->
+    <div class="settings-block admin-only">
       <div class="settings-block-hdr" onclick="toggleSettingsBlock(this)">
         <span class="sb-icon">⚙️</span>
         <span class="sb-title sf">Parametrizações <span id="adm-params-year" style="color:var(--ink)"></span></span>
@@ -575,8 +585,8 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
       </div>
     </div>
 
-    <!-- 2. Plantel -->
-    <div class="settings-block">
+    <!-- 2. Plantel (só admin) -->
+    <div class="settings-block admin-only">
       <div class="settings-block-hdr" onclick="toggleSettingsBlock(this)">
         <span class="sb-icon">👥</span>
         <span class="sb-title sf">Plantel MEO <span id="adm-plantel-year" style="color:var(--ink)"></span></span>
@@ -598,8 +608,8 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
       </div>
     </div>
 
-    <!-- 3. Adicionar Novo Ano -->
-    <div class="settings-block">
+    <!-- 3. Adicionar Novo Ano (só admin) -->
+    <div class="settings-block admin-only">
       <div class="settings-block-hdr" onclick="toggleSettingsBlock(this)">
         <span class="sb-icon">➕</span>
         <span class="sb-title sf">Adicionar Novo Ano</span>
@@ -622,6 +632,32 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
         </div>
         <div class="mbtns" style="margin-top:10px">
           <button class="btn prim" onclick="addNewYear()">Criar Ano</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3b. Utilizadores & Casais (só admin) -->
+    <div class="settings-block admin-only">
+      <div class="settings-block-hdr" onclick="toggleSettingsBlock(this)">
+        <span class="sb-icon">🔗</span>
+        <span class="sb-title sf">Utilizadores &amp; Casais</span>
+        <span class="sb-arrow sf">▼</span>
+      </div>
+      <div class="settings-block-body">
+        <p style="font-size:12px;color:var(--muted);margin-bottom:12px;line-height:1.5">Liga cada conta aprovada a um membro do plantel. Os casais definem quem pode marcar presenças, convidados e despesas um do outro.</p>
+        <div class="sf" style="font-size:11px;font-weight:700;color:var(--gold);letter-spacing:.04em;margin-bottom:6px">CONTAS ↔ MEMBROS</div>
+        <div id="adm-ligacoes-list"><div class="note">A carregar…</div></div>
+        <div class="sf" style="font-size:11px;font-weight:700;color:var(--gold);letter-spacing:.04em;margin:14px 0 6px">CASAIS</div>
+        <div id="adm-casais-list"><div class="note">A carregar…</div></div>
+        <div style="border:1px dashed var(--line);border-radius:10px;padding:12px;margin-top:8px">
+          <div class="sf" style="font-size:11px;color:var(--faint);text-transform:uppercase;letter-spacing:.08em;font-weight:700;margin-bottom:8px">Ligar casal</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+            <select id="adm-casal-a" class="sf" style="width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:9px 10px;color:var(--ink);font-size:13px;-webkit-appearance:none;appearance:none;min-width:0"></select>
+            <select id="adm-casal-b" class="sf" style="width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:9px 10px;color:var(--ink);font-size:13px;-webkit-appearance:none;appearance:none;min-width:0"></select>
+          </div>
+          <div class="mbtns" style="margin-top:8px">
+            <button class="btn prim" onclick="sbAddConjuge()">Ligar casal</button>
+          </div>
         </div>
       </div>
     </div>
@@ -677,6 +713,42 @@ function sbHeaders(extra = {}) {
 let ALL_YEARS=[];
 let YEAR_IDX=0;
 let DATA=null,CALC=null,TAB='saldos',GH_SHA=null;
+
+/* ── Permissões: utilizadores ↔ membros ↔ casais ── */
+let USER_AMIGOS=[];   // [{email,amigo}]
+let CONJUGES=[];      // [{amigo_a,amigo_b}]
+let MY_NAMES=[];      // nomes que o utilizador atual pode gerir (próprio + cônjuge)
+const enc=encodeURIComponent;
+
+function isAdmin(){return !!_sbSession&&_sbSession.user.email===ADMIN_EMAIL;}
+function hojeISO(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+function computeMyNames(){
+  MY_NAMES=[];
+  if(!_sbSession)return;
+  const me=USER_AMIGOS.find(u=>u.email===_sbSession.user.email);
+  if(!me)return;
+  const s=new Set([me.amigo]);
+  CONJUGES.forEach(c=>{if(c.amigo_a===me.amigo)s.add(c.amigo_b);if(c.amigo_b===me.amigo)s.add(c.amigo_a);});
+  MY_NAMES=[...s];
+}
+function diaEditavel(dia){
+  const rd=(DATA&&DATA.refeicoesDef||[]).find(r=>r.dia===dia);
+  return !!rd&&rd.data>=hojeISO();
+}
+function canTouchPresenca(nome,dia){return isAdmin()||(MY_NAMES.includes(nome)&&diaEditavel(dia));}
+function permErrorMsg(e){
+  const m=(e&&e.message||'')+'';
+  if(/row-level security|42501|permission/i.test(m))return 'Sem permissão para esta alteração (ou a data já passou)';
+  return 'Erro: '+m;
+}
+function marcaGuardado(){setSync('live','guardado · '+new Date().toLocaleTimeString('pt-PT',{hour:'2-digit',minute:'2-digit'}));}
+function syncMirror(){if(ALL_YEARS[YEAR_IDX])ALL_YEARS[YEAR_IDX]=Object.assign(JSON.parse(JSON.stringify(DATA)),{_sbId:DATA._sbId});}
+function queueWrite(fn){
+  const p=_writeChain.then(fn);
+  _writeChain=p.then(()=>true,()=>false);
+  _writeBusy++;p.finally(()=>{_writeBusy--;});
+  return p;
+}
 
 function changeYear(delta){
   const ni=YEAR_IDX+delta;
@@ -1023,8 +1095,8 @@ function renderAll(){
             </div>
           </div>
           <div class="refdef-actions">
-            <button class="refdef-edit write-action" onclick="editRefdef(${rd._idx})" title="Editar">✎</button>
-            <button class="refdef-del write-action" onclick="deleteRefdef(${rd._idx})" title="Remover">✕</button>
+            <button class="refdef-edit write-action admin-only" onclick="editRefdef(${rd._idx})" title="Editar">✎</button>
+            <button class="refdef-del write-action admin-only" onclick="deleteRefdef(${rd._idx})" title="Remover">✕</button>
           </div>`;
         // Merged: custo info if there are people
         if(calcRef&&calcRef.D>0){
@@ -1046,12 +1118,16 @@ function renderAll(){
     });
     r+='</div>';
   }
-  r+=`<div class="refdef-add-bar"><button class="refdef-add-btn sf write-action" onclick="openRefdefModal()">＋ Adicionar Refeição</button></div>`;
+  r+=`<div class="refdef-add-bar"><button class="refdef-add-btn sf write-action admin-only" onclick="openRefdefModal()">＋ Adicionar Refeição</button></div>`;
   r+='</div>';
 
   // ── SUB 2: Presenças ──
   r+='<div id="ref-sub-presencas" style="'+(REF_SUB==='presencas'?'':'display:none')+'">';
+  if(_sbSession&&!isAdmin()&&!MY_NAMES.length){
+    r+='<div class="perm-hint sf">👤 A tua conta ainda não está ligada a um membro do plantel. Pede ao administrador para te ligar e poderes marcar presenças, convidados e despesas.</div>';
+  }
   r+=renderPresencaGrid();
+  r+=renderGuestAddButton();
   r+=renderGuestSection();
   r+='</div>';
 
@@ -1171,8 +1247,8 @@ function renderCashFlows(){
       <div class="v cf-${cf.sign}">${sgn}${eur(cf.valor)}</div></div>
       <div class="meta"><span class="chip t">${cf.label}</span>${cf.line2?`<span class="chip">${truncRef(cf.line2)}</span>`:''}
       <div class="card-actions">
-        <button class="card-act write-action" onclick="editCfEntry('${cf.source}',${cf.idx})" title="Editar">✎</button>
-        <button class="card-act del write-action" onclick="deleteCfEntry('${cf.source}',${cf.idx})" title="Remover">✕</button>
+        <button class="card-act write-action admin-only" onclick="editCfEntry('${cf.source}',${cf.idx})" title="Editar">✎</button>
+        <button class="card-act del write-action admin-only" onclick="deleteCfEntry('${cf.source}',${cf.idx})" title="Remover">✕</button>
       </div>
       </div></div>`;
   });
@@ -1337,20 +1413,27 @@ async function carregar(){
   setSync('load','a sincronizar…');
   try{
     const sel='*,membros(*,presencas(*)),refeicoes_def(*),despesas(*),convidados(*),mealheiros(*),pagamentos(*)';
-    const res=await fetch(`${SB_URL}/rest/v1/eventos?select=${encodeURIComponent(sel)}&order=ano.asc`,{headers:sbHeaders(),cache:'no-store'});
+    const [res,uaRes,cjRes]=await Promise.all([
+      fetch(`${SB_URL}/rest/v1/eventos?select=${encodeURIComponent(sel)}&order=ano.asc`,{headers:sbHeaders(),cache:'no-store'}),
+      fetch(`${SB_URL}/rest/v1/user_amigos?select=email,amigo`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null),
+      fetch(`${SB_URL}/rest/v1/conjuges?select=amigo_a,amigo_b`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null)
+    ]);
     if(!res.ok)throw new Error('HTTP '+res.status);
     const rows=await res.json();
+    USER_AMIGOS=(uaRes&&uaRes.ok)?await uaRes.json():[];
+    CONJUGES=(cjRes&&cjRes.ok)?await cjRes.json():[];
+    computeMyNames();
     const N=v=>v==null?0:Number(v);
     ALL_YEARS=rows.map(ev=>({
       _sbId: ev.id,
       evento:{nome:ev.nome,ano:ev.ano,tesoureiro:ev.tesoureiro,arredondaTotal:!!ev.arredonda_total,missaoPoupanca:N(ev.missao_poupanca),fundoReserva:N(ev.fundo_reserva)},
       membros:(ev.membros||[]).sort((a,b)=>a.nome.localeCompare(b.nome,'pt')).map(m=>({
-        nome:m.nome,fator:N(m.fator),sobras:N(m.sobras),outras:N(m.outras),
+        _id:m.id,nome:m.nome,fator:N(m.fator),sobras:N(m.sobras),outras:N(m.outras),
         presencas:(m.presencas||[]).map(p=>`${p.dia}|${p.ref}`)
       })),
       refeicoesDef:(ev.refeicoes_def||[]).map(r=>({data:r.data,dia:r.dia,ref:r.ref,peso:N(r.peso),minMEO:N(r.min_meo),minConv:N(r.min_conv),extraConv:N(r.extra_conv)})),
-      despesas:(ev.despesas||[]).map(d=>({quem:d.quem,dataDesp:d.data_desp,dataValor:d.data_valor,desc:d.descricao,tipo:d.tipo,valor:N(d.valor)})),
-      convidados:(ev.convidados||[]).map(c=>({membro:c.membro,nome:c.nome,data:c.data,dia:c.dia,ref:c.ref,pagante:c.pagante?'Sim':'Não',preco:N(c.preco)})),
+      despesas:(ev.despesas||[]).map(d=>({_id:d.id,quem:d.quem,dataDesp:d.data_desp,dataValor:d.data_valor,desc:d.descricao,tipo:d.tipo,valor:N(d.valor)})),
+      convidados:(ev.convidados||[]).map(c=>({_id:c.id,membro:c.membro,nome:c.nome,data:c.data,dia:c.dia,ref:c.ref,pagante:c.pagante?'Sim':'Não',preco:N(c.preco)})),
       mealheiros:(ev.mealheiros||[]).map(m=>({quem:m.quem,data:m.data,valor:N(m.valor),subtipo:m.subtipo,desc:m.descricao})),
       pagamentos:(ev.pagamentos||[]).map(p=>({de:p.de,para:p.para,valor:N(p.valor),ref:p.ref,data:p.data}))
     }));
@@ -1400,23 +1483,37 @@ async function sbGuardarEvento(y,slot){
     for(const t of ['membros','refeicoes_def','despesas','convidados','mealheiros','pagamentos'])
       await sbReq('DELETE',`${t}?evento_id=eq.${eid}`);
     // membros com return=representation para mapear nome -> id (FK das presenças)
+    let idByNome=null;
     if(y.membros.length){
       const mres=await sbReq('POST','membros',y.membros.map(m=>({evento_id:eid,nome:m.nome,fator:m.fator||0,sobras:m.sobras||0,outras:m.outras||0})),{Prefer:'return=representation'});
-      const idByNome={};mres.forEach(r=>idByNome[r.nome]=r.id);
+      idByNome={};mres.forEach(r=>idByNome[r.nome]=r.id);
+      y.membros.forEach(m=>{if(idByNome[m.nome])m._id=idByNome[m.nome];});
       const pres=[];
       y.membros.forEach(m=>(m.presencas||[]).forEach(p=>{const[dia,ref]=p.split('|');pres.push({membro_id:idByNome[m.nome],dia,ref});}));
       if(pres.length)await sbReq('POST','presencas',pres);
     }
     if(y.refeicoesDef&&y.refeicoesDef.length)
       await sbReq('POST','refeicoes_def',y.refeicoesDef.map(r=>({evento_id:eid,data:r.data,dia:r.dia,ref:r.ref,peso:r.peso||0,min_meo:r.minMEO||0,min_conv:r.minConv||0,extra_conv:r.extraConv||0})));
-    if(y.despesas&&y.despesas.length)
-      await sbReq('POST','despesas',y.despesas.map(d=>({evento_id:eid,quem:d.quem,data_desp:d.dataDesp||null,data_valor:d.dataValor||null,descricao:d.desc||'',tipo:d.tipo,valor:d.valor})));
-    if(y.convidados&&y.convidados.length)
-      await sbReq('POST','convidados',y.convidados.map(c=>({evento_id:eid,membro:c.membro,nome:c.nome,data:c.data||null,dia:c.dia,ref:c.ref,pagante:c.pagante==='Sim',preco:c.preco||0})));
+    if(y.despesas&&y.despesas.length){
+      const dres=await sbReq('POST','despesas',y.despesas.map(d=>({evento_id:eid,quem:d.quem,data_desp:d.dataDesp||null,data_valor:d.dataValor||null,descricao:d.desc||'',tipo:d.tipo,valor:d.valor})),{Prefer:'return=representation'});
+      if(Array.isArray(dres))dres.forEach((r,i)=>{if(y.despesas[i])y.despesas[i]._id=r.id;});
+    }
+    if(y.convidados&&y.convidados.length){
+      const cres=await sbReq('POST','convidados',y.convidados.map(c=>({evento_id:eid,membro:c.membro,nome:c.nome,data:c.data||null,dia:c.dia,ref:c.ref,pagante:c.pagante==='Sim',preco:c.preco||0})),{Prefer:'return=representation'});
+      if(Array.isArray(cres))cres.forEach((r,i)=>{if(y.convidados[i])y.convidados[i]._id=r.id;});
+    }
     if(y.mealheiros&&y.mealheiros.length)
       await sbReq('POST','mealheiros',y.mealheiros.map(m=>({evento_id:eid,quem:m.quem,data:m.data||null,valor:m.valor,subtipo:m.subtipo||'lata',descricao:m.desc||''})));
     if(y.pagamentos&&y.pagamentos.length)
       await sbReq('POST','pagamentos',y.pagamentos.map(p=>({evento_id:eid,de:p.de,para:p.para,valor:p.valor,ref:p.ref||'',data:p.data||null})));
+    // Propagar ids novos para o estado vivo (o replace recria todas as linhas)
+    [ALL_YEARS[slot],(DATA&&DATA.evento&&DATA.evento.ano===ev.ano)?DATA:null].forEach(T=>{
+      if(!T)return;
+      if(idByNome&&T.membros)T.membros.forEach(m=>{if(idByNome[m.nome])m._id=idByNome[m.nome];});
+      ['convidados','despesas'].forEach(k=>{
+        if(T[k]&&y[k]&&T[k].length===y[k].length)T[k].forEach((row,i)=>{row._id=y[k][i]._id;});
+      });
+    });
     setSync('live','guardado · '+new Date().toLocaleTimeString('pt-PT',{hour:'2-digit',minute:'2-digit'}));
     return true;
   }catch(e){
@@ -1460,7 +1557,7 @@ function updateCfForm(){
   } else if(cfDir==='despesa'){
     f.innerHTML=`
       <label>Quem pagou?</label>
-      <select id="cf-who">${memberOptions()}</select>
+      <select id="cf-who">${isAdmin()?memberOptions():myMemberOptions()}</select>
       <div class="inline-row" style="margin-top:14px">
         <div><label>Data Despesa</label><input type="date" id="cf-date" value="${today}"></div>
         <div><label>Data-Valor</label><input type="date" id="cf-date2" value="${today}"></div>
@@ -1610,7 +1707,9 @@ function recalcSdVal(){
 function openPayModal(){
   document.getElementById('pay-bg').classList.add('show');
   document.body.classList.add('no-scroll');
-  setCfType('reembolso');
+  setCfType(isAdmin()?'reembolso':'despesa');
+  const note=document.getElementById('cf-note');
+  if(note)note.textContent=isAdmin()?'Guardado na base de dados do grupo.':'Podes registar despesas pagas por ti ou pelo teu cônjuge.';
 }
 function closePayModal(){
   document.getElementById('pay-bg').classList.remove('show');
@@ -1641,8 +1740,30 @@ async function saveCashFlow(){
   } else if(cfDir==='despesa'){
     const tipo=document.getElementById('cf-tipo')?.value||'Gerais';
     const date2=document.getElementById('cf-date2')?.value||date;
-    DATA.despesas.push({quem:who,dataDesp:date,dataValor:date2,desc:desc||'(sem descrição)',tipo,valor:rnd(val,2)});
-    commitMsg=`Despesa: ${who} ${eur(val)} (${tipo})`;
+    if(!isAdmin()&&!MY_NAMES.includes(who)){
+      toast('Só podes registar despesas tuas ou do teu cônjuge','bad');
+      document.getElementById('pay-save').disabled=false;return;
+    }
+    if(!DATA._sbId){toast('Sem ligação à base de dados — recarrega a página','bad');document.getElementById('pay-save').disabled=false;return;}
+    setSync('load','a guardar…');
+    try{
+      const ins=await queueWrite(()=>sbReq('POST','despesas',
+        [{evento_id:DATA._sbId,quem:who,data_desp:date||null,data_valor:date2||null,descricao:desc||'(sem descrição)',tipo,valor:rnd(val,2)}],
+        {Prefer:'return=representation'}));
+      DATA.despesas.push({_id:ins&&ins[0]?ins[0].id:null,quem:who,dataDesp:date,dataValor:date2,desc:desc||'(sem descrição)',tipo,valor:rnd(val,2)});
+      syncMirror();
+      marcaGuardado();
+      document.getElementById('pay-save').disabled=false;
+      closePayModal();
+      CALC=calcular(JSON.parse(JSON.stringify(DATA)));
+      renderAll();
+      toast('Despesa registada ✓','ok');
+    }catch(e){
+      setSync('err','erro ao guardar');
+      document.getElementById('pay-save').disabled=false;
+      toast(permErrorMsg(e),'bad');
+    }
+    return;
   } else if(cfDir==='mealheiro'){
     const mealSub=document.querySelector('#meal-subtype-wheel .cf-opt.on')?.dataset?.sub||'corrente';
     if(mealSub==='sobras'){
@@ -1930,8 +2051,8 @@ function openAdmin(){
   const em=document.getElementById('adm-conta-email');
   if(em)em.textContent=_sbSession?_sbSession.user.email:'—';
   const adm=document.getElementById('adm-pedidos-wrap');
-  if(adm)adm.style.display=(_sbSession&&_sbSession.user.email===ADMIN_EMAIL)?'':'none';
-  if(_sbSession&&_sbSession.user.email===ADMIN_EMAIL)sbRenderPedidos();
+  if(adm)adm.style.display=isAdmin()?'':'none';
+  if(isAdmin()){sbRenderPedidos();sbRenderLigacoes();}
   loadParams();
   renderPlantel();
   document.getElementById('admin-bg').classList.add('show');
@@ -2108,6 +2229,8 @@ function renderPresencaGrid(){
   });
 
   const totalSlots=refs.length;
+  const hoje=hojeISO();
+  const adm=isAdmin();
 
   let h='<div class="pres-section">';
   h+='<div class="sec-title sf" style="margin-top:18px">Presenças</div>';
@@ -2122,7 +2245,9 @@ function renderPresencaGrid(){
   // Header row 1: day names spanning their slots
   h+='<thead><tr><th class="pres-corner"></th>';
   days.forEach(d=>{
-    h+=`<th class="pres-day-hdr sf" colspan="${d.slots.length}">${d.dia}<div style="font-size:9px;font-weight:500;color:var(--faint);letter-spacing:0;text-transform:none;margin-top:1px">${d.data.slice(5)}</div></th>`;
+    const isToday=d.data===hoje;
+    const isPast=d.data<hoje;
+    h+=`<th class="pres-day-hdr sf${isToday?' today':''}${isPast&&!adm?' past':''}" colspan="${d.slots.length}">${d.dia}<div style="font-size:9px;font-weight:500;color:${isToday?'var(--gold)':'var(--faint)'};letter-spacing:0;text-transform:none;margin-top:1px">${isToday?'hoje':d.data.slice(5)}${isPast&&!adm?' 🔒':''}</div></th>`;
   });
   h+='<th class="pres-day-hdr sf" style="border-bottom-color:var(--muted)">Σ</th></tr>';
 
@@ -2136,15 +2261,18 @@ function renderPresencaGrid(){
   });
   h+='<th class="pres-ref-hdr sf" style="color:var(--muted)">Total</th></tr>';
 
-  // Select-all row
-  h+='<tr><td class="pres-name" style="border-bottom:2px solid var(--line)"><span class="sf" style="font-size:10px;color:var(--faint);padding-left:2px">Sel. todos</span></td>';
-  days.forEach(d=>{
-    d.slots.forEach(s=>{
-      const allOn=mbrs.every(m=>(m.presencas||[]).includes(s.key));
-      h+=`<td class="pres-selall"><button class="pres-selall-btn sf${allOn?' all':''}" onclick="toggleAllSlot('${s.key}',this)" title="Selecionar/desselecionar todos">${allOn?'✓':'∀'}</button></td>`;
+  // Select-all row (só admin)
+  if(adm){
+    h+='<tr><td class="pres-name" style="border-bottom:2px solid var(--line)"><span class="sf" style="font-size:10px;color:var(--faint);padding-left:2px">Sel. todos</span></td>';
+    days.forEach(d=>{
+      d.slots.forEach(s=>{
+        const allOn=mbrs.every(m=>(m.presencas||[]).includes(s.key));
+        h+=`<td class="pres-selall"><button class="pres-selall-btn sf${allOn?' all':''}" onclick="toggleAllSlot('${s.key}',this)" title="Selecionar/desselecionar todos">${allOn?'✓':'∀'}</button></td>`;
+      });
     });
-  });
-  h+='<td class="pres-selall"></td></tr></thead>';
+    h+='<td class="pres-selall"></td></tr>';
+  }
+  h+='</thead>';
 
   // Member rows
   h+='<tbody>';
@@ -2152,11 +2280,14 @@ function renderPresencaGrid(){
     const pres=m.presencas||[];
     const memberCount=pres.length;
     h+='<tr>';
-    h+=`<td class="pres-name"><div class="pres-name-inner"><div class="pres-name-av" style="background:${AVCOL[mi%AVCOL.length]}">${m.nome.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase()}</div><span class="pres-name-txt sf">${m.nome}</span></div></td>`;
+    const meu=MY_NAMES.includes(m.nome);
+    h+=`<td class="pres-name"><div class="pres-name-inner"><div class="pres-name-av" style="background:${AVCOL[mi%AVCOL.length]}">${m.nome.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase()}</div><span class="pres-name-txt sf">${m.nome}</span>${meu&&!adm?'<span class="mine-dot" title="Podes gerir esta pessoa"></span>':''}</div></td>`;
     days.forEach(d=>{
+      const isToday=d.data===hoje;
+      const pode=adm||(meu&&d.data>=hoje);
       d.slots.forEach(s=>{
         const isOn=pres.includes(s.key);
-        h+=`<td class="pres-cell"><button class="pres-btn${isOn?' on':''}" data-member="${mi}" data-slot="${s.key}" onclick="togglePresenca(${mi},'${s.key}',this)"></button></td>`;
+        h+=`<td class="pres-cell${isToday?' today':''}"><button class="pres-btn${isOn?' on':''}${pode?'':' locked'}" data-member="${mi}" data-slot="${s.key}"${pode?` onclick="togglePresenca(${mi},'${s.key}',this)"`:''}></button></td>`;
       });
     });
     h+=`<td class="pres-member-count sf${memberCount===totalSlots?' full':''}">${memberCount}/${totalSlots}</td>`;
@@ -2278,20 +2409,36 @@ function renderGuestSection(){
           <div class="pg-meta sf">por ${g.membro}</div>
         </div>
         ${paysBadge}
-        <div class="card-actions">
+        ${(isAdmin()||(MY_NAMES.includes(g.membro)&&diaEditavel(g.dia)))?`<div class="card-actions">
           <button class="card-act del write-action" onclick="deleteGuest(${g._idx})" title="Remover">✕</button>
-        </div>
+        </div>`:''}
       </div>`;
     });
   }
-  h+=`<button class="pres-guest-add sf write-action" onclick="openGuestModal()">＋ Adicionar Convidado</button>`;
   h+='</div>';
   return h;
 }
 
+function renderGuestAddButton(){
+  if(!DATA||!DATA.refeicoesDef||!DATA.refeicoesDef.length)return'';
+  if(!isAdmin()){
+    if(!MY_NAMES.length)return'';
+    if(!(DATA.refeicoesDef||[]).some(rd=>rd.data>=hojeISO()))return'';
+  }
+  return `<button class="pres-guest-add sf write-action" onclick="openGuestModal()" style="margin-top:10px">＋ Adicionar Convidado</button>`;
+}
+
+function myMemberOptions(sel){
+  const names=(DATA&&DATA.membros||[]).map(m=>m.nome).filter(n=>MY_NAMES.includes(n));
+  if(!names.length)return '<option value="">—</option>';
+  return names.map(n=>`<option value="${n}"${sel===n?' selected':''}>${n}</option>`).join('');
+}
+
 function openGuestModal(){
   // Build a simple modal for adding guests
-  const days=[...new Set((DATA.refeicoesDef||[]).map(r=>r.dia))];
+  const allDays=[...new Set((DATA.refeicoesDef||[]).map(r=>r.dia))];
+  const days=isAdmin()?allDays:allDays.filter(d=>diaEditavel(d));
+  if(!days.length){toast('Já não há dias abertos para registar convidados','bad');return;}
   const refs=[...new Set((DATA.refeicoesDef||[]).map(r=>r.ref))];
   let html=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
     <h3 style="margin-bottom:0">Adicionar Convidado</h3>
@@ -2300,7 +2447,7 @@ function openGuestModal(){
   <label>Nome do convidado</label>
   <input type="text" id="guest-nome" placeholder="Nome">
   <label>Trazido por</label>
-  <select id="guest-membro">${memberOptions()}</select>
+  <select id="guest-membro">${isAdmin()?memberOptions():myMemberOptions()}</select>
   <div class="inline-row" style="margin-top:14px">
     <div><label>Dia</label>
       <select id="guest-dia">${days.map(d=>`<option value="${d}">${d}</option>`).join('')}</select>
@@ -2333,27 +2480,50 @@ async function saveGuest(){
   const pagante=document.getElementById('guest-pagante').value;
   if(!nome){toast('Indica o nome do convidado','bad');return;}
   if(!membro){toast('Seleciona quem traz o convidado','bad');return;}
-  if(!DATA.convidados)DATA.convidados=[];
-  DATA.convidados.push({nome,membro,dia,ref,pagante});
-  const ok=await pushToGitHub('Adicionar convidado: '+nome);
-  if(ok){
+  if(!isAdmin()){
+    if(!MY_NAMES.includes(membro)){toast('Só podes registar convidados teus ou do teu cônjuge','bad');return;}
+    if(!diaEditavel(dia)){toast('Esse dia já passou — fala com o administrador','bad');return;}
+  }
+  if(!DATA._sbId){toast('Sem ligação à base de dados — recarrega a página','bad');return;}
+  setSync('load','a guardar…');
+  try{
+    const ins=await queueWrite(()=>sbReq('POST','convidados',
+      [{evento_id:DATA._sbId,membro,nome,data:null,dia,ref,pagante:pagante==='Sim',preco:0}],
+      {Prefer:'return=representation'}));
+    if(!DATA.convidados)DATA.convidados=[];
+    DATA.convidados.push({_id:ins&&ins[0]?ins[0].id:null,nome,membro,dia,ref,pagante});
+    syncMirror();
+    marcaGuardado();
     const bg=document.getElementById('guest-modal-bg');
     if(bg){bg.classList.remove('show');document.body.classList.remove('no-scroll');}
     CALC=calcular(JSON.parse(JSON.stringify(DATA)));
     renderAll();
     toast('Convidado adicionado ✓','ok');
+  }catch(e){
+    setSync('err','erro ao guardar');
+    toast(permErrorMsg(e),'bad');
   }
 }
 
 async function deleteGuest(idx){
   const g=DATA.convidados[idx];
+  if(!isAdmin()&&(!MY_NAMES.includes(g.membro)||!diaEditavel(g.dia))){
+    toast('Só o administrador pode remover este convidado','bad');return;
+  }
   if(!confirm('Remover convidado '+g.nome+'?'))return;
-  DATA.convidados.splice(idx,1);
-  const ok=await pushToGitHub('Remover convidado: '+g.nome);
-  if(ok){
+  if(!g._id){toast('Sem ligação à base de dados — recarrega a página','bad');return;}
+  setSync('load','a guardar…');
+  try{
+    await queueWrite(()=>sbReq('DELETE',`convidados?id=eq.${g._id}`));
+    DATA.convidados.splice(idx,1);
+    syncMirror();
+    marcaGuardado();
     CALC=calcular(JSON.parse(JSON.stringify(DATA)));
     renderAll();
     toast('Convidado removido ✓','ok');
+  }catch(e){
+    setSync('err','erro ao guardar');
+    toast(permErrorMsg(e),'bad');
   }
 }
 
@@ -2361,26 +2531,50 @@ let presDebounce=null;
 async function togglePresenca(memberIdx,slotKey,btn){
   if(btn.classList.contains('saving'))return;
   const m=DATA.membros[memberIdx];
+  const [dia,ref]=slotKey.split('|');
+  if(!canTouchPresenca(m.nome,dia)){
+    toast(MY_NAMES.includes(m.nome)?'Esse dia já passou — fala com o administrador':'Só podes marcar as tuas presenças ou do teu cônjuge','bad');
+    return;
+  }
+  if(!m._id){toast('Sem ligação à base de dados — recarrega a página','bad');return;}
   if(!m.presencas)m.presencas=[];
   const idx=m.presencas.indexOf(slotKey);
-  if(idx>=0){m.presencas.splice(idx,1);btn.classList.remove('on');}
-  else{m.presencas.push(slotKey);btn.classList.add('on');}
+  const adding=idx<0;
+  if(adding){m.presencas.push(slotKey);btn.classList.add('on');}
+  else{m.presencas.splice(idx,1);btn.classList.remove('on');}
   btn.classList.add('saving');
+  setSync('load','a guardar…');
 
-  // Debounce: wait 600ms of inactivity before pushing
-  clearTimeout(presDebounce);
-  presDebounce=setTimeout(async()=>{
-    const ok=await pushToGitHub('Atualizar presenças');
-    document.querySelectorAll('.pres-btn.saving').forEach(b=>b.classList.remove('saving'));
-    if(ok){
-      CALC=calcular(JSON.parse(JSON.stringify(DATA)));
-      renderAll();
-      toast('Presenças atualizadas ✓','ok');
+  queueWrite(async()=>{
+    try{
+      if(adding)await sbReq('POST','presencas?on_conflict=membro_id,dia,ref',[{membro_id:m._id,dia,ref}],{Prefer:'resolution=ignore-duplicates'});
+      else await sbReq('DELETE',`presencas?membro_id=eq.${m._id}&dia=eq.${enc(dia)}&ref=eq.${enc(ref)}`);
+      btn.classList.remove('saving');
+      marcaGuardado();
+      clearTimeout(presDebounce);
+      presDebounce=setTimeout(()=>{
+        syncMirror();
+        CALC=calcular(JSON.parse(JSON.stringify(DATA)));
+        renderAll();
+      },400);
+      return true;
+    }catch(e){
+      // reverter o toggle otimista
+      const i2=m.presencas.indexOf(slotKey);
+      if(adding&&i2>=0)m.presencas.splice(i2,1);
+      else if(!adding&&i2<0)m.presencas.push(slotKey);
+      btn.classList.toggle('on',m.presencas.includes(slotKey));
+      btn.classList.remove('saving');
+      setSync('err','erro ao guardar');
+      toast(permErrorMsg(e),'bad');
+      return false;
     }
-  },600);
+  });
 }
 
 async function toggleAllSlot(slotKey,btn){
+  if(!isAdmin())return;
+  const [dia,ref]=slotKey.split('|');
   const mbrs=DATA.membros;
   const allOn=mbrs.every(m=>(m.presencas||[]).includes(slotKey));
   mbrs.forEach(m=>{
@@ -2389,13 +2583,29 @@ async function toggleAllSlot(slotKey,btn){
     if(allOn){if(idx>=0)m.presencas.splice(idx,1);}
     else{if(idx<0)m.presencas.push(slotKey);}
   });
-
-  const ok=await pushToGitHub('Presenças em massa: '+slotKey);
-  if(ok){
-    CALC=calcular(JSON.parse(JSON.stringify(DATA)));
-    renderAll();
-    toast('Presenças atualizadas ✓','ok');
-  }
+  setSync('load','a guardar…');
+  queueWrite(async()=>{
+    try{
+      const ids=mbrs.map(m=>m._id).filter(Boolean);
+      if(allOn){
+        if(ids.length)await sbReq('DELETE',`presencas?dia=eq.${enc(dia)}&ref=eq.${enc(ref)}&membro_id=in.(${ids.join(',')})`);
+      }else{
+        const rows=mbrs.filter(m=>m._id).map(m=>({membro_id:m._id,dia,ref}));
+        if(rows.length)await sbReq('POST','presencas?on_conflict=membro_id,dia,ref',rows,{Prefer:'resolution=ignore-duplicates'});
+      }
+      syncMirror();
+      marcaGuardado();
+      CALC=calcular(JSON.parse(JSON.stringify(DATA)));
+      renderAll();
+      toast('Presenças atualizadas ✓','ok');
+      return true;
+    }catch(e){
+      setSync('err','erro ao guardar');
+      toast(permErrorMsg(e),'bad');
+      carregar();
+      return false;
+    }
+  });
 }
 
 /* ═══ REFEIÇÕES DEF CRUD ═══ */
@@ -2828,6 +3038,8 @@ function buildPersonReport(pessoa){
 /* ═══ READ-ONLY MODE ═══ */
 function updateReadOnlyMode(){
   document.body.classList.toggle('read-only',!_sbSession);
+  document.body.classList.toggle('no-admin',!isAdmin());
+  document.body.classList.toggle('no-write',!isAdmin()&&!MY_NAMES.length);
 }
 
 /* ═══ RELATÓRIOS TAB (inline) ═══ */
@@ -3030,6 +3242,7 @@ async function sbAprovarAcesso(email){
     await sbReq('DELETE',`access_requests?email=eq.${encodeURIComponent(email)}`);
     toast('Acesso aprovado ✓','ok');
     sbRenderPedidos();
+    sbRenderLigacoes();
   }catch(e){toast('Erro: '+e.message,'bad');}
 }
 
@@ -3038,6 +3251,80 @@ async function sbRecusarAcesso(email){
     await sbReq('DELETE',`access_requests?email=eq.${encodeURIComponent(email)}`);
     toast('Pedido removido','ok');
     sbRenderPedidos();
+  }catch(e){toast('Erro: '+e.message,'bad');}
+}
+
+/* ═══ UTILIZADORES ↔ MEMBROS & CASAIS (admin) ═══ */
+function allMemberNames(){
+  return [...new Set(ALL_YEARS.flatMap(y=>(y.membros||[]).map(m=>m.nome)))].sort((a,b)=>a.localeCompare(b,'pt'));
+}
+
+async function sbRenderLigacoes(){
+  if(!isAdmin())return;
+  const elL=document.getElementById('adm-ligacoes-list');
+  const elC=document.getElementById('adm-casais-list');
+  if(!elL||!elC)return;
+  try{
+    const [users,ua,cj]=await Promise.all([
+      sbReq('GET','allowed_users?select=email&order=email.asc'),
+      sbReq('GET','user_amigos?select=email,amigo'),
+      sbReq('GET','conjuges?select=amigo_a,amigo_b')
+    ]);
+    USER_AMIGOS=ua||[];CONJUGES=cj||[];
+    computeMyNames();updateReadOnlyMode();
+    const names=allMemberNames();
+    const esc=s=>s.replace(/'/g,"\\'");
+    const opt=sel=>'<option value="">— sem ligação —</option>'+names.map(n=>`<option value="${n}"${sel===n?' selected':''}>${n}</option>`).join('');
+    elL.innerHTML=(users||[]).map(u=>{
+      const cur=(USER_AMIGOS.find(x=>x.email===u.email)||{}).amigo||'';
+      return `<div class="lig-row sf">
+        <span style="flex:1;font-size:12px;color:var(--ink);word-break:break-all">${u.email}${u.email===ADMIN_EMAIL?' <span style="color:var(--gold);font-size:10px">admin</span>':''}</span>
+        <select onchange="sbSetAmigo('${esc(u.email)}',this.value)">${opt(cur)}</select>
+      </div>`;
+    }).join('')||'<div class="note">Sem contas aprovadas.</div>';
+    elC.innerHTML=CONJUGES.length?CONJUGES.map(c=>`
+      <div class="lig-row sf">
+        <span style="flex:1;font-size:12.5px;color:var(--ink)">💞 ${c.amigo_a} ↔ ${c.amigo_b}</span>
+        <button class="card-act del" title="Separar" onclick="sbDelConjuge('${esc(c.amigo_a)}','${esc(c.amigo_b)}')">✕</button>
+      </div>`).join(''):'<div class="note">Sem casais definidos.</div>';
+    const sa=document.getElementById('adm-casal-a'),sb2=document.getElementById('adm-casal-b');
+    if(sa&&sb2){
+      const o=names.map(n=>`<option value="${n}">${n}</option>`).join('');
+      sa.innerHTML=o;sb2.innerHTML=o;
+    }
+  }catch(e){
+    elL.innerHTML='<div class="note">Erro a carregar ('+e.message+'). Já correste o script 03 no Supabase?</div>';
+    elC.innerHTML='';
+  }
+}
+
+async function sbSetAmigo(email,amigo){
+  try{
+    if(!amigo)await sbReq('DELETE',`user_amigos?email=eq.${enc(email)}`);
+    else await sbReq('POST','user_amigos?on_conflict=email',[{email,amigo}],{Prefer:'resolution=merge-duplicates'});
+    toast('Ligação atualizada ✓','ok');
+    sbRenderLigacoes();
+  }catch(e){toast('Erro: '+e.message,'bad');}
+}
+
+async function sbAddConjuge(){
+  const a=document.getElementById('adm-casal-a').value;
+  const b=document.getElementById('adm-casal-b').value;
+  if(!a||!b||a===b){toast('Escolhe duas pessoas diferentes','bad');return;}
+  if(CONJUGES.some(c=>(c.amigo_a===a&&c.amigo_b===b)||(c.amigo_a===b&&c.amigo_b===a))){toast('Esse casal já está ligado','bad');return;}
+  try{
+    await sbReq('POST','conjuges',[{amigo_a:a,amigo_b:b}]);
+    toast('Casal ligado ✓','ok');
+    sbRenderLigacoes();
+  }catch(e){toast('Erro: '+e.message,'bad');}
+}
+
+async function sbDelConjuge(a,b){
+  if(!confirm(`Separar ${a} ↔ ${b}?`))return;
+  try{
+    await sbReq('DELETE',`conjuges?amigo_a=eq.${enc(a)}&amigo_b=eq.${enc(b)}`);
+    toast('Casal removido','ok');
+    sbRenderLigacoes();
   }catch(e){toast('Erro: '+e.message,'bad');}
 }
 
