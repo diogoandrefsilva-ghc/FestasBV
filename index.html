@@ -63,9 +63,11 @@ header .sub{font-size:12.5px;color:var(--muted);margin-top:5px}
 
 /* Tabs */
 .tabs{display:flex;gap:6px;background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:5px;margin-bottom:16px;position:sticky;top:8px;z-index:20;backdrop-filter:blur(8px)}
-.tab{flex:1;text-align:center;font-size:12.5px;font-weight:600;color:var(--muted);padding:9px 4px;border-radius:9px;cursor:pointer;transition:.18s}
+/* font-size fluido: encolhe com a largura do ecrã para "Cash-Flows" caber sempre inteiro (sem elipse) */
+.tab{flex:1;text-align:center;font-size:clamp(8.5px,2.7vw,12.5px);font-weight:600;color:var(--muted);padding:9px 4px;border-radius:9px;cursor:pointer;transition:.18s;white-space:nowrap;min-width:0;letter-spacing:-.1px}
 .tab.on{background:var(--gold);color:#241600}
 .tab[data-tab="definicoes"]{flex:0 0 38px;font-size:15px;padding:7px 0}
+@media (max-width:380px){.tabs{gap:4px;padding:4px}.tab{padding:9px 2px}}
 
 /* Member rows */
 .sec-title{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--faint);margin:4px 2px 10px}
@@ -463,8 +465,8 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
     </div>
     <!-- Wheel selector -->
     <div class="cf-wheel" id="cf-wheel">
-      <div class="cf-opt on admin-only" data-cf="reembolso" onclick="setCfType('reembolso')"><span class="cf-icon">💸</span><span class="cf-lbl">Reembolso</span></div>
       <div class="cf-opt" data-cf="despesa" onclick="setCfType('despesa')"><span class="cf-icon">🛒</span><span class="cf-lbl">Despesa</span></div>
+      <div class="cf-opt admin-only" data-cf="reembolso" onclick="setCfType('reembolso')"><span class="cf-icon">💸</span><span class="cf-lbl">Reembolso</span></div>
       <div class="cf-opt admin-only" data-cf="mealheiro" onclick="setCfType('mealheiro')"><span class="cf-icon" style="font-size:20px">🥫</span><span class="cf-lbl">Mealheiro</span></div>
       <div class="cf-opt admin-only" data-cf="saldar" onclick="setCfType('saldar')"><span class="cf-icon">🤝</span><span class="cf-lbl">Pagar Dívida</span></div>
     </div>
@@ -1089,10 +1091,14 @@ function renderAll(){
     m._sfEcra=rnd(cred-deb,2);
   });
   const sorted=[...ms].sort((a,b)=>b._sfEcra-a._sfEcra);
-  const withDebt=sorted.filter(m=>Math.abs(m._sfEcra)>=0.005);
-  const settled=sorted.filter(m=>Math.abs(m._sfEcra)<0.005);
-  let h='<div class="sec-title sf">Quem recebe / quem deve</div><div class="mlist">';
-  if(!withDebt.length) h+='<div class="empty sf">Todas as contas estão saldadas 🎉</div>';
+  // Não-admin: só vê o próprio saldo e o do cônjuge
+  const visivel=isAdmin()?sorted:sorted.filter(m=>MY_NAMES.includes(m.nome));
+  const withDebt=visivel.filter(m=>Math.abs(m._sfEcra)>=0.005);
+  const settled=visivel.filter(m=>Math.abs(m._sfEcra)<0.005);
+  let h='<div class="sec-title sf">'+(isAdmin()?'Quem recebe / quem deve':'O meu saldo')+'</div><div class="mlist">';
+  if(!visivel.length) h+='<div class="empty sf">Liga a tua conta a um membro nas Definições para veres o teu saldo.</div>';
+  else if(!withDebt.length&&!settled.length) h+='<div class="empty sf">Sem saldo a mostrar.</div>';
+  else if(!withDebt.length) h+='<div class="empty sf">'+(isAdmin()?'Todas as contas estão saldadas 🎉':'As tuas contas estão saldadas 🎉')+'</div>';
   withDebt.forEach((m,i)=>{
     const sf=m._sfEcra;const cls=sf>0?'pos':'neg';
     const sign=sf>0.005?'a receber':'a pagar';
@@ -1616,12 +1622,8 @@ function updateCfForm(){
       <label>Quem pagou?</label>
       <select id="cf-who">${isAdmin()?memberOptions():myMemberOptions()}</select>
       <div class="inline-row" style="margin-top:14px">
-        <div><label>Data Despesa</label><input type="date" id="cf-date" value="${today}"></div>
-        <div><label>Data-Valor</label><input type="date" id="cf-date2" value="${today}"></div>
-      </div>
-      <div class="inline-row" style="margin-top:14px">
         <div><label>Tipo</label>
-          <select id="cf-tipo">
+          <select id="cf-tipo" onchange="cfTipoChanged()">
             <option value="Gerais">Gerais</option>
             <option value="Bebidas">Bebidas</option>
             <option value="Almoço">Almoço</option>
@@ -1630,8 +1632,13 @@ function updateCfForm(){
         </div>
         <div><label>Valor (€)</label><input type="number" id="cf-val" step="0.01" min="0.01" placeholder="0,00" inputmode="decimal"></div>
       </div>
+      <div class="inline-row" style="margin-top:14px">
+        <div><label>Data Despesa</label><input type="date" id="cf-date" value="${today}" oninput="cfSyncDataValor()"></div>
+        <div><label>Data-Valor</label><input type="date" id="cf-date2" value=""></div>
+      </div>
       <label>Descritivo</label>
       <textarea id="cf-desc" placeholder="Ex: Continente — Bacalhau" rows="2"></textarea>`;
+    setTimeout(cfTipoChanged,10);
   } else if(cfDir==='mealheiro'){
     f.innerHTML=`
       <label>Tipo de mealheiro</label>
@@ -1680,6 +1687,60 @@ function updateCfForm(){
       </div>
       <div class="note" id="cf-val-hint"></div>`;
     setTimeout(updateSdChips,10);
+  }
+}
+
+function cfTipoChanged(){
+  const tipo=document.getElementById('cf-tipo')?.value||'Gerais';
+  const d2=document.getElementById('cf-date2');
+  const d1=document.getElementById('cf-date');
+  if(!d2||!d1)return;
+  // Data-valor só é editável em Almoço/Jantar. Bebidas/Gerais → igual à data-despesa, bloqueado.
+  const editavel=tipo==='Almoço'||tipo==='Jantar';
+  if(editavel){
+    d2.readOnly=false;d2.style.opacity='1';d2.style.pointerEvents='';
+  }else{
+    d2.value=d1.value;            // força igual à data-despesa
+    d2.readOnly=true;d2.style.opacity='.55';d2.style.pointerEvents='none';
+  }
+}
+function cfSyncDataValor(){
+  const tipo=document.getElementById('cf-tipo')?.value||'Gerais';
+  const d2=document.getElementById('cf-date2');
+  const d1=document.getElementById('cf-date');
+  if(!d2||!d1)return;
+  // Gerais/Bebidas: data-valor segue sempre a data-despesa.
+  // Almoço/Jantar: só preenche se ainda estiver vazia (não mexe se o user já a definiu).
+  if(tipo==='Almoço'||tipo==='Jantar'){
+    if(!d2.value)d2.value=d1.value;
+  }else{
+    d2.value=d1.value;
+  }
+}
+
+function ecfTipoChanged(){
+  const tipo=document.getElementById('ecf-tipo')?.value||'Gerais';
+  const d2=document.getElementById('ecf-date2');
+  const d1=document.getElementById('ecf-date');
+  if(!d2||!d1)return;
+  const editavel=tipo==='Almoço'||tipo==='Jantar';
+  if(editavel){
+    d2.readOnly=false;d2.style.opacity='1';d2.style.pointerEvents='';
+    if(!d2.value)d2.value=d1.value;
+  }else{
+    d2.value=d1.value;
+    d2.readOnly=true;d2.style.opacity='.55';d2.style.pointerEvents='none';
+  }
+}
+function ecfSyncDataValor(){
+  const tipo=document.getElementById('ecf-tipo')?.value||'Gerais';
+  const d2=document.getElementById('ecf-date2');
+  const d1=document.getElementById('ecf-date');
+  if(!d2||!d1)return;
+  if(tipo==='Almoço'||tipo==='Jantar'){
+    if(!d2.value)d2.value=d1.value;
+  }else{
+    d2.value=d1.value;
   }
 }
 
@@ -1764,7 +1825,7 @@ function recalcSdVal(){
 function openPayModal(){
   document.getElementById('pay-bg').classList.add('show');
   document.body.classList.add('no-scroll');
-  setCfType(isAdmin()?'reembolso':'despesa');
+  setCfType('despesa');
   const note=document.getElementById('cf-note');
   if(note)note.textContent=isAdmin()?'Guardado na base de dados do grupo.':'Podes registar despesas pagas por ti ou pelo teu cônjuge.';
 }
@@ -1941,19 +2002,20 @@ function editCfEntry(source,idx){
       <label>Quem pagou?</label>
       <select id="ecf-who">${memberOptions(d.quem)}</select>
       <div class="inline-row" style="margin-top:14px">
-        <div><label>Data Despesa</label><input type="date" id="ecf-date" value="${d.dataDesp||''}"></div>
-        <div><label>Data-Valor</label><input type="date" id="ecf-date2" value="${d.dataValor||''}"></div>
-      </div>
-      <div class="inline-row" style="margin-top:14px">
         <div><label>Tipo</label>
-          <select id="ecf-tipo">
+          <select id="ecf-tipo" onchange="ecfTipoChanged()">
             ${['Gerais','Bebidas','Almoço','Jantar','Renda','Cerveja'].map(t=>`<option value="${t}"${t===d.tipo?' selected':''}>${t}</option>`).join('')}
           </select>
         </div>
         <div><label>Valor (€)</label><input type="number" id="ecf-val" step="0.01" value="${d.valor}" inputmode="decimal"></div>
       </div>
+      <div class="inline-row" style="margin-top:14px">
+        <div><label>Data Despesa</label><input type="date" id="ecf-date" value="${d.dataDesp||''}" oninput="ecfSyncDataValor()"></div>
+        <div><label>Data-Valor</label><input type="date" id="ecf-date2" value="${d.dataValor||''}"></div>
+      </div>
       <label>Descritivo</label>
       <textarea id="ecf-desc" rows="2">${d.desc||''}</textarea>`;
+    setTimeout(ecfTipoChanged,10);
   } else if(editType==='mealheiro'){
     const m=DATA.mealheiros[idx];
     f.innerHTML=`
@@ -2519,7 +2581,7 @@ function renderGuestSection(){
         const icon=g.ref==='Almoço'?'🍳':g.ref==='Jantar'?'🍖':'🍺';
         h+=`<div style="font-size:11px;color:var(--gold);font-weight:700;letter-spacing:.1em;text-transform:uppercase;margin:12px 0 6px;display:flex;align-items:center;gap:6px" class="sf"><span>${icon}</span>${g.dia} · ${g.ref}</div>`;
       }
-      const paysBadge=g.pagante==='Sim'?'<span class="pg-badge pays sf">Paga</span>':'<span class="pg-badge free sf">Oferta</span>';
+      const paysBadge=g.pagante==='Sim'?'':'<span class="pg-badge free sf">Oferta</span>';
       h+=`<div class="pres-guest-card">
         <div class="pg-info">
           <div class="pg-name sf">${g.nome}</div>
