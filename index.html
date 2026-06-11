@@ -7,34 +7,34 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
-<meta name="theme-color" content="#0c110d">
+<meta name="theme-color" content="#16100a">
 <meta name="apple-mobile-web-app-title" content="MEO">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <style>
 :root{
-  /* Paleta Festas do Barrete Verde e das Salinas (Alcochete):
-     verde do barrete · vermelho do colete do campino · branco-sal */
-  --bg:#0c110d;--panel:#141d16;--panel2:#1b271d;--line:#2a3a2d;
-  --ink:#f1efe4;--muted:#94a193;--faint:#5e6b60;
-  --gold:#50b96e;--green:#3ecf8e;--red:#e0533f;--blue:#5aa9ff;
-  --sal:#f1efe4;--campino:#e0533f;
-  --shadow:0 8px 30px rgba(0,0,0,.4);
+  /* Paleta do cartaz das Festas do Barrete Verde e das Salinas (Alcochete):
+     mostarda dourada · vermelho campino · verde barrete · branco-sal · noite quente */
+  --bg:#16100a;--panel:#221810;--panel2:#2b1f14;--line:#42301e;
+  --ink:#f6eedb;--muted:#b3a087;--faint:#7d6c54;
+  --gold:#eeb64d;--green:#43c98a;--red:#e0533f;--blue:#5aa9ff;
+  --sal:#f6eedb;--campino:#d8432f;--barrete:#2f9e77;
+  --shadow:0 8px 30px rgba(0,0,0,.45);
 }
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-body{font-family:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;background:var(--bg);color:var(--ink);padding:0 0 90px;line-height:1.5;background-image:radial-gradient(circle at 50% -10%,#1c2533 0%,var(--bg) 55%);min-height:100vh}
+body{font-family:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;background:var(--bg);color:var(--ink);padding:0 0 90px;line-height:1.5;background-image:radial-gradient(circle at 50% -10%,#33210f 0%,var(--bg) 55%);min-height:100vh}
 .sf{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
 .wrap{max-width:560px;margin:0 auto;padding:0 14px}
 
 /* Header */
 header{padding:20px 14px 14px;text-align:center}
-header::after{content:"";display:block;height:3px;margin:12px auto 0;max-width:170px;border-radius:2px;background:linear-gradient(90deg,var(--gold) 0 42%,var(--campino) 42% 72%,var(--sal) 72% 100%);opacity:.85}
+header::after{content:"";display:block;height:3px;margin:12px auto 0;max-width:170px;border-radius:2px;background:linear-gradient(90deg,var(--barrete) 0 28%,var(--gold) 28% 56%,var(--campino) 56% 82%,var(--sal) 82% 100%);opacity:.85}
 .header-title-row{display:flex;align-items:center;justify-content:center;gap:4px}
 header h1{font-size:36px;font-weight:700;letter-spacing:-.5px;line-height:1}
 header .sub{font-size:12.5px;color:var(--muted);margin-top:5px}
 .yr-label-inline{font-size:36px;font-weight:700;color:var(--ink);letter-spacing:-.5px;line-height:1}
 .yr-btn-inline{background:none;border:1px solid var(--line);color:var(--gold);font-size:20px;font-weight:700;width:32px;height:32px;border-radius:9px;cursor:pointer;transition:.15s;line-height:1;display:flex;align-items:center;justify-content:center;flex-shrink:0}
-.yr-btn-inline:active{background:rgba(80,185,110,.12);transform:scale(.92)}
+.yr-btn-inline:active{background:rgba(238,182,77,.12);transform:scale(.92)}
 .yr-btn-inline:disabled{color:var(--faint);opacity:.3;cursor:default;transform:none;background:none}
 .syncpill{display:inline-flex;align-items:center;gap:6px;margin-top:8px;font-size:11px;color:var(--muted);background:var(--panel);border:1px solid var(--line);padding:5px 11px;border-radius:20px}
 .dot{width:7px;height:7px;border-radius:50%;background:var(--faint)}.dot.live{background:var(--green);box-shadow:0 0 8px var(--green)}.dot.err{background:var(--red)}
@@ -43,7 +43,7 @@ header .sub{font-size:12.5px;color:var(--muted);margin-top:5px}
 
 /* Hero */
 .hero{background:linear-gradient(155deg,var(--panel2),var(--panel));border:1px solid var(--line);border-radius:18px;padding:22px;margin:12px 0 16px;box-shadow:var(--shadow);position:relative;overflow:hidden}
-.hero::before{content:"";position:absolute;inset:0;background:radial-gradient(circle at 85% 0%,rgba(80,185,110,.10),transparent 60%);pointer-events:none}
+.hero::before{content:"";position:absolute;inset:0;background:radial-gradient(circle at 85% 0%,rgba(238,182,77,.10),transparent 60%);pointer-events:none}
 .hero .lbl{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted)}
 .hero .big{font-size:46px;font-weight:700;letter-spacing:-1px;margin-top:2px}
 .hero .big.pos{color:var(--green)}.hero .big.neg{color:var(--red)}
@@ -64,7 +64,7 @@ header .sub{font-size:12.5px;color:var(--muted);margin-top:5px}
 /* Tabs */
 .tabs{display:flex;gap:6px;background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:5px;margin-bottom:16px;position:sticky;top:8px;z-index:20;backdrop-filter:blur(8px)}
 .tab{flex:1;text-align:center;font-size:12.5px;font-weight:600;color:var(--muted);padding:9px 4px;border-radius:9px;cursor:pointer;transition:.18s}
-.tab.on{background:var(--gold);color:#07130a}
+.tab.on{background:var(--gold);color:#241600}
 .tab[data-tab="definicoes"]{flex:0 0 38px;font-size:15px;padding:7px 0}
 
 /* Member rows */
@@ -72,7 +72,7 @@ header .sub{font-size:12.5px;color:var(--muted);margin-top:5px}
 .mlist{display:flex;flex-direction:column;gap:8px}
 .mrow{background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:14px 15px;display:flex;align-items:center;gap:13px;cursor:pointer;transition:.16s}
 .mrow:active{transform:scale(.985);background:var(--panel2)}
-.av{width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:15px;color:#07130a;flex-shrink:0}
+.av{width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:15px;color:#241600;flex-shrink:0}
 .mrow .nm{flex:1;font-size:17px;font-weight:600;letter-spacing:-.2px}
 .mrow .nm small{display:block;font-size:11px;font-weight:500;color:var(--faint);letter-spacing:0}
 .mrow .amt{font-size:18px;font-weight:700;text-align:right}
@@ -109,7 +109,7 @@ body.no-scroll{overflow:hidden;position:fixed;width:100%;}
 .bd-title{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--gold);margin:20px 2px 9px;position:relative;z-index:1}
 /* Collapsible sections */
 .collapse-toggle{display:flex;align-items:center;justify-content:space-between;padding:9px 12px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;cursor:pointer;margin-top:6px;transition:.15s;user-select:none}
-.collapse-toggle:active{transform:scale(.985);background:rgba(80,185,110,.06)}
+.collapse-toggle:active{transform:scale(.985);background:rgba(238,182,77,.06)}
 .collapse-toggle .ct-label{font-size:13px;font-weight:600;color:var(--ink);display:flex;align-items:center;gap:8px}
 .collapse-toggle .ct-val{font-size:14px;font-weight:700;color:var(--ink)}
 .collapse-toggle .ct-arrow{font-size:12px;color:var(--faint);transition:transform .2s;margin-left:6px}
@@ -132,8 +132,8 @@ body.no-scroll{overflow:hidden;position:fixed;width:100%;}
 .fab{width:54px;height:54px;border-radius:16px;border:none;font-size:22px;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 6px 20px rgba(0,0,0,.3)}
 .fab:active{transform:scale(.92)}
 .fab-drag-handle{width:54px;height:20px;border-radius:10px;background:var(--panel2);border:1px solid var(--line);color:var(--faint);font-size:11px;font-weight:700;letter-spacing:2px;display:flex;align-items:center;justify-content:center;cursor:grab;user-select:none;touch-action:none;opacity:.6;transition:.15s}
-.fab-drag-handle:active{cursor:grabbing;opacity:1;background:rgba(80,185,110,.1)}
-.fab.gold{background:var(--gold);color:#07130a;box-shadow:0 6px 20px rgba(80,185,110,.4)}
+.fab-drag-handle:active{cursor:grabbing;opacity:1;background:rgba(238,182,77,.1)}
+.fab.gold{background:var(--gold);color:#241600;box-shadow:0 6px 20px rgba(238,182,77,.4)}
 .fab.dark{background:var(--panel2);color:var(--muted);border:1px solid var(--line)}
 
 /* Modal */
@@ -147,10 +147,10 @@ body.no-scroll{overflow:hidden;position:fixed;width:100%;}
 .modal input,.modal select,.modal textarea{width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:12px;color:var(--ink);font-size:15px;-webkit-appearance:none;appearance:none;font-family:inherit}
 .modal textarea{resize:vertical;min-height:44px;max-height:120px;line-height:1.4}
 .modal input:focus,.modal select:focus,.modal textarea:focus{outline:none;border-color:var(--gold)}
-.modal select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238a93a2' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;padding-right:34px}
+.modal select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23b3a087' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;padding-right:34px}
 .mbtns{display:flex;gap:9px;margin-top:18px}
 .btn{flex:1;padding:13px;border-radius:10px;border:none;font-size:14px;font-weight:700;cursor:pointer}
-.btn.prim{background:var(--gold);color:#07130a}.btn.ghost{background:var(--panel2);color:var(--ink);border:1px solid var(--line)}
+.btn.prim{background:var(--gold);color:#241600}.btn.ghost{background:var(--panel2);color:var(--ink);border:1px solid var(--line)}
 .btn:disabled{opacity:.4}
 .note{font-size:11px;color:var(--faint);margin-top:10px;line-height:1.5}
 
@@ -159,7 +159,7 @@ body.no-scroll{overflow:hidden;position:fixed;width:100%;}
 .cf-wheel::-webkit-scrollbar{display:none}
 .cf-opt{flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 12px;border-radius:12px;border:1.5px solid var(--line);background:var(--panel2);cursor:pointer;transition:.18s;min-width:72px;user-select:none}
 .cf-opt:active{transform:scale(.95)}
-.cf-opt.on{border-color:var(--gold);background:rgba(80,185,110,.1)}
+.cf-opt.on{border-color:var(--gold);background:rgba(238,182,77,.1)}
 .cf-opt .cf-icon{font-size:22px;line-height:1}
 .cf-opt .cf-lbl{font-size:10.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;text-align:center;line-height:1.2}
 .cf-opt.on .cf-lbl{color:var(--gold)}
@@ -173,20 +173,20 @@ body.no-scroll{overflow:hidden;position:fixed;width:100%;}
 .sd-list{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
 .sd-chip{display:inline-flex;align-items:center;gap:6px;padding:7px 12px;border-radius:20px;border:1.5px solid var(--line);background:var(--panel2);cursor:pointer;transition:.15s;user-select:none;font-size:13px;font-weight:600;color:var(--muted)}
 .sd-chip:active{transform:scale(.96)}
-.sd-chip.on{border-color:var(--gold);background:rgba(80,185,110,.12);color:var(--ink)}
+.sd-chip.on{border-color:var(--gold);background:rgba(238,182,77,.12);color:var(--ink)}
 .sd-chip .sd-dot{width:8px;height:8px;border-radius:50%;background:var(--line);transition:.15s;flex-shrink:0}
-.sd-chip.on .sd-dot{background:var(--gold);box-shadow:0 0 6px rgba(80,185,110,.5)}
+.sd-chip.on .sd-dot{background:var(--gold);box-shadow:0 0 6px rgba(238,182,77,.5)}
 .sd-chip .sd-amt{font-size:11px;font-weight:700;color:var(--red);margin-left:2px}
 .sd-chip.on .sd-amt{color:var(--green)}
 
 /* Card action buttons (edit/delete) */
 .card-actions{display:flex;gap:4px;margin-left:auto;flex-shrink:0}
 .card-act{width:28px;height:28px;border-radius:7px;border:1px solid var(--line);background:var(--panel2);color:var(--muted);font-size:13px;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:.12s}
-.card-act:active{transform:scale(.9);background:rgba(80,185,110,.1)}
+.card-act:active{transform:scale(.9);background:rgba(238,182,77,.1)}
 .card-act.del:active{background:rgba(255,107,107,.12)}
 
 /* Toast */
-.toast{position:fixed;left:50%;bottom:84px;transform:translateX(-50%) translateY(20px);background:#222a36;border:1px solid var(--line);color:var(--ink);padding:11px 18px;border-radius:11px;font-size:13px;opacity:0;pointer-events:none;transition:.25s;z-index:80;box-shadow:var(--shadow);max-width:90%;text-align:center}
+.toast{position:fixed;left:50%;bottom:84px;transform:translateX(-50%) translateY(20px);background:#33261a;border:1px solid var(--line);color:var(--ink);padding:11px 18px;border-radius:11px;font-size:13px;opacity:0;pointer-events:none;transition:.25s;z-index:80;box-shadow:var(--shadow);max-width:90%;text-align:center}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 .toast.ok{border-color:var(--green)}.toast.bad{border-color:var(--red)}
 
@@ -197,8 +197,8 @@ body.no-write .write-action{display:none!important}
 .pres-btn.locked{opacity:.4;cursor:default;pointer-events:none}
 .pres-day-hdr.past{opacity:.55}
 .pres-day-hdr.today{color:var(--gold)}
-.pres-cell.today{background:rgba(80,185,110,.07)}
-.mine-dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--gold);margin-left:5px;box-shadow:0 0 6px rgba(80,185,110,.7);flex-shrink:0}
+.pres-cell.today{background:rgba(238,182,77,.07)}
+.mine-dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--gold);margin-left:5px;box-shadow:0 0 6px rgba(238,182,77,.7);flex-shrink:0}
 .perm-hint{font-size:12px;color:var(--muted);background:var(--panel);border:1px dashed var(--line);border-radius:10px;padding:10px 12px;margin:12px 0 4px;line-height:1.5}
 .lig-row{display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;margin-bottom:6px}
 .lig-row select{flex:0 0 47%;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:7px 8px;color:var(--ink);font-size:12px;-webkit-appearance:none;appearance:none;min-width:0;max-width:100%}
@@ -215,7 +215,7 @@ body.read-only .readonly-banner{display:block}
 
 /* Guest filter */
 .guest-filter{margin-bottom:10px}
-.guest-filter select{width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:9px 32px 9px 11px;color:var(--ink);font-size:13px;font-weight:600;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;-webkit-appearance:none;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238a93a2' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;cursor:pointer}
+.guest-filter select{width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:9px 32px 9px 11px;color:var(--ink);font-size:13px;font-weight:600;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;-webkit-appearance:none;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23b3a087' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;cursor:pointer}
 
 /* Plantel member items */
 .pl-item{display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;margin-bottom:6px}
@@ -232,14 +232,14 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 /* Cash-flow filters */
 .cf-filters{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap}
 .cf-filter{position:relative;flex:1;min-width:0}
-.cf-filter select{width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:9px 32px 9px 11px;color:var(--ink);font-size:13px;font-weight:600;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;-webkit-appearance:none;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238a93a2' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;cursor:pointer;transition:.15s}
+.cf-filter select{width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:9px 32px 9px 11px;color:var(--ink);font-size:13px;font-weight:600;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;-webkit-appearance:none;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23b3a087' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;cursor:pointer;transition:.15s}
 .cf-filter select:focus{outline:none;border-color:var(--gold)}
 .cf-filter select option{background:var(--panel);color:var(--ink)}
 
 /* ═══ REFEIÇÕES SUB-TABS ═══ */
 .sub-tabs{display:flex;gap:0;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:3px;margin-bottom:14px}
 .sub-tab{flex:1;text-align:center;font-size:12px;font-weight:600;color:var(--muted);padding:8px 4px;border-radius:7px;cursor:pointer;transition:.18s}
-.sub-tab.on{background:var(--gold);color:#07130a}
+.sub-tab.on{background:var(--gold);color:#241600}
 
 /* Guest attendance in presenças */
 .pres-guest-section{margin-top:18px}
@@ -251,12 +251,12 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .pres-guest-card .pg-badge.pays{background:rgba(62,207,142,.12);color:var(--green)}
 .pres-guest-card .pg-badge.free{background:rgba(90,169,255,.12);color:var(--blue)}
 .pres-guest-add{display:flex;align-items:center;gap:6px;padding:10px 16px;border-radius:10px;border:1.5px dashed var(--line);background:transparent;color:var(--gold);font-size:13px;font-weight:600;cursor:pointer;transition:.15s;width:100%;justify-content:center;margin-top:8px}
-.pres-guest-add:active{background:rgba(80,185,110,.06);transform:scale(.97)}
+.pres-guest-add:active{background:rgba(238,182,77,.06);transform:scale(.97)}
 
 /* Settings collapsible blocks */
 .settings-block{border:1px solid var(--line);border-radius:12px;margin-bottom:10px;overflow:hidden}
 .settings-block-hdr{display:flex;align-items:center;gap:10px;padding:14px 16px;cursor:pointer;transition:.15s;user-select:none}
-.settings-block-hdr:active{background:rgba(80,185,110,.04)}
+.settings-block-hdr:active{background:rgba(238,182,77,.04)}
 .settings-block-hdr .sb-icon{font-size:16px;flex-shrink:0}
 .settings-block-hdr .sb-title{flex:1;font-size:14px;font-weight:700;color:var(--gold);letter-spacing:.04em}
 .settings-block-hdr .sb-arrow{font-size:12px;color:var(--faint);transition:transform .2s}
@@ -280,9 +280,9 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .pres-ref-hdr .ref-icon{display:block;font-size:14px;line-height:1;margin-bottom:1px}
 .pres-name{position:sticky;left:0;z-index:1;background:var(--panel);text-align:left!important;padding:0 10px 0 0!important;white-space:nowrap}
 .pres-name-inner{display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--line)}
-.pres-name-av{width:26px;height:26px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:10px;color:#07130a;flex-shrink:0}
+.pres-name-av{width:26px;height:26px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:10px;color:#241600;flex-shrink:0}
 .pres-name-txt{font-size:12.5px;font-weight:600;max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.pres-cell{padding:3px 2px!important;border-bottom:1px solid rgba(42,49,60,.4)}
+.pres-cell{padding:3px 2px!important;border-bottom:1px solid rgba(66,48,30,.55)}
 .pres-btn{width:32px;height:32px;border-radius:8px;border:1.5px solid var(--line);background:var(--panel2);cursor:pointer;transition:.15s;display:flex;align-items:center;justify-content:center;margin:0 auto;position:relative;overflow:hidden}
 .pres-btn:active{transform:scale(.88)}
 .pres-btn.on{border-color:var(--green);background:rgba(62,207,142,.12)}
@@ -292,7 +292,7 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .pres-btn.on.saving::after{content:"";border:2px solid var(--green);border-top-color:transparent;border-radius:50%;width:12px;height:12px;background:none;animation:sp .5s linear infinite}
 .pres-count{font-size:10px;font-weight:700;color:var(--faint);text-align:center;padding:4px 0;border-top:2px solid var(--line)}
 .pres-count.has{color:var(--green)}
-.pres-member-count{font-size:11px;font-weight:700;color:var(--muted);padding:3px 0;text-align:right;min-width:30px;border-bottom:1px solid rgba(42,49,60,.4)}
+.pres-member-count{font-size:11px;font-weight:700;color:var(--muted);padding:3px 0;text-align:right;min-width:30px;border-bottom:1px solid rgba(66,48,30,.55)}
 .pres-member-count.full{color:var(--green)}
 
 /* Stats row at bottom */
@@ -304,7 +304,7 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 /* Select all row */
 .pres-selall{padding:3px 2px!important;border-bottom:2px solid var(--line)}
 .pres-selall-btn{width:32px;height:26px;border-radius:6px;border:1px dashed var(--faint);background:transparent;cursor:pointer;transition:.15s;display:flex;align-items:center;justify-content:center;margin:0 auto;font-size:10px;color:var(--faint);font-weight:700}
-.pres-selall-btn:active{transform:scale(.9);background:rgba(80,185,110,.08)}
+.pres-selall-btn:active{transform:scale(.9);background:rgba(238,182,77,.08)}
 .pres-selall-btn.all{border-style:solid;border-color:var(--green);color:var(--green)}
 
 /* ═══ REFEIÇÕES DEF ═══ */
@@ -324,11 +324,11 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .refdef-del{width:26px;height:26px;border-radius:7px;border:1px solid var(--line);background:transparent;color:var(--red);font-size:13px;display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:.5;transition:.12s}
 .refdef-del:active{opacity:1;background:rgba(255,107,107,.1);transform:scale(.9)}
 .refdef-edit{width:26px;height:26px;border-radius:7px;border:1px solid var(--line);background:transparent;color:var(--muted);font-size:12px;display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:.5;transition:.12s}
-.refdef-edit:active{opacity:1;background:rgba(80,185,110,.1);transform:scale(.9)}
+.refdef-edit:active{opacity:1;background:rgba(238,182,77,.1);transform:scale(.9)}
 .refdef-empty{text-align:center;padding:20px;color:var(--faint);font-size:13px;border:1px dashed var(--line);border-radius:10px}
 .refdef-add-bar{margin-top:10px;display:flex;gap:8px;align-items:center}
 .refdef-add-btn{display:flex;align-items:center;gap:6px;padding:10px 16px;border-radius:10px;border:1.5px dashed var(--line);background:transparent;color:var(--gold);font-size:13px;font-weight:600;cursor:pointer;transition:.15s;flex:1;justify-content:center}
-.refdef-add-btn:active{background:rgba(80,185,110,.06);transform:scale(.97)}
+.refdef-add-btn:active{background:rgba(238,182,77,.06);transform:scale(.97)}
 
 /* Ref def modal */
 .refdef-modal-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
@@ -337,7 +337,7 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 
 /* ═══ LOGIN (Supabase) ═══ */
 .auth-page{position:fixed;inset:0;z-index:200;display:none;flex-direction:column;align-items:center;justify-content:center;background:var(--bg);padding:28px;text-align:center}
-.auth-page .auth-faixa{width:120px;height:4px;border-radius:2px;margin:14px auto 22px;background:linear-gradient(90deg,var(--gold) 0 42%,var(--campino) 42% 72%,var(--sal) 72% 100%)}
+.auth-page .auth-faixa{width:120px;height:4px;border-radius:2px;margin:14px auto 22px;background:linear-gradient(90deg,var(--barrete) 0 28%,var(--gold) 28% 56%,var(--campino) 56% 82%,var(--sal) 82% 100%)}
 .auth-page h2{font-size:24px;font-weight:800;color:var(--ink);letter-spacing:.02em}
 .auth-page .auth-sub{font-size:13px;color:var(--muted);margin-top:6px;max-width:300px;line-height:1.5}
 .auth-card{width:100%;max-width:340px;margin-top:26px;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:20px;box-shadow:var(--shadow);text-align:left}
@@ -346,8 +346,8 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .auth-card input:focus{outline:none;border-color:var(--gold)}
 .auth-btn{width:100%;margin-top:14px;padding:12px;border-radius:11px;border:none;font-size:14px;font-weight:700;cursor:pointer;transition:.15s;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
 .auth-btn:active{transform:scale(.97)}
-.auth-btn.google{background:var(--sal);color:#1c241d;display:flex;align-items:center;justify-content:center;gap:9px}
-.auth-btn.prim{background:var(--gold);color:#07130a}
+.auth-btn.google{background:var(--sal);color:#241600;display:flex;align-items:center;justify-content:center;gap:9px}
+.auth-btn.prim{background:var(--gold);color:#241600}
 .auth-btn.ghost{background:transparent;border:1px solid var(--line);color:var(--muted)}
 .auth-divider{display:flex;align-items:center;gap:10px;margin:16px 0 2px;color:var(--faint);font-size:11px;text-transform:uppercase;letter-spacing:.08em}
 .auth-divider::before,.auth-divider::after{content:"";flex:1;height:1px;background:var(--line)}
@@ -357,7 +357,7 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .cfs-strip{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
 .cfs-card{background:var(--panel2);border:1.5px solid var(--line);border-radius:12px;padding:10px 12px;cursor:pointer;transition:.15s;user-select:none;position:relative;overflow:hidden}
 .cfs-card:active{transform:scale(.97)}
-.cfs-card.on{border-color:var(--gold);background:rgba(80,185,110,.1)}
+.cfs-card.on{border-color:var(--gold);background:rgba(238,182,77,.1)}
 .cfs-card .cfs-top{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
 .cfs-card.on .cfs-top{color:var(--gold)}
 .cfs-card .cfs-n{margin-left:auto;font-size:10px;font-weight:700;color:var(--faint);background:var(--panel);padding:1px 7px;border-radius:8px}
@@ -616,21 +616,20 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
         <span class="sb-arrow sf">▼</span>
       </div>
       <div class="settings-block-body">
-        <p style="font-size:12px;color:var(--muted);margin-bottom:12px;line-height:1.5">Cria um novo ano MEO com plantel vazio, pronto para configurar.</p>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-          <div>
-            <label style="margin-top:0">Ano</label>
-            <input type="number" id="adm-new-year" placeholder="2026" min="2000" max="2099" inputmode="numeric">
-          </div>
-          <div>
-            <label style="margin-top:0">Tesoureiro</label>
-            <input type="text" id="adm-new-tes" placeholder="Nome">
-          </div>
+        <p style="font-size:12px;color:var(--muted);margin-bottom:12px;line-height:1.5">1. Indica o ano · 2. Define o plantel (podes copiar o atual) · 3. Escolhe o tesoureiro entre os membros.</p>
+        <label style="margin-top:0">Ano</label>
+        <input type="number" id="adm-new-year" placeholder="2026" min="2000" max="2099" inputmode="numeric">
+        <label>Plantel do novo ano</label>
+        <button class="btn ghost sf" style="width:100%;margin-bottom:8px" onclick="nyCopiarPlantel()">⬇ Copiar plantel de <span id="ny-copy-year"></span></button>
+        <div id="ny-plantel-list"><div class="empty sf">Sem membros — copia o plantel ou adiciona abaixo</div></div>
+        <div style="display:grid;grid-template-columns:2fr 1fr auto;gap:8px;margin-top:8px">
+          <input type="text" id="ny-new-member" placeholder="Nome" style="width:100%">
+          <input type="number" id="ny-new-fator" placeholder="Fator" step="0.05" value="1" min="0" inputmode="decimal" style="width:100%">
+          <button class="btn ghost sf" style="flex:0;padding:13px 16px" onclick="nyAddMember()">＋</button>
         </div>
-        <div style="margin-top:10px">
-          <label style="margin-top:0"><input type="checkbox" id="adm-copy-plantel" style="width:auto;margin-right:6px;vertical-align:middle"> Copiar plantel do ano atual</label>
-        </div>
-        <div class="mbtns" style="margin-top:10px">
+        <label>Tesoureiro</label>
+        <select id="adm-new-tes" class="sf"><option value="">— escolhe um membro —</option></select>
+        <div class="mbtns" style="margin-top:14px">
           <button class="btn prim" onclick="addNewYear()">Criar Ano</button>
         </div>
       </div>
@@ -707,6 +706,64 @@ function sbHeaders(extra = {}) {
   };
   return Object.assign(h, extra);
 }
+
+/* ── Sessão: refresh automático (o access token expira em ~1h) ── */
+function sbSaveSession(s){
+  _sbSession=s;
+  localStorage.setItem(SESSION_KEY,JSON.stringify(s));
+}
+let _refreshing=null;   // evita refreshes concorrentes (o refresh_token é de uso único)
+async function sbRefresh(){
+  if(!_sbSession||!_sbSession.refresh_token)return false;
+  if(_refreshing)return _refreshing;
+  _refreshing=(async()=>{
+    try{
+      const r=await fetch(`${SB_URL}/auth/v1/token?grant_type=refresh_token`,{
+        method:'POST',
+        headers:{'apikey':SB_KEY,'Content-Type':'application/json'},
+        body:JSON.stringify({refresh_token:_sbSession.refresh_token})
+      });
+      if(!r.ok)return false;
+      const d=await r.json();
+      sbSaveSession({
+        access_token:d.access_token,
+        refresh_token:d.refresh_token||_sbSession.refresh_token,
+        expires_at:d.expires_at||Math.floor(Date.now()/1000)+(d.expires_in||3600),
+        user:d.user||_sbSession.user
+      });
+      return true;
+    }catch(e){return false;}
+  })();
+  const ok=await _refreshing;
+  _refreshing=null;
+  return ok;
+}
+function tokenQuaseExpirado(){
+  // Sem expires_at (sessões antigas) assume-se que pode estar expirado
+  if(!_sbSession)return false;
+  if(!_sbSession.expires_at)return true;
+  return (_sbSession.expires_at-Date.now()/1000)<120;
+}
+async function sbEnsureFresh(){
+  if(_sbSession&&_sbSession.refresh_token&&tokenQuaseExpirado())await sbRefresh();
+}
+// fetch para o REST: garante token fresco e, se ainda assim vier 401, faz refresh + 1 retry
+async function sbFetch(url,opt){
+  await sbEnsureFresh();
+  opt=opt||{};
+  opt.headers=Object.assign({},opt.headers,{'Authorization':`Bearer ${_sbSession?.access_token||SB_KEY}`});
+  let r=await fetch(url,opt);
+  if(r.status===401&&_sbSession&&_sbSession.refresh_token){
+    const ok=await sbRefresh();
+    if(ok){
+      opt.headers['Authorization']=`Bearer ${_sbSession.access_token}`;
+      r=await fetch(url,opt);
+    }
+  }
+  return r;
+}
+// Refresh preventivo: a cada 10 min e sempre que a PWA volta ao ecrã
+setInterval(()=>{sbEnsureFresh();},10*60*1000);
 
 
 /* STATE */
@@ -958,7 +1015,7 @@ function calcular(data){
 
 /* RENDER */
 const eur=x=>new Intl.NumberFormat('pt-PT',{style:'currency',currency:'EUR'}).format(x);
-const AVCOL=['#50b96e','#5aa9ff','#3ecf8e','#ff6b6b','#b98cff','#ff9f5a','#4fd1c5','#f06595'];
+const AVCOL=['#eeb64d','#e0533f','#2f9e77','#7fa8c9','#d98a3d','#43c98a','#c96f8a','#b98cff'];
 function av(nome,i){return`<div class="av" style="background:${AVCOL[i%AVCOL.length]}">${nome.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase()}</div>`;}
 
 function setTab(t){TAB=t;document.querySelectorAll('.tab').forEach(e=>e.classList.toggle('on',e.dataset.tab===t));
@@ -1414,9 +1471,9 @@ async function carregar(){
   try{
     const sel='*,membros(*,presencas(*)),refeicoes_def(*),despesas(*),convidados(*),mealheiros(*),pagamentos(*)';
     const [res,uaRes,cjRes]=await Promise.all([
-      fetch(`${SB_URL}/rest/v1/eventos?select=${encodeURIComponent(sel)}&order=ano.asc`,{headers:sbHeaders(),cache:'no-store'}),
-      fetch(`${SB_URL}/rest/v1/user_amigos?select=email,amigo`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null),
-      fetch(`${SB_URL}/rest/v1/conjuges?select=amigo_a,amigo_b`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null)
+      sbFetch(`${SB_URL}/rest/v1/eventos?select=${encodeURIComponent(sel)}&order=ano.asc`,{headers:sbHeaders(),cache:'no-store'}),
+      sbFetch(`${SB_URL}/rest/v1/user_amigos?select=email,amigo`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null),
+      sbFetch(`${SB_URL}/rest/v1/conjuges?select=amigo_a,amigo_b`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null)
     ]);
     if(!res.ok)throw new Error('HTTP '+res.status);
     const rows=await res.json();
@@ -1458,7 +1515,7 @@ async function pushToGitHub(msg){
 async function sbReq(method,path,body,extra){
   const opt={method,headers:sbHeaders(extra||{})};
   if(body!==undefined)opt.body=JSON.stringify(body);
-  const r=await fetch(`${SB_URL}/rest/v1/${path}`,opt);
+  const r=await sbFetch(`${SB_URL}/rest/v1/${path}`,opt);
   if(!r.ok){let m='HTTP '+r.status;try{const j=await r.json();m=j.message||m;}catch(_){ }throw new Error(m);}
   const tx=await r.text();
   return tx?JSON.parse(tx):null;
@@ -2095,23 +2152,73 @@ async function saveParams(){
 }
 
 /* ── Add New Year ── */
+let NY_MEMBROS=[];   // plantel em preparação para o novo ano
+
+function nyRender(){
+  const list=document.getElementById('ny-plantel-list');
+  if(!NY_MEMBROS.length){
+    list.innerHTML='<div class="empty sf">Sem membros — copia o plantel ou adiciona abaixo</div>';
+  }else{
+    let h='';
+    NY_MEMBROS.forEach((m,i)=>{
+      h+=`<div class="pl-item">
+        <span class="pl-name">${m.nome}</span>
+        <span class="pl-fator"><input type="number" value="${m.fator}" step="0.05" min="0" onchange="nyUpdateFator(${i},this.value)" title="Fator"></span>
+        <button class="pl-del" onclick="nyRemoveMember(${i})" title="Remover">✕</button>
+      </div>`;
+    });
+    list.innerHTML=h;
+  }
+  // Tesoureiro: dropdown alimentado pelos membros em preparação
+  const sel=document.getElementById('adm-new-tes');
+  const prev=sel.value;
+  let o='<option value="">— escolhe um membro —</option>';
+  NY_MEMBROS.forEach(m=>{o+=`<option value="${m.nome}"${prev===m.nome?' selected':''}>${m.nome}</option>`;});
+  sel.innerHTML=o;
+  if(prev&&!NY_MEMBROS.find(m=>m.nome===prev))sel.value='';
+}
+
+function nyCopiarPlantel(){
+  if(!DATA||!DATA.membros||!DATA.membros.length){toast('O ano atual não tem plantel para copiar','bad');return;}
+  NY_MEMBROS=DATA.membros.map(m=>({nome:m.nome,fator:m.fator}));
+  nyRender();
+  // Sugerir o mesmo tesoureiro do ano atual, se vier na cópia
+  const tesAtual=DATA.evento.tesoureiro;
+  if(NY_MEMBROS.find(m=>m.nome===tesAtual))document.getElementById('adm-new-tes').value=tesAtual;
+  toast('Plantel de '+DATA.evento.ano+' copiado ('+NY_MEMBROS.length+' membros) ✓','ok');
+}
+
+function nyAddMember(){
+  const nome=(document.getElementById('ny-new-member').value||'').trim();
+  const fator=parseFloat(document.getElementById('ny-new-fator').value)||1;
+  if(!nome){toast('Indica o nome','bad');return;}
+  if(NY_MEMBROS.find(m=>m.nome===nome)){toast(nome+' já está na lista','bad');return;}
+  NY_MEMBROS.push({nome,fator});
+  document.getElementById('ny-new-member').value='';
+  document.getElementById('ny-new-fator').value='1';
+  nyRender();
+}
+
+function nyRemoveMember(i){
+  NY_MEMBROS.splice(i,1);
+  nyRender();
+}
+
+function nyUpdateFator(i,v){
+  const f=parseFloat(v);
+  if(!isNaN(f)&&f>=0)NY_MEMBROS[i].fator=f;
+}
+
 async function addNewYear(){
   const yearVal=parseInt(document.getElementById('adm-new-year').value);
-  const tesVal=(document.getElementById('adm-new-tes').value||'').trim();
+  const tesVal=document.getElementById('adm-new-tes').value;
   if(!yearVal||yearVal<2000||yearVal>2099){toast('Ano inválido','bad');return;}
-  if(!tesVal){toast('Indica o tesoureiro','bad');return;}
-  // Check duplicate
   if(ALL_YEARS.some(y=>y.evento.ano===yearVal)){toast('Ano '+yearVal+' já existe','bad');return;}
+  if(!NY_MEMBROS.length){toast('Adiciona pelo menos um membro ao plantel','bad');return;}
+  if(!tesVal){toast('Escolhe o tesoureiro entre os membros','bad');return;}
+  if(!NY_MEMBROS.find(m=>m.nome===tesVal)){toast('O tesoureiro tem de pertencer ao plantel','bad');return;}
 
-  const copyPlantel=document.getElementById('adm-copy-plantel').checked;
-  let membros=[];
-  if(copyPlantel&&DATA&&DATA.membros){
-    membros=DATA.membros.map(m=>({nome:m.nome,fator:m.fator,presencas:[],sobras:0,outras:0}));
-  }
-  // Ensure tesoureiro is in the plantel
-  if(!membros.find(m=>m.nome===tesVal)){
-    membros.unshift({nome:tesVal,fator:1,presencas:[],sobras:0,outras:0});
-  }
+  const membros=NY_MEMBROS.map(m=>({nome:m.nome,fator:m.fator,presencas:[],sobras:0,outras:0}));
 
   const newYear={
     evento:{nome:'MEO '+yearVal,ano:yearVal,tesoureiro:tesVal,arredondaTotal:false,missaoPoupanca:0,fundoReserva:0},
@@ -2135,7 +2242,14 @@ async function addNewYear(){
     toast('Ano '+yearVal+' criado ✓','ok');
     document.getElementById('adm-new-year').value='';
     document.getElementById('adm-new-tes').value='';
+    NY_MEMBROS=[];
+    nyRender();
     renderPlantel();
+  }else{
+    // Reverter o estado local se a gravação falhou (ex.: sessão expirada)
+    ALL_YEARS=ALL_YEARS.filter(y=>y!==newYear);
+    YEAR_IDX=Math.min(YEAR_IDX,ALL_YEARS.length-1);
+    if(ALL_YEARS.length)selectYear();
   }
 }
 
@@ -2143,6 +2257,9 @@ async function addNewYear(){
 function renderPlantel(){
   if(!DATA)return;
   document.getElementById('adm-plantel-year').textContent=DATA.evento.ano||'';
+  const nyYr=document.getElementById('ny-copy-year');
+  if(nyYr)nyYr.textContent=DATA.evento.ano||'';
+  nyRender();
   const list=document.getElementById('adm-plantel-list');
   if(!DATA.membros||!DATA.membros.length){
     list.innerHTML='<div class="empty sf">Sem membros neste ano</div>';
@@ -3124,9 +3241,18 @@ async function sbInit(){
   if(stored){
     try{
       const s=JSON.parse(stored);
-      const r=await fetch(`${SB_URL}/auth/v1/user`,{headers:{'apikey':SB_KEY,'Authorization':`Bearer ${s.access_token}`}});
-      if(r.ok){const u=await r.json();_sbSession={...s,user:u};await sbAposLogin();return;}
+      _sbSession=s;
+      // Token expirado ou quase? Tenta renovar com o refresh_token antes de validar
+      if(tokenQuaseExpirado())await sbRefresh();
+      let r=await fetch(`${SB_URL}/auth/v1/user`,{headers:{'apikey':SB_KEY,'Authorization':`Bearer ${_sbSession.access_token}`}});
+      if(!r.ok&&_sbSession.refresh_token){
+        // Última tentativa: refresh + revalidar (sessões antigas sem expires_at caem aqui)
+        if(await sbRefresh())
+          r=await fetch(`${SB_URL}/auth/v1/user`,{headers:{'apikey':SB_KEY,'Authorization':`Bearer ${_sbSession.access_token}`}});
+      }
+      if(r.ok){const u=await r.json();sbSaveSession({..._sbSession,user:u});await sbAposLogin();return;}
     }catch(e){}
+    _sbSession=null;
     localStorage.removeItem(SESSION_KEY);
   }
   const hash=window.location.hash;
@@ -3134,12 +3260,12 @@ async function sbInit(){
     const params=new URLSearchParams(hash.substring(1));
     const access_token=params.get('access_token');
     const refresh_token=params.get('refresh_token');
+    const expires_at=parseInt(params.get('expires_at'))||Math.floor(Date.now()/1000)+(parseInt(params.get('expires_in'))||3600);
     if(access_token){
       const r=await fetch(`${SB_URL}/auth/v1/user`,{headers:{'apikey':SB_KEY,'Authorization':`Bearer ${access_token}`}});
       if(r.ok){
         const u=await r.json();
-        _sbSession={access_token,refresh_token,user:u};
-        localStorage.setItem(SESSION_KEY,JSON.stringify(_sbSession));
+        sbSaveSession({access_token,refresh_token,expires_at,user:u});
         window.history.replaceState({},document.title,window.location.pathname);
         await sbAposLogin();return;
       }
@@ -3158,7 +3284,7 @@ async function sbAposLogin(){
   const email=_sbSession.user.email;
   let data=null;
   try{
-    const r=await fetch(`${SB_URL}/rest/v1/allowed_users?email=eq.${encodeURIComponent(email)}&select=email`,{headers:sbHeaders()});
+    const r=await sbFetch(`${SB_URL}/rest/v1/allowed_users?email=eq.${encodeURIComponent(email)}&select=email`,{headers:sbHeaders()});
     if(r.ok)data=await r.json();
   }catch(e){}
   if(!Array.isArray(data)||data.length===0){
@@ -3184,8 +3310,7 @@ async function sbLoginEmail(){
     const r=await fetch(`${SB_URL}/auth/v1/token?grant_type=password`,{method:'POST',headers:{'apikey':SB_KEY,'Content-Type':'application/json'},body:JSON.stringify({email,password})});
     const d=await r.json();
     if(!r.ok){status.style.color='var(--red)';status.textContent=d.error_description||d.msg||'Erro ao entrar.';return;}
-    _sbSession={access_token:d.access_token,refresh_token:d.refresh_token,user:d.user};
-    localStorage.setItem(SESSION_KEY,JSON.stringify(_sbSession));
+    sbSaveSession({access_token:d.access_token,refresh_token:d.refresh_token,expires_at:d.expires_at||Math.floor(Date.now()/1000)+(d.expires_in||3600),user:d.user});
     await sbAposLogin();
   }catch(e){status.style.color='var(--red)';status.textContent='Erro de ligação.';}
 }
@@ -3209,10 +3334,31 @@ async function sbSolicitarAcesso(){
   const status=document.getElementById('solicitar-status');
   btn.disabled=true;btn.textContent='A enviar…';
   try{
-    await fetch(`${SB_URL}/rest/v1/access_requests`,{method:'POST',headers:sbHeaders({'Prefer':'resolution=merge-duplicates'}),body:JSON.stringify({email:_sbSession.user.email})});
-    status.style.display='block';status.style.color='var(--green)';status.textContent='✓ Pedido enviado! Aguarda aprovação.';
-    btn.style.display='none';
-  }catch(e){status.style.display='block';status.style.color='var(--red)';status.textContent='Erro ao enviar pedido.';btn.disabled=false;btn.textContent='Solicitar acesso';}
+    // INSERT simples (sem merge-duplicates: ON CONFLICT DO UPDATE seria
+    // recusado pela RLS — access_requests não tem policy de UPDATE).
+    // 409 = pedido já registado anteriormente → também é sucesso.
+    const r=await sbFetch(`${SB_URL}/rest/v1/access_requests`,{
+      method:'POST',
+      headers:sbHeaders({'Prefer':'return=minimal'}),
+      body:JSON.stringify({email:_sbSession.user.email})
+    });
+    if(r.ok||r.status===409){
+      status.style.display='block';status.style.color='var(--green)';
+      status.textContent=r.status===409?'✓ O pedido já estava registado. Aguarda aprovação.':'✓ Pedido enviado! Aguarda aprovação.';
+      btn.style.display='none';
+      return;
+    }
+    let msg='HTTP '+r.status;
+    try{const j=await r.json();msg=j.message||msg;}catch(_){}
+    if(r.status===401)msg='Sessão expirada — sai e volta a entrar.';
+    status.style.display='block';status.style.color='var(--red)';
+    status.textContent='Erro ao enviar pedido: '+msg;
+    btn.disabled=false;btn.textContent='Solicitar acesso';
+  }catch(e){
+    status.style.display='block';status.style.color='var(--red)';
+    status.textContent='Erro de ligação — tenta novamente.';
+    btn.disabled=false;btn.textContent='Solicitar acesso';
+  }
 }
 
 function sbLogout(){
@@ -3330,7 +3476,7 @@ async function sbDelConjuge(a,b){
 
 /* GO */
 sbInit();
-document.addEventListener('visibilitychange',()=>{if(!document.hidden&&_sbSession&&!_writeBusy)carregar();});
+document.addEventListener('visibilitychange',async()=>{if(!document.hidden&&_sbSession&&!_writeBusy){await sbEnsureFresh();carregar();}});
 document.getElementById('admin-bg').addEventListener('click',e=>{if(e.target.id==='admin-bg')closeAdmin();});
 document.getElementById('pay-bg').addEventListener('click',e=>{if(e.target.id==='pay-bg')closePayModal();});
 document.getElementById('edit-cf-bg').addEventListener('click',e=>{if(e.target.id==='edit-cf-bg')closeEditCf();});
