@@ -410,6 +410,16 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .cf-card.b-mealheiro{border-left:4px solid var(--green)}
 .cf-card.b-reembolso{border-left:4px solid var(--blue)}
 .cf-card.b-saldar{border-left:4px solid var(--gold)}
+.chip.sub.s-almoco{background:rgba(168,123,20,.14);color:var(--gold)}
+.chip.sub.s-jantar{background:rgba(105,70,160,.12);color:#6946A0}
+.chip.sub.s-gerais{background:rgba(111,92,66,.12);color:var(--muted)}
+.chip.sub.s-bebidas{background:rgba(46,111,168,.12);color:var(--blue)}
+.chip.sub.s-cerveja{background:rgba(196,144,32,.16);color:#9A6E0E}
+.chip.sub.s-renda{background:rgba(120,86,55,.14);color:#7A5637}
+.cf-subchips{display:flex;gap:6px;flex-wrap:wrap;margin:-2px 0 12px}
+.cf-subchip{padding:6px 12px;border-radius:18px;border:1.5px solid var(--line);background:#FFFDF6;font-size:12px;font-weight:700;color:var(--muted);cursor:pointer;transition:.15s;user-select:none}
+.cf-subchip:active{transform:scale(.95)}
+.cf-subchip.on{border-color:var(--barrete);background:rgba(30,122,77,.1);color:var(--barrete)}
 .cf-card .chip.t.b-despesa{background:rgba(179,64,47,.1);color:var(--red)}
 .cf-card .chip.t.b-mealheiro{background:rgba(30,122,77,.1);color:var(--green)}
 .cf-card .chip.t.b-reembolso{background:rgba(46,111,168,.1);color:var(--blue)}
@@ -1245,6 +1255,28 @@ function renderAll(){
 
 let cfFilterType='all';
 let cfFilterPerson='all';
+let cfFilterSub='all';
+
+/* Reembolsos e dívidas pagas: não-admins só veem movimentos seus ou dos cônjuges */
+function cfVisivel(cf){
+  if(isAdmin())return true;
+  if(cf.type!=='reembolso'&&cf.type!=='saldar')return true;
+  if(!MY_NAMES.length)return false;
+  if((cf.people||[]).some(n=>MY_NAMES.includes(n)))return true;
+  if(cf.source==='pagamentos'){
+    const p=DATA.pagamentos[cf.idx];
+    if(p&&p.ref&&MY_NAMES.some(n=>p.ref.includes('own:'+n)||p.ref.includes('conv:'+n)))return true;
+  }
+  return false;
+}
+
+/* Ref de "saldar" legível: own:/conv: → nomes; vazio → adiantamento */
+function sdRefLabel(ref){
+  if(!ref)return 'Adiantamento';
+  return ref.split(/,\s*/).filter(Boolean).map(k=>
+    k.startsWith('own:')?k.slice(4):k.startsWith('conv:')?k.slice(5)+' (conv.)':k
+  ).join(', ');
+}
 
 function renderCashFlows(){
   // Lista unificada de cash-flows (semântica de sinal na perspetiva do grupo:
@@ -1253,46 +1285,50 @@ function renderCashFlows(){
 
   (DATA.pagamentos||[]).forEach((p,i)=>{
     const t=cfType(p);
+    const l2=t==='reembolso'?(p.ref||'').replace(/^Reembolso:?\s*/,''):sdRefLabel(p.ref);
     allCf.push({type:t,date:p.data||'',label:cfLabel(t),icon:cfIcon(t),
-      line1:`${p.de} → ${p.para}`,line2:p.ref||'',valor:p.valor,
+      line1:`${p.de} → ${p.para}`,line2:l2,valor:p.valor,
       sign:t==='reembolso'?'mov':'set',source:'pagamentos',idx:i,people:[p.de,p.para].filter(Boolean)});
   });
 
   (DATA.despesas||[]).forEach((d,i)=>{
-    // Para Almoço/Jantar, acrescenta o dia da semana abreviado da data-valor (ex: "Almoço · Sáb")
-    let tipoLbl=d.tipo;
+    // Dia da semana (Almoço/Jantar) vai para o line2; o tipo passa a badge próprio
+    let diaLbl='';
     if((d.tipo==='Almoço'||d.tipo==='Jantar')&&d.dataValor){
       const dia=dataToDia(d.dataValor);
-      if(dia)tipoLbl=`${d.tipo} · ${dia}`;
+      if(dia)diaLbl=dia+' · ';
     }
-    allCf.push({type:'despesa',date:d.dataDesp||d.dataValor||'',label:'Despesa',icon:'🛒',
-      line1:d.desc||'(sem descrição)',line2:`${tipoLbl} · pagou ${d.quem}`,valor:d.valor,
+    allCf.push({type:'despesa',date:d.dataDesp||d.dataValor||'',label:'Despesa',icon:'🛒',sub:d.tipo||'Gerais',
+      line1:d.desc||'(sem descrição)',line2:`${diaLbl}pagou ${d.quem}`,valor:d.valor,
       sign:'neg',source:'despesas',idx:i,people:[d.quem]});
   });
 
   (DATA.mealheiros||[]).forEach((m,i)=>{
     const subIcons={'sobras_ano_anterior':['🏦','Sobras Ano Anterior'],'outros':['🎁','Outros']};
     const [mIcon,mLabel]=subIcons[m.subtipo]||['🥫','Lata'];
-    allCf.push({type:'mealheiro',date:m.data||'',label:mLabel,icon:mIcon,
+    allCf.push({type:'mealheiro',date:m.data||'',label:mLabel,icon:mIcon,sub:mLabel,
       line1:`${m.quem} recebeu`,line2:m.desc||'',valor:m.valor,
       sign:'pos',source:'mealheiros',idx:i,people:[m.quem]});
   });
 
   allCf.sort((a,b)=>(b.date||'').localeCompare(a.date||''));
 
+  // Visibilidade por utilizador (reembolsos/saldar restritos a não-admins)
+  const visCf=allCf.filter(cfVisivel);
+
   // Totais por tipo (sempre do conjunto completo — o resumo é o mapa, não o filtro)
   const tot={despesa:0,reembolso:0,mealheiro:0,saldar:0};
   const cnt={despesa:0,reembolso:0,mealheiro:0,saldar:0};
-  allCf.forEach(cf=>{tot[cf.type]=(tot[cf.type]||0)+cf.valor;cnt[cf.type]=(cnt[cf.type]||0)+1;});
+  visCf.forEach(cf=>{tot[cf.type]=(tot[cf.type]||0)+cf.valor;cnt[cf.type]=(cnt[cf.type]||0)+1;});
 
   // Pessoas para filtro
   const personSet=new Set();
-  allCf.forEach(cf=>(cf.people||[]).forEach(p=>personSet.add(p)));
+  visCf.forEach(cf=>(cf.people||[]).forEach(p=>personSet.add(p)));
   const personList=[...personSet].sort((a,b)=>a.localeCompare(b,'pt'));
 
   // Resumo: 4 cartões clicáveis que funcionam como filtro de tipo
   const card=(t,icon,lbl,cls,sgn)=>`
-    <div class="cfs-card b-${t}${cfFilterType===t?' on':''}" onclick="cfFilterType=cfFilterType==='${t}'?'all':'${t}';renderCashFlows()">
+    <div class="cfs-card b-${t}${cfFilterType===t?' on':''}" onclick="cfFilterType=cfFilterType==='${t}'?'all':'${t}';cfFilterSub='all';renderCashFlows()">
       <span class="cfs-badge b-${t}">${icon}</span>
       <div class="cfs-body">
         <div class="cfs-top sf">${lbl}<span class="cfs-n">${cnt[t]||0}</span></div>
@@ -1314,9 +1350,21 @@ function renderCashFlows(){
     </select></div>
   </div>`;
 
+  // Sub-filtros variáveis (subtipos de despesa / mealheiro)
+  if(cfFilterType==='despesa'||cfFilterType==='mealheiro'){
+    const subs=[...new Set(visCf.filter(c=>c.type===cfFilterType&&c.sub).map(c=>c.sub))];
+    if(subs.length>1){
+      pp+=`<div class="cf-subchips">
+        <div class="cf-subchip${cfFilterSub==='all'?' on':''}" onclick="cfFilterSub='all';renderCashFlows()">Todos</div>
+        ${subs.map(s=>`<div class="cf-subchip${cfFilterSub===s?' on':''}" onclick="cfFilterSub='${s.replace(/'/g,"\\'")}';renderCashFlows()">${s}</div>`).join('')}
+      </div>`;
+    }
+  }
+
   // Aplicar filtros
-  let filtered=allCf;
+  let filtered=visCf;
   if(cfFilterType!=='all') filtered=filtered.filter(cf=>cf.type===cfFilterType);
+  if(cfFilterSub!=='all') filtered=filtered.filter(cf=>cf.sub===cfFilterSub);
   if(cfFilterPerson!=='all'){
     const memberGuests=(DATA.convidados||[]).filter(g=>g.membro===cfFilterPerson).map(g=>g.nome);
     filtered=filtered.filter(cf=>{
@@ -1335,7 +1383,7 @@ function renderCashFlows(){
   const filteredTotal=filtered.reduce((a,cf)=>a+cf.valor,0);
   const showTotal=(cfFilterType!=='all'||cfFilterPerson!=='all')&&filtered.length>0;
   pp+=`<div class="sec-title sf" style="display:flex;justify-content:space-between;align-items:center">
-    <span>Movimentos (${filtered.length}${filtered.length!==allCf.length?' de '+allCf.length:''})</span>
+    <span>Movimentos (${filtered.length}${filtered.length!==visCf.length?' de '+visCf.length:''})</span>
     ${showTotal?`<span style="color:var(--gold);font-size:12px;font-weight:700;letter-spacing:0">${eur(filteredTotal)}</span>`:''}
   </div>`;
   if(!filtered.length) pp+='<div class="empty sf">Nenhum movimento encontrado</div>';
@@ -1359,7 +1407,7 @@ function renderCashFlows(){
       <div class="cf-badge">${cf.icon}</div>
       <div class="cf-main"><div class="top"><div class="desc">${cf.line1}</div>
       <div class="v cf-${cf.sign}">${sgn}${eur(cf.valor)}</div></div>
-      <div class="meta"><span class="chip t b-${cf.type}">${cf.label}</span>${cf.line2?`<span class="chip">${truncRef(cf.line2)}</span>`:''}
+      <div class="meta"><span class="chip t b-${cf.type}">${cf.label}</span>${cf.type==='despesa'&&cf.sub?`<span class="chip sub s-${cf.sub.toLowerCase().normalize('NFD').replace(/[^a-z]/g,'')}">${cf.sub}</span>`:''}${cf.line2?`<span class="chip">${truncRef(cf.line2)}</span>`:''}
       </div></div></div>`;
   });
   document.getElementById('view-cashflows').innerHTML=pp;
@@ -1866,7 +1914,7 @@ function recalcSdVal(){
       valEl.readOnly=false;valEl.style.opacity='1';
       if(hint)hint.textContent='Podes ajustar o valor para pagamento parcial';
     }
-  } else if(valEl){valEl.value='';valEl.readOnly=false;valEl.style.opacity='1';if(hint)hint.textContent='';}
+  } else if(valEl){valEl.readOnly=false;valEl.style.opacity='1';if(hint)hint.textContent='Sem dívidas selecionadas — será registado como pagamento livre / adiantamento.';}
 }
 
 function openPayModal(){
@@ -1961,7 +2009,12 @@ async function saveCashFlow(){
   } else if(cfDir==='saldar'){
     const covParts=[];
     document.querySelectorAll('#sd-chips .sd-chip.on').forEach(chip=>{covParts.push(chip.dataset.key);});
-    if(!covParts.length){toast('Seleciona pelo menos uma dívida','bad');document.getElementById('pay-save').disabled=false;return;}
+    if(!covParts.length){
+      // Pagamento livre / adiantamento — ref fica vazio
+      if(!confirm(`Sem dívidas selecionadas. Registar ${eur(val)} como pagamento livre / adiantamento de ${who}?`)){
+        document.getElementById('pay-save').disabled=false;return;
+      }
+    }
     // If multiple chips selected, enforce total value (no partial across multiple debts)
     if(covParts.length>1){
       let expectedTotal=0;
@@ -2117,7 +2170,7 @@ function updateEditSdChips(){
   debtors.forEach(m=>{
     const guestDebt=Math.max(0,m.AA);
     const key='conv:'+m.nome;
-    const isOn=selKeys.includes(key)||(m.nome===who&&!selKeys.length);
+    const isOn=selKeys.includes(key);
     if(guestDebt>0.005){
       html+=`<div class="sd-chip${isOn?' on':''}" onclick="toggleEditSdChip(this)" data-key="${key}">
         <span class="sd-dot"></span>${m.nome} <span style="font-size:10px;opacity:.6">conv.</span><span class="sd-amt">${eur(guestDebt)}</span></div>`;
@@ -2126,14 +2179,14 @@ function updateEditSdChips(){
   debtors.forEach(m=>{
     const ownDebt=Math.max(0,rnd(m.V-m.Y-m.W-m.X,2));
     const key='own:'+m.nome;
-    const isOn=selKeys.includes(key)||(m.nome===who&&!selKeys.length);
+    const isOn=selKeys.includes(key);
     if(ownDebt>0.005){
       html+=`<div class="sd-chip${isOn?' on':''}" onclick="toggleEditSdChip(this)" data-key="${key}">
         <span class="sd-dot"></span>${m.nome}<span class="sd-amt">${eur(ownDebt)}</span></div>`;
     }
   });
   container.innerHTML=html;
-  recalcEditSdVal();
+  recalcEditSdVal(false); // ao abrir, NÃO reescrever o valor guardado
 }
 function toggleEditSdChip(el){
   el.classList.toggle('on');
@@ -2143,9 +2196,9 @@ function toggleEditSdChip(el){
     document.querySelectorAll('#esd-chips .sd-chip.on').forEach(c=>keys.push(c.dataset.key));
     editingCf.selectedKeys=keys;
   }
-  recalcEditSdVal();
+  recalcEditSdVal(true); // alteração explícita do utilizador → recalcular
 }
-function recalcEditSdVal(){
+function recalcEditSdVal(apply){
   if(!CALC)return;
   const ms=CALC.membros;
   let total=0;
@@ -2163,17 +2216,20 @@ function recalcEditSdVal(){
   total=rnd(total,2);
   const valEl=document.getElementById('ecf-val');
   const hint=document.getElementById('ecf-val-hint');
-  if(valEl&&total>0){
-    valEl.value=total.toFixed(2);
-    if(onChips.length>1){
-      valEl.readOnly=true;valEl.style.opacity='.6';
-      if(hint)hint.textContent='Valor fixo (múltiplas dívidas selecionadas)';
-    } else {
-      valEl.readOnly=false;valEl.style.opacity='1';
-      if(hint)hint.textContent='Podes ajustar o valor para pagamento parcial';
-    }
+  if(!valEl)return;
+  if(onChips.length>1){
+    if(apply)valEl.value=total.toFixed(2);
+    valEl.readOnly=true;valEl.style.opacity='.6';
+    if(hint)hint.textContent='Valor fixo (múltiplas dívidas selecionadas)';
+  } else if(onChips.length===1){
+    if(apply)valEl.value=total.toFixed(2);
+    valEl.readOnly=false;valEl.style.opacity='1';
+    if(hint)hint.textContent='Podes ajustar o valor para pagamento parcial';
+  } else {
+    // Pagamento livre / adiantamento — manter o valor guardado
+    valEl.readOnly=false;valEl.style.opacity='1';
+    if(hint)hint.textContent='💡 Pagamento livre / adiantamento — sem dívida associada. O valor fica como crédito da pessoa.';
   }
-  else if(valEl){valEl.value='';valEl.readOnly=false;valEl.style.opacity='1';if(hint)hint.textContent='';}
 }
 
 function closeEditCf(){
@@ -3138,7 +3194,8 @@ function buildGeneralReport(){
   const allCf=[];
   (DATA.pagamentos||[]).forEach(p=>{
     const t=cfType(p);
-    allCf.push({type:t,date:p.data||'',desc:t==='reembolso'?`${p.de} → ${p.para}`:`${p.de} → ${p.para}`,ref:p.ref||'',valor:p.valor,label:cfLabel(t)});
+    const rf=t==='reembolso'?(p.ref||'').replace(/^Reembolso:?\s*/,''):sdRefLabel(p.ref);
+    allCf.push({type:t,date:p.data||'',desc:`${p.de} → ${p.para}`,ref:rf,valor:p.valor,label:cfLabel(t)});
   });
   (DATA.despesas||[]).forEach(d=>{
     allCf.push({type:'despesa',date:d.dataDesp||d.dataValor||'',desc:d.desc||'(sem descrição)',ref:`${d.tipo} · ${d.quem}`,valor:d.valor,label:'Despesa'});
