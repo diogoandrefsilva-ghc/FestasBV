@@ -425,11 +425,20 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .cf-card .chip.t.b-reembolso{background:rgba(46,111,168,.1);color:var(--blue)}
 .cf-card .chip.t.b-saldar{background:rgba(168,123,20,.12);color:var(--gold)}
 /* Despesa prevista (sem data) */
-.cf-prev-toggle{display:flex;align-items:center;gap:8px;margin-top:14px;font-size:13px;font-weight:600;color:var(--muted);cursor:pointer;user-select:none}
-.cf-prev-toggle input{width:17px;height:17px;accent-color:var(--gold);cursor:pointer}
+.cf-prev-toggle{display:flex;align-items:center;gap:11px;margin-top:14px;cursor:pointer;user-select:none;background:var(--panel2);border:1px solid var(--line);border-radius:11px;padding:11px 13px;transition:.15s}
+.cf-prev-toggle:active{transform:scale(.99)}
+.modal label.cf-prev-toggle input[type="checkbox"]{position:absolute!important;opacity:0!important;width:1px!important;height:1px!important;margin:0!important;padding:0!important;pointer-events:none}
+.cf-switch{flex:0 0 auto;width:42px;height:25px;border-radius:25px;background:var(--line);position:relative;transition:background .2s}
+.cf-switch::after{content:"";position:absolute;top:3px;left:3px;width:19px;height:19px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(80,55,20,.3);transition:transform .2s}
+.cf-prev-toggle input:checked ~ .cf-switch{background:var(--gold)}
+.cf-prev-toggle input:checked ~ .cf-switch::after{transform:translateX(17px)}
+.cf-prev-text{flex:1;font-size:13.5px;font-weight:600;color:var(--muted);letter-spacing:.01em;line-height:1.3}
+.cf-prev-toggle input:checked ~ .cf-prev-text{color:var(--gold)}
 .chip.prevista{background:rgba(168,123,20,.16);color:#9A6E0E;font-weight:700}
 .cf-card.cf-prevista{border-left:4px dashed var(--gold);background:repeating-linear-gradient(135deg,rgba(168,123,20,.04) 0 9px,transparent 9px 18px)}
 .cf-card.cf-prevista .cf-badge{background:rgba(168,123,20,.15);border:2px dashed var(--gold);box-shadow:none}
+.cf-obs{margin-top:6px;font-size:12px;color:var(--muted);line-height:1.4;display:flex;gap:5px;align-items:flex-start}
+.cf-obs::before{content:"📝";font-size:11px;flex-shrink:0;opacity:.7}
 </style>
 </head>
 <body>
@@ -1314,8 +1323,8 @@ function renderCashFlows(){
       if(dd)dia=dd;
     }
     const prevista=!d.dataDesp&&!d.dataValor;
-    allCf.push({type:'despesa',date:d.dataDesp||d.dataValor||'',label:'Despesa',icon:'🛒',sub:d.tipo||'Gerais',dia,prevista,
-      line1:d.desc||'(sem descrição)',line2:`pagou ${d.quem}`,valor:d.valor,
+    allCf.push({type:'despesa',date:d.dataDesp||d.dataValor||'',label:'Despesa',icon:'🛒',sub:d.tipo||'Gerais',dia,prevista,obs:d.obs||'',
+      line1:d.desc||'(sem descrição)',line2:`${prevista?'pagará':'pagou'} ${d.quem}`,valor:d.valor,
       sign:'neg',source:'despesas',idx:i,people:[d.quem]});
   });
 
@@ -1424,12 +1433,13 @@ function renderCashFlows(){
       <div class="cf-main"><div class="top"><div class="desc">${cf.line1}</div>
       <div class="v cf-${cf.sign}">${sgn}${eur(cf.valor)}</div></div>
       <div class="meta"><span class="chip t b-${cf.type}">${cf.label}</span>${cf.type==='despesa'&&cf.sub?`<span class="chip sub s-${cf.sub.toLowerCase().normalize('NFD').replace(/[^a-z]/g,'')}">${cf.sub}${cf.dia?' · '+cf.dia:''}</span>`:''}${cf.prevista?`<span class="chip prevista">prevista</span>`:''}${cf.line2?`<span class="chip">${truncRef(cf.line2)}</span>`:''}
-      </div></div></div>`;
+      </div>${cf.obs?`<div class="cf-obs">${escHtml(cf.obs)}</div>`:''}</div></div>`;
   });
   document.getElementById('view-cashflows').innerHTML=pp;
 }
 
 function truncRef(s){return s.length>40?s.slice(0,37)+'…':s;}
+function escHtml(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 
 function openMember(nome){
   const m=CALC.membros.find(x=>x.nome===nome);if(!m)return;
@@ -1606,7 +1616,7 @@ async function carregar(){
         presencas:(m.presencas||[]).map(p=>`${p.dia}|${p.ref}`)
       })),
       refeicoesDef:(ev.refeicoes_def||[]).map(r=>({data:r.data,dia:r.dia,ref:r.ref,peso:N(r.peso),minMEO:N(r.min_meo),minConv:N(r.min_conv),extraConv:N(r.extra_conv)})),
-      despesas:(ev.despesas||[]).map(d=>({_id:d.id,quem:d.quem,dataDesp:d.data_desp,dataValor:d.data_valor,desc:d.descricao,tipo:d.tipo,valor:N(d.valor)})),
+      despesas:(ev.despesas||[]).map(d=>({_id:d.id,quem:d.quem,dataDesp:d.data_desp,dataValor:d.data_valor,desc:d.descricao,tipo:d.tipo,valor:N(d.valor),obs:d.observacoes||''})),
       convidados:(ev.convidados||[]).map(c=>({_id:c.id,membro:c.membro,nome:c.nome,data:c.data,dia:c.dia,ref:c.ref,pagante:c.pagante?'Sim':'Não',preco:N(c.preco)})),
       mealheiros:(ev.mealheiros||[]).map(m=>({quem:m.quem,data:m.data,valor:N(m.valor),subtipo:m.subtipo,desc:m.descricao})),
       pagamentos:(ev.pagamentos||[]).map(p=>({de:p.de,para:p.para,valor:N(p.valor),ref:p.ref,data:p.data}))
@@ -1669,7 +1679,7 @@ async function sbGuardarEvento(y,slot){
     if(y.refeicoesDef&&y.refeicoesDef.length)
       await sbReq('POST','refeicoes_def',y.refeicoesDef.map(r=>({evento_id:eid,data:r.data,dia:r.dia,ref:r.ref,peso:r.peso||0,min_meo:r.minMEO||0,min_conv:r.minConv||0,extra_conv:r.extraConv||0})));
     if(y.despesas&&y.despesas.length){
-      const dres=await sbReq('POST','despesas',y.despesas.map(d=>({evento_id:eid,quem:d.quem,data_desp:d.dataDesp||null,data_valor:d.dataValor||null,descricao:d.desc||'',tipo:d.tipo,valor:d.valor})),{Prefer:'return=representation'});
+      const dres=await sbReq('POST','despesas',y.despesas.map(d=>({evento_id:eid,quem:d.quem,data_desp:d.dataDesp||null,data_valor:d.dataValor||null,descricao:d.desc||'',tipo:d.tipo,valor:d.valor,observacoes:d.obs||null})),{Prefer:'return=representation'});
       if(Array.isArray(dres))dres.forEach((r,i)=>{if(y.despesas[i])y.despesas[i]._id=r.id;});
     }
     if(y.convidados&&y.convidados.length){
@@ -1740,13 +1750,15 @@ function updateCfForm(){
         </div>
         <div><label>Valor (€)</label><input type="number" id="cf-val" step="0.01" min="0.01" placeholder="0,00" inputmode="decimal"></div>
       </div>
-      <label class="cf-prev-toggle"><input type="checkbox" id="cf-prevista" onchange="cfPrevistaChanged()"> 📌 Despesa prevista (ainda sem data)</label>
+      <label class="cf-prev-toggle"><input type="checkbox" id="cf-prevista" onchange="cfPrevistaChanged()"><span class="cf-switch"></span><span class="cf-prev-text">📌 Despesa prevista (ainda sem data)</span></label>
       <div id="cf-date-row" class="inline-row" style="margin-top:14px">
         <div><label>Data Despesa</label><input type="date" id="cf-date" value="${today}" oninput="cfSyncDataValor()"></div>
         <div><label>Data-Valor</label><input type="date" id="cf-date2" value=""></div>
       </div>
       <label>Descritivo</label>
-      <textarea id="cf-desc" placeholder="Ex: Continente — Bacalhau" rows="2"></textarea>`;
+      <textarea id="cf-desc" placeholder="Ex: Continente — Bacalhau" rows="2"></textarea>
+      <label>Observações</label>
+      <textarea id="cf-obs" placeholder="Detalhe adicional (opcional)" rows="2"></textarea>`;
     setTimeout(cfTipoChanged,10);
   } else if(cfDir==='mealheiro'){
     f.innerHTML=`
@@ -2001,6 +2013,7 @@ async function saveCashFlow(){
   } else if(cfDir==='despesa'){
     const tipo=document.getElementById('cf-tipo')?.value||'Gerais';
     const prevista=document.getElementById('cf-prevista')?.checked;
+    const obs=document.getElementById('cf-obs')?.value?.trim()||'';
     const date2=prevista?'':(document.getElementById('cf-date2')?.value||date);
     const dDesp=prevista?'':date;
     if(!isAdmin()&&!MY_NAMES.includes(who)){
@@ -2011,9 +2024,9 @@ async function saveCashFlow(){
     setSync('load','a guardar…');
     try{
       const ins=await queueWrite(()=>sbReq('POST','despesas',
-        [{evento_id:DATA._sbId,quem:who,data_desp:dDesp||null,data_valor:date2||null,descricao:desc||'(sem descrição)',tipo,valor:rnd(val,2)}],
+        [{evento_id:DATA._sbId,quem:who,data_desp:dDesp||null,data_valor:date2||null,descricao:desc||'(sem descrição)',tipo,valor:rnd(val,2),observacoes:obs||null}],
         {Prefer:'return=representation'}));
-      DATA.despesas.push({_id:ins&&ins[0]?ins[0].id:null,quem:who,dataDesp:dDesp,dataValor:date2,desc:desc||'(sem descrição)',tipo,valor:rnd(val,2)});
+      DATA.despesas.push({_id:ins&&ins[0]?ins[0].id:null,quem:who,dataDesp:dDesp,dataValor:date2,desc:desc||'(sem descrição)',tipo,valor:rnd(val,2),obs});
       syncMirror();
       marcaGuardado();
       document.getElementById('pay-save').disabled=false;
@@ -2173,13 +2186,15 @@ function editCfEntry(source,idx){
         </div>
         <div><label>Valor (€)</label><input type="number" id="ecf-val" step="0.01" value="${d.valor}" inputmode="decimal"></div>
       </div>
-      <label class="cf-prev-toggle"><input type="checkbox" id="ecf-prevista" onchange="ecfPrevistaChanged()"${isPrev?' checked':''}> 📌 Despesa prevista (ainda sem data)</label>
+      <label class="cf-prev-toggle"><input type="checkbox" id="ecf-prevista" onchange="ecfPrevistaChanged()"${isPrev?' checked':''}><span class="cf-switch"></span><span class="cf-prev-text">📌 Despesa prevista (ainda sem data)</span></label>
       <div id="ecf-date-row" class="inline-row" style="margin-top:14px${isPrev?';display:none':''}">
         <div><label>Data Despesa</label><input type="date" id="ecf-date" value="${d.dataDesp||''}" oninput="ecfSyncDataValor()"></div>
         <div><label>Data-Valor</label><input type="date" id="ecf-date2" value="${d.dataValor||''}"></div>
       </div>
       <label>Descritivo</label>
-      <textarea id="ecf-desc" rows="2">${d.desc||''}</textarea>`;
+      <textarea id="ecf-desc" rows="2">${d.desc||''}</textarea>
+      <label>Observações</label>
+      <textarea id="ecf-obs" rows="2" placeholder="Detalhe adicional (opcional)">${escHtml(d.obs||'')}</textarea>`;
     setTimeout(ecfTipoChanged,10);
   } else if(editType==='mealheiro'){
     const m=DATA.mealheiros[idx];
@@ -2317,6 +2332,7 @@ async function saveEditCf(){
     d.tipo=document.getElementById('ecf-tipo').value;
     d.valor=parseFloat(document.getElementById('ecf-val').value)||d.valor;
     d.desc=(document.getElementById('ecf-desc')?.value||'').trim();
+    d.obs=(document.getElementById('ecf-obs')?.value||'').trim();
   } else if(source==='mealheiros'){
     const m=DATA.mealheiros[idx];
     m.quem=document.getElementById('ecf-who').value;
@@ -3257,7 +3273,7 @@ function buildGeneralReport(){
   });
   (DATA.despesas||[]).forEach(d=>{
     const prevista=!d.dataDesp&&!d.dataValor;
-    allCf.push({type:'despesa',date:d.dataDesp||d.dataValor||'',desc:d.desc||'(sem descrição)',ref:`${d.tipo} · ${d.quem}`,valor:d.valor,label:'Despesa',prevista});
+    allCf.push({type:'despesa',date:d.dataDesp||d.dataValor||'',desc:d.desc||'(sem descrição)',ref:`${d.tipo} · ${d.quem}`,valor:d.valor,label:'Despesa',prevista,obs:d.obs||''});
   });
   (DATA.mealheiros||[]).forEach(m=>{
     allCf.push({type:'mealheiro',date:m.data||'',desc:`${m.quem}`,ref:m.desc||m.subtipo||'',valor:m.valor,label:'Mealheiro'});
@@ -3267,7 +3283,7 @@ function buildGeneralReport(){
   h+='<h2>Cash-Flows</h2>';
   h+='<table><tr><th>Data</th><th>Tipo</th><th>Descrição</th><th class="right">Valor</th></tr>';
   allCf.forEach(cf=>{
-    h+=`<tr><td>${fmtPdfDate(cf.date)}</td><td><span class="badge ${cf.prevista?'badge-amber':'badge-blue'}">${cf.prevista?'Prevista':cf.label}</span></td><td>${cf.desc}${cf.ref?' · '+cf.ref:''}</td><td class="right">${eur(cf.valor)}</td></tr>`;
+    h+=`<tr><td>${fmtPdfDate(cf.date)}</td><td><span class="badge ${cf.prevista?'badge-amber':'badge-blue'}">${cf.prevista?'Prevista':cf.label}</span></td><td>${cf.desc}${cf.ref?' · '+cf.ref:''}${cf.obs?`<br><span style="color:#888;font-size:10px">📝 ${escHtml(cf.obs)}</span>`:''}</td><td class="right">${eur(cf.valor)}</td></tr>`;
   });
   h+='</table>';
 
@@ -3352,7 +3368,7 @@ function buildPersonReport(pessoa){
     h+='<table><tr><th>Data</th><th>Descrição</th><th>Tipo</th><th class="right">Valor</th></tr>';
     DATA.despesas.filter(x=>x.quem===m.nome).forEach(d=>{
       const prevista=!d.dataDesp&&!d.dataValor;
-      h+=`<tr><td>${fmtPdfDate(d.dataDesp||d.dataValor||'')}</td><td>${d.desc||'—'}${prevista?' <span class="badge badge-amber">prevista</span>':''}</td><td>${d.tipo}</td><td class="right">${eur(d.valor)}</td></tr>`;
+      h+=`<tr><td>${fmtPdfDate(d.dataDesp||d.dataValor||'')}</td><td>${d.desc||'—'}${prevista?' <span class="badge badge-amber">prevista</span>':''}${d.obs?`<br><span style="color:#888;font-size:10px">📝 ${escHtml(d.obs)}</span>`:''}</td><td>${d.tipo}</td><td class="right">${eur(d.valor)}</td></tr>`;
     });
     h+=`<tr style="border-top:2px solid #ddd;font-weight:700"><td colspan="3"><b>Total</b></td><td class="right pos"><b>${eur(rnd(totalPagoDesp,2))}</b></td></tr>`;
     h+='</table>';
