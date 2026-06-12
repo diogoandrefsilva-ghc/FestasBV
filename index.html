@@ -424,16 +424,14 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .cf-card .chip.t.b-mealheiro{background:rgba(30,122,77,.1);color:var(--green)}
 .cf-card .chip.t.b-reembolso{background:rgba(46,111,168,.1);color:var(--blue)}
 .cf-card .chip.t.b-saldar{background:rgba(168,123,20,.12);color:var(--gold)}
-/* Despesa prevista (sem data) */
-.cf-prev-toggle{display:flex;align-items:center;gap:11px;margin-top:14px;cursor:pointer;user-select:none;background:var(--panel2);border:1px solid var(--line);border-radius:11px;padding:11px 13px;transition:.15s}
-.cf-prev-toggle:active{transform:scale(.99)}
-.modal label.cf-prev-toggle input[type="checkbox"]{position:absolute!important;opacity:0!important;width:1px!important;height:1px!important;margin:0!important;padding:0!important;pointer-events:none}
-.cf-switch{flex:0 0 auto;width:42px;height:25px;border-radius:25px;background:var(--line);position:relative;transition:background .2s}
-.cf-switch::after{content:"";position:absolute;top:3px;left:3px;width:19px;height:19px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(80,55,20,.3);transition:transform .2s}
-.cf-prev-toggle input:checked ~ .cf-switch{background:var(--gold)}
-.cf-prev-toggle input:checked ~ .cf-switch::after{transform:translateX(17px)}
-.cf-prev-text{flex:1;font-size:13.5px;font-weight:600;color:var(--muted);letter-spacing:.01em;line-height:1.3}
-.cf-prev-toggle input:checked ~ .cf-prev-text{color:var(--gold)}
+/* Despesa prevista (sem data) — segmentado de 2 estados */
+.cf-quando{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:14px;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:4px}
+.cf-quando .cfq{text-align:center;padding:10px 6px;border-radius:9px;font-size:13px;font-weight:700;color:var(--muted);cursor:pointer;user-select:none;transition:.15s;border:1.5px solid transparent;line-height:1.2}
+.cf-quando .cfq:active{transform:scale(.97)}
+.cf-quando .cfq.on{background:#FFFDF6;box-shadow:0 1px 4px rgba(80,55,20,.12)}
+.cf-quando .cfq[data-q="real"].on{border-color:var(--barrete);color:var(--barrete)}
+.cf-quando .cfq[data-q="prevista"].on{border-color:var(--gold);color:var(--gold)}
+.cf-quando-hint{font-size:11px;color:var(--faint);margin-top:6px;line-height:1.4}
 .chip.prevista{background:rgba(168,123,20,.16);color:#9A6E0E;font-weight:700}
 .cf-card.cf-prevista{border-left:4px dashed var(--gold);background:repeating-linear-gradient(135deg,rgba(168,123,20,.04) 0 9px,transparent 9px 18px)}
 .cf-card.cf-prevista .cf-badge{background:rgba(168,123,20,.15);border:2px dashed var(--gold);box-shadow:none}
@@ -1750,7 +1748,11 @@ function updateCfForm(){
         </div>
         <div><label>Valor (€)</label><input type="number" id="cf-val" step="0.01" min="0.01" placeholder="0,00" inputmode="decimal"></div>
       </div>
-      <label class="cf-prev-toggle"><input type="checkbox" id="cf-prevista" onchange="cfPrevistaChanged()"><span class="cf-switch"></span><span class="cf-prev-text">📌 Despesa prevista (ainda sem data)</span></label>
+      <div class="cf-quando" id="cf-quando">
+        <div class="cfq on" data-q="real" onclick="setCfQuando('cf','real')">📅 Com data</div>
+        <div class="cfq" data-q="prevista" onclick="setCfQuando('cf','prevista')">📌 Prevista</div>
+      </div>
+      <div class="cf-quando-hint" id="cf-quando-hint">Despesa já realizada, com data conhecida.</div>
       <div id="cf-date-row" class="inline-row" style="margin-top:14px">
         <div><label>Data Despesa</label><input type="date" id="cf-date" value="${today}" oninput="cfSyncDataValor()"></div>
         <div><label>Data-Valor</label><input type="date" id="cf-date2" value=""></div>
@@ -1812,7 +1814,7 @@ function updateCfForm(){
 }
 
 function cfTipoChanged(){
-  if(document.getElementById('cf-prevista')?.checked)return; // prevista: datas escondidas
+  if(isCfPrevista('cf'))return; // prevista: datas escondidas
   const tipo=document.getElementById('cf-tipo')?.value||'Gerais';
   const d2=document.getElementById('cf-date2');
   const d1=document.getElementById('cf-date');
@@ -1839,22 +1841,28 @@ function cfSyncDataValor(){
     d2.value=d1.value;
   }
 }
-function cfPrevistaChanged(){
-  const on=document.getElementById('cf-prevista')?.checked;
-  const row=document.getElementById('cf-date-row');
-  const d1=document.getElementById('cf-date'),d2=document.getElementById('cf-date2');
+function isCfPrevista(prefix){
+  return document.querySelector(`#${prefix}-quando .cfq.on`)?.dataset?.q==='prevista';
+}
+function setCfQuando(prefix,q){
+  document.querySelectorAll(`#${prefix}-quando .cfq`).forEach(el=>el.classList.toggle('on',el.dataset.q===q));
+  const on=q==='prevista';
+  const row=document.getElementById(`${prefix}-date-row`);
+  const hint=document.getElementById(`${prefix}-quando-hint`);
+  const d1=document.getElementById(`${prefix}-date`),d2=document.getElementById(`${prefix}-date2`);
   if(row)row.style.display=on?'none':'';
+  if(hint)hint.textContent=on?'Despesa prevista — entra nas contas, mas ainda sem data de pagamento.':'Despesa já realizada, com data conhecida.';
   if(on){
     if(d1)d1.value='';
     if(d2)d2.value='';
   }else{
     if(d1&&!d1.value)d1.value=new Date().toISOString().slice(0,10);
-    cfTipoChanged();
+    if(prefix==='cf')cfTipoChanged();else ecfTipoChanged();
   }
 }
 
 function ecfTipoChanged(){
-  if(document.getElementById('ecf-prevista')?.checked)return; // prevista: datas escondidas
+  if(isCfPrevista('ecf'))return; // prevista: datas escondidas
   const tipo=document.getElementById('ecf-tipo')?.value||'Gerais';
   const d2=document.getElementById('ecf-date2');
   const d1=document.getElementById('ecf-date');
@@ -1866,19 +1874,6 @@ function ecfTipoChanged(){
   }else{
     d2.value=d1.value;
     d2.readOnly=true;d2.style.opacity='.55';d2.style.pointerEvents='none';
-  }
-}
-function ecfPrevistaChanged(){
-  const on=document.getElementById('ecf-prevista')?.checked;
-  const row=document.getElementById('ecf-date-row');
-  const d1=document.getElementById('ecf-date'),d2=document.getElementById('ecf-date2');
-  if(row)row.style.display=on?'none':'';
-  if(on){
-    if(d1)d1.value='';
-    if(d2)d2.value='';
-  }else{
-    if(d1&&!d1.value)d1.value=new Date().toISOString().slice(0,10);
-    ecfTipoChanged();
   }
 }
 function ecfSyncDataValor(){
@@ -2012,7 +2007,7 @@ async function saveCashFlow(){
     commitMsg=`Reembolso: ${tes} → ${who} ${eur(val)}`;
   } else if(cfDir==='despesa'){
     const tipo=document.getElementById('cf-tipo')?.value||'Gerais';
-    const prevista=document.getElementById('cf-prevista')?.checked;
+    const prevista=isCfPrevista('cf');
     const obs=document.getElementById('cf-obs')?.value?.trim()||'';
     const date2=prevista?'':(document.getElementById('cf-date2')?.value||date);
     const dDesp=prevista?'':date;
@@ -2186,7 +2181,11 @@ function editCfEntry(source,idx){
         </div>
         <div><label>Valor (€)</label><input type="number" id="ecf-val" step="0.01" value="${d.valor}" inputmode="decimal"></div>
       </div>
-      <label class="cf-prev-toggle"><input type="checkbox" id="ecf-prevista" onchange="ecfPrevistaChanged()"${isPrev?' checked':''}><span class="cf-switch"></span><span class="cf-prev-text">📌 Despesa prevista (ainda sem data)</span></label>
+      <div class="cf-quando" id="ecf-quando">
+        <div class="cfq${isPrev?'':' on'}" data-q="real" onclick="setCfQuando('ecf','real')">📅 Com data</div>
+        <div class="cfq${isPrev?' on':''}" data-q="prevista" onclick="setCfQuando('ecf','prevista')">📌 Prevista</div>
+      </div>
+      <div class="cf-quando-hint" id="ecf-quando-hint">${isPrev?'Despesa prevista — entra nas contas, mas ainda sem data de pagamento.':'Despesa já realizada, com data conhecida.'}</div>
       <div id="ecf-date-row" class="inline-row" style="margin-top:14px${isPrev?';display:none':''}">
         <div><label>Data Despesa</label><input type="date" id="ecf-date" value="${d.dataDesp||''}" oninput="ecfSyncDataValor()"></div>
         <div><label>Data-Valor</label><input type="date" id="ecf-date2" value="${d.dataValor||''}"></div>
@@ -2325,7 +2324,7 @@ async function saveEditCf(){
     }
   } else if(source==='despesas'){
     const d=DATA.despesas[idx];
-    const prevista=document.getElementById('ecf-prevista')?.checked;
+    const prevista=isCfPrevista('ecf');
     d.quem=document.getElementById('ecf-who').value;
     d.dataDesp=prevista?'':document.getElementById('ecf-date').value;
     d.dataValor=prevista?'':document.getElementById('ecf-date2').value;
