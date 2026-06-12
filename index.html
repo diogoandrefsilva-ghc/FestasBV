@@ -3780,6 +3780,72 @@ document.getElementById('refdef-bg').addEventListener('click',e=>{if(e.target.id
 </script>
 
 <script>
+/* ── Pull-to-refresh (só DADOS, só em modo standalone/PWA) ── */
+(function(){
+  const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+  if (!isStandalone) return;
+
+  const el = document.createElement('div');
+  el.id = 'ptr-indicator';
+  el.style.cssText = 'position:fixed;top:0;left:0;right:0;height:0;display:flex;align-items:center;justify-content:center;overflow:hidden;z-index:9998;pointer-events:none;font-size:13px;font-weight:600;color:var(--ink,#444);background:linear-gradient(to bottom,rgba(0,0,0,.06),transparent);';
+  document.body.appendChild(el);
+
+  const THRESHOLD = 70, MAX = 110;
+  let startY = 0, pulling = false, dist = 0, busy = false;
+
+  function atTop(){ return (window.scrollY || document.documentElement.scrollTop) <= 0; }
+  function insideScrollable(t){
+    for (let n = t; n && n !== document.body; n = n.parentElement){
+      const s = getComputedStyle(n);
+      if ((s.overflowY === 'auto' || s.overflowY === 'scroll') && n.scrollHeight > n.clientHeight) return true;
+    }
+    return false;
+  }
+
+  async function doRefresh(){
+    if (!_sbSession) return;
+    if (_writeBusy) { try { await _writeChain; } catch(_){} }  // flush escritas pendentes primeiro
+    await sbEnsureFresh();
+    await carregar();
+  }
+
+  window.addEventListener('touchstart', e => {
+    if (busy || !atTop() || insideScrollable(e.target)) { pulling = false; return; }
+    startY = e.touches[0].clientY; dist = 0; pulling = true;
+  }, { passive: true });
+
+  window.addEventListener('touchmove', e => {
+    if (!pulling || busy) return;
+    dist = e.touches[0].clientY - startY;
+    if (dist > 0 && atTop()){
+      const h = Math.min(dist * 0.5, MAX);
+      el.style.transition = 'none';
+      el.style.height = h + 'px';
+      el.textContent = h >= THRESHOLD ? '↑ Largar para atualizar' : '↓ Puxar para atualizar';
+    } else {
+      el.style.height = '0';
+    }
+  }, { passive: true });
+
+  window.addEventListener('touchend', async () => {
+    if (!pulling || busy) return;
+    pulling = false;
+    el.style.transition = 'height .2s';
+    if (dist * 0.5 >= THRESHOLD){
+      busy = true;
+      el.style.height = '44px';
+      el.textContent = '⏳ A atualizar…';
+      try { await doRefresh(); } catch(_){} 
+      finally { el.style.height = '0'; busy = false; }
+    } else {
+      el.style.height = '0';
+    }
+    dist = 0;
+  });
+})();
+</script>
+
+<script>
 if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/FestasBV/sw.js', { scope: '/FestasBV/' })
         .then((reg) => { setInterval(() => reg.update().catch(() => {}), 60000); })
