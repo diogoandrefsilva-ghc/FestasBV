@@ -424,6 +424,12 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .cf-card .chip.t.b-mealheiro{background:rgba(30,122,77,.1);color:var(--green)}
 .cf-card .chip.t.b-reembolso{background:rgba(46,111,168,.1);color:var(--blue)}
 .cf-card .chip.t.b-saldar{background:rgba(168,123,20,.12);color:var(--gold)}
+/* Despesa prevista (sem data) */
+.cf-prev-toggle{display:flex;align-items:center;gap:8px;margin-top:14px;font-size:13px;font-weight:600;color:var(--muted);cursor:pointer;user-select:none}
+.cf-prev-toggle input{width:17px;height:17px;accent-color:var(--gold);cursor:pointer}
+.chip.prevista{background:rgba(168,123,20,.16);color:#9A6E0E;font-weight:700}
+.cf-card.cf-prevista{border-left:4px dashed var(--gold);background:repeating-linear-gradient(135deg,rgba(168,123,20,.04) 0 9px,transparent 9px 18px)}
+.cf-card.cf-prevista .cf-badge{background:rgba(168,123,20,.15);border:2px dashed var(--gold);box-shadow:none}
 </style>
 </head>
 <body>
@@ -844,6 +850,12 @@ function diaEditavel(dia){
   const rd=(DATA&&DATA.refeicoesDef||[]).find(r=>r.dia===dia);
   return !!rd&&rd.data>=hojeISO();
 }
+// Nome do amigo (membro) associado ao utilizador logado — usado como default em "quem paga/recebe"
+function myPrimaryName(){
+  if(!DATA||!MY_NAMES.length)return'';
+  const names=(DATA.membros||[]).map(m=>m.nome);
+  return MY_NAMES.find(n=>names.includes(n))||'';
+}
 function canTouchPresenca(nome,dia){return isAdmin()||(MY_NAMES.includes(nome)&&diaEditavel(dia));}
 function permErrorMsg(e){
   const m=(e&&e.message||'')+'';
@@ -896,7 +908,10 @@ function calcular(data){
   const tot={};for(const x of despesas)tot[x.tipo]=(tot[x.tipo]||0)+x.valor;
   const totalDesp=rnd(sumv(tot),2);
 
-  const F20=rnd((totalDesp-(tot['Almoço']||0)-(tot['Jantar']||0))*0.5,2);
+  // Almoço/Jantar são alocados diretamente à refeição via data-valor. As "previstas"
+  // (sem data-valor) não casam com nenhuma refeição, por isso entram no rateio indireto (F20).
+  const allocDireta=despesas.filter(x=>(x.tipo==='Almoço'||x.tipo==='Jantar')&&x.dataValor).reduce((a,x)=>a+x.valor,0);
+  const F20=rnd((totalDesp-allocDireta)*0.5,2);
 
   const cmemb=(d,ref)=>{const rs=ref==='Lanche'?'Tarde':ref;const s=day2slot[d]+'|'+rs;return membros.filter(m=>m.presencas.includes(s)).length;};
 
@@ -1292,14 +1307,15 @@ function renderCashFlows(){
   });
 
   (DATA.despesas||[]).forEach((d,i)=>{
-    // Dia da semana (Almoço/Jantar) vai para o line2; o tipo passa a badge próprio
-    let diaLbl='';
+    // Dia da semana (Almoço/Jantar) → junta-se ao badge do tipo, não ao de quem pagou
+    let dia='';
     if((d.tipo==='Almoço'||d.tipo==='Jantar')&&d.dataValor){
-      const dia=dataToDia(d.dataValor);
-      if(dia)diaLbl=dia+' · ';
+      const dd=dataToDia(d.dataValor);
+      if(dd)dia=dd;
     }
-    allCf.push({type:'despesa',date:d.dataDesp||d.dataValor||'',label:'Despesa',icon:'🛒',sub:d.tipo||'Gerais',
-      line1:d.desc||'(sem descrição)',line2:`${diaLbl}pagou ${d.quem}`,valor:d.valor,
+    const prevista=!d.dataDesp&&!d.dataValor;
+    allCf.push({type:'despesa',date:d.dataDesp||d.dataValor||'',label:'Despesa',icon:'🛒',sub:d.tipo||'Gerais',dia,prevista,
+      line1:d.desc||'(sem descrição)',line2:`pagou ${d.quem}`,valor:d.valor,
       sign:'neg',source:'despesas',idx:i,people:[d.quem]});
   });
 
@@ -1403,11 +1419,11 @@ function renderCashFlows(){
       pp+=`<div class="cf-group-hdr sf">${fmtDia(cf.date)}<span class="cfg-sum">${dayItems.length} mov.</span></div>`;
     }
     const sgn=cf.sign==='neg'?'−':cf.sign==='pos'?'+':'';
-    pp+=`<div class="card cf-card b-${cf.type}" onclick="openCfDetail('${cf.source}',${cf.idx})">
-      <div class="cf-badge">${cf.icon}</div>
+    pp+=`<div class="card cf-card b-${cf.type}${cf.prevista?' cf-prevista':''}" onclick="openCfDetail('${cf.source}',${cf.idx})">
+      <div class="cf-badge">${cf.prevista?'📌':cf.icon}</div>
       <div class="cf-main"><div class="top"><div class="desc">${cf.line1}</div>
       <div class="v cf-${cf.sign}">${sgn}${eur(cf.valor)}</div></div>
-      <div class="meta"><span class="chip t b-${cf.type}">${cf.label}</span>${cf.type==='despesa'&&cf.sub?`<span class="chip sub s-${cf.sub.toLowerCase().normalize('NFD').replace(/[^a-z]/g,'')}">${cf.sub}</span>`:''}${cf.line2?`<span class="chip">${truncRef(cf.line2)}</span>`:''}
+      <div class="meta"><span class="chip t b-${cf.type}">${cf.label}</span>${cf.type==='despesa'&&cf.sub?`<span class="chip sub s-${cf.sub.toLowerCase().normalize('NFD').replace(/[^a-z]/g,'')}">${cf.sub}${cf.dia?' · '+cf.dia:''}</span>`:''}${cf.prevista?`<span class="chip prevista">prevista</span>`:''}${cf.line2?`<span class="chip">${truncRef(cf.line2)}</span>`:''}
       </div></div></div>`;
   });
   document.getElementById('view-cashflows').innerHTML=pp;
@@ -1705,7 +1721,7 @@ function updateCfForm(){
   if(cfDir==='reembolso'){
     f.innerHTML=`
       <label>A quem reembolsaste?</label>
-      <select id="cf-who">${memberOptions()}</select>
+      <select id="cf-who">${memberOptions(myPrimaryName())}</select>
       <div class="inline-row" style="margin-top:14px">
         <div><label>Valor (€)</label><input type="number" id="cf-val" step="0.01" min="0.01" placeholder="0,00" inputmode="decimal"></div>
         <div><label>Data</label><input type="date" id="cf-date" value="${today}"></div>
@@ -1715,19 +1731,17 @@ function updateCfForm(){
   } else if(cfDir==='despesa'){
     f.innerHTML=`
       <label>Quem pagou?</label>
-      <select id="cf-who">${isAdmin()?memberOptions():myMemberOptions()}</select>
+      <select id="cf-who">${isAdmin()?memberOptions(myPrimaryName()):myMemberOptions(myPrimaryName())}</select>
       <div class="inline-row" style="margin-top:14px">
         <div><label>Tipo</label>
           <select id="cf-tipo" onchange="cfTipoChanged()">
-            <option value="Gerais">Gerais</option>
-            <option value="Bebidas">Bebidas</option>
-            <option value="Almoço">Almoço</option>
-            <option value="Jantar">Jantar</option>
+            ${['Gerais','Bebidas','Almoço','Jantar','Renda','Cerveja'].map(t=>`<option value="${t}">${t}</option>`).join('')}
           </select>
         </div>
         <div><label>Valor (€)</label><input type="number" id="cf-val" step="0.01" min="0.01" placeholder="0,00" inputmode="decimal"></div>
       </div>
-      <div class="inline-row" style="margin-top:14px">
+      <label class="cf-prev-toggle"><input type="checkbox" id="cf-prevista" onchange="cfPrevistaChanged()"> 📌 Despesa prevista (ainda sem data)</label>
+      <div id="cf-date-row" class="inline-row" style="margin-top:14px">
         <div><label>Data Despesa</label><input type="date" id="cf-date" value="${today}" oninput="cfSyncDataValor()"></div>
         <div><label>Data-Valor</label><input type="date" id="cf-date2" value=""></div>
       </div>
@@ -1744,7 +1758,7 @@ function updateCfForm(){
       </div>
       <div id="meal-corrente-fields">
         <label>Quem recolheu?</label>
-        <select id="cf-who">${memberOptions(tes)}</select>
+        <select id="cf-who">${memberOptions(myPrimaryName()||tes)}</select>
         <div class="inline-row" style="margin-top:14px">
           <div><label>Valor (€)</label><input type="number" id="cf-val" step="0.01" min="0.01" placeholder="0,00" inputmode="decimal"></div>
           <div><label>Data</label><input type="date" id="cf-date" value="${today}"></div>
@@ -1773,7 +1787,7 @@ function updateCfForm(){
   } else if(cfDir==='saldar'){
     f.innerHTML=`
       <label>Quem pagou?</label>
-      <select id="cf-who" onchange="updateSdChips()">${memberOptions()}</select>
+      <select id="cf-who" onchange="updateSdChips()">${memberOptions(myPrimaryName())}</select>
       <label>Que dívidas paga?</label>
       <div class="sd-list" id="sd-chips"></div>
       <div class="inline-row" style="margin-top:14px">
@@ -1786,6 +1800,7 @@ function updateCfForm(){
 }
 
 function cfTipoChanged(){
+  if(document.getElementById('cf-prevista')?.checked)return; // prevista: datas escondidas
   const tipo=document.getElementById('cf-tipo')?.value||'Gerais';
   const d2=document.getElementById('cf-date2');
   const d1=document.getElementById('cf-date');
@@ -1812,8 +1827,22 @@ function cfSyncDataValor(){
     d2.value=d1.value;
   }
 }
+function cfPrevistaChanged(){
+  const on=document.getElementById('cf-prevista')?.checked;
+  const row=document.getElementById('cf-date-row');
+  const d1=document.getElementById('cf-date'),d2=document.getElementById('cf-date2');
+  if(row)row.style.display=on?'none':'';
+  if(on){
+    if(d1)d1.value='';
+    if(d2)d2.value='';
+  }else{
+    if(d1&&!d1.value)d1.value=new Date().toISOString().slice(0,10);
+    cfTipoChanged();
+  }
+}
 
 function ecfTipoChanged(){
+  if(document.getElementById('ecf-prevista')?.checked)return; // prevista: datas escondidas
   const tipo=document.getElementById('ecf-tipo')?.value||'Gerais';
   const d2=document.getElementById('ecf-date2');
   const d1=document.getElementById('ecf-date');
@@ -1825,6 +1854,19 @@ function ecfTipoChanged(){
   }else{
     d2.value=d1.value;
     d2.readOnly=true;d2.style.opacity='.55';d2.style.pointerEvents='none';
+  }
+}
+function ecfPrevistaChanged(){
+  const on=document.getElementById('ecf-prevista')?.checked;
+  const row=document.getElementById('ecf-date-row');
+  const d1=document.getElementById('ecf-date'),d2=document.getElementById('ecf-date2');
+  if(row)row.style.display=on?'none':'';
+  if(on){
+    if(d1)d1.value='';
+    if(d2)d2.value='';
+  }else{
+    if(d1&&!d1.value)d1.value=new Date().toISOString().slice(0,10);
+    ecfTipoChanged();
   }
 }
 function ecfSyncDataValor(){
@@ -1958,7 +2000,9 @@ async function saveCashFlow(){
     commitMsg=`Reembolso: ${tes} → ${who} ${eur(val)}`;
   } else if(cfDir==='despesa'){
     const tipo=document.getElementById('cf-tipo')?.value||'Gerais';
-    const date2=document.getElementById('cf-date2')?.value||date;
+    const prevista=document.getElementById('cf-prevista')?.checked;
+    const date2=prevista?'':(document.getElementById('cf-date2')?.value||date);
+    const dDesp=prevista?'':date;
     if(!isAdmin()&&!MY_NAMES.includes(who)){
       toast('Só podes registar despesas tuas ou do teu cônjuge','bad');
       document.getElementById('pay-save').disabled=false;return;
@@ -1967,9 +2011,9 @@ async function saveCashFlow(){
     setSync('load','a guardar…');
     try{
       const ins=await queueWrite(()=>sbReq('POST','despesas',
-        [{evento_id:DATA._sbId,quem:who,data_desp:date||null,data_valor:date2||null,descricao:desc||'(sem descrição)',tipo,valor:rnd(val,2)}],
+        [{evento_id:DATA._sbId,quem:who,data_desp:dDesp||null,data_valor:date2||null,descricao:desc||'(sem descrição)',tipo,valor:rnd(val,2)}],
         {Prefer:'return=representation'}));
-      DATA.despesas.push({_id:ins&&ins[0]?ins[0].id:null,quem:who,dataDesp:date,dataValor:date2,desc:desc||'(sem descrição)',tipo,valor:rnd(val,2)});
+      DATA.despesas.push({_id:ins&&ins[0]?ins[0].id:null,quem:who,dataDesp:dDesp,dataValor:date2,desc:desc||'(sem descrição)',tipo,valor:rnd(val,2)});
       syncMirror();
       marcaGuardado();
       document.getElementById('pay-save').disabled=false;
@@ -2117,6 +2161,7 @@ function editCfEntry(source,idx){
     setTimeout(()=>updateEditSdChips(),10);
   } else if(editType==='despesa'){
     const d=DATA.despesas[idx];
+    const isPrev=!d.dataDesp&&!d.dataValor;
     f.innerHTML=`
       <label>Quem pagou?</label>
       <select id="ecf-who">${memberOptions(d.quem)}</select>
@@ -2128,7 +2173,8 @@ function editCfEntry(source,idx){
         </div>
         <div><label>Valor (€)</label><input type="number" id="ecf-val" step="0.01" value="${d.valor}" inputmode="decimal"></div>
       </div>
-      <div class="inline-row" style="margin-top:14px">
+      <label class="cf-prev-toggle"><input type="checkbox" id="ecf-prevista" onchange="ecfPrevistaChanged()"${isPrev?' checked':''}> 📌 Despesa prevista (ainda sem data)</label>
+      <div id="ecf-date-row" class="inline-row" style="margin-top:14px${isPrev?';display:none':''}">
         <div><label>Data Despesa</label><input type="date" id="ecf-date" value="${d.dataDesp||''}" oninput="ecfSyncDataValor()"></div>
         <div><label>Data-Valor</label><input type="date" id="ecf-date2" value="${d.dataValor||''}"></div>
       </div>
@@ -2264,9 +2310,10 @@ async function saveEditCf(){
     }
   } else if(source==='despesas'){
     const d=DATA.despesas[idx];
+    const prevista=document.getElementById('ecf-prevista')?.checked;
     d.quem=document.getElementById('ecf-who').value;
-    d.dataDesp=document.getElementById('ecf-date').value;
-    d.dataValor=document.getElementById('ecf-date2').value;
+    d.dataDesp=prevista?'':document.getElementById('ecf-date').value;
+    d.dataValor=prevista?'':document.getElementById('ecf-date2').value;
     d.tipo=document.getElementById('ecf-tipo').value;
     d.valor=parseFloat(document.getElementById('ecf-val').value)||d.valor;
     d.desc=(document.getElementById('ecf-desc')?.value||'').trim();
@@ -3089,11 +3136,18 @@ function closeReports(){
   if(bg){bg.classList.remove('show');document.body.classList.remove('no-scroll');}
 }
 
+function fmtPdfDate(ds){
+  if(!ds)return'—';
+  const dt=new Date(ds+'T12:00:00');
+  if(isNaN(dt))return ds;
+  const mes=['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'][dt.getMonth()];
+  return dt.getDate()+'/'+mes;
+}
 function generatePDF(type){
   const pessoa=type==='pessoa'?document.getElementById('report-person')?.value:null;
   const ms=CALC.membros;
   const ano=DATA.evento.ano||'';
-  const nome=DATA.evento.nome||'MEO';
+  const nome=(DATA.evento.nome||'MEO').replace(/\s*\d{4}\s*/g,'').trim()||'MEO';
 
   // Build SVG-based PDF content as printable HTML and use browser print
   let body='';
@@ -3118,9 +3172,13 @@ function generatePDF(type){
     tr:last-child td{border-bottom:none}
     .pos{color:#2a9d6a;font-weight:700}.neg{color:#e04545;font-weight:700}.zero{color:#999}
     .right{text-align:right}
+    table.gastos-membro th{font-size:8px;letter-spacing:.02em;padding:5px 5px}
+    table.gastos-membro td{padding:5px 5px}
+    table.gastos-membro td:first-child{white-space:nowrap;font-size:10.5px}
     .section{margin-bottom:8px}
     .badge{display:inline-block;font-size:9px;font-weight:700;padding:1px 6px;border-radius:4px}
     .badge-green{background:#e8f9f1;color:#2a9d6a}.badge-red{background:#fff0f0;color:#e04545}.badge-blue{background:#eef5ff;color:#3a7dd6}
+    .badge-amber{background:#fdf3e0;color:#b9831a}
     .footer{margin-top:24px;padding-top:10px;border-top:1px solid #ddd;font-size:10px;color:#999;text-align:center}
     @media print{body{padding:16px} .no-print{display:none}}
   `;
@@ -3158,14 +3216,14 @@ function generatePDF(type){
 function buildGeneralReport(){
   const ms=CALC.membros;
   const ano=DATA.evento.ano||'';
-  const nome=DATA.evento.nome||'MEO';
+  const nome=(DATA.evento.nome||'MEO').replace(/\s*\d{4}\s*/g,'').trim()||'MEO';
   let h=`<h1>${nome} ${ano}</h1>`;
   h+=`<div class="subtitle">${DATA.evento.datas||''} · Tesoureiro: ${DATA.evento.tesoureiro}</div>`;
 
   // Hero summary
   const sg=CALC.saldoGrupo;
   h+=`<div class="hero-row">
-    <div class="hero-box ${sg>=0?'green':'red'}"><div class="hb-label">Saldo do Grupo</div><div class="hb-val">${eur(sg)}</div></div>
+    <div class="hero-box ${sg>=0?'green':'red'}"><div class="hb-label">Saldo</div><div class="hb-val">${eur(sg)}</div></div>
     <div class="hero-box green"><div class="hb-label">Receitas</div><div class="hb-val">${eur(CALC.totReceitas)}</div></div>
     <div class="hero-box red"><div class="hb-label">Despesas</div><div class="hb-val">${eur(CALC.totDespesas)}</div></div>
   </div>`;
@@ -3198,7 +3256,8 @@ function buildGeneralReport(){
     allCf.push({type:t,date:p.data||'',desc:`${p.de} → ${p.para}`,ref:rf,valor:p.valor,label:cfLabel(t)});
   });
   (DATA.despesas||[]).forEach(d=>{
-    allCf.push({type:'despesa',date:d.dataDesp||d.dataValor||'',desc:d.desc||'(sem descrição)',ref:`${d.tipo} · ${d.quem}`,valor:d.valor,label:'Despesa'});
+    const prevista=!d.dataDesp&&!d.dataValor;
+    allCf.push({type:'despesa',date:d.dataDesp||d.dataValor||'',desc:d.desc||'(sem descrição)',ref:`${d.tipo} · ${d.quem}`,valor:d.valor,label:'Despesa',prevista});
   });
   (DATA.mealheiros||[]).forEach(m=>{
     allCf.push({type:'mealheiro',date:m.data||'',desc:`${m.quem}`,ref:m.desc||m.subtipo||'',valor:m.valor,label:'Mealheiro'});
@@ -3208,13 +3267,13 @@ function buildGeneralReport(){
   h+='<h2>Cash-Flows</h2>';
   h+='<table><tr><th>Data</th><th>Tipo</th><th>Descrição</th><th class="right">Valor</th></tr>';
   allCf.forEach(cf=>{
-    h+=`<tr><td>${cf.date||'—'}</td><td><span class="badge badge-blue">${cf.label}</span></td><td>${cf.desc}${cf.ref?' · '+cf.ref:''}</td><td class="right">${eur(cf.valor)}</td></tr>`;
+    h+=`<tr><td>${fmtPdfDate(cf.date)}</td><td><span class="badge ${cf.prevista?'badge-amber':'badge-blue'}">${cf.prevista?'Prevista':cf.label}</span></td><td>${cf.desc}${cf.ref?' · '+cf.ref:''}</td><td class="right">${eur(cf.valor)}</td></tr>`;
   });
   h+='</table>';
 
   // Resumo de gastos por membro (consumo próprio + convidados — sem saldos/regularizações)
   h+='<h2>Resumo de Gastos por Membro</h2>';
-  h+='<table><tr><th>Membro</th><th class="right">Refeições</th><th class="right">Quota Extra</th><th class="right">Convidados</th><th class="right">Total</th></tr>';
+  h+='<table class="gastos-membro"><tr><th>Membro</th><th class="right">Refeições</th><th class="right">Quota Extra</th><th class="right">Convidados</th><th class="right">Total</th></tr>';
   let gT={ref:0,quota:0,conv:0,tot:0};
   [...ms].map(m=>{
     const refe=rnd(m.Sown||0,2);
@@ -3244,7 +3303,7 @@ function buildPersonReport(pessoa){
   const m=CALC.membros.find(x=>x.nome===pessoa);
   if(!m) return '<h1>Membro não encontrado</h1>';
   const ano=DATA.evento.ano||'';
-  const evNome=DATA.evento.nome||'MEO';
+  const evNome=(DATA.evento.nome||'MEO').replace(/\s*\d{4}\s*/g,'').trim()||'MEO';
   const isTes=m.nome===DATA.evento.tesoureiro;
 
   let h=`<h1>${evNome} ${ano} — ${pessoa}</h1>`;
@@ -3292,7 +3351,8 @@ function buildPersonReport(pessoa){
     h+='<h2>Despesas Adiantadas</h2>';
     h+='<table><tr><th>Data</th><th>Descrição</th><th>Tipo</th><th class="right">Valor</th></tr>';
     DATA.despesas.filter(x=>x.quem===m.nome).forEach(d=>{
-      h+=`<tr><td>${d.dataDesp||d.dataValor||'—'}</td><td>${d.desc||'—'}</td><td>${d.tipo}</td><td class="right">${eur(d.valor)}</td></tr>`;
+      const prevista=!d.dataDesp&&!d.dataValor;
+      h+=`<tr><td>${fmtPdfDate(d.dataDesp||d.dataValor||'')}</td><td>${d.desc||'—'}${prevista?' <span class="badge badge-amber">prevista</span>':''}</td><td>${d.tipo}</td><td class="right">${eur(d.valor)}</td></tr>`;
     });
     h+=`<tr style="border-top:2px solid #ddd;font-weight:700"><td colspan="3"><b>Total</b></td><td class="right pos"><b>${eur(rnd(totalPagoDesp,2))}</b></td></tr>`;
     h+='</table>';
@@ -3306,7 +3366,7 @@ function buildPersonReport(pessoa){
     h+='<h2>Pagamentos</h2>';
     h+='<table><tr><th>Data</th><th>De → Para</th><th>Ref</th><th class="right">Valor</th></tr>';
     myPags.forEach(p=>{
-      h+=`<tr><td>${p.data||'—'}</td><td>${p.de} → ${p.para}</td><td>${(p.ref||'').slice(0,40)}</td><td class="right">${eur(p.valor)}</td></tr>`;
+      h+=`<tr><td>${fmtPdfDate(p.data||'')}</td><td>${p.de} → ${p.para}</td><td>${(p.ref||'').slice(0,40)}</td><td class="right">${eur(p.valor)}</td></tr>`;
     });
     h+='</table>';
   }
