@@ -2,7 +2,7 @@
 <html lang="pt-PT">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>MEO · Contas</title>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
@@ -15,6 +15,10 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600&display=swap" rel="stylesheet">
 <style>
+/* Bloqueia pinch-zoom e double-tap zoom (iOS PWA) */
+*{touch-action:manipulation}
+html,body{touch-action:pan-x pan-y}
+
 :root{
   /* ═══ Tema "Areia das Largadas" ═══
      areia da praça · vermelho campino · verde barrete · branco-sal · dourado mostarda */
