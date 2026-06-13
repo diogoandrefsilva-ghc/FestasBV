@@ -390,18 +390,31 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .refdef-date{font-size:11px;color:var(--faint)}
 .refdef-params{display:flex;gap:4px;font-size:9px;color:var(--muted);margin-top:4px;flex-wrap:wrap}
 .refdef-params span{background:var(--panel2);padding:1px 4px;border-radius:4px}
-.refdef-comp{display:flex;gap:4px;flex-wrap:wrap;margin-top:4px}
-.refdef-comp .rc{font-size:9px;font-weight:400;padding:1px 4px;border-radius:4px;white-space:nowrap}
-.refdef-comp .rc.b{background:rgba(46,111,168,.12);color:var(--blue)}
-.refdef-comp .rc.cv{background:rgba(196,144,32,.16);color:#9A6E0E}
-.refdef-comp .rc.g{background:rgba(111,92,66,.12);color:var(--muted)}
-.refdef-comp .rc.r{background:rgba(168,123,20,.14);color:var(--gold)}
+.refdef-indireto{display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin-top:4px;padding:3px 6px;background:rgba(0,0,0,.025);border:1px dashed var(--line);border-radius:6px}
+.refdef-indireto .rdi-peso{font-size:9px;font-weight:700;color:var(--ink)}
+.refdef-indireto .rdi-arrow{font-size:10px;color:var(--faint);margin:0 1px}
+.refdef-indireto .rc{font-size:9px;font-weight:400;padding:1px 4px;border-radius:4px;white-space:nowrap}
+.refdef-indireto .rc.b{background:rgba(46,111,168,.12);color:var(--blue)}
+.refdef-indireto .rc.cv{background:rgba(196,144,32,.16);color:#9A6E0E}
+.refdef-indireto .rc.g{background:rgba(111,92,66,.12);color:var(--muted)}
 .refdef-actions{display:flex;gap:4px;flex-shrink:0}
 .refdef-del{width:26px;height:26px;border-radius:7px;border:1px solid var(--line);background:transparent;color:var(--red);font-size:13px;display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:.5;transition:.12s}
 .refdef-del:active{opacity:1;background:rgba(179,64,47,.1);transform:scale(.9)}
 .refdef-edit{width:26px;height:26px;border-radius:7px;border:1px solid var(--line);background:transparent;color:var(--muted);font-size:12px;display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:.5;transition:.12s}
 .refdef-edit:active{opacity:1;background:rgba(168,123,20,.12);transform:scale(.9)}
 .refdef-empty{text-align:center;padding:20px;color:var(--faint);font-size:13px;border:1px dashed var(--line);border-radius:10px}
+/* Explicação colapsável do cálculo de custos */
+.calc-help{margin-bottom:12px;background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.calc-help summary{cursor:pointer;padding:10px 12px;font-size:12px;font-weight:600;color:var(--muted);list-style:none;display:flex;align-items:center;gap:6px}
+.calc-help summary::-webkit-details-marker{display:none}
+.calc-help summary .ch-ico{color:var(--gold)}
+.calc-help summary .chev{margin-left:auto;color:var(--faint);transition:transform .2s;display:inline-block;font-size:18px;line-height:1}
+.calc-help[open] summary .chev{transform:rotate(90deg)}
+.calc-help[open] summary{border-bottom:1px solid var(--line)}
+.calc-help-body{padding:10px 12px;font-size:11.5px;color:var(--muted);line-height:1.5}
+.calc-help-body p{margin:0 0 7px}
+.calc-help-body p:last-child{margin-bottom:0}
+.calc-help-body b{color:var(--ink);font-weight:600}
 .refdef-add-bar{margin-top:10px;display:flex;gap:8px;align-items:center}
 .refdef-add-btn{display:flex;align-items:center;gap:6px;padding:10px 16px;border-radius:10px;border:1.5px dashed var(--line);background:transparent;color:var(--barrete);font-size:13px;font-weight:600;cursor:pointer;transition:.15s;flex:1;justify-content:center}
 .refdef-add-btn:active{background:rgba(30,122,77,.06);transform:scale(.97)}
@@ -1305,6 +1318,17 @@ function renderAll(){
 
   // ── SUB 1: Calendário (merged: definição + custo por pessoa) ──
   r+='<div id="ref-sub-calendario" style="'+(REF_SUB==='calendario'?'':'display:none')+'">';
+  r+=`<details class="calc-help sf">
+    <summary><span class="ch-ico">ⓘ</span> Como se calculam os custos? <span class="chev">›</span></summary>
+    <div class="calc-help-body">
+      <p><b>Indireto</b> — as despesas de <b>bebidas</b>, <b>cerveja</b> e <b>gerais</b> juntam-se numa bolsa comum. O <b>peso</b> (%) de cada refeição define a fatia dessa bolsa que lhe toca.</p>
+      <p><b>Diretos</b> — o que se gastou especificamente naquela refeição (o almoço/jantar em si).</p>
+      <p><b>Total refeição</b> = diretos + indiretos (bebidas + cerveja + gerais).</p>
+      <p><b>Unitário</b> = total ÷ pessoas presentes nessa refeição.</p>
+      <p><b>Custo por membro</b> = o maior valor entre o <b>mínimo MEO</b> e o unitário.</p>
+      <p><b>Convidado</b> = unitário arredondado para cima + <b>extra por convidado</b>, nunca abaixo do <b>mínimo de convidado</b>.</p>
+    </div>
+  </details>`;
   if(!DATA.refeicoesDef||!DATA.refeicoesDef.length){
     r+='<div class="refdef-empty sf">Nenhuma refeição definida para este ano.<br>Adiciona dias e refeições para começar.</div>';
   } else {
@@ -1326,23 +1350,29 @@ function renderAll(){
         const pesoDisplay=rd.peso!=null?Math.round((rd.peso||0)*100)+'%':'—';
         const totDisp=calcRef&&calcRef.custoTotal?eur(calcRef.custoTotal):'—';
         const unitDisp=calcRef&&calcRef.custoUnit?eur(calcRef.custoUnit):'—';
-        let compHtml='';
+        const diretosDisp=calcRef?eur(calcRef.dirRef):'—';
+        // Linha 1 (container leve): peso indireto aplicado sobre bebidas/cerveja/gerais
+        let indiretoHtml='';
         if(calcRef){
-          const comps=[
+          const ind=[
             {c:'b',lbl:'Bebidas',v:calcRef.cBebidas},
             {c:'cv',lbl:'Cerveja',v:calcRef.cCerveja},
-            {c:'g',lbl:'Gerais',v:calcRef.cGerais},
-            {c:'r',lbl:'Refeição',v:calcRef.dirRef}
+            {c:'g',lbl:'Gerais',v:calcRef.cGerais}
           ].filter(x=>x.v>0);
-          if(comps.length) compHtml='<div class="refdef-comp sf">'+comps.map(x=>`<span class="rc ${x.c}">${x.lbl} ${eur(x.v)}</span>`).join('')+'</div>';
+          if(rd.peso!=null||ind.length){
+            indiretoHtml='<div class="refdef-indireto sf">'+
+              (rd.peso!=null?`<span class="rdi-peso">Peso ${pesoDisplay}</span>`:'')+
+              (ind.length?'<span class="rdi-arrow">→</span>'+ind.map(x=>`<span class="rc ${x.c}">${x.lbl} ${eur(x.v)}</span>`).join(''):'')+
+            '</div>';
+          }
         }
         r+=`<div class="refdef-row refdef-click" style="flex-wrap:wrap" onclick="openRefdefModal(${rd._idx})">
           <span class="refdef-icon">${icon}</span>
           <div class="refdef-info">
             <div class="refdef-ref sf">${rd.ref}${rd.prato?`<span class="refdef-prato sf"> · ${escHtml(rd.prato)}</span>`:''}</div>
-            ${compHtml}
+            ${indiretoHtml}
             <div class="refdef-params sf">
-              <span>Peso ${pesoDisplay}</span>
+              <span>Diretos ${diretosDisp}</span>
               <span>Total ${totDisp}</span>
               <span>Unit. ${unitDisp}</span>
             </div>
