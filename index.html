@@ -1645,13 +1645,28 @@ function openMember(nome){
   if(contribTotal>0){
     h+='<div class="bd-title sf">Contribuições</div>';
     if(m._refs.length){
-      h+=`<div class="collapse-toggle" onclick="this.classList.toggle('open');this.nextElementSibling.classList.toggle('open')">
-        <span class="ct-label">🍽 Refeições (${m._refs.length})</span>
-        <span><span class="ct-val minus">${eur(m.Sown)}</span><span class="ct-arrow">▼</span></span>
-      </div>`;
-      h+='<div class="collapse-body"><div class="meals">';
-      m._refs.forEach(r=>h+=`<div class="meal"><span class="d">${r.dia} · ${r.ref}</span><span class="p">${eur(r.p)}</span></div>`);
-      h+='</div></div>';
+      const comeR=m._refs.filter(r=>r.modo!=='bebe');
+      const bebeR=m._refs.filter(r=>r.modo==='bebe');
+      const sCome=rnd(comeR.reduce((a,x)=>a+x.p,0),2);
+      const sBebe=rnd(bebeR.reduce((a,x)=>a+x.p,0),2);
+      if(comeR.length){
+        h+=`<div class="collapse-toggle" onclick="this.classList.toggle('open');this.nextElementSibling.classList.toggle('open')">
+          <span class="ct-label">🍽 Refeições (${comeR.length})</span>
+          <span><span class="ct-val minus">${eur(sCome)}</span><span class="ct-arrow">▼</span></span>
+        </div>`;
+        h+='<div class="collapse-body"><div class="meals">';
+        comeR.forEach(r=>h+=`<div class="meal"><span class="d">${r.dia} · ${r.ref}</span><span class="p">${eur(r.p)}</span></div>`);
+        h+='</div></div>';
+      }
+      if(bebeR.length){
+        h+=`<div class="collapse-toggle" onclick="this.classList.toggle('open');this.nextElementSibling.classList.toggle('open')"${comeR.length?' style="margin-top:6px"':''}>
+          <span class="ct-label">🍺 Só bebida (${bebeR.length})</span>
+          <span><span class="ct-val minus">${eur(sBebe)}</span><span class="ct-arrow">▼</span></span>
+        </div>`;
+        h+='<div class="collapse-body"><div class="meals">';
+        bebeR.forEach(r=>h+=`<div class="meal"><span class="d">${r.dia} · ${r.ref}</span><span class="p">${eur(r.p)}</span></div>`);
+        h+='</div></div>';
+      }
     }
     if(m._convs.length){
       h+=`<div class="collapse-toggle" onclick="this.classList.toggle('open');this.nextElementSibling.classList.toggle('open')" style="margin-top:6px">
@@ -3559,24 +3574,30 @@ function buildGeneralReport(){
   h+='</table>';
 
   // Resumo de gastos por membro (consumo próprio + convidados — sem saldos/regularizações)
+  const temBebeGrupo=ms.some(m=>(m._refs||[]).some(r=>r.modo==='bebe'));
   h+='<h2>Resumo de Gastos por Membro</h2>';
-  h+='<table class="gastos-membro"><tr><th>Membro</th><th class="right">Refeições</th><th class="right">Quota Extra</th><th class="right">Convidados</th><th class="right">Total</th></tr>';
-  let gT={ref:0,quota:0,conv:0,tot:0};
+  h+='<table class="gastos-membro"><tr><th>Membro</th><th class="right">Refeições</th>'+(temBebeGrupo?'<th class="right">Só bebida</th>':'')+'<th class="right">Quota Extra</th><th class="right">Convidados</th><th class="right">Total</th></tr>';
+  let gT={ref:0,bebe:0,quota:0,conv:0,tot:0};
   [...ms].map(m=>{
-    const refe=rnd(m.Sown||0,2);
+    const comeR=(m._refs||[]).filter(r=>r.modo!=='bebe');
+    const bebeR=(m._refs||[]).filter(r=>r.modo==='bebe');
+    const refe=rnd(comeR.reduce((a,x)=>a+x.p,0),2);
+    const bebe=rnd(bebeR.reduce((a,x)=>a+x.p,0),2);
     const quota=rnd((m.R||0)+(m.U||0),2);
     const conv=rnd(m.AA||0,2);
-    return{nome:m.nome,refe,quota,conv,tot:rnd(refe+quota+conv,2)};
+    return{nome:m.nome,refe,bebe,quota,conv,tot:rnd(refe+bebe+quota+conv,2)};
   }).sort((a,b)=>b.tot-a.tot).forEach(g=>{
-    gT.ref+=g.refe;gT.quota+=g.quota;gT.conv+=g.conv;gT.tot+=g.tot;
+    gT.ref+=g.refe;gT.bebe+=g.bebe;gT.quota+=g.quota;gT.conv+=g.conv;gT.tot+=g.tot;
     h+=`<tr><td>${g.nome}${g.nome===DATA.evento.tesoureiro?' <span class="badge badge-blue">tes.</span>':''}</td>
       <td class="right">${g.refe>0?eur(g.refe):'—'}</td>
+      ${temBebeGrupo?`<td class="right">${g.bebe>0?eur(g.bebe):'—'}</td>`:''}
       <td class="right">${g.quota>0?eur(g.quota):'—'}</td>
       <td class="right">${g.conv>0?eur(g.conv):'—'}</td>
       <td class="right"><b>${eur(g.tot)}</b></td></tr>`;
   });
   h+=`<tr style="border-top:2px solid #ddd;font-weight:700"><td><b>Total</b></td>
     <td class="right">${eur(rnd(gT.ref,2))}</td>
+    ${temBebeGrupo?`<td class="right">${eur(rnd(gT.bebe,2))}</td>`:''}
     <td class="right">${eur(rnd(gT.quota,2))}</td>
     <td class="right">${eur(rnd(gT.conv,2))}</td>
     <td class="right">${eur(rnd(gT.tot,2))}</td></tr>`;
@@ -3606,11 +3627,22 @@ function buildPersonReport(pessoa){
 
   // Contribuições (refeições)
   if(m._refs.length){
-    h+='<h2>Refeições</h2>';
-    h+='<table><tr><th>Dia</th><th>Refeição</th><th class="right">Valor</th></tr>';
-    m._refs.forEach(r=>{h+=`<tr><td>${r.dia}</td><td>${r.ref}</td><td class="right">${eur(r.p)}</td></tr>`;});
-    h+=`<tr style="border-top:2px solid #ddd;font-weight:700"><td colspan="2"><b>Total Refeições</b></td><td class="right"><b>${eur(m.Sown)}</b></td></tr>`;
-    h+='</table>';
+    const comeR=m._refs.filter(r=>r.modo!=='bebe');
+    const bebeR=m._refs.filter(r=>r.modo==='bebe');
+    if(comeR.length){
+      h+='<h2>Refeições</h2>';
+      h+='<table><tr><th>Dia</th><th>Refeição</th><th class="right">Valor</th></tr>';
+      comeR.forEach(r=>{h+=`<tr><td>${r.dia}</td><td>${r.ref}</td><td class="right">${eur(r.p)}</td></tr>`;});
+      h+=`<tr style="border-top:2px solid #ddd;font-weight:700"><td colspan="2"><b>Total Refeições</b></td><td class="right"><b>${eur(rnd(comeR.reduce((a,x)=>a+x.p,0),2))}</b></td></tr>`;
+      h+='</table>';
+    }
+    if(bebeR.length){
+      h+='<h2>Só bebida</h2>';
+      h+='<table><tr><th>Dia</th><th>Refeição</th><th class="right">Valor</th></tr>';
+      bebeR.forEach(r=>{h+=`<tr><td>${r.dia}</td><td>${r.ref}</td><td class="right">${eur(r.p)}</td></tr>`;});
+      h+=`<tr style="border-top:2px solid #ddd;font-weight:700"><td colspan="2"><b>Total Só bebida</b></td><td class="right"><b>${eur(rnd(bebeR.reduce((a,x)=>a+x.p,0),2))}</b></td></tr>`;
+      h+='</table>';
+    }
   }
 
   // Convidados
@@ -3714,22 +3746,26 @@ function renderResumo(){
   const nrm=r=>r==='Tarde'?'Lanche':r;
   const oKey=x=>ord[x.dia+'|'+nrm(x.ref)]!=null?ord[x.dia+'|'+nrm(x.ref)]:999;
   const rows=[...ms].map(m=>{
-    const refe=rnd(m.Sown||0,2);
     const amigos=rnd(m.AA||0,2);
     const poup=rnd(m.U||0,2);
     const quota=rnd(m.R||0,2);
-    const refsList=[...(m._refs||[])].sort((a,b)=>oKey(a)-oKey(b)).map(x=>({k:`${x.dia} · ${x.ref}`,v:rnd(x.p,2)}));
+    const allR=[...(m._refs||[])].sort((a,b)=>oKey(a)-oKey(b));
+    const refsCome=allR.filter(x=>x.modo!=='bebe').map(x=>({k:`${x.dia} · ${x.ref}`,v:rnd(x.p,2)}));
+    const refsBebe=allR.filter(x=>x.modo==='bebe').map(x=>({k:`${x.dia} · ${x.ref}`,v:rnd(x.p,2)}));
+    const refeCome=rnd(refsCome.reduce((a,x)=>a+x.v,0),2);
+    const refeBebe=rnd(refsBebe.reduce((a,x)=>a+x.v,0),2);
     const convsList=[...(m._convs||[])].sort((a,b)=>oKey(a)-oKey(b)).map(x=>({k:`${x.nome} — ${x.dia} · ${x.ref}`,v:rnd(x.q,2)}));
-    return{nome:m.nome,i:ms.indexOf(m),refe,amigos,poup,quota,refsList,convsList,tot:rnd(refe+amigos+poup+quota,2)};
+    return{nome:m.nome,i:ms.indexOf(m),refeCome,refeBebe,amigos,poup,quota,refsCome,refsBebe,convsList,tot:rnd(refeCome+refeBebe+amigos+poup+quota,2)};
   }).sort((a,b)=>b.tot-a.tot);
-  const T=rows.reduce((a,g)=>({refe:a.refe+g.refe,amigos:a.amigos+g.amigos,poup:a.poup+g.poup,quota:a.quota+g.quota,tot:a.tot+g.tot}),{refe:0,amigos:0,poup:0,quota:0,tot:0});
+  const T=rows.reduce((a,g)=>({refeCome:a.refeCome+g.refeCome,refeBebe:a.refeBebe+g.refeBebe,amigos:a.amigos+g.amigos,poup:a.poup+g.poup,quota:a.quota+g.quota,tot:a.tot+g.tot}),{refeCome:0,refeBebe:0,amigos:0,poup:0,quota:0,tot:0});
   // agregado do grupo por dia/refeição
-  const aggR={},aggC={};
+  const aggRCome={},aggRBebe={},aggC={};
   ms.forEach(m=>{
-    (m._refs||[]).forEach(x=>{const k=x.dia+'|'+nrm(x.ref);(aggR[k]=aggR[k]||{dia:x.dia,ref:nrm(x.ref),n:0,v:0});aggR[k].n++;aggR[k].v+=x.p;});
+    (m._refs||[]).forEach(x=>{const tgt=x.modo==='bebe'?aggRBebe:aggRCome;const k=x.dia+'|'+nrm(x.ref);(tgt[k]=tgt[k]||{dia:x.dia,ref:nrm(x.ref),n:0,v:0});tgt[k].n++;tgt[k].v+=x.p;});
     (m._convs||[]).forEach(x=>{const k=x.dia+'|'+nrm(x.ref);(aggC[k]=aggC[k]||{dia:x.dia,ref:nrm(x.ref),n:0,v:0});aggC[k].n++;aggC[k].v+=x.q;});
   });
-  T.refsList=Object.values(aggR).sort((a,b)=>oKey(a)-oKey(b)).map(a=>({k:`${a.dia} · ${a.ref} — ${a.n} 🧑`,v:rnd(a.v,2)}));
+  T.refsCome=Object.values(aggRCome).sort((a,b)=>oKey(a)-oKey(b)).map(a=>({k:`${a.dia} · ${a.ref} — ${a.n} 🧑`,v:rnd(a.v,2)}));
+  T.refsBebe=Object.values(aggRBebe).sort((a,b)=>oKey(a)-oKey(b)).map(a=>({k:`${a.dia} · ${a.ref} — ${a.n} 🧑`,v:rnd(a.v,2)}));
   T.convsList=Object.values(aggC).sort((a,b)=>oKey(a)-oKey(b)).map(a=>({k:`${a.dia} · ${a.ref} — ${a.n} conv.`,v:rnd(a.v,2)}));
 
   const expIt=(icon,lbl,total,list)=>{
@@ -3739,7 +3775,8 @@ function renderResumo(){
       <div class="rs-sub">${list.map(it=>`<div class="rs-sub-it"><span class="k">${it.k}</span><span class="v">${eur(it.v)}</span></div>`).join('')}</div>`;
   };
   const det=g=>`<div class="rs-detail"><div class="rs-detail-inner sf">
-      ${expIt('🍽','Refeições',g.refe,g.refsList)}
+      ${expIt('🍽','Refeições',g.refeCome,g.refsCome)}
+      ${g.refeBebe>0.005?expIt('🍺','Só bebida',g.refeBebe,g.refsBebe):''}
       ${expIt('👥','Amigos',g.amigos,g.convsList)}
       <div class="rs-it"><span class="k">🐖 Poupança</span><span class="v">${g.poup>0.005?eur(g.poup):'—'}</span></div>
       <div class="rs-it"><span class="k">➕ Quota Extra</span><span class="v">${g.quota>0.005?eur(g.quota):'—'}</span></div>
@@ -3760,7 +3797,7 @@ function renderResumo(){
         <div class="av" style="background:var(--gold)">Σ</div>
         <div class="nm">Total do Grupo<small>${rows.length} membros</small></div>
         <div class="amt">${eur(rnd(T.tot,2))}</div><span class="rs-arrow">▼</span>
-      </div>${det({refe:rnd(T.refe,2),amigos:rnd(T.amigos,2),poup:rnd(T.poup,2),quota:rnd(T.quota,2),refsList:T.refsList,convsList:T.convsList})}</div>`;
+      </div>${det({refeCome:rnd(T.refeCome,2),refeBebe:rnd(T.refeBebe,2),amigos:rnd(T.amigos,2),poup:rnd(T.poup,2),quota:rnd(T.quota,2),refsCome:T.refsCome,refsBebe:T.refsBebe,convsList:T.convsList})}</div>`;
   }
   h+='</div>';
   document.getElementById('view-resumo').innerHTML=h;
