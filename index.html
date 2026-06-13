@@ -2,7 +2,7 @@
 <html lang="pt-PT">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>MEO · Contas</title>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
@@ -26,7 +26,7 @@
   --shadow:0 6px 22px rgba(80,55,20,.14);
 }
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--ink);padding:0 0 90px;line-height:1.5;min-height:100vh}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--ink);padding:0 0 90px;line-height:1.5;min-height:100vh;touch-action:manipulation}
 .sf{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
 
 /* ═══ Banda campino (header + tabs, estilo SplitBill) ═══ */
@@ -243,6 +243,9 @@ body.no-scroll{overflow:hidden;position:fixed;width:100%;}
 body.read-only .write-action{display:none!important}
 body.no-admin .admin-only{display:none!important}
 body.no-write .write-action{display:none!important}
+/* Detalhe em modo consulta (não-admin): campos bloqueados */
+.modal.ro-fields input,.modal.ro-fields select,.modal.ro-fields textarea{pointer-events:none!important;opacity:.7;background:var(--panel2)}
+.modal.ro-fields .cfq,.modal.ro-fields .cf-quando,.modal.ro-fields .sd-chip,.modal.ro-fields .sd-list{pointer-events:none!important;opacity:.7}
 .pres-btn.locked{opacity:.4;cursor:default;pointer-events:none}
 .pres-day-hdr.past{opacity:.55}
 .pres-day-hdr.today{color:var(--campino)}
@@ -269,7 +272,8 @@ body.read-only .readonly-banner{display:block}
 .guest-meal-chips{display:flex;flex-wrap:nowrap;gap:4px;padding:2px 0 8px;margin-bottom:6px}
 .guest-meal-chip{flex:1 1 0;min-width:0;display:flex;flex-direction:column;align-items:center;gap:2px;min-height:52px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:6px 3px;cursor:pointer;transition:.12s;font-family:inherit;overflow:hidden}
 .guest-meal-chip .gmc-dia{font-size:11px;font-weight:700;color:var(--ink);line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
-.guest-meal-chip .gmc-ref{font-size:8px;font-weight:600;color:var(--muted);line-height:1;text-transform:uppercase;letter-spacing:.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.guest-meal-chip .gmc-ref{font-size:7px;font-weight:600;color:var(--muted);line-height:1;text-transform:uppercase;letter-spacing:.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.guest-meal-chip.gmc-all .gmc-dia{margin-top:8px}
 .guest-meal-chip .gmc-ref.r-almoco{color:var(--gold)}
 .guest-meal-chip .gmc-ref.r-jantar{color:#6946A0}
 .guest-meal-chip .gmc-ref.r-lanche{color:var(--blue)}
@@ -2326,6 +2330,7 @@ function editCfEntry(source,idx){
       </div>`;
   }
 
+  document.getElementById('edit-cf-modal').classList.toggle('ro-fields',!isAdmin());
   document.getElementById('edit-cf-bg').classList.add('show');
   document.body.classList.add('no-scroll');
 }
@@ -2847,12 +2852,21 @@ function renderGuestSection(){
     membersWithGuests.forEach(m=>{h+=`<option value="${m}"${guestFilterMember===m?' selected':''}>${m}</option>`;});
     h+='</select></div>';
 
-    let filtered=DATA.convidados.map((g,i)=>({...g,_idx:i}));
-    if(guestFilterMember!=='all') filtered=filtered.filter(g=>g.membro===guestFilterMember);
+    // Base de convidados conforme o filtro de membro ativo
+    const baseGuests=guestFilterMember==='all'?DATA.convidados:DATA.convidados.filter(g=>g.membro===guestFilterMember);
+    const refOrd={Almoço:0,Lanche:1,Jantar:2};
+    // Refeições com convidados (>0) para o filtro atual — só estas viram chip
+    const mealChips=(DATA.refeicoesDef||[]).slice()
+      .sort((a,b)=>a.data.localeCompare(b.data)||(refOrd[a.ref]||0)-(refOrd[b.ref]||0))
+      .map(rd=>({rd,key:rd.dia+'|'+rd.ref,n:baseGuests.filter(g=>g.dia===rd.dia&&g.ref===rd.ref).length}))
+      .filter(x=>x.n>0);
+    // Se o filtro de refeição apontar para algo sem convidados (ex: mudou o membro), volta a "Todas"
+    if(guestFilterMeal!=='all' && !mealChips.some(x=>x.key===guestFilterMeal)) guestFilterMeal='all';
+
+    let filtered=baseGuests.map(g=>({...g,_idx:DATA.convidados.indexOf(g)}));
     if(guestFilterMeal!=='all') filtered=filtered.filter(g=>g.dia+'|'+g.ref===guestFilterMeal);
 
     // Sort by date then meal order (Almoço < Lanche < Jantar)
-    const refOrd={Almoço:0,Lanche:1,Jantar:2};
     const diaToDate={};
     (DATA.refeicoesDef||[]).forEach(rd=>{diaToDate[rd.dia]=rd.data;});
     filtered.sort((a,b)=>{
@@ -2863,19 +2877,13 @@ function renderGuestSection(){
       return(refOrd[a.ref]||0)-(refOrd[b.ref]||0);
     });
 
-    // Cards de refeição (filtro) — um por refeição definida, com badge do nº de convidados.
-    // Contagem respeita o filtro de membro ativo, para alinhar com a lista mostrada.
-    const baseGuests=guestFilterMember==='all'?DATA.convidados:DATA.convidados.filter(g=>g.membro===guestFilterMember);
-    const ordered=(DATA.refeicoesDef||[]).slice().sort((a,b)=>a.data.localeCompare(b.data)||(refOrd[a.ref]||0)-(refOrd[b.ref]||0));
-    if(ordered.length){
+    // Cards de refeição (filtro) — uma linha, sem scroll. Só refeições com convidados.
+    if(mealChips.length){
       h+='<div class="guest-meal-chips sf">';
-      const totN=baseGuests.length;
-      h+=`<button class="guest-meal-chip${guestFilterMeal==='all'?' on':''}" onclick="setGuestMeal('all')"><span class="gmc-dia">Todas</span><span class="gmc-badge">${totN}</span></button>`;
-      ordered.forEach(rd=>{
-        const key=rd.dia+'|'+rd.ref;
+      h+=`<button class="guest-meal-chip gmc-all${guestFilterMeal==='all'?' on':''}" onclick="setGuestMeal('all')"><span class="gmc-dia">Todas</span><span class="gmc-badge">${baseGuests.length}</span></button>`;
+      mealChips.forEach(({rd,key,n})=>{
         const rc={'Almoço':'almoco','Lanche':'lanche','Jantar':'jantar'}[rd.ref]||'';
-        const n=baseGuests.filter(g=>g.dia===rd.dia&&g.ref===rd.ref).length;
-        h+=`<button class="guest-meal-chip${guestFilterMeal===key?' on':''}${n===0?' empty':''}" onclick="setGuestMeal('${key}')">
+        h+=`<button class="guest-meal-chip${guestFilterMeal===key?' on':''}" onclick="setGuestMeal('${key}')">
           <span class="gmc-dia">${rd.dia}</span>
           <span class="gmc-ref r-${rc}">${rd.ref}</span>
           <span class="gmc-badge">${n}</span>
@@ -3142,6 +3150,7 @@ function openRefdefModal(editIdx){
     delBtn.style.display='none';
   }
 
+  document.getElementById('refdef-modal').classList.toggle('ro-fields',!isAdmin());
   document.getElementById('refdef-bg').classList.add('show');
   document.body.classList.add('no-scroll');
 }
@@ -4058,6 +4067,15 @@ if ('serviceWorker' in navigator) {
         .then((reg) => { setInterval(() => reg.update().catch(() => {}), 60000); })
         .catch((err) => console.log('[SW] Registration failed:', err));
 }
+
+/* Bloquear zoom no PWA (iOS ignora user-scalable=no, por isso reforçamos) */
+['gesturestart','gesturechange','gestureend'].forEach(ev=>
+  document.addEventListener(ev,e=>e.preventDefault(),{passive:false}));
+(function(){let last=0;document.addEventListener('touchend',e=>{
+  const now=Date.now();
+  if(now-last<=300)e.preventDefault();   // mata o double-tap-to-zoom
+  last=now;
+},{passive:false});})();
 </script>
 </body>
 </html>
