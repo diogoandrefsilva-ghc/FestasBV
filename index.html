@@ -270,14 +270,14 @@ body.read-only .readonly-banner{display:block}
 .guest-filter select{width:100%;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:9px 32px 9px 11px;color:var(--ink);font-size:13px;font-weight:600;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;-webkit-appearance:none;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236F5C42' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;cursor:pointer}
 /* Cards de refeição (filtro) na secção de convidados — uma linha, sem scroll, encolhem por igual */
 .guest-meal-chips{display:flex;flex-wrap:nowrap;gap:4px;padding:2px 0 8px;margin-bottom:6px}
-.guest-meal-chip{flex:1 1 0;min-width:0;display:flex;flex-direction:column;align-items:center;gap:2px;min-height:52px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:6px 3px;cursor:pointer;transition:.12s;font-family:inherit;overflow:hidden}
+.guest-meal-chip{flex:1 1 0;min-width:0;display:flex;flex-direction:column;align-items:center;gap:2px;min-height:52px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:6px 3px 4px;cursor:pointer;transition:.12s;font-family:inherit;overflow:hidden}
 .guest-meal-chip .gmc-dia{font-size:11px;font-weight:700;color:var(--ink);line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
 .guest-meal-chip .gmc-ref{font-size:7px;font-weight:600;color:var(--muted);line-height:1;text-transform:uppercase;letter-spacing:.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
-.guest-meal-chip.gmc-all .gmc-dia{margin-top:8px}
+.guest-meal-chip.gmc-all .gmc-dia{margin-top:4px}
 .guest-meal-chip .gmc-ref.r-almoco{color:var(--gold)}
 .guest-meal-chip .gmc-ref.r-jantar{color:#6946A0}
 .guest-meal-chip .gmc-ref.r-lanche{color:var(--blue)}
-.guest-meal-chip .gmc-badge{margin-top:auto;font-size:12px;font-weight:700;color:var(--gold);background:var(--panel2);border-radius:6px;padding:0 5px;min-width:18px;text-align:center;line-height:1.6}
+.guest-meal-chip .gmc-badge{margin-top:auto;font-size:10.5px;font-weight:700;color:var(--gold);background:var(--panel2);border-radius:6px;padding:0 5px;min-width:16px;text-align:center;line-height:1.5}
 .guest-meal-chip.on{border-color:var(--barrete);background:var(--panel2);box-shadow:0 0 0 1px var(--barrete) inset}
 .guest-meal-chip.on .gmc-badge{color:#fff;background:var(--barrete)}
 .guest-meal-chip.on .gmc-ref{color:var(--ink)}
@@ -390,21 +390,17 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .refdef-date{font-size:11px;color:var(--faint)}
 .refdef-params{display:flex;gap:6px;font-size:10.5px;color:var(--muted);margin-top:2px;flex-wrap:wrap}
 .refdef-params span{background:var(--panel2);padding:1px 6px;border-radius:4px}
+.refdef-comp{display:flex;gap:5px;flex-wrap:wrap;margin-top:4px}
+.refdef-comp .rc{font-size:10px;font-weight:600;padding:1px 6px;border-radius:4px;white-space:nowrap}
+.refdef-comp .rc.b{background:rgba(46,111,168,.12);color:var(--blue)}
+.refdef-comp .rc.cv{background:rgba(196,144,32,.16);color:#9A6E0E}
+.refdef-comp .rc.g{background:rgba(111,92,66,.12);color:var(--muted)}
+.refdef-comp .rc.r{background:rgba(168,123,20,.14);color:var(--gold)}
 .refdef-actions{display:flex;gap:4px;flex-shrink:0}
 .refdef-del{width:26px;height:26px;border-radius:7px;border:1px solid var(--line);background:transparent;color:var(--red);font-size:13px;display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:.5;transition:.12s}
 .refdef-del:active{opacity:1;background:rgba(179,64,47,.1);transform:scale(.9)}
 .refdef-edit{width:26px;height:26px;border-radius:7px;border:1px solid var(--line);background:transparent;color:var(--muted);font-size:12px;display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:.5;transition:.12s}
 .refdef-edit:active{opacity:1;background:rgba(168,123,20,.12);transform:scale(.9)}
-/* Campos bloqueados (informativos) no detalhe da refeição */
-.rd-considerado{margin:4px 0 2px}
-.rd-considerado-lbl{font-size:11px;color:var(--faint);text-transform:uppercase;letter-spacing:.06em;font-weight:700;margin-bottom:6px}
-.rd-locked-grid{display:flex;gap:8px}
-.rd-locked{flex:1;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:8px 10px;text-align:center}
-.rd-locked .rdl-val{font-size:15px;font-weight:700;color:var(--ink)}
-.rd-locked .rdl-lbl{font-size:9.5px;color:var(--faint);text-transform:uppercase;letter-spacing:.04em;margin-top:2px}
-.rd-locked.b .rdl-val{color:var(--blue)}
-.rd-locked.g .rdl-val{color:var(--muted)}
-.rd-locked.r .rdl-val{color:var(--gold)}
 .refdef-empty{text-align:center;padding:20px;color:var(--faint);font-size:13px;border:1px dashed var(--line);border-radius:10px}
 .refdef-add-bar{margin-top:10px;display:flex;gap:8px;align-items:center}
 .refdef-add-btn{display:flex;align-items:center;gap:6px;padding:10px 16px;border-radius:10px;border:1.5px dashed var(--line);background:transparent;color:var(--barrete);font-size:13px;font-weight:600;cursor:pointer;transition:.15s;flex:1;justify-content:center}
@@ -652,8 +648,12 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
         <input type="text" id="rd-prato" maxlength="80" placeholder="ex: Esparguete à bolonhesa">
       </div>
       <div>
-        <label>Peso indireto</label>
-        <input type="number" id="rd-peso" step="0.05" min="0" max="1" value="0" placeholder="0" inputmode="decimal">
+        <label>Peso indireto (%)</label>
+        <input type="number" id="rd-peso" step="5" min="0" max="100" value="0" placeholder="0" inputmode="decimal">
+      </div>
+      <div>
+        <label>Extra conv. (€)</label>
+        <input type="number" id="rd-extraconv" step="0.5" min="0" value="2" placeholder="2" inputmode="decimal">
       </div>
       <div>
         <label>Mín. MEO (€)</label>
@@ -662,18 +662,6 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
       <div>
         <label>Mín. Convidado (€)</label>
         <input type="number" id="rd-minconv" step="0.5" min="0" value="10" placeholder="10" inputmode="decimal">
-      </div>
-      <div>
-        <label>Extra conv. (€)</label>
-        <input type="number" id="rd-extraconv" step="0.5" min="0" value="2" placeholder="2" inputmode="decimal">
-      </div>
-    </div>
-    <div class="rd-considerado" id="rd-considerado" style="display:none">
-      <div class="rd-considerado-lbl">Considerado no cálculo</div>
-      <div class="rd-locked-grid">
-        <div class="rd-locked b"><div class="rdl-val" id="rd-c-bebidas">—</div><div class="rdl-lbl">Bebidas</div></div>
-        <div class="rd-locked g"><div class="rdl-val" id="rd-c-gerais">—</div><div class="rdl-lbl">Gerais</div></div>
-        <div class="rd-locked r"><div class="rdl-val" id="rd-c-refeicao">—</div><div class="rdl-lbl">Refeição</div></div>
       </div>
     </div>
     <div class="mbtns">
@@ -999,14 +987,14 @@ function calcular(data){
   const allocDireta=despesas.filter(x=>(x.tipo==='Almoço'||x.tipo==='Jantar')&&x.dataValor).reduce((a,x)=>a+x.valor,0);
   const F20=rnd((totalDesp-allocDireta)*0.5,2);
 
-  // Repartição do indireto entre "bebidas" e "gerais" (só apresentação na lista/detalhe).
-  // A bolsa indireta = tudo o que não é despesa direta de refeição. Bebidas+Cerveja → "bebidas";
-  // o resto (Gerais, Renda, Almoço/Jantar previstos) → "gerais". A soma das 2 parcelas é SEMPRE
-  // igual ao indireto I, por isso L/P/Q e os saldos não mudam.
-  const TIPOS_BEBIDA=['Bebidas','Cerveja'];
+  // Repartição do indireto entre "bebidas", "cerveja" e "gerais" (só apresentação na lista).
+  // A bolsa indireta = tudo o que não é despesa direta de refeição. A soma das 3 parcelas é
+  // SEMPRE igual ao indireto I, por isso L/P/Q e os saldos não mudam.
   const baseIndireta=rnd(totalDesp-allocDireta,2);
-  const baseBebidas=rnd(despesas.filter(x=>TIPOS_BEBIDA.includes(x.tipo)).reduce((a,x)=>a+x.valor,0),2);
+  const baseBebidas=rnd(despesas.filter(x=>x.tipo==='Bebidas').reduce((a,x)=>a+x.valor,0),2);
+  const baseCerveja=rnd(despesas.filter(x=>x.tipo==='Cerveja').reduce((a,x)=>a+x.valor,0),2);
   const fracBebidas=baseIndireta>0?baseBebidas/baseIndireta:0;
+  const fracCerveja=baseIndireta>0?baseCerveja/baseIndireta:0;
 
   const cmemb=(d,ref)=>{const rs=ref==='Lanche'?'Tarde':ref;const s=day2slot[d]+'|'+rs;return membros.filter(m=>m.presencas.includes(s)).length;};
 
@@ -1028,13 +1016,14 @@ function calcular(data){
     if(Ec===0)Q=0;
     else if(rd.ref==='Lanche')Q=P===0?0:Math.max(5,roundup(P,0)+rd.extraConv);
     else Q=P===0?0:Math.max(rd.minConv,roundup(P,0)+rd.extraConv);
-    // Custos para a lista/detalhe: direto (refeição) + indireto repartido em bebidas/gerais.
+    // Custos para a lista: direto (refeição) + indireto repartido em bebidas/cerveja/gerais.
     const indir=rd.ref==='Lanche'?rnd(L*D,2):I;     // bolsa indireta imputada a esta refeição
     const dirRef=rd.ref==='Lanche'?0:rnd(Fdir,2);    // despesa direta de comida da refeição
     const cBebidas=rnd(indir*fracBebidas,2);
-    const cGerais=rnd(indir-cBebidas,2);
+    const cCerveja=rnd(indir*fracCerveja,2);
+    const cGerais=rnd(indir-cBebidas-cCerveja,2);
     const custoTotal=rnd(dirRef+indir,2);            // = D*L
-    refeicoes.push({...rd,D,E:Ec,Fdir:rnd(Fdir,2),I,L,P,Q,dirRef,cBebidas,cGerais,custoTotal,custoUnit:L});
+    refeicoes.push({...rd,D,E:Ec,Fdir:rnd(Fdir,2),I,L,P,Q,dirRef,cBebidas,cCerveja,cGerais,custoTotal,custoUnit:L});
   }
 
   const rmap={};for(const r of refeicoes)rmap[r.data+'|'+r.ref]=r;
@@ -1337,10 +1326,21 @@ function renderAll(){
         const pesoDisplay=rd.peso!=null?Math.round((rd.peso||0)*100)+'%':'—';
         const totDisp=calcRef&&calcRef.custoTotal?eur(calcRef.custoTotal):'—';
         const unitDisp=calcRef&&calcRef.custoUnit?eur(calcRef.custoUnit):'—';
+        let compHtml='';
+        if(calcRef){
+          const comps=[
+            {c:'b',lbl:'Bebidas',v:calcRef.cBebidas},
+            {c:'cv',lbl:'Cerveja',v:calcRef.cCerveja},
+            {c:'g',lbl:'Gerais',v:calcRef.cGerais},
+            {c:'r',lbl:'Refeição',v:calcRef.dirRef}
+          ].filter(x=>x.v>0);
+          if(comps.length) compHtml='<div class="refdef-comp sf">'+comps.map(x=>`<span class="rc ${x.c}">${x.lbl} ${eur(x.v)}</span>`).join('')+'</div>';
+        }
         r+=`<div class="refdef-row refdef-click" style="flex-wrap:wrap" onclick="openRefdefModal(${rd._idx})">
           <span class="refdef-icon">${icon}</span>
           <div class="refdef-info">
             <div class="refdef-ref sf">${rd.ref}${rd.prato?`<span class="refdef-prato sf"> · ${escHtml(rd.prato)}</span>`:''}</div>
+            ${compHtml}
             <div class="refdef-params sf">
               <span>peso ${pesoDisplay}</span>
               <span>total ${totDisp}</span>
@@ -2330,7 +2330,7 @@ function editCfEntry(source,idx){
       </div>`;
   }
 
-  document.getElementById('edit-cf-modal').classList.toggle('ro-fields',!isAdmin());
+  applyRoFields(document.getElementById('edit-cf-modal'),!isAdmin());
   document.getElementById('edit-cf-bg').classList.add('show');
   document.body.classList.add('no-scroll');
 }
@@ -3110,6 +3110,19 @@ async function toggleAllSlot(slotKey,btn){
 /* ═══ REFEIÇÕES DEF CRUD ═══ */
 let editingRefdef=null;
 
+// Modo consulta (não-admin): bloqueia campos e remove os placeholders de exemplo
+function applyRoFields(modalEl,ro){
+  if(!modalEl)return;
+  modalEl.classList.toggle('ro-fields',ro);
+  modalEl.querySelectorAll('input,textarea').forEach(el=>{
+    if(ro){
+      if(el.placeholder){el.dataset.ph=el.placeholder;el.placeholder='';}
+    } else if(el.dataset.ph!==undefined){
+      el.placeholder=el.dataset.ph;delete el.dataset.ph;
+    }
+  });
+}
+
 function openRefdefModal(editIdx){
   editingRefdef=typeof editIdx==='number'?editIdx:null;
   const isEdit=editingRefdef!==null;
@@ -3120,7 +3133,7 @@ function openRefdefModal(editIdx){
     document.getElementById('rd-data').value=rd.data||'';
     document.getElementById('rd-ref').value=rd.ref||'Jantar';
     document.getElementById('rd-prato').value=rd.prato||'';
-    document.getElementById('rd-peso').value=rd.peso??0;
+    document.getElementById('rd-peso').value=rd.peso!=null?Math.round(rd.peso*100):0;
     document.getElementById('rd-minmeo').value=rd.minMEO||0;
     document.getElementById('rd-minconv').value=rd.minConv||10;
     document.getElementById('rd-extraconv').value=rd.extraConv||2;
@@ -3134,23 +3147,8 @@ function openRefdefModal(editIdx){
     document.getElementById('rd-extraconv').value='2';
   }
 
-  // Campos bloqueados (informativos): bebidas/gerais/refeição considerados — só em edição
-  const considerado=document.getElementById('rd-considerado');
-  const delBtn=document.getElementById('rd-del');
-  if(isEdit){
-    const rd=DATA.refeicoesDef[editingRefdef];
-    const calcRef=CALC&&CALC.refeicoes?CALC.refeicoes.find(x=>x.data===rd.data&&x.ref===rd.ref):null;
-    document.getElementById('rd-c-bebidas').textContent=calcRef?eur(calcRef.cBebidas):'—';
-    document.getElementById('rd-c-gerais').textContent=calcRef?eur(calcRef.cGerais):'—';
-    document.getElementById('rd-c-refeicao').textContent=calcRef?eur(calcRef.dirRef):'—';
-    considerado.style.display='';
-    delBtn.style.display=isAdmin()?'':'none';
-  } else {
-    considerado.style.display='none';
-    delBtn.style.display='none';
-  }
-
-  document.getElementById('refdef-modal').classList.toggle('ro-fields',!isAdmin());
+  document.getElementById('rd-del').style.display=(isEdit&&isAdmin())?'':'none';
+  applyRoFields(document.getElementById('refdef-modal'),!isAdmin());
   document.getElementById('refdef-bg').classList.add('show');
   document.body.classList.add('no-scroll');
 }
@@ -3172,7 +3170,7 @@ async function saveRefdef(){
   const data=document.getElementById('rd-data').value;
   const ref=document.getElementById('rd-ref').value;
   const prato=document.getElementById('rd-prato').value.trim();
-  const peso=parseFloat(document.getElementById('rd-peso').value)||0;
+  const peso=(parseFloat(document.getElementById('rd-peso').value)||0)/100;
   const minMEO=parseFloat(document.getElementById('rd-minmeo').value)||0;
   const minConv=parseFloat(document.getElementById('rd-minconv').value)||0;
   const extraConv=parseFloat(document.getElementById('rd-extraconv').value)||0;
