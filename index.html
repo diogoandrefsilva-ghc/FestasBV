@@ -265,15 +265,18 @@ body.read-only .readonly-banner{display:block}
 /* Guest filter */
 .guest-filter{margin-bottom:10px}
 .guest-filter select{width:100%;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:9px 32px 9px 11px;color:var(--ink);font-size:13px;font-weight:600;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;-webkit-appearance:none;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236F5C42' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;cursor:pointer}
-/* Cards de refeição (filtro) na secção de convidados */
-.guest-meal-chips{display:flex;gap:7px;overflow-x:auto;-webkit-overflow-scrolling:touch;padding:2px 0 8px;margin-bottom:6px;scrollbar-width:none}
-.guest-meal-chips::-webkit-scrollbar{display:none}
-.guest-meal-chip{flex:0 0 auto;display:flex;flex-direction:column;align-items:flex-start;gap:4px;min-width:0;background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:7px 10px;cursor:pointer;transition:.12s;position:relative;font-family:inherit}
-.guest-meal-chip .gmc-top{font-size:11px;font-weight:700;color:var(--ink);white-space:nowrap}
-.guest-meal-chip .gmc-ref{font-weight:500;color:var(--muted)}
-.guest-meal-chip .gmc-badge{font-size:13px;font-weight:700;color:var(--gold);background:var(--panel2);border-radius:7px;padding:1px 8px;min-width:22px;text-align:center}
+/* Cards de refeição (filtro) na secção de convidados — uma linha, sem scroll, encolhem por igual */
+.guest-meal-chips{display:flex;flex-wrap:nowrap;gap:4px;padding:2px 0 8px;margin-bottom:6px}
+.guest-meal-chip{flex:1 1 0;min-width:0;display:flex;flex-direction:column;align-items:center;gap:2px;min-height:52px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:6px 3px;cursor:pointer;transition:.12s;font-family:inherit;overflow:hidden}
+.guest-meal-chip .gmc-dia{font-size:11px;font-weight:700;color:var(--ink);line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.guest-meal-chip .gmc-ref{font-size:8px;font-weight:600;color:var(--muted);line-height:1;text-transform:uppercase;letter-spacing:.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.guest-meal-chip .gmc-ref.r-almoco{color:var(--gold)}
+.guest-meal-chip .gmc-ref.r-jantar{color:#6946A0}
+.guest-meal-chip .gmc-ref.r-lanche{color:var(--blue)}
+.guest-meal-chip .gmc-badge{margin-top:auto;font-size:12px;font-weight:700;color:var(--gold);background:var(--panel2);border-radius:6px;padding:0 5px;min-width:18px;text-align:center;line-height:1.6}
 .guest-meal-chip.on{border-color:var(--barrete);background:var(--panel2);box-shadow:0 0 0 1px var(--barrete) inset}
 .guest-meal-chip.on .gmc-badge{color:#fff;background:var(--barrete)}
+.guest-meal-chip.on .gmc-ref{color:var(--ink)}
 .guest-meal-chip:active{transform:scale(.96)}
 .guest-meal-chip.empty .gmc-badge{color:var(--faint)}
 
@@ -2867,13 +2870,14 @@ function renderGuestSection(){
     if(ordered.length){
       h+='<div class="guest-meal-chips sf">';
       const totN=baseGuests.length;
-      h+=`<button class="guest-meal-chip${guestFilterMeal==='all'?' on':''}" onclick="setGuestMeal('all')"><span class="gmc-top">Todas</span><span class="gmc-badge">${totN}</span></button>`;
+      h+=`<button class="guest-meal-chip${guestFilterMeal==='all'?' on':''}" onclick="setGuestMeal('all')"><span class="gmc-dia">Todas</span><span class="gmc-badge">${totN}</span></button>`;
       ordered.forEach(rd=>{
         const key=rd.dia+'|'+rd.ref;
-        const icon=rd.ref==='Almoço'?'🍳':rd.ref==='Jantar'?'🍖':'🍺';
+        const rc={'Almoço':'almoco','Lanche':'lanche','Jantar':'jantar'}[rd.ref]||'';
         const n=baseGuests.filter(g=>g.dia===rd.dia&&g.ref===rd.ref).length;
         h+=`<button class="guest-meal-chip${guestFilterMeal===key?' on':''}${n===0?' empty':''}" onclick="setGuestMeal('${key}')">
-          <span class="gmc-top">${rd.dia} <span class="gmc-ref">${icon} ${rd.ref}</span></span>
+          <span class="gmc-dia">${rd.dia}</span>
+          <span class="gmc-ref r-${rc}">${rd.ref}</span>
           <span class="gmc-badge">${n}</span>
         </button>`;
       });
