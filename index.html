@@ -353,9 +353,13 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .pres-btn:active{transform:scale(.88)}
 .pres-btn.on{border-color:var(--green);background:rgba(30,122,77,.12)}
 .pres-btn.on::after{content:"✓";color:var(--green);font-size:14px;font-weight:800}
-.pres-btn:not(.on)::after{content:"";display:block;width:8px;height:8px;border-radius:50%;background:var(--line)}
+.pres-btn:not(.on):not(.bebe)::after{content:"";display:block;width:8px;height:8px;border-radius:50%;background:var(--line)}
+.pres-btn.bebe{border-color:var(--blue);background:rgba(46,111,168,.12)}
+.pres-btn .beer-ic{width:17px;height:17px;color:var(--blue);display:block}
 .pres-btn.saving{pointer-events:none;opacity:.5}
 .pres-btn.on.saving::after{content:"";border:2px solid var(--green);border-top-color:transparent;border-radius:50%;width:12px;height:12px;background:none;animation:sp .5s linear infinite}
+.pres-sub{font-size:8.5px;color:var(--faint);font-weight:400;opacity:.8}
+.rc-bebe{background:rgba(46,111,168,.12);color:var(--blue);padding:1px 4px;border-radius:4px}
 .pres-count{font-size:10px;font-weight:700;color:var(--faint);text-align:center;padding:4px 0;border-top:2px solid var(--line)}
 .pres-count.has{color:var(--green)}
 .pres-member-count{font-size:11px;font-weight:700;color:var(--muted);padding:3px 0;text-align:right;min-width:30px;border-bottom:1px solid rgba(168,140,90,.35)}
@@ -986,6 +990,14 @@ function rnd(x,n=2){const f=Math.pow(10,n);return Math.floor(Math.abs(x)*f+0.5)/
 function roundup(x,n=0){const f=Math.pow(10,n);return Math.ceil(Math.abs(x)*f-1e-9)/f*(x>=0?1:-1);}
 const sumv=o=>Object.values(o).reduce((a,b)=>a+b,0);
 
+// A partir deste ano (inclusive), quem só bebe entra no denominador do indireto (alivia os
+// que comem). Antes disso, mantém-se o modelo legado: quem só bebe herda o indireto/nº-que-comem
+// como uma taxa que vai para o fundo (reproduz o antigo "Lanche").
+const MODELO_BEBE_DESDE=2026;
+// Presenças: cada item é {k:"dia|ref", modo:'come'|'bebe'}
+function presIdx(m,key){return(m.presencas||[]).findIndex(p=>p&&p.k===key);}
+function presModo(m,key){const p=(m.presencas||[]).find(p=>p&&p.k===key);return p?p.modo:null;}
+
 function calcular(data){
   const{evento,membros,despesas,convidados,mealheiros,refeicoesDef,pagamentos}=data;
   const pag=pagamentos||[];
@@ -1009,44 +1021,62 @@ function calcular(data){
   const fracBebidas=baseIndireta>0?baseBebidas/baseIndireta:0;
   const fracCerveja=baseIndireta>0?baseCerveja/baseIndireta:0;
 
-  const cmemb=(d,ref)=>{const rs=ref==='Lanche'?'Tarde':ref;const s=day2slot[d]+'|'+rs;return membros.filter(m=>m.presencas.includes(s)).length;};
+  const slotKeyOf=(d,ref)=>{const rs=ref==='Lanche'?'Tarde':ref;return day2slot[d]+'|'+rs;};
+  const countModo=(d,ref,modo)=>{const s=slotKeyOf(d,ref);return membros.filter(m=>(m.presencas||[]).some(p=>p.k===s&&p.modo===modo)).length;};
+  const countAny=(d,ref)=>{const s=slotKeyOf(d,ref);return membros.filter(m=>(m.presencas||[]).some(p=>p.k===s)).length;};
+  const indiretoComBebe=(evento.ano||9999)>=MODELO_BEBE_DESDE;
 
   const refeicoes=[];let prevIndirectPerPerson=0;
   for(const rd of refeicoesDef){
     const Ec=convidados.filter(g=>g.dia===rd.dia&&g.ref===rd.ref&&g.pagante==='Sim').length;
-    const D=cmemb(rd.data,rd.ref)+Ec;
-    let Fdir=0,I=0,L=0;
     if(rd.ref==='Lanche'){
-      L=rnd(prevIndirectPerPerson,2);
-    } else {
-      Fdir=despesas.filter(x=>x.tipo===rd.ref&&x.dataValor===rd.data).reduce((a,x)=>a+x.valor,0);
-      I=rnd(F20*(rd.peso||0),2);
-      L=D?rnd((Fdir+I)/D,2):0;
-      if(D)prevIndirectPerPerson=rnd(I/D,2);
+      // LEGADO: lanche herda o indireto unitário do almoço anterior (taxa para o fundo).
+      // Mantido para anos antigos não migrados ao modelo "só bebe".
+      const D=countAny(rd.data,rd.ref)+Ec;
+      const L=rnd(prevIndirectPerPerson,2);
+      const P=D===0?0:Math.max(rd.minMEO,L);
+      let Q;
+      if(Ec===0)Q=0;else Q=P===0?0:Math.max(5,roundup(P,0)+rd.extraConv);
+      const indir=rnd(L*D,2);
+      const cBebidas=rnd(indir*fracBebidas,2),cCerveja=rnd(indir*fracCerveja,2),cGerais=rnd(indir-cBebidas-cCerveja,2);
+      refeicoes.push({...rd,D,E:Ec,Ncomem:D,Nbebe:0,Fdir:0,I:0,L,P,Pbebe:0,Q,dirRef:0,cBebidas,cCerveja,cGerais,custoTotal:indir,custoUnit:L,custoUnitBebe:0,temBebe:false});
+      continue;
     }
-    const P=D===0?0:Math.max(rd.minMEO,L);
+    // Refeição normal (Almoço/Jantar): estados come / só bebe
+    const Ncomem=countModo(rd.data,rd.ref,'come')+Ec;   // convidados comem sempre
+    const Nbebe=countModo(rd.data,rd.ref,'bebe');
+    const Fdir=despesas.filter(x=>x.tipo===rd.ref&&x.dataValor===rd.data).reduce((a,x)=>a+x.valor,0);
+    const I=rnd(F20*(rd.peso||0),2);
+    const Ndiv=indiretoComBebe?(Ncomem+Nbebe):Ncomem;   // 2026+: bebes entram no denominador
+    const indiretoPP=Ndiv>0?rnd(I/Ndiv,2):0;
+    const diretoPP=Ncomem>0?rnd(Fdir/Ncomem,2):0;
+    const L=rnd(diretoPP+indiretoPP,2);                  // unitário de quem come
+    const Lbebe=indiretoPP;                              // unitário de quem só bebe
+    if(Ncomem)prevIndirectPerPerson=rnd(I/Ncomem,2);     // para o lanche legado herdar
+    const P=Ncomem===0?0:Math.max(rd.minMEO,L);
+    const Pbebe=Lbebe;                                   // sem mínimo
     let Q;
-    if(Ec===0)Q=0;
-    else if(rd.ref==='Lanche')Q=P===0?0:Math.max(5,roundup(P,0)+rd.extraConv);
-    else Q=P===0?0:Math.max(rd.minConv,roundup(P,0)+rd.extraConv);
-    // Custos para a lista: direto (refeição) + indireto repartido em bebidas/cerveja/gerais.
-    const indir=rd.ref==='Lanche'?rnd(L*D,2):I;     // bolsa indireta imputada a esta refeição
-    const dirRef=rd.ref==='Lanche'?0:rnd(Fdir,2);    // despesa direta de comida da refeição
-    const cBebidas=rnd(indir*fracBebidas,2);
-    const cCerveja=rnd(indir*fracCerveja,2);
-    const cGerais=rnd(indir-cBebidas-cCerveja,2);
-    const custoTotal=rnd(dirRef+indir,2);            // = D*L
-    refeicoes.push({...rd,D,E:Ec,Fdir:rnd(Fdir,2),I,L,P,Q,dirRef,cBebidas,cCerveja,cGerais,custoTotal,custoUnit:L});
+    if(Ec===0)Q=0;else Q=P===0?0:Math.max(rd.minConv,roundup(P,0)+rd.extraConv);
+    const dirRef=rnd(Fdir,2);
+    const cBebidas=rnd(I*fracBebidas,2),cCerveja=rnd(I*fracCerveja,2),cGerais=rnd(I-cBebidas-cCerveja,2);
+    const custoTotal=rnd(Fdir+I,2);
+    refeicoes.push({...rd,D:Ncomem,E:Ec,Ncomem,Nbebe,Fdir:rnd(Fdir,2),I,L,P,Pbebe,Q,dirRef,cBebidas,cCerveja,cGerais,custoTotal,custoUnit:L,custoUnitBebe:Lbebe,temBebe:Nbebe>0});
   }
 
   const rmap={};for(const r of refeicoes)rmap[r.data+'|'+r.ref]=r;
   const reffor=(dia,ref)=>{if(ref==='Tarde')ref='Lanche';return rmap[slotday[dia]+'|'+ref];};
   for(const m of membros){
     m._refs=[];
-    m.presencas.forEach(k=>{
-      const[dia,ref]=k.split('|');
+    (m.presencas||[]).forEach(p=>{
+      const[dia,ref]=p.k.split('|');
       const r=reffor(dia,ref);
-      if(r&&r.P>0)m._refs.push({dia,ref:ref==='Tarde'?'Lanche':ref,p:r.P});
+      if(!r)return;
+      const refName=ref==='Tarde'?'Lanche':ref;
+      if(p.modo==='bebe'){
+        if(r.Pbebe>0)m._refs.push({dia,ref:refName,p:r.Pbebe,modo:'bebe'});
+      } else {
+        if(r.P>0)m._refs.push({dia,ref:refName,p:r.P,modo:'come'});
+      }
     });
     m.Sown=rnd(m._refs.reduce((a,x)=>a+x.p,0),2);
     m._convs=convidados.filter(g=>g.membro===m.nome&&g.pagante==='Sim').map(g=>{
@@ -1185,6 +1215,9 @@ function calcular(data){
 
 /* RENDER */
 const eur=x=>new Intl.NumberFormat('pt-PT',{style:'currency',currency:'EUR'}).format(x);
+// Ícone "só bebe" — caneca de cerveja, uma cor (currentColor)
+const BEER_SVG='<svg class="beer-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 10v8a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2v-8"/><path d="M15 12h2a2 2 0 0 1 2 2v1a2 2 0 0 1-2 2h-2"/><path d="M7 10a2 2 0 1 1 3-1.7A2 2 0 0 1 13 8a2 2 0 0 1 2 2"/></svg>';
+const BEER_SVG_SM='<svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M7 10v8a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2v-8"/><path d="M15 12h2a2 2 0 0 1 2 2v1a2 2 0 0 1-2 2h-2"/><path d="M7 10a2 2 0 1 1 3-1.7A2 2 0 0 1 13 8a2 2 0 0 1 2 2"/></svg>';
 const AVCOL=['#eeb64d','#e0533f','#2f9e77','#7fa8c9','#d98a3d','#43c98a','#c96f8a','#b98cff'];
 function av(nome,i){return`<div class="av" style="background:${AVCOL[i%AVCOL.length]}">${nome.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase()}</div>`;}
 
@@ -1375,6 +1408,7 @@ function renderAll(){
               <span>Diretos ${diretosDisp}</span>
               <span>Total ${totDisp}</span>
               <span>Unit. ${unitDisp}</span>
+              ${calcRef&&calcRef.temBebe?`<span class="rc-bebe">Só bebida ${eur(calcRef.custoUnitBebe)}</span>`:''}
             </div>
           </div>
           <span class="refdef-chevron sf">›</span>`;
@@ -1756,7 +1790,7 @@ async function carregar(){
       evento:{nome:ev.nome,ano:ev.ano,tesoureiro:ev.tesoureiro,arredondaTotal:!!ev.arredonda_total,missaoPoupanca:N(ev.missao_poupanca),fundoReserva:N(ev.fundo_reserva)},
       membros:(ev.membros||[]).sort((a,b)=>a.nome.localeCompare(b.nome,'pt')).map(m=>({
         _id:m.id,nome:m.nome,fator:N(m.fator),sobras:N(m.sobras),outras:N(m.outras),
-        presencas:(m.presencas||[]).map(p=>`${p.dia}|${p.ref}`)
+        presencas:(m.presencas||[]).map(p=>({k:`${p.dia}|${p.ref}`,modo:p.modo==='bebe'?'bebe':'come'}))
       })),
       refeicoesDef:(ev.refeicoes_def||[]).map(r=>({data:r.data,dia:r.dia,ref:r.ref,prato:r.prato||'',peso:N(r.peso),minMEO:N(r.min_meo),minConv:N(r.min_conv),extraConv:N(r.extra_conv)})),
       despesas:(ev.despesas||[]).map(d=>({_id:d.id,quem:d.quem,dataDesp:d.data_desp,dataValor:d.data_valor,desc:d.descricao,tipo:d.tipo,valor:N(d.valor),obs:d.observacoes||''})),
@@ -1816,7 +1850,7 @@ async function sbGuardarEvento(y,slot){
       idByNome={};mres.forEach(r=>idByNome[r.nome]=r.id);
       y.membros.forEach(m=>{if(idByNome[m.nome])m._id=idByNome[m.nome];});
       const pres=[];
-      y.membros.forEach(m=>(m.presencas||[]).forEach(p=>{const[dia,ref]=p.split('|');pres.push({membro_id:idByNome[m.nome],dia,ref});}));
+      y.membros.forEach(m=>(m.presencas||[]).forEach(p=>{const[dia,ref]=p.k.split('|');pres.push({membro_id:idByNome[m.nome],dia,ref,modo:p.modo||'come'});}));
       if(pres.length)await sbReq('POST','presencas',pres);
     }
     if(y.refeicoesDef&&y.refeicoesDef.length)
@@ -2753,7 +2787,8 @@ function renderPresencaGrid(){
   let h='<div class="pres-section">';
   h+='<div class="sec-title sf" style="margin-top:18px">Presenças</div>';
   h+='<div class="pres-legend sf">';
-  h+='<div class="pres-legend-item"><div class="pres-legend-dot" style="background:var(--green)"></div> Presente</div>';
+  h+='<div class="pres-legend-item"><div class="pres-legend-dot" style="background:var(--green)"></div> Come</div>';
+  h+='<div class="pres-legend-item"><div class="pres-legend-dot" style="background:var(--blue)"></div> Só bebe</div>';
   h+='<div class="pres-legend-item"><div class="pres-legend-dot" style="background:var(--line)"></div> Ausente</div>';
   h+='</div>';
 
@@ -2784,7 +2819,7 @@ function renderPresencaGrid(){
     h+='<tr><td class="pres-name" style="border-bottom:2px solid var(--line)"><span class="sf" style="font-size:10px;color:var(--faint);padding-left:2px">Sel. todos</span></td>';
     days.forEach(d=>{
       d.slots.forEach(s=>{
-        const allOn=mbrs.every(m=>(m.presencas||[]).includes(s.key));
+        const allOn=mbrs.every(m=>(m.presencas||[]).some(p=>p.k===s.key));
         h+=`<td class="pres-selall"><button class="pres-selall-btn sf${allOn?' all':''}" onclick="toggleAllSlot('${s.key}',this)" title="Selecionar/desselecionar todos">${allOn?'✓':'∀'}</button></td>`;
       });
     });
@@ -2804,8 +2839,9 @@ function renderPresencaGrid(){
       const isToday=d.data===hoje;
       const pode=adm||(meu&&d.data>=hoje);
       d.slots.forEach(s=>{
-        const isOn=pres.includes(s.key);
-        h+=`<td class="pres-cell${isToday?' today':''}"><button class="pres-btn${isOn?' on':''}${pode?'':' locked'}" data-member="${mi}" data-slot="${s.key}"${pode?` onclick="togglePresenca(${mi},'${s.key}',this)"`:''}></button></td>`;
+        const modo=presModo(m,s.key);
+        const cls=modo==='bebe'?' bebe':(modo==='come'?' on':'');
+        h+=`<td class="pres-cell${isToday?' today':''}"><button class="pres-btn${cls}${pode?'':' locked'}" data-member="${mi}" data-slot="${s.key}"${pode?` onclick="togglePresenca(${mi},'${s.key}',this)"`:''}>${modo==='bebe'?BEER_SVG:''}</button></td>`;
       });
     });
     h+=`<td class="pres-member-count sf${memberCount===totalSlots?' full':''}">${memberCount}/${totalSlots}</td>`;
@@ -2813,24 +2849,24 @@ function renderPresencaGrid(){
   });
   h+='</tbody>';
 
-  // Footer: count per slot — membros
-  h+='<tfoot><tr><td class="pres-name" style="border-bottom:none"><span class="sf" style="font-size:10px;color:var(--faint);padding-left:2px">Membros</span></td>';
+  const subLbl='<span class="pres-sub">que comem</span>';
+  // Footer: membros que comem
+  h+='<tfoot><tr><td class="pres-name" style="border-bottom:none"><span class="sf" style="font-size:10px;color:var(--faint);padding-left:2px">Membros '+subLbl+'</span></td>';
   days.forEach(d=>{
     d.slots.forEach(s=>{
-      const count=mbrs.filter(m=>(m.presencas||[]).includes(s.key)).length;
+      const count=mbrs.filter(m=>presModo(m,s.key)==='come').length;
       h+=`<td class="pres-count sf${count>0?' has':''}">${count}</td>`;
     });
   });
-  const totalMemPres=mbrs.reduce((a,m)=>a+(m.presencas||[]).length,0);
-  h+=`<td class="pres-count sf has">${totalMemPres}</td>`;
+  const totalMemComem=mbrs.reduce((a,m)=>a+(m.presencas||[]).filter(p=>p.modo==='come').length,0);
+  h+=`<td class="pres-count sf has">${totalMemComem}</td>`;
   h+='</tr>';
 
-  // Footer: convidados per slot
-  h+='<tr><td class="pres-name" style="border-bottom:none"><span class="sf" style="font-size:10px;color:var(--faint);padding-left:2px">Convid.</span></td>';
+  // Footer: convidados que comem
+  h+='<tr><td class="pres-name" style="border-bottom:none"><span class="sf" style="font-size:10px;color:var(--faint);padding-left:2px">Convidados '+subLbl+'</span></td>';
   let totalGuestAll=0;
   days.forEach(d=>{
     d.slots.forEach(s=>{
-      // Map slot key back to dia/ref for convidados lookup
       const parts=s.key.split('|');
       const slotDia=parts[0];
       const slotRef=parts[1]==='Tarde'?'Lanche':parts[1];
@@ -2842,12 +2878,12 @@ function renderPresencaGrid(){
   h+=`<td class="pres-count sf${totalGuestAll>0?' has':''}" style="${totalGuestAll>0?'color:var(--gold)':''}">${totalGuestAll}</td>`;
   h+='</tr>';
 
-  // Footer: total people (membros + convidados)
-  h+='<tr><td class="pres-name" style="border-bottom:none;border-top:2px solid var(--line)"><span class="sf" style="font-size:10px;font-weight:700;color:var(--muted);padding-left:2px">Total</span></td>';
+  // Footer: total que comem (membros + convidados)
+  h+='<tr><td class="pres-name" style="border-bottom:none;border-top:2px solid var(--line)"><span class="sf" style="font-size:10px;font-weight:700;color:var(--muted);padding-left:2px">Total '+subLbl+'</span></td>';
   let totalPeopleAll=0;
   days.forEach(d=>{
     d.slots.forEach(s=>{
-      const memCount=mbrs.filter(m=>(m.presencas||[]).includes(s.key)).length;
+      const memCount=mbrs.filter(m=>presModo(m,s.key)==='come').length;
       const parts=s.key.split('|');
       const slotDia=parts[0];
       const slotRef=parts[1]==='Tarde'?'Lanche':parts[1];
@@ -2858,7 +2894,22 @@ function renderPresencaGrid(){
     });
   });
   h+=`<td class="pres-count sf has" style="border-top:2px solid var(--line);font-weight:700">${totalPeopleAll}</td>`;
-  h+='</tr></tfoot></table></div>';
+  h+='</tr>';
+
+  // Footer: total que só bebem
+  let totalBebeAll=0;
+  const bebeRow=days.map(d=>d.slots.map(s=>{
+    const c=mbrs.filter(m=>presModo(m,s.key)==='bebe').length;
+    totalBebeAll+=c;return c;
+  })).flat();
+  if(totalBebeAll>0){
+    let bi=0;
+    h+='<tr><td class="pres-name" style="border-bottom:none"><span class="sf" style="font-size:10px;color:var(--blue);padding-left:2px;display:flex;align-items:center;gap:3px">'+BEER_SVG_SM+' Só bebem</span></td>';
+    days.forEach(d=>{d.slots.forEach(()=>{const c=bebeRow[bi++];h+=`<td class="pres-count sf${c>0?' has':''}" style="${c>0?'color:var(--blue)':''}">${c||'—'}</td>`;});});
+    h+=`<td class="pres-count sf has" style="color:var(--blue)">${totalBebeAll}</td>`;
+    h+='</tr>';
+  }
+  h+='</tfoot></table></div>';
   h+='</div>';
   return h;
 }
@@ -3067,17 +3118,25 @@ async function togglePresenca(memberIdx,slotKey,btn){
   }
   if(!m._id){toast('Sem ligação à base de dados — recarrega a página','bad');return;}
   if(!m.presencas)m.presencas=[];
-  const idx=m.presencas.indexOf(slotKey);
-  const adding=idx<0;
-  if(adding){m.presencas.push(slotKey);btn.classList.add('on');}
-  else{m.presencas.splice(idx,1);btn.classList.remove('on');}
+  const i=presIdx(m,slotKey);
+  const cur=i<0?null:m.presencas[i].modo;        // null | 'come' | 'bebe'
+  const next=cur===null?'come':(cur==='come'?'bebe':null);  // ciclo: vazio → come → só bebe → vazio
+  // estado local otimista
+  if(next===null){if(i>=0)m.presencas.splice(i,1);}
+  else if(i<0)m.presencas.push({k:slotKey,modo:next});
+  else m.presencas[i].modo=next;
+  paintPresBtn(btn,next);
   btn.classList.add('saving');
   setSync('load','a guardar…');
 
   queueWrite(async()=>{
     try{
-      if(adding)await sbReq('POST','presencas?on_conflict=membro_id,dia,ref',[{membro_id:m._id,dia,ref}],{Prefer:'resolution=ignore-duplicates'});
-      else await sbReq('DELETE',`presencas?membro_id=eq.${m._id}&dia=eq.${enc(dia)}&ref=eq.${enc(ref)}`);
+      if(cur===null&&next==='come')
+        await sbReq('POST','presencas?on_conflict=membro_id,dia,ref',[{membro_id:m._id,dia,ref,modo:'come'}],{Prefer:'resolution=ignore-duplicates'});
+      else if(next==='bebe')
+        await sbReq('PATCH',`presencas?membro_id=eq.${m._id}&dia=eq.${enc(dia)}&ref=eq.${enc(ref)}`,{modo:'bebe'});
+      else
+        await sbReq('DELETE',`presencas?membro_id=eq.${m._id}&dia=eq.${enc(dia)}&ref=eq.${enc(ref)}`);
       btn.classList.remove('saving');
       marcaGuardado();
       clearTimeout(presDebounce);
@@ -3088,11 +3147,12 @@ async function togglePresenca(memberIdx,slotKey,btn){
       },400);
       return true;
     }catch(e){
-      // reverter o toggle otimista
-      const i2=m.presencas.indexOf(slotKey);
-      if(adding&&i2>=0)m.presencas.splice(i2,1);
-      else if(!adding&&i2<0)m.presencas.push(slotKey);
-      btn.classList.toggle('on',m.presencas.includes(slotKey));
+      // reverter para o estado anterior
+      const j=presIdx(m,slotKey);
+      if(cur===null){if(j>=0)m.presencas.splice(j,1);}
+      else if(j<0)m.presencas.push({k:slotKey,modo:cur});
+      else m.presencas[j].modo=cur;
+      paintPresBtn(btn,cur);
       btn.classList.remove('saving');
       setSync('err','erro ao guardar');
       toast(permErrorMsg(e),'bad');
@@ -3100,17 +3160,23 @@ async function togglePresenca(memberIdx,slotKey,btn){
     }
   });
 }
+function paintPresBtn(btn,modo){
+  btn.classList.remove('on','bebe');
+  if(modo==='come'){btn.classList.add('on');btn.innerHTML='';}
+  else if(modo==='bebe'){btn.classList.add('bebe');btn.innerHTML=BEER_SVG;}
+  else btn.innerHTML='';
+}
 
 async function toggleAllSlot(slotKey,btn){
   if(!isAdmin())return;
   const [dia,ref]=slotKey.split('|');
   const mbrs=DATA.membros;
-  const allOn=mbrs.every(m=>(m.presencas||[]).includes(slotKey));
+  const allOn=mbrs.every(m=>(m.presencas||[]).some(p=>p.k===slotKey));
   mbrs.forEach(m=>{
     if(!m.presencas)m.presencas=[];
-    const idx=m.presencas.indexOf(slotKey);
+    const idx=presIdx(m,slotKey);
     if(allOn){if(idx>=0)m.presencas.splice(idx,1);}
-    else{if(idx<0)m.presencas.push(slotKey);}
+    else{if(idx<0)m.presencas.push({k:slotKey,modo:'come'});}
   });
   setSync('load','a guardar…');
   queueWrite(async()=>{
@@ -3119,7 +3185,7 @@ async function toggleAllSlot(slotKey,btn){
       if(allOn){
         if(ids.length)await sbReq('DELETE',`presencas?dia=eq.${enc(dia)}&ref=eq.${enc(ref)}&membro_id=in.(${ids.join(',')})`);
       }else{
-        const rows=mbrs.filter(m=>m._id).map(m=>({membro_id:m._id,dia,ref}));
+        const rows=mbrs.filter(m=>m._id).map(m=>({membro_id:m._id,dia,ref,modo:'come'}));
         if(rows.length)await sbReq('POST','presencas?on_conflict=membro_id,dia,ref',rows,{Prefer:'resolution=ignore-duplicates'});
       }
       syncMirror();
@@ -3253,8 +3319,7 @@ async function deleteRefdef(idx){
   const slotKey=rd.dia+'|'+(rd.ref==='Lanche'?'Tarde':rd.ref);
   DATA.membros.forEach(m=>{
     if(!m.presencas)return;
-    const pi=m.presencas.indexOf(slotKey);
-    if(pi>=0)m.presencas.splice(pi,1);
+    m.presencas=m.presencas.filter(p=>p.k!==slotKey);
   });
   DATA.refeicoesDef.splice(idx,1);
   const ok=await pushToGitHub('Remover refeição: '+rd.dia+' '+rd.ref);
