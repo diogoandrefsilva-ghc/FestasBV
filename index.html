@@ -355,7 +355,7 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .pres-btn.on::after{content:"✓";color:var(--green);font-size:14px;font-weight:800}
 .pres-btn:not(.on):not(.bebe)::after{content:"";display:block;width:8px;height:8px;border-radius:50%;background:var(--line)}
 .pres-btn.bebe{border-color:var(--blue);background:rgba(46,111,168,.12)}
-.pres-btn .beer-ic{width:17px;height:17px;color:var(--blue);display:block}
+.pres-btn .beer-ic{width:21px;height:21px;color:var(--blue);display:block}
 .pres-btn.saving{pointer-events:none;opacity:.5}
 .pres-btn.on.saving::after{content:"";border:2px solid var(--green);border-top-color:transparent;border-radius:50%;width:12px;height:12px;background:none;animation:sp .5s linear infinite}
 .pres-sub{font-size:8.5px;color:var(--faint);font-weight:400;opacity:.8}
@@ -1215,9 +1215,9 @@ function calcular(data){
 
 /* RENDER */
 const eur=x=>new Intl.NumberFormat('pt-PT',{style:'currency',currency:'EUR'}).format(x);
-// Ícone "só bebe" — caneca de cerveja, uma cor (currentColor)
-const BEER_SVG='<svg class="beer-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 10v8a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2v-8"/><path d="M15 12h2a2 2 0 0 1 2 2v1a2 2 0 0 1-2 2h-2"/><path d="M7 10a2 2 0 1 1 3-1.7A2 2 0 0 1 13 8a2 2 0 0 1 2 2"/></svg>';
-const BEER_SVG_SM='<svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M7 10v8a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2v-8"/><path d="M15 12h2a2 2 0 0 1 2 2v1a2 2 0 0 1-2 2h-2"/><path d="M7 10a2 2 0 1 1 3-1.7A2 2 0 0 1 13 8a2 2 0 0 1 2 2"/></svg>';
+// Ícone "só bebe" — caneca de cerveja com espuma, uma cor (currentColor)
+const BEER_SVG='<svg class="beer-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 11h1a3 3 0 0 1 0 6h-1"/><path d="M9 12v6"/><path d="M13 12v6"/><path d="M14 7.5c-1 0-1.44.5-3 .5s-2-.5-3-.5-1.72.5-2.5.5a2.5 2.5 0 0 1 0-5c.78 0 1.57.5 2.5.5S9.44 3 11 3s2 .5 3 .5 1.72-.5 2.5-.5a2.5 2.5 0 0 1 0 5c-.78 0-1.5-.5-2.5-.5Z"/><path d="M5 8v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V8"/></svg>';
+const BEER_SVG_SM='<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M17 11h1a3 3 0 0 1 0 6h-1"/><path d="M9 12v6"/><path d="M13 12v6"/><path d="M14 7.5c-1 0-1.44.5-3 .5s-2-.5-3-.5-1.72.5-2.5.5a2.5 2.5 0 0 1 0-5c.78 0 1.57.5 2.5.5S9.44 3 11 3s2 .5 3 .5 1.72-.5 2.5-.5a2.5 2.5 0 0 1 0 5c-.78 0-1.5-.5-2.5-.5Z"/><path d="M5 8v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V8"/></svg>';
 const AVCOL=['#eeb64d','#e0533f','#2f9e77','#7fa8c9','#d98a3d','#43c98a','#c96f8a','#b98cff'];
 function av(nome,i){return`<div class="av" style="background:${AVCOL[i%AVCOL.length]}">${nome.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase()}</div>`;}
 
