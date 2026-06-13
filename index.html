@@ -919,6 +919,9 @@ setInterval(()=>{sbEnsureFresh();},10*60*1000);
 let ALL_YEARS=[];
 let YEAR_IDX=0;
 let DATA=null,CALC=null,TAB='saldos',GH_SHA=null;
+// Persistência do estado de navegação (sobrevive ao reload do PWA quando o iOS o descarrega)
+function lsSet(k,v){try{localStorage.setItem(k,v);}catch(_){}}
+function lsGet(k){try{return localStorage.getItem(k);}catch(_){return null;}}
 
 /* ── Permissões: utilizadores ↔ membros ↔ casais ── */
 let USER_AMIGOS=[];   // [{email,amigo}]
@@ -971,6 +974,7 @@ function changeYear(delta){
 function selectYear(){
   DATA=JSON.parse(JSON.stringify(ALL_YEARS[YEAR_IDX]));
   CALC=calcular(JSON.parse(JSON.stringify(DATA)));
+  if(DATA.evento&&DATA.evento.ano)lsSet('fbv_ano',DATA.evento.ano);
   updateYearUI();
   renderAll();
 }
@@ -1222,6 +1226,7 @@ const AVCOL=['#eeb64d','#e0533f','#2f9e77','#7fa8c9','#d98a3d','#43c98a','#c96f8
 function av(nome,i){return`<div class="av" style="background:${AVCOL[i%AVCOL.length]}">${nome.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase()}</div>`;}
 
 function setTab(t){TAB=t;document.querySelectorAll('.tab').forEach(e=>e.classList.toggle('on',e.dataset.tab===t));
+  if(['saldos','resumo','refeicoes','cashflows'].includes(t))lsSet('fbv_tab',t);
   ['saldos','resumo','refeicoes','cashflows'].forEach(v=>document.getElementById('view-'+v).style.display=v===t?'':'none');
   // Hero only visible in saldos tab
   const hero=document.getElementById('hero-card');
@@ -1229,7 +1234,7 @@ function setTab(t){TAB=t;document.querySelectorAll('.tab').forEach(e=>e.classLis
 }
 
 let REF_SUB='calendario';
-function setRefSub(s){REF_SUB=s;document.querySelectorAll('.sub-tab').forEach(e=>e.classList.toggle('on',e.dataset.sub===s));
+function setRefSub(s){REF_SUB=s;lsSet('fbv_refsub',s);document.querySelectorAll('.sub-tab').forEach(e=>e.classList.toggle('on',e.dataset.sub===s));
   document.getElementById('ref-sub-calendario').style.display=s==='calendario'?'':'none';
   document.getElementById('ref-sub-presencas').style.display=s==='presencas'?'':'none';}
 
@@ -1799,8 +1804,15 @@ async function carregar(){
       pagamentos:(ev.pagamentos||[]).map(p=>({de:p.de,para:p.para,valor:N(p.valor),ref:p.ref,data:p.data}))
     }));
     ALL_YEARS.sort((a,b)=>(a.evento.ano||0)-(b.evento.ano||0));
-    YEAR_IDX=ALL_YEARS.length-1;
+    // Restaurar onde o utilizador estava (ano + separadores), senão ano mais recente
+    const savedAno=parseInt(lsGet('fbv_ano'),10);
+    const yi=ALL_YEARS.findIndex(y=>y.evento.ano===savedAno);
+    YEAR_IDX=yi>=0?yi:ALL_YEARS.length-1;
+    const savedSub=lsGet('fbv_refsub');
+    if(savedSub==='calendario'||savedSub==='presencas')REF_SUB=savedSub;
     selectYear();
+    const savedTab=lsGet('fbv_tab');
+    if(['saldos','resumo','refeicoes','cashflows'].includes(savedTab))setTab(savedTab);
     setSync('live','sincronizado · '+new Date().toLocaleTimeString('pt-PT',{hour:'2-digit',minute:'2-digit'}));
     updateReadOnlyMode();
   }catch(e){setSync('err','sem ligação');toast('Erro: '+e.message,'bad');}
@@ -2668,6 +2680,7 @@ async function addNewYear(){
   ALL_YEARS.push(newYear);
   ALL_YEARS.sort((a,b)=>(a.evento.ano||0)-(b.evento.ano||0));
   YEAR_IDX=ALL_YEARS.findIndex(y=>y.evento.ano===yearVal);
+  lsSet('fbv_ano',yearVal);
   DATA=JSON.parse(JSON.stringify(ALL_YEARS[YEAR_IDX]));
   CALC=calcular(JSON.parse(JSON.stringify(DATA)));
   updateYearUI();renderAll();
