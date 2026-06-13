@@ -390,8 +390,8 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .refdef-date{font-size:11px;color:var(--faint)}
 .refdef-params{display:flex;gap:6px;font-size:10.5px;color:var(--muted);margin-top:2px;flex-wrap:wrap}
 .refdef-params span{background:var(--panel2);padding:1px 6px;border-radius:4px}
-.refdef-comp{display:flex;gap:5px;flex-wrap:wrap;margin-top:4px}
-.refdef-comp .rc{font-size:10px;font-weight:600;padding:1px 6px;border-radius:4px;white-space:nowrap}
+.refdef-comp{display:flex;gap:4px;flex-wrap:wrap;margin-top:4px}
+.refdef-comp .rc{font-size:9px;font-weight:400;padding:1px 4px;border-radius:4px;white-space:nowrap}
 .refdef-comp .rc.b{background:rgba(46,111,168,.12);color:var(--blue)}
 .refdef-comp .rc.cv{background:rgba(196,144,32,.16);color:#9A6E0E}
 .refdef-comp .rc.g{background:rgba(111,92,66,.12);color:var(--muted)}
@@ -1172,6 +1172,7 @@ function calcular(data){
 
 /* RENDER */
 const eur=x=>new Intl.NumberFormat('pt-PT',{style:'currency',currency:'EUR'}).format(x);
+const eurc=x=>new Intl.NumberFormat('pt-PT',{minimumFractionDigits:2,maximumFractionDigits:2}).format(x);
 const AVCOL=['#eeb64d','#e0533f','#2f9e77','#7fa8c9','#d98a3d','#43c98a','#c96f8a','#b98cff'];
 function av(nome,i){return`<div class="av" style="background:${AVCOL[i%AVCOL.length]}">${nome.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase()}</div>`;}
 
@@ -1334,7 +1335,7 @@ function renderAll(){
             {c:'g',lbl:'Gerais',v:calcRef.cGerais},
             {c:'r',lbl:'Refeição',v:calcRef.dirRef}
           ].filter(x=>x.v>0);
-          if(comps.length) compHtml='<div class="refdef-comp sf">'+comps.map(x=>`<span class="rc ${x.c}">${x.lbl} ${eur(x.v)}</span>`).join('')+'</div>';
+          if(comps.length) compHtml='<div class="refdef-comp sf">'+comps.map(x=>`<span class="rc ${x.c}">${x.lbl} ${eurc(x.v)}</span>`).join('')+'</div>';
         }
         r+=`<div class="refdef-row refdef-click" style="flex-wrap:wrap" onclick="openRefdefModal(${rd._idx})">
           <span class="refdef-icon">${icon}</span>
