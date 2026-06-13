@@ -265,6 +265,17 @@ body.read-only .readonly-banner{display:block}
 /* Guest filter */
 .guest-filter{margin-bottom:10px}
 .guest-filter select{width:100%;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:9px 32px 9px 11px;color:var(--ink);font-size:13px;font-weight:600;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;-webkit-appearance:none;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236F5C42' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;cursor:pointer}
+/* Cards de refeição (filtro) na secção de convidados */
+.guest-meal-chips{display:flex;gap:7px;overflow-x:auto;-webkit-overflow-scrolling:touch;padding:2px 0 8px;margin-bottom:6px;scrollbar-width:none}
+.guest-meal-chips::-webkit-scrollbar{display:none}
+.guest-meal-chip{flex:0 0 auto;display:flex;flex-direction:column;align-items:flex-start;gap:4px;min-width:0;background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:7px 10px;cursor:pointer;transition:.12s;position:relative;font-family:inherit}
+.guest-meal-chip .gmc-top{font-size:11px;font-weight:700;color:var(--ink);white-space:nowrap}
+.guest-meal-chip .gmc-ref{font-weight:500;color:var(--muted)}
+.guest-meal-chip .gmc-badge{font-size:13px;font-weight:700;color:var(--gold);background:var(--panel2);border-radius:7px;padding:1px 8px;min-width:22px;text-align:center}
+.guest-meal-chip.on{border-color:var(--barrete);background:var(--panel2);box-shadow:0 0 0 1px var(--barrete) inset}
+.guest-meal-chip.on .gmc-badge{color:#fff;background:var(--barrete)}
+.guest-meal-chip:active{transform:scale(.96)}
+.guest-meal-chip.empty .gmc-badge{color:var(--faint)}
 
 /* Plantel member items */
 .pl-item{display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;margin-bottom:6px}
@@ -362,6 +373,10 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .refdef-day-hdr{font-family:var(--display);font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:var(--campino);font-weight:600;margin:12px 0 6px;display:flex;align-items:center;gap:8px}
 .refdef-day-hdr::after{content:"";flex:1;height:1px;background:linear-gradient(90deg,var(--campino),transparent 60%);opacity:.5}
 .refdef-row{display:flex;align-items:center;gap:8px;padding:9px 12px;background:var(--panel);border:1px solid var(--line);border-radius:10px}
+.refdef-click{cursor:pointer;transition:.12s}
+.refdef-click:active{background:var(--panel2);transform:scale(.995)}
+.refdef-chevron{flex-shrink:0;color:var(--faint);font-size:22px;line-height:1;font-weight:600;padding-left:2px}
+.refdef-prato{font-weight:500;color:var(--gold);font-size:12.5px}
 .refdef-icon{font-size:18px;flex-shrink:0}
 .refdef-info{flex:1;min-width:0}
 .refdef-ref{font-size:14px;font-weight:600;color:var(--ink)}
@@ -373,6 +388,16 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .refdef-del:active{opacity:1;background:rgba(179,64,47,.1);transform:scale(.9)}
 .refdef-edit{width:26px;height:26px;border-radius:7px;border:1px solid var(--line);background:transparent;color:var(--muted);font-size:12px;display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:.5;transition:.12s}
 .refdef-edit:active{opacity:1;background:rgba(168,123,20,.12);transform:scale(.9)}
+/* Campos bloqueados (informativos) no detalhe da refeição */
+.rd-considerado{margin:4px 0 2px}
+.rd-considerado-lbl{font-size:11px;color:var(--faint);text-transform:uppercase;letter-spacing:.06em;font-weight:700;margin-bottom:6px}
+.rd-locked-grid{display:flex;gap:8px}
+.rd-locked{flex:1;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:8px 10px;text-align:center}
+.rd-locked .rdl-val{font-size:15px;font-weight:700;color:var(--ink)}
+.rd-locked .rdl-lbl{font-size:9.5px;color:var(--faint);text-transform:uppercase;letter-spacing:.04em;margin-top:2px}
+.rd-locked.b .rdl-val{color:var(--blue)}
+.rd-locked.g .rdl-val{color:var(--muted)}
+.rd-locked.r .rdl-val{color:var(--gold)}
 .refdef-empty{text-align:center;padding:20px;color:var(--faint);font-size:13px;border:1px dashed var(--line);border-radius:10px}
 .refdef-add-bar{margin-top:10px;display:flex;gap:8px;align-items:center}
 .refdef-add-btn{display:flex;align-items:center;gap:6px;padding:10px 16px;border-radius:10px;border:1.5px dashed var(--line);background:transparent;color:var(--barrete);font-size:13px;font-weight:600;cursor:pointer;transition:.15s;flex:1;justify-content:center}
@@ -615,6 +640,10 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
           <option value="Lanche">🍺 Lanche</option>
         </select>
       </div>
+      <div style="grid-column:1/-1">
+        <label>Prato</label>
+        <input type="text" id="rd-prato" maxlength="80" placeholder="ex: Esparguete à bolonhesa">
+      </div>
       <div>
         <label>Peso indireto</label>
         <input type="number" id="rd-peso" step="0.05" min="0" max="1" value="0" placeholder="0" inputmode="decimal">
@@ -632,9 +661,18 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
         <input type="number" id="rd-extraconv" step="0.5" min="0" value="2" placeholder="2" inputmode="decimal">
       </div>
     </div>
+    <div class="rd-considerado" id="rd-considerado" style="display:none">
+      <div class="rd-considerado-lbl">Considerado no cálculo</div>
+      <div class="rd-locked-grid">
+        <div class="rd-locked b"><div class="rdl-val" id="rd-c-bebidas">—</div><div class="rdl-lbl">Bebidas</div></div>
+        <div class="rd-locked g"><div class="rdl-val" id="rd-c-gerais">—</div><div class="rdl-lbl">Gerais</div></div>
+        <div class="rd-locked r"><div class="rdl-val" id="rd-c-refeicao">—</div><div class="rdl-lbl">Refeição</div></div>
+      </div>
+    </div>
     <div class="mbtns">
       <button class="btn ghost" onclick="closeRefdefModal()">Cancelar</button>
-      <button class="btn prim" id="rd-save" onclick="saveRefdef()">Guardar</button>
+      <button class="btn danger write-action admin-only" id="rd-del" onclick="deleteRefdefFromModal()" style="display:none">Eliminar</button>
+      <button class="btn prim write-action admin-only" id="rd-save" onclick="saveRefdef()">Guardar</button>
     </div>
   </div>
 </div>
@@ -954,6 +992,15 @@ function calcular(data){
   const allocDireta=despesas.filter(x=>(x.tipo==='Almoço'||x.tipo==='Jantar')&&x.dataValor).reduce((a,x)=>a+x.valor,0);
   const F20=rnd((totalDesp-allocDireta)*0.5,2);
 
+  // Repartição do indireto entre "bebidas" e "gerais" (só apresentação na lista/detalhe).
+  // A bolsa indireta = tudo o que não é despesa direta de refeição. Bebidas+Cerveja → "bebidas";
+  // o resto (Gerais, Renda, Almoço/Jantar previstos) → "gerais". A soma das 2 parcelas é SEMPRE
+  // igual ao indireto I, por isso L/P/Q e os saldos não mudam.
+  const TIPOS_BEBIDA=['Bebidas','Cerveja'];
+  const baseIndireta=rnd(totalDesp-allocDireta,2);
+  const baseBebidas=rnd(despesas.filter(x=>TIPOS_BEBIDA.includes(x.tipo)).reduce((a,x)=>a+x.valor,0),2);
+  const fracBebidas=baseIndireta>0?baseBebidas/baseIndireta:0;
+
   const cmemb=(d,ref)=>{const rs=ref==='Lanche'?'Tarde':ref;const s=day2slot[d]+'|'+rs;return membros.filter(m=>m.presencas.includes(s)).length;};
 
   const refeicoes=[];let prevIndirectPerPerson=0;
@@ -974,7 +1021,13 @@ function calcular(data){
     if(Ec===0)Q=0;
     else if(rd.ref==='Lanche')Q=P===0?0:Math.max(5,roundup(P,0)+rd.extraConv);
     else Q=P===0?0:Math.max(rd.minConv,roundup(P,0)+rd.extraConv);
-    refeicoes.push({...rd,D,E:Ec,Fdir:rnd(Fdir,2),I,L,P,Q});
+    // Custos para a lista/detalhe: direto (refeição) + indireto repartido em bebidas/gerais.
+    const indir=rd.ref==='Lanche'?rnd(L*D,2):I;     // bolsa indireta imputada a esta refeição
+    const dirRef=rd.ref==='Lanche'?0:rnd(Fdir,2);    // despesa direta de comida da refeição
+    const cBebidas=rnd(indir*fracBebidas,2);
+    const cGerais=rnd(indir-cBebidas,2);
+    const custoTotal=rnd(dirRef+indir,2);            // = D*L
+    refeicoes.push({...rd,D,E:Ec,Fdir:rnd(Fdir,2),I,L,P,Q,dirRef,cBebidas,cGerais,custoTotal,custoUnit:L});
   }
 
   const rmap={};for(const r of refeicoes)rmap[r.data+'|'+r.ref]=r;
@@ -1275,20 +1328,19 @@ function renderAll(){
         // Find calculated data for this meal
         const calcRef=CALC.refeicoes.find(x=>x.data===rd.data&&x.ref===rd.ref);
         const pesoDisplay=rd.peso!=null?Math.round((rd.peso||0)*100)+'%':'—';
-        r+=`<div class="refdef-row" style="flex-wrap:wrap">
+        const totDisp=calcRef&&calcRef.custoTotal?eur(calcRef.custoTotal):'—';
+        const unitDisp=calcRef&&calcRef.custoUnit?eur(calcRef.custoUnit):'—';
+        r+=`<div class="refdef-row refdef-click" style="flex-wrap:wrap" onclick="openRefdefModal(${rd._idx})">
           <span class="refdef-icon">${icon}</span>
           <div class="refdef-info">
-            <div class="refdef-ref sf">${rd.ref}</div>
+            <div class="refdef-ref sf">${rd.ref}${rd.prato?`<span class="refdef-prato sf"> · ${escHtml(rd.prato)}</span>`:''}</div>
             <div class="refdef-params sf">
               <span>peso ${pesoDisplay}</span>
-              <span>mín €${rd.minMEO||0}</span>
-              <span>conv €${rd.minConv||0}+${rd.extraConv||0}</span>
+              <span>total ${totDisp}</span>
+              <span>unit. ${unitDisp}</span>
             </div>
           </div>
-          <div class="refdef-actions">
-            <button class="refdef-edit write-action admin-only" onclick="editRefdef(${rd._idx})" title="Editar">✎</button>
-            <button class="refdef-del write-action admin-only" onclick="deleteRefdef(${rd._idx})" title="Remover">✕</button>
-          </div>`;
+          <span class="refdef-chevron sf">›</span>`;
         // Merged: custo info if there are people
         if(calcRef&&calcRef.D>0){
           const membrosCount=calcRef.D-calcRef.E;
@@ -1669,7 +1721,7 @@ async function carregar(){
         _id:m.id,nome:m.nome,fator:N(m.fator),sobras:N(m.sobras),outras:N(m.outras),
         presencas:(m.presencas||[]).map(p=>`${p.dia}|${p.ref}`)
       })),
-      refeicoesDef:(ev.refeicoes_def||[]).map(r=>({data:r.data,dia:r.dia,ref:r.ref,peso:N(r.peso),minMEO:N(r.min_meo),minConv:N(r.min_conv),extraConv:N(r.extra_conv)})),
+      refeicoesDef:(ev.refeicoes_def||[]).map(r=>({data:r.data,dia:r.dia,ref:r.ref,prato:r.prato||'',peso:N(r.peso),minMEO:N(r.min_meo),minConv:N(r.min_conv),extraConv:N(r.extra_conv)})),
       despesas:(ev.despesas||[]).map(d=>({_id:d.id,quem:d.quem,dataDesp:d.data_desp,dataValor:d.data_valor,desc:d.descricao,tipo:d.tipo,valor:N(d.valor),obs:d.observacoes||''})),
       convidados:(ev.convidados||[]).map(c=>({_id:c.id,membro:c.membro,nome:c.nome,data:c.data,dia:c.dia,ref:c.ref,pagante:c.pagante?'Sim':'Não',preco:N(c.preco)})),
       mealheiros:(ev.mealheiros||[]).map(m=>({quem:m.quem,data:m.data,valor:N(m.valor),subtipo:m.subtipo,desc:m.descricao})),
@@ -1731,7 +1783,7 @@ async function sbGuardarEvento(y,slot){
       if(pres.length)await sbReq('POST','presencas',pres);
     }
     if(y.refeicoesDef&&y.refeicoesDef.length)
-      await sbReq('POST','refeicoes_def',y.refeicoesDef.map(r=>({evento_id:eid,data:r.data,dia:r.dia,ref:r.ref,peso:r.peso||0,min_meo:r.minMEO||0,min_conv:r.minConv||0,extra_conv:r.extraConv||0})));
+      await sbReq('POST','refeicoes_def',y.refeicoesDef.map(r=>({evento_id:eid,data:r.data,dia:r.dia,ref:r.ref,prato:r.prato||null,peso:r.peso||0,min_meo:r.minMEO||0,min_conv:r.minConv||0,extra_conv:r.extraConv||0})));
     if(y.despesas&&y.despesas.length){
       const dres=await sbReq('POST','despesas',y.despesas.map(d=>({evento_id:eid,quem:d.quem,data_desp:d.dataDesp||null,data_valor:d.dataValor||null,descricao:d.desc||'',tipo:d.tipo,valor:d.valor,observacoes:d.obs||null})),{Prefer:'return=representation'});
       if(Array.isArray(dres))dres.forEach((r,i)=>{if(y.despesas[i])y.despesas[i]._id=r.id;});
@@ -2775,6 +2827,8 @@ function renderPresencaGrid(){
 
 /* ═══ GUEST SECTION IN PRESENÇAS ═══ */
 let guestFilterMember='all';
+let guestFilterMeal='all';
+function setGuestMeal(k){guestFilterMeal=(guestFilterMeal===k?'all':k);renderAll();}
 
 function renderGuestSection(){
   if(!DATA||!DATA.convidados)return'';
@@ -2792,6 +2846,7 @@ function renderGuestSection(){
 
     let filtered=DATA.convidados.map((g,i)=>({...g,_idx:i}));
     if(guestFilterMember!=='all') filtered=filtered.filter(g=>g.membro===guestFilterMember);
+    if(guestFilterMeal!=='all') filtered=filtered.filter(g=>g.dia+'|'+g.ref===guestFilterMeal);
 
     // Sort by date then meal order (Almoço < Lanche < Jantar)
     const refOrd={Almoço:0,Lanche:1,Jantar:2};
@@ -2805,21 +2860,25 @@ function renderGuestSection(){
       return(refOrd[a.ref]||0)-(refOrd[b.ref]||0);
     });
 
-    // Totals
-    const totalConvidados=filtered.length;
-    const totalRefeicao=filtered.reduce((acc,g)=>{
-      const calcRef=CALC.refeicoes.find(x=>{
-        const rd=DATA.refeicoesDef.find(r=>r.dia===g.dia&&r.ref===g.ref);
-        return rd&&x.data===rd.data&&x.ref===rd.ref;
+    // Cards de refeição (filtro) — um por refeição definida, com badge do nº de convidados.
+    // Contagem respeita o filtro de membro ativo, para alinhar com a lista mostrada.
+    const baseGuests=guestFilterMember==='all'?DATA.convidados:DATA.convidados.filter(g=>g.membro===guestFilterMember);
+    const ordered=(DATA.refeicoesDef||[]).slice().sort((a,b)=>a.data.localeCompare(b.data)||(refOrd[a.ref]||0)-(refOrd[b.ref]||0));
+    if(ordered.length){
+      h+='<div class="guest-meal-chips sf">';
+      const totN=baseGuests.length;
+      h+=`<button class="guest-meal-chip${guestFilterMeal==='all'?' on':''}" onclick="setGuestMeal('all')"><span class="gmc-top">Todas</span><span class="gmc-badge">${totN}</span></button>`;
+      ordered.forEach(rd=>{
+        const key=rd.dia+'|'+rd.ref;
+        const icon=rd.ref==='Almoço'?'🍳':rd.ref==='Jantar'?'🍖':'🍺';
+        const n=baseGuests.filter(g=>g.dia===rd.dia&&g.ref===rd.ref).length;
+        h+=`<button class="guest-meal-chip${guestFilterMeal===key?' on':''}${n===0?' empty':''}" onclick="setGuestMeal('${key}')">
+          <span class="gmc-top">${rd.dia} <span class="gmc-ref">${icon} ${rd.ref}</span></span>
+          <span class="gmc-badge">${n}</span>
+        </button>`;
       });
-      return acc+(calcRef?calcRef.Q:0);
-    },0);
-
-    // Stats bar
-    h+='<div class="pres-stats sf" style="margin-bottom:10px">';
-    h+=`<div class="pres-stat"><div class="ps-val">${totalConvidados}</div><div class="ps-lbl">Convidados</div></div>`;
-    h+=`<div class="pres-stat"><div class="ps-val" style="color:var(--gold)">${eur(rnd(totalRefeicao,2))}</div><div class="ps-lbl">Total Refeição</div></div>`;
-    h+='</div>';
+      h+='</div>';
+    }
 
     // Group by day/ref
     let currentGroup='';
@@ -3042,12 +3101,13 @@ let editingRefdef=null;
 function openRefdefModal(editIdx){
   editingRefdef=typeof editIdx==='number'?editIdx:null;
   const isEdit=editingRefdef!==null;
-  document.getElementById('refdef-title').textContent=isEdit?'Editar Refeição':'Adicionar Refeição';
+  document.getElementById('refdef-title').textContent=isEdit?'Detalhe da Refeição':'Adicionar Refeição';
 
   if(isEdit){
     const rd=DATA.refeicoesDef[editingRefdef];
     document.getElementById('rd-data').value=rd.data||'';
     document.getElementById('rd-ref').value=rd.ref||'Jantar';
+    document.getElementById('rd-prato').value=rd.prato||'';
     document.getElementById('rd-peso').value=rd.peso??0;
     document.getElementById('rd-minmeo').value=rd.minMEO||0;
     document.getElementById('rd-minconv').value=rd.minConv||10;
@@ -3055,11 +3115,29 @@ function openRefdefModal(editIdx){
   } else {
     document.getElementById('rd-data').value='';
     document.getElementById('rd-ref').value='Jantar';
+    document.getElementById('rd-prato').value='';
     document.getElementById('rd-peso').value='0';
     document.getElementById('rd-minmeo').value='0';
     document.getElementById('rd-minconv').value='10';
     document.getElementById('rd-extraconv').value='2';
   }
+
+  // Campos bloqueados (informativos): bebidas/gerais/refeição considerados — só em edição
+  const considerado=document.getElementById('rd-considerado');
+  const delBtn=document.getElementById('rd-del');
+  if(isEdit){
+    const rd=DATA.refeicoesDef[editingRefdef];
+    const calcRef=CALC&&CALC.refeicoes?CALC.refeicoes.find(x=>x.data===rd.data&&x.ref===rd.ref):null;
+    document.getElementById('rd-c-bebidas').textContent=calcRef?eur(calcRef.cBebidas):'—';
+    document.getElementById('rd-c-gerais').textContent=calcRef?eur(calcRef.cGerais):'—';
+    document.getElementById('rd-c-refeicao').textContent=calcRef?eur(calcRef.dirRef):'—';
+    considerado.style.display='';
+    delBtn.style.display=isAdmin()?'':'none';
+  } else {
+    considerado.style.display='none';
+    delBtn.style.display='none';
+  }
+
   document.getElementById('refdef-bg').classList.add('show');
   document.body.classList.add('no-scroll');
 }
@@ -3080,6 +3158,7 @@ function dataToDia(dateStr){
 async function saveRefdef(){
   const data=document.getElementById('rd-data').value;
   const ref=document.getElementById('rd-ref').value;
+  const prato=document.getElementById('rd-prato').value.trim();
   const peso=parseFloat(document.getElementById('rd-peso').value)||0;
   const minMEO=parseFloat(document.getElementById('rd-minmeo').value)||0;
   const minConv=parseFloat(document.getElementById('rd-minconv').value)||0;
@@ -3093,10 +3172,11 @@ async function saveRefdef(){
   const dup=DATA.refeicoesDef.findIndex((rd,i)=>rd.data===data&&rd.ref===ref&&i!==editingRefdef);
   if(dup>=0){toast(`${dia} ${ref} já existe`,'bad');return;}
 
-  const entry={data,dia,ref,peso:ref==='Lanche'?null:peso,minMEO,minConv,extraConv};
+  const wasEdit=editingRefdef!==null;
+  const entry={data,dia,ref,prato:prato||'',peso:ref==='Lanche'?null:peso,minMEO,minConv,extraConv};
 
   document.getElementById('rd-save').disabled=true;
-  if(editingRefdef!==null){
+  if(wasEdit){
     DATA.refeicoesDef[editingRefdef]=entry;
   } else {
     if(!DATA.refeicoesDef)DATA.refeicoesDef=[];
@@ -3107,14 +3187,22 @@ async function saveRefdef(){
   const refOrd={Almoço:0,Lanche:1,Jantar:2};
   DATA.refeicoesDef.sort((a,b)=>a.data.localeCompare(b.data)||(refOrd[a.ref]||0)-(refOrd[b.ref]||0));
 
-  const ok=await pushToGitHub((editingRefdef!==null?'Editar':'Adicionar')+' refeição: '+dia+' '+ref);
+  const ok=await pushToGitHub((wasEdit?'Editar':'Adicionar')+' refeição: '+dia+' '+ref);
   document.getElementById('rd-save').disabled=false;
   if(ok){
     closeRefdefModal();
     CALC=calcular(JSON.parse(JSON.stringify(DATA)));
     renderAll();
-    toast((editingRefdef!==null?'Refeição editada':'Refeição adicionada')+' ✓','ok');
+    toast((wasEdit?'Refeição editada':'Refeição adicionada')+' ✓','ok');
   }
+}
+
+// Eliminar a partir do detalhe (modal)
+async function deleteRefdefFromModal(){
+  if(editingRefdef===null)return;
+  const idx=editingRefdef;
+  closeRefdefModal();
+  await deleteRefdef(idx);
 }
 
 async function deleteRefdef(idx){
