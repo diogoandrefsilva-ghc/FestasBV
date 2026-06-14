@@ -3474,7 +3474,7 @@ function generatePDF(type){
     tr:last-child td{border-bottom:none}
     .pos{color:#2a9d6a;font-weight:700}.neg{color:#e04545;font-weight:700}.zero{color:#999}
     .right{text-align:right}
-    table.gastos-membro th{font-size:8px;letter-spacing:.02em;padding:5px 5px}
+    table.gastos-membro th{font-size:8px;letter-spacing:.02em;padding:5px 5px;white-space:nowrap}
     table.gastos-membro td{padding:5px 5px}
     table.gastos-membro td:first-child{white-space:nowrap;font-size:10.5px}
     .section{margin-bottom:8px}
@@ -3550,33 +3550,38 @@ function buildGeneralReport(){
   h+=`<tr style="border-top:2px solid #ddd;font-weight:700"><td><b>Total Despesas</b></td><td class="right neg"><b>${eur(CALC.totDespesas)}</b></td></tr>`;
   h+='</table>';
 
-  // Cash-flows list
+  // Cash-flows list — apenas despesas e mealheiros (sem pagamentos de dívidas nem reembolsos)
+  const cfSubLabels={'sobras_ano_anterior':'Sobras Ano Anterior','outros':'Outros','lata':'Lata'};
   const allCf=[];
-  (DATA.pagamentos||[]).forEach(p=>{
-    const t=cfType(p);
-    const rf=t==='reembolso'?(p.ref||'').replace(/^Reembolso:?\s*/,''):sdRefLabel(p.ref);
-    allCf.push({type:t,date:p.data||'',desc:`${p.de} → ${p.para}`,ref:rf,valor:p.valor,label:cfLabel(t)});
-  });
   (DATA.despesas||[]).forEach(d=>{
     const prevista=!d.dataDesp&&!d.dataValor;
-    allCf.push({type:'despesa',date:d.dataDesp||d.dataValor||'',desc:d.desc||'(sem descrição)',ref:`${d.tipo} · ${d.quem}`,valor:d.valor,label:'Despesa',prevista,obs:d.obs||''});
+    allCf.push({type:'despesa',date:d.dataDesp||d.dataValor||'',title:d.desc||'(sem descrição)',tipo:d.tipo||'',obs:d.obs||'',valor:d.valor,prevista});
   });
   (DATA.mealheiros||[]).forEach(m=>{
-    allCf.push({type:'mealheiro',date:m.data||'',desc:`${m.quem}`,ref:m.desc||m.subtipo||'',valor:m.valor,label:'Mealheiro'});
+    allCf.push({type:'mealheiro',date:m.data||'',title:m.desc||'',tipo:cfSubLabels[m.subtipo]||m.subtipo||'Mealheiro',obs:'',valor:m.valor,prevista:false});
   });
   allCf.sort((a,b)=>(b.date||'').localeCompare(a.date||''));
 
   h+='<h2>Cash-Flows</h2>';
-  h+='<table><tr><th>Data</th><th>Tipo</th><th>Descrição</th><th class="right">Valor</th></tr>';
+  h+='<table><tr><th>Data</th><th>Descrição</th><th class="right">Valor</th></tr>';
   allCf.forEach(cf=>{
-    h+=`<tr><td>${fmtPdfDate(cf.date)}</td><td><span class="badge ${cf.prevista?'badge-amber':'badge-blue'}">${cf.prevista?'Prevista':cf.label}</span></td><td>${cf.desc}${cf.ref?' · '+cf.ref:''}${cf.obs?`<br><span style="color:#888;font-size:10px">📝 ${escHtml(cf.obs)}</span>`:''}</td><td class="right">${eur(cf.valor)}</td></tr>`;
+    const badgeCls=cf.type==='mealheiro'?'badge-green':'badge-red';
+    let descCell='';
+    if(cf.title) descCell+=`<div>${escHtml(cf.title)}</div>`;
+    const badges=[];
+    if(cf.tipo) badges.push(`<span class="badge ${badgeCls}">${escHtml(cf.tipo)}</span>`);
+    if(cf.prevista) badges.push(`<span class="badge badge-amber">Prevista</span>`);
+    if(badges.length) descCell+=`<div${cf.title?' style="margin-top:3px"':''}>${badges.join(' ')}</div>`;
+    if(cf.obs) descCell+=`<div style="color:#888;font-size:10px;margin-top:3px">📝 ${escHtml(cf.obs)}</div>`;
+    if(!descCell) descCell='—';
+    h+=`<tr><td>${fmtPdfDate(cf.date)}</td><td>${descCell}</td><td class="right">${eur(cf.valor)}</td></tr>`;
   });
   h+='</table>';
 
   // Resumo de gastos por membro (consumo próprio + convidados — sem saldos/regularizações)
   const temBebeGrupo=ms.some(m=>(m._refs||[]).some(r=>r.modo==='bebe'));
   h+='<h2>Resumo de Gastos por Membro</h2>';
-  h+='<table class="gastos-membro"><tr><th>Membro</th><th class="right">Refeições</th>'+(temBebeGrupo?'<th class="right">Só bebida</th>':'')+'<th class="right">Quota Extra</th><th class="right">Convidados</th><th class="right">Total</th></tr>';
+  h+='<table class="gastos-membro"><tr><th>Membro</th><th class="right">Refeições</th>'+(temBebeGrupo?'<th class="right">Só bebida</th>':'')+'<th class="right">Quota</th><th class="right">Convidados</th><th class="right">Total</th></tr>';
   let gT={ref:0,bebe:0,quota:0,conv:0,tot:0};
   [...ms].map(m=>{
     const comeR=(m._refs||[]).filter(r=>r.modo!=='bebe');
@@ -3657,7 +3662,7 @@ function buildPersonReport(pessoa){
   // Quota extra
   const quotaExtra=rnd((m.R||0)+(m.U||0),2);
   if(quotaExtra>0){
-    h+='<h2>Quota Extra</h2><table>';
+    h+='<h2>Quota</h2><table>';
     if(m.R>0) h+=`<tr><td>Quota adicional (fator ${m.fator})</td><td class="right">${eur(m.R)}</td></tr>`;
     if(m.U>0) h+=`<tr><td>Missão poupança</td><td class="right">${eur(m.U)}</td></tr>`;
     h+=`<tr style="border-top:2px solid #ddd;font-weight:700"><td><b>Total</b></td><td class="right"><b>${eur(quotaExtra)}</b></td></tr>`;
