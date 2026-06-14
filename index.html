@@ -279,6 +279,41 @@ body.read-only .pl-fator input{pointer-events:none!important;opacity:.7}
 .readonly-banner{display:none;text-align:center;font-size:11px;color:var(--muted);background:rgba(46,111,168,.08);border:1px solid rgba(46,111,168,.25);border-radius:10px;padding:8px 14px;margin:12px 0 0}
 body.read-only .readonly-banner{display:block}
 
+/* ── Contas fechadas: ano deixa de ser editável (excepto pagamentos) ── */
+body.contas-fechadas .card-act,
+body.contas-fechadas .refdef-edit,
+body.contas-fechadas .refdef-del,
+body.contas-fechadas .refdef-add-btn,
+body.contas-fechadas .pres-selall-btn,
+body.contas-fechadas .pres-guest-add,
+body.contas-fechadas .pl-del{display:none!important}
+body.contas-fechadas .pres-btn{pointer-events:none!important;opacity:.7}
+body.contas-fechadas .pl-fator input{pointer-events:none!important;opacity:.7}
+/* No modal de cash-flows, esconder entradas de apuramento (despesa/mealheiro) com contas fechadas */
+body.contas-fechadas .cf-entrada{display:none!important}
+/* Pós-fecho só o admin regista pagamentos */
+body.contas-fechadas.no-admin .fab.gold{display:none!important}
+/* Dívidas todas saldadas → não há mais cash-flows a registar */
+body.dividas-saldadas .fab.gold{display:none!important}
+
+/* ── Estado das contas ── */
+.contas-card{background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:15px;box-shadow:0 1px 4px rgba(80,55,20,.07)}
+.contas-card.fechada{border-color:var(--gold);background:rgba(168,123,20,.07)}
+.contas-card .cc-row{display:flex;align-items:center;gap:12px}
+.contas-card .cc-ic{font-size:24px;flex:none;line-height:1}
+.contas-card .cc-title{font-size:16px;font-weight:700;color:var(--ink)}
+.contas-card .cc-sub{font-size:12px;color:var(--faint);margin-top:2px}
+.contas-card .btn{width:100%}
+/* ── Validação de contas ── */
+.val-row{background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:12px 14px;display:flex;align-items:center;gap:12px;box-shadow:0 1px 4px rgba(80,55,20,.07)}
+.val-row .val-ic{width:26px;height:26px;border-radius:50%;background:rgba(30,122,77,.14);color:var(--green);display:flex;align-items:center;justify-content:center;font-weight:800;flex:none}
+.val-row .val-txt{flex:1;min-width:0}
+.val-row .val-name{font-size:15px;font-weight:600;color:var(--ink)}
+.val-row .val-txt small{display:block;font-size:11px;color:var(--faint);margin-top:1px;word-break:break-word}
+.val-row .val-x{background:var(--panel2);border:1px solid var(--line);color:var(--muted);border-radius:8px;width:30px;height:30px;font-size:14px;cursor:pointer;flex:none}
+.val-check{display:flex;align-items:center;gap:10px;padding:11px 12px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;margin-bottom:8px;font-size:14px;color:var(--ink);cursor:pointer}
+.val-check input{width:18px;height:18px;flex:none}
+
 /* Guest filter */
 .guest-filter{margin-bottom:10px}
 .guest-filter select{width:100%;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:9px 32px 9px 11px;color:var(--ink);font-size:13px;font-weight:600;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;-webkit-appearance:none;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236F5C42' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;cursor:pointer}
@@ -621,9 +656,9 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
     </div>
     <!-- Wheel selector -->
     <div class="cf-wheel" id="cf-wheel">
-      <div class="cf-opt" data-cf="despesa" onclick="setCfType('despesa')"><span class="cf-icon">🛒</span><span class="cf-lbl">Despesa</span></div>
+      <div class="cf-opt cf-entrada" data-cf="despesa" onclick="setCfType('despesa')"><span class="cf-icon">🛒</span><span class="cf-lbl">Despesa</span></div>
       <div class="cf-opt admin-only" data-cf="reembolso" onclick="setCfType('reembolso')"><span class="cf-icon">💸</span><span class="cf-lbl">Reembolso</span></div>
-      <div class="cf-opt admin-only" data-cf="mealheiro" onclick="setCfType('mealheiro')"><span class="cf-icon" style="font-size:20px">🥫</span><span class="cf-lbl">Mealheiro</span></div>
+      <div class="cf-opt admin-only cf-entrada" data-cf="mealheiro" onclick="setCfType('mealheiro')"><span class="cf-icon" style="font-size:20px">🥫</span><span class="cf-lbl">Mealheiro</span></div>
       <div class="cf-opt admin-only" data-cf="saldar" onclick="setCfType('saldar')"><span class="cf-icon">🤝</span><span class="cf-lbl">Pagar Dívida</span></div>
     </div>
 
@@ -651,6 +686,20 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
       <button class="btn danger" id="edit-cf-del" onclick="deleteCfFromDetail()">Apagar</button>
       <button class="btn prim" id="edit-cf-save" onclick="saveEditCf()">Guardar</button>
     </div>
+  </div>
+</div>
+
+<!-- Validação de Contas modal -->
+<div class="modal-bg" id="val-bg">
+  <div class="modal" id="val-modal">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <h3 style="margin-bottom:0">Validar Contas</h3>
+      <button onclick="closeValModal()" style="background:var(--panel2);border:1px solid var(--line);color:var(--muted);border-radius:9px;width:32px;height:32px;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0">✕</button>
+    </div>
+    <p class="note" style="margin-top:0;margin-bottom:14px">Confirmas que aceitas as contas apuradas deste ano? Escolhe o que estás a validar:</p>
+    <div id="val-form"></div>
+    <div class="mbtns"><button class="btn prim" id="val-save" onclick="confirmarValidacaoUI()">Validar</button></div>
+    <div class="note" id="val-note">Fica registado quem validou e quando.</div>
   </div>
 </div>
 
@@ -940,6 +989,7 @@ function lsGet(k){try{return localStorage.getItem(k);}catch(_){return null;}}
 /* ── Permissões: utilizadores ↔ membros ↔ casais ── */
 let USER_AMIGOS=[];   // [{email,amigo}]
 let CONJUGES=[];      // [{amigo_a,amigo_b}]
+let VALIDACOES=[];    // [{evento_id,amigo,validado_por_email,validado_em}]
 let MY_NAMES=[];      // nomes que o utilizador atual pode gerir (próprio + cônjuge)
 const enc=encodeURIComponent;
 
@@ -969,6 +1019,168 @@ function permErrorMsg(e){
   const m=(e&&e.message||'')+'';
   if(/row-level security|42501|permission/i.test(m))return 'Sem permissão para esta alteração (ou a data já passou)';
   return 'Erro: '+m;
+}
+
+/* ── Fecho de contas + validação ── */
+function contasFechadas(){return !!(DATA&&DATA.evento&&DATA.evento.contasFechadas);}
+function ultimaRefeicaoISO(){const ds=(DATA&&DATA.refeicoesDef||[]).map(r=>r.data).filter(Boolean);return ds.length?ds.slice().sort().slice(-1)[0]:null;}
+function temDespesasPendentes(){return (DATA&&DATA.despesas||[]).some(d=>!d.dataValor);}  // sem data-valor = pagamento ainda não efetivo
+function podeFecharContas(){
+  if(!isAdmin()||!DATA||!DATA._sbId)return false;
+  if(contasFechadas())return false;
+  const ult=ultimaRefeicaoISO();
+  if(!ult||hojeISO()<ult)return false;
+  if(temDespesasPendentes())return false;
+  return true;
+}
+function dividasTodasSaldadas(){
+  if(!CALC||!CALC.membros||!CALC.membros.length)return false;
+  return CALC.membros.every(m=>typeof m._sfEcra==='number'&&Math.abs(m._sfEcra)<0.005);
+}
+function validacoesDoAno(){if(!DATA||!DATA._sbId)return[];return VALIDACOES.filter(v=>v.evento_id===DATA._sbId);}
+function meuNomePrincipal(){if(!_sbSession)return'';const me=USER_AMIGOS.find(u=>u.email===_sbSession.user.email);return me?me.amigo:'';}
+function fmtDataHora(iso){if(!iso)return'';const d=new Date(iso);if(isNaN(d))return'';return d.toLocaleDateString('pt-PT')+' '+d.toLocaleTimeString('pt-PT',{hour:'2-digit',minute:'2-digit'});}
+
+function updateContasUI(){
+  document.body.classList.toggle('contas-fechadas',contasFechadas());
+  document.body.classList.toggle('dividas-saldadas',dividasTodasSaldadas());
+}
+
+async function fecharContas(){
+  if(!isAdmin()||!DATA||!DATA._sbId)return;
+  if(!podeFecharContas()){toast('Ainda não é possível fechar as contas','bad');return;}
+  if(!confirm('Fechar as contas deste ano?\n\nO ano deixa de ser editável (até para ti). Só os pagamentos de dívidas continuam possíveis. Podes reabrir a qualquer momento.'))return;
+  const agora=new Date().toISOString();
+  setSync('load','a guardar…');
+  try{
+    await queueWrite(()=>sbReq('PATCH',`eventos?id=eq.${DATA._sbId}`,{contas_fechadas:true,contas_fechadas_em:agora,contas_fechadas_por:_sbSession.user.email}));
+    DATA.evento.contasFechadas=true;DATA.evento.contasFechadasEm=agora;DATA.evento.contasFechadasPor=_sbSession.user.email;
+    syncMirror();marcaGuardado();renderAll();toast('Contas fechadas 🔒','ok');
+  }catch(e){setSync('err','erro ao guardar');toast(permErrorMsg(e),'bad');}
+}
+async function reabrirContas(){
+  if(!isAdmin()||!DATA||!DATA._sbId)return;
+  if(!confirm('Reabrir as contas deste ano? O ano volta a ficar editável.'))return;
+  setSync('load','a guardar…');
+  try{
+    await queueWrite(()=>sbReq('PATCH',`eventos?id=eq.${DATA._sbId}`,{contas_fechadas:false,contas_fechadas_em:null,contas_fechadas_por:null}));
+    DATA.evento.contasFechadas=false;DATA.evento.contasFechadasEm=null;DATA.evento.contasFechadasPor=null;
+    syncMirror();marcaGuardado();renderAll();toast('Contas reabertas 🔓','ok');
+  }catch(e){setSync('err','erro ao guardar');toast(permErrorMsg(e),'bad');}
+}
+
+function abrirValModal(){
+  if(!_sbSession){toast('Inicia sessão para validar','bad');return;}
+  const meuNome=meuNomePrincipal();
+  const conj=MY_NAMES.filter(n=>n!==meuNome);
+  let f='';
+  if(meuNome)f+=`<label class="val-check"><input type="checkbox" id="val-self" checked disabled><span>As minhas contas (${meuNome})</span></label>`;
+  conj.forEach(n=>{f+=`<label class="val-check"><input type="checkbox" class="val-conj" data-nome="${n.replace(/"/g,'&quot;')}" checked><span>Contas de ${n} (cônjuge)</span></label>`;});
+  if(!meuNome&&!conj.length)f='<div class="empty">Não tens nenhum membro associado à tua conta. Liga-a nas Definições.</div>';
+  document.getElementById('val-form').innerHTML=f;
+  document.getElementById('val-save').style.display=(meuNome||conj.length)?'':'none';
+  document.getElementById('val-bg').classList.add('show');
+  document.body.classList.add('no-scroll');
+}
+function closeValModal(){document.getElementById('val-bg').classList.remove('show');document.body.classList.remove('no-scroll');}
+function confirmarValidacaoUI(){
+  const meuNome=meuNomePrincipal();
+  const amigos=[];
+  if(meuNome)amigos.push(meuNome);
+  document.querySelectorAll('#val-form .val-conj').forEach(c=>{if(c.checked&&amigos.indexOf(c.dataset.nome)<0)amigos.push(c.dataset.nome);});
+  if(!amigos.length){toast('Nada para validar','bad');return;}
+  closeValModal();
+  confirmarValidacao(amigos);
+}
+async function confirmarValidacao(amigos){
+  if(!_sbSession){toast('Sessão expirada — volta a entrar','bad');return;}
+  if(!DATA||!DATA._sbId){toast('Sem ligação à base de dados — recarrega','bad');return;}
+  const email=_sbSession.user.email;
+  const agora=new Date().toISOString();
+  const rows=amigos.map(a=>({evento_id:DATA._sbId,amigo:a,validado_por_email:email,validado_em:agora}));
+  setSync('load','a guardar…');
+  try{
+    const ret=await queueWrite(()=>sbReq('POST','validacoes?on_conflict=evento_id,amigo',rows,{Prefer:'resolution=merge-duplicates,return=representation'}));
+    rows.forEach(r=>{
+      const fromRet=(Array.isArray(ret)?ret.find(x=>x.evento_id===r.evento_id&&x.amigo===r.amigo):null)||r;
+      const i=VALIDACOES.findIndex(v=>v.evento_id===r.evento_id&&v.amigo===r.amigo);
+      if(i>=0)VALIDACOES[i]=Object.assign({},VALIDACOES[i],fromRet);else VALIDACOES.push(fromRet);
+    });
+    marcaGuardado();renderAll();toast(amigos.length>1?'Contas validadas ✓':'Contas validadas ✓','ok');
+  }catch(e){setSync('err','erro ao guardar');toast(permErrorMsg(e),'bad');}
+}
+async function removerValidacao(amigo){
+  if(!_sbSession||!DATA||!DATA._sbId)return;
+  if(!confirm(`Anular a validação das contas de ${amigo}?`))return;
+  setSync('load','a guardar…');
+  try{
+    await queueWrite(()=>sbReq('DELETE',`validacoes?evento_id=eq.${DATA._sbId}&amigo=eq.${enc(amigo)}`));
+    VALIDACOES=VALIDACOES.filter(v=>!(v.evento_id===DATA._sbId&&v.amigo===amigo));
+    marcaGuardado();renderAll();toast('Validação anulada','ok');
+  }catch(e){setSync('err','erro ao guardar');toast(permErrorMsg(e),'bad');}
+}
+
+function secContasHtml(){
+  if(!DATA)return'';
+  const fechadas=contasFechadas();
+  const admin=isAdmin();
+  let s='';
+  // ── Estado das Contas ──
+  s+='<div class="sec-title sf" style="margin-top:26px">Estado das Contas</div>';
+  s+='<div class="mlist">';
+  s+=`<div class="contas-card ${fechadas?'fechada':'aberta'}">
+        <div class="cc-row">
+          <span class="cc-ic">${fechadas?'🔒':'🔓'}</span>
+          <div class="cc-txt">
+            <div class="cc-title">${fechadas?'Contas fechadas':'Contas abertas'}</div>
+            <div class="cc-sub">${fechadas?('Fechadas a '+fmtDataHora(DATA.evento.contasFechadasEm)):'Ano editável — apuramento em curso'}</div>
+          </div>
+        </div>`;
+  if(admin){
+    if(fechadas){
+      s+=`<button class="btn ghost sf" style="margin-top:13px" onclick="reabrirContas()">🔓 Reabrir Contas</button>`;
+    } else if(podeFecharContas()){
+      s+=`<button class="btn prim sf" style="margin-top:13px" onclick="fecharContas()">🔒 Fechar Contas</button>`;
+    } else {
+      const ult=ultimaRefeicaoISO();
+      let motivo;
+      if(!ult)motivo='Define primeiro as refeições do ano.';
+      else if(hojeISO()<ult)motivo='Disponível a partir da última refeição ('+ult+').';
+      else if(temDespesasPendentes())motivo='Há despesas previstas ainda sem data de pagamento.';
+      else motivo='Indisponível de momento.';
+      s+=`<button class="btn prim sf" style="margin-top:13px;opacity:.4;pointer-events:none">🔒 Fechar Contas</button>
+          <p class="sf" style="font-size:11px;color:var(--faint);margin:8px 2px 0">${motivo}</p>`;
+    }
+  } else if(fechadas){
+    s+=`<p class="sf" style="font-size:11px;color:var(--faint);margin:11px 2px 0">Este ano já não é editável.</p>`;
+  }
+  s+='</div>';
+
+  // ── Validação de Contas ──
+  s+='<div class="sec-title sf" style="margin-top:22px">Validação de Contas</div>';
+  const vals=validacoesDoAno();
+  const meuNome=meuNomePrincipal();
+  if(_sbSession&&MY_NAMES.length){
+    s+=`<button class="btn prim sf write-action" style="margin-bottom:12px;width:100%" onclick="abrirValModal()">✓ Validar contas</button>`;
+  }
+  const visiveis=admin?vals:vals.filter(v=>MY_NAMES.includes(v.amigo));
+  s+='<div class="mlist">';
+  if(!visiveis.length){
+    s+='<div class="empty sf">'+(admin?'Ainda ninguém validou as contas deste ano.':(MY_NAMES.length?'Ainda não validaste as tuas contas.':'Liga a tua conta a um membro para poderes validar.'))+'</div>';
+  } else {
+    visiveis.slice().sort((a,b)=>(a.amigo||'').localeCompare(b.amigo||'','pt')).forEach(v=>{
+      const podeAnular=admin||MY_NAMES.includes(v.amigo);
+      const porTerceiro=v.validado_por_email&&meuNome&&v.amigo!==meuNome;
+      const sub=admin?('Validado '+fmtDataHora(v.validado_em)+' · '+(v.validado_por_email||'')):('Validado '+fmtDataHora(v.validado_em)+(porTerceiro?' · pelo teu agregado':''));
+      s+=`<div class="val-row">
+        <span class="val-ic">✓</span>
+        <div class="val-txt"><div class="val-name">${v.amigo}</div><small>${sub}</small></div>
+        ${podeAnular?`<button class="val-x write-action" onclick="removerValidacao('${(v.amigo||'').replace(/'/g,"\\'")}')" title="Anular validação">✕</button>`:''}
+      </div>`;
+    });
+  }
+  s+='</div>';
+  return s;
 }
 function marcaGuardado(){setSync('live','guardado · '+new Date().toLocaleTimeString('pt-PT',{hour:'2-digit',minute:'2-digit'}));}
 function syncMirror(){if(ALL_YEARS[YEAR_IDX])ALL_YEARS[YEAR_IDX]=Object.assign(JSON.parse(JSON.stringify(DATA)),{_sbId:DATA._sbId});}
@@ -1340,6 +1552,9 @@ function renderAll(){
   }
   h+='</div>';
 
+  // CONTAS — fecho de contas + validação (depois do saldo global)
+  h+=secContasHtml();
+
   // RELATÓRIOS — links movidos do antigo tab para o fundo dos Saldos
   h+=`<div class="sec-title sf" style="margin-top:24px">Relatórios</div>
   <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:6px">
@@ -1360,6 +1575,7 @@ function renderAll(){
   </div>`;
 
   document.getElementById('view-saldos').innerHTML=h;
+  updateContasUI();
 
   // RESUMO — despesa total por membro
   renderResumo();
@@ -1808,20 +2024,22 @@ async function carregar(){
   setSync('load','a sincronizar…');
   try{
     const sel='*,membros(*,presencas(*)),refeicoes_def(*),despesas(*),convidados(*),mealheiros(*),pagamentos(*)';
-    const [res,uaRes,cjRes]=await Promise.all([
+    const [res,uaRes,cjRes,vlRes]=await Promise.all([
       sbFetch(`${SB_URL}/rest/v1/eventos?select=${encodeURIComponent(sel)}&order=ano.asc`,{headers:sbHeaders(),cache:'no-store'}),
       sbFetch(`${SB_URL}/rest/v1/user_amigos?select=email,amigo`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null),
-      sbFetch(`${SB_URL}/rest/v1/conjuges?select=amigo_a,amigo_b`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null)
+      sbFetch(`${SB_URL}/rest/v1/conjuges?select=amigo_a,amigo_b`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null),
+      sbFetch(`${SB_URL}/rest/v1/validacoes?select=evento_id,amigo,validado_por_email,validado_em`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null)
     ]);
     if(!res.ok)throw new Error('HTTP '+res.status);
     const rows=await res.json();
     USER_AMIGOS=(uaRes&&uaRes.ok)?await uaRes.json():[];
     CONJUGES=(cjRes&&cjRes.ok)?await cjRes.json():[];
+    VALIDACOES=(vlRes&&vlRes.ok)?await vlRes.json():[];
     computeMyNames();
     const N=v=>v==null?0:Number(v);
     ALL_YEARS=rows.map(ev=>({
       _sbId: ev.id,
-      evento:{nome:ev.nome,ano:ev.ano,tesoureiro:ev.tesoureiro,arredondaTotal:!!ev.arredonda_total,missaoPoupanca:N(ev.missao_poupanca),fundoReserva:N(ev.fundo_reserva)},
+      evento:{nome:ev.nome,ano:ev.ano,tesoureiro:ev.tesoureiro,arredondaTotal:!!ev.arredonda_total,missaoPoupanca:N(ev.missao_poupanca),fundoReserva:N(ev.fundo_reserva),contasFechadas:!!ev.contas_fechadas,contasFechadasEm:ev.contas_fechadas_em||null,contasFechadasPor:ev.contas_fechadas_por||null},
       membros:(ev.membros||[]).sort((a,b)=>a.nome.localeCompare(b.nome,'pt')).map(m=>({
         _id:m.id,nome:m.nome,fator:N(m.fator),sobras:N(m.sobras),outras:N(m.outras),
         presencas:(m.presencas||[]).map(p=>({k:`${p.dia}|${p.ref}`,modo:p.modo==='bebe'?'bebe':'come'}))
@@ -2236,9 +2454,9 @@ function openPayModal(){
     const visiveis=[...wheel.querySelectorAll('.cf-opt')].filter(o=>getComputedStyle(o).display!=='none').length;
     wheel.style.setProperty('--cf-cols',Math.max(1,visiveis));
   }
-  setCfType('despesa');
+  setCfType(contasFechadas()?'saldar':'despesa');
   const note=document.getElementById('cf-note');
-  if(note)note.textContent=isAdmin()?'Guardado na base de dados do grupo.':'Podes registar despesas pagas por ti ou pelo teu cônjuge.';
+  if(note)note.textContent=contasFechadas()?'Contas fechadas — só pagamentos de dívidas.':(isAdmin()?'Guardado na base de dados do grupo.':'Podes registar despesas pagas por ti ou pelo teu cônjuge.');
 }
 function closePayModal(){
   document.getElementById('pay-bg').classList.remove('show');
@@ -2246,6 +2464,7 @@ function closePayModal(){
 }
 
 async function saveCashFlow(){
+  if(contasFechadas()&&(cfDir==='despesa'||cfDir==='mealheiro')){toast('Contas fechadas — só pagamentos de dívidas','bad');return;}
   const who=document.getElementById('cf-who')?.value;
   const val=parseFloat(document.getElementById('cf-val')?.value);
   const date=document.getElementById('cf-date')?.value;
@@ -2354,8 +2573,12 @@ let editingCf=null;
 
 function openCfDetail(source,idx){
   editCfEntry(source,idx);
-  // Não-admins veem o detalhe em modo leitura (botões já escondidos via .admin-only)
-  if(!isAdmin()){
+  const et=editingCf&&editingCf.editType;
+  // Pós-fecho: despesas e mealheiros (entradas de apuramento) ficam só de leitura; pagamentos continuam editáveis
+  const bloquearPorFecho=contasFechadas()&&(et==='despesa'||et==='mealheiro');
+  const mbtns=document.querySelector('#edit-cf-modal .mbtns');
+  if(mbtns)mbtns.style.display=bloquearPorFecho?'none':'';
+  if(!isAdmin()||bloquearPorFecho){
     const f=document.getElementById('edit-cf-form');
     f.querySelectorAll('input,select,textarea').forEach(el=>{el.disabled=true;el.style.opacity='.75';});
     f.querySelectorAll('.sd-chip').forEach(el=>{el.style.pointerEvents='none';});
