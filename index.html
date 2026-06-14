@@ -2158,7 +2158,7 @@ function updateSdChips(){
       if(rel.has(m.nome))mine+=chip;else{other+=chip;otherN++;}
     }
   });
-  _sdRenderGroups(container,mine,other,otherN,false,false); // criação: outros colapsado
+  _sdRenderGroups(container,mine,other,otherN,false,true); // criação: "outros" sempre rotulado e colapsado
   recalcSdVal();
 }
 
