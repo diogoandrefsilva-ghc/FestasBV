@@ -311,14 +311,16 @@ body.dividas-saldadas .fab.gold{display:none!important}
 .val-row .val-name{font-size:15px;font-weight:600;color:var(--ink)}
 .val-row .val-txt small{display:block;font-size:11px;color:var(--faint);margin-top:1px;word-break:break-word}
 .val-row .val-x{background:var(--panel2);border:1px solid var(--line);color:var(--muted);border-radius:8px;width:30px;height:30px;font-size:14px;cursor:pointer;flex:none}
-.val-check{display:flex;align-items:center;gap:11px;padding:13px 14px;background:var(--panel2);border:1px solid var(--line);border-radius:11px;margin-bottom:9px;font-size:14px;color:var(--ink);cursor:pointer;-webkit-tap-highlight-color:transparent}
-.val-check span{flex:1;min-width:0;line-height:1.3}
-.val-check input[type=checkbox]{-webkit-appearance:none;appearance:none;margin:0;flex:none;width:24px;height:24px;min-width:24px;border:2px solid var(--line);border-radius:7px;background:var(--panel);cursor:pointer;position:relative;box-sizing:border-box;transition:background .12s,border-color .12s}
-.val-check input[type=checkbox]:checked{background:var(--green);border-color:var(--green)}
-.val-check input[type=checkbox]:checked::after{content:"";position:absolute;left:7px;top:3px;width:6px;height:11px;border:solid #fff;border-width:0 2.5px 2.5px 0;transform:rotate(45deg)}
-.val-check input[type=checkbox]:disabled{opacity:.5;cursor:default}
-.val-check:has(input:disabled){cursor:default;opacity:.85}
-.val-block-t{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:4px 2px 9px}
+.val-block-t{display:flex;align-items:baseline;justify-content:space-between;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:4px 2px 10px}
+.val-block-t .vb-link{background:none;border:none;padding:0;font-family:inherit;font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:none;color:var(--green);cursor:pointer;-webkit-tap-highlight-color:transparent}
+.val-opt{display:flex;align-items:center;gap:13px;padding:13px 15px;background:var(--panel2);border:1.5px solid var(--line);border-radius:14px;margin-bottom:9px;cursor:pointer;transition:background .15s,border-color .15s,transform .05s;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none}
+.val-opt:active{transform:scale(.992)}
+.val-opt .vo-check{width:27px;height:27px;flex:none;border-radius:50%;border:2px solid var(--line);background:transparent;color:transparent;font-size:14px;font-weight:800;display:flex;align-items:center;justify-content:center;transition:background .15s,border-color .15s,color .15s}
+.val-opt .vo-label{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+.val-opt .vo-name{font-size:15px;font-weight:600;color:var(--ink);line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.val-opt .vo-sub{font-size:12px;color:var(--faint);line-height:1.2}
+.val-opt.sel{background:rgba(30,122,77,.09);border-color:var(--green)}
+.val-opt.sel .vo-check{background:var(--green);border-color:var(--green);color:#fff}
 
 /* Guest filter */
 .guest-filter{margin-bottom:10px}
@@ -1090,8 +1092,26 @@ async function reabrirContas(){
   }catch(e){setSync('err','erro ao guardar');toast(permErrorMsg(e),'bad');}
 }
 
-function valChkRow(nome,label,checked){
-  return `<label class="val-check"><input type="checkbox" class="val-chk" data-nome="${(nome||'').replace(/"/g,'&quot;')}" ${checked?'checked':''}><span>${label}</span></label>`;
+function valOptRow(nome,name,sub,sel){
+  const dn=(nome||'').replace(/"/g,'&quot;');
+  return `<div class="val-opt${sel?' sel':''}" data-nome="${dn}" onclick="toggleValOpt(this)">
+    <span class="vo-check">✓</span>
+    <span class="vo-label"><span class="vo-name">${name}</span>${sub?`<span class="vo-sub">${sub}</span>`:''}</span>
+  </div>`;
+}
+function valSyncLink(block){
+  const link=block.querySelector('.vb-link');if(!link)return;
+  const opts=block.querySelectorAll('.val-opt');
+  const allSel=opts.length&&[...opts].every(o=>o.classList.contains('sel'));
+  link.textContent=allSel?'Desmarcar todos':'Marcar todos';
+}
+function toggleValOpt(el){el.classList.toggle('sel');const b=el.closest('.val-block');if(b)valSyncLink(b);}
+function valBlockToggle(btn){
+  const b=btn.closest('.val-block');if(!b)return;
+  const opts=b.querySelectorAll('.val-opt');
+  const allSel=opts.length&&[...opts].every(o=>o.classList.contains('sel'));
+  opts.forEach(o=>o.classList.toggle('sel',!allSel));
+  valSyncLink(b);
 }
 function abrirValModal(){
   if(!_sbSession){toast('Inicia sessão para validar','bad');return;}
@@ -1103,13 +1123,17 @@ function abrirValModal(){
   const temProprias=!!(meuNome||conj.length);
   let f='';
   if(temProprias){
+    f+='<div class="val-block">';
     if(admin&&semUser.length)f+='<div class="val-block-t">As tuas contas</div>';
-    if(meuNome)f+=valChkRow(meuNome,`As minhas contas (${meuNome})`,true);
-    conj.forEach(n=>{f+=valChkRow(n,`Contas de ${n} (cônjuge)`,true);});
+    if(meuNome)f+=valOptRow(meuNome,'As minhas contas',meuNome,true);
+    conj.forEach(n=>{f+=valOptRow(n,n,'cônjuge',true);});
+    f+='</div>';
   }
   if(semUser.length){
-    f+='<div class="val-block-t"'+(temProprias?' style="margin-top:14px"':'')+'>Amigos sem utilizador</div>';
-    semUser.forEach(n=>{const c=conjugeDe(n);f+=valChkRow(n,c?`${n} <span style="color:var(--faint)">(c/ ${c})</span>`:n,true);});
+    f+='<div class="val-block">';
+    f+='<div class="val-block-t"'+(temProprias?' style="margin-top:18px"':'')+'><span>Amigos sem utilizador</span>'+(semUser.length>1?'<button class="vb-link" onclick="valBlockToggle(this)">Desmarcar todos</button>':'')+'</div>';
+    semUser.forEach(n=>{const c=conjugeDe(n);f+=valOptRow(n,n,c?('c/ '+c):'',true);});
+    f+='</div>';
   }
   const temAlgo=temProprias||semUser.length;
   if(!temAlgo)f='<div class="empty">Não há contas que possas validar. Liga a tua conta a um membro nas Definições.</div>';
@@ -1121,7 +1145,7 @@ function abrirValModal(){
 function closeValModal(){document.getElementById('val-bg').classList.remove('show');document.body.classList.remove('no-scroll');}
 function confirmarValidacaoUI(){
   const amigos=[];
-  document.querySelectorAll('#val-form .val-chk').forEach(c=>{if(c.checked&&amigos.indexOf(c.dataset.nome)<0)amigos.push(c.dataset.nome);});
+  document.querySelectorAll('#val-form .val-opt.sel').forEach(c=>{const n=c.dataset.nome;if(n&&amigos.indexOf(n)<0)amigos.push(n);});
   if(!amigos.length){toast('Nada selecionado para validar','bad');return;}
   closeValModal();
   confirmarValidacao(amigos);
@@ -1192,38 +1216,35 @@ function secContasHtml(){
   }
   s+='</div>';
 
-  // ── Validação de Contas ──
-  s+='<div class="sec-title sf" style="margin-top:22px">Validação de Contas</div>';
-  const vals=validacoesDoAno();
-  const meuNome=meuNomePrincipal();
-  const podeValidar=_sbSession&&(MY_NAMES.length||(admin&&amigosSemUtilizador().length));
-  if(podeValidar){
-    if(fechadas){
+  // ── Validação de Contas (só com contas fechadas) ──
+  if(fechadas){
+    s+='<div class="sec-title sf" style="margin-top:22px">Validação de Contas</div>';
+    const vals=validacoesDoAno();
+    const podeValidar=_sbSession&&(MY_NAMES.length||(admin&&amigosSemUtilizador().length));
+    if(podeValidar){
       s+=`<button class="btn prim sf write-action" style="margin-bottom:12px;width:100%" onclick="abrirValModal()">✓ Validar contas</button>`;
-    } else {
-      s+=`<p class="sf" style="font-size:11px;color:var(--faint);margin:0 2px 12px">Validação disponível depois de as contas serem fechadas.</p>`;
     }
+    const visiveis=admin?vals:vals.filter(v=>MY_NAMES.includes(v.amigo));
+    s+='<div class="mlist">';
+    if(!visiveis.length){
+      s+='<div class="empty sf">'+(admin?'Ainda ninguém validou as contas deste ano.':(MY_NAMES.length?'Ainda não validaste as tuas contas.':'Liga a tua conta a um membro para poderes validar.'))+'</div>';
+    } else {
+      visiveis.slice().sort((a,b)=>(a.amigo||'').localeCompare(b.amigo||'','pt')).forEach(v=>{
+        const podeAnular=admin||MY_NAMES.includes(v.amigo);
+        const por=v.validado_por_amigo||'';
+        const porDif=por&&por!==v.amigo;   // validado por outra pessoa (cônjuge/admin)
+        let sub='Validado '+fmtDataHora(v.validado_em);
+        if(por)sub+=' · por '+por+(porDif?' (em nome de '+v.amigo+')':'');
+        if(admin&&v.validado_por_email)sub+=' · '+v.validado_por_email;
+        s+=`<div class="val-row">
+          <span class="val-ic">✓</span>
+          <div class="val-txt"><div class="val-name">${v.amigo}</div><small>${sub}</small></div>
+          ${podeAnular?`<button class="val-x write-action" onclick="removerValidacao('${(v.amigo||'').replace(/'/g,"\\'")}')" title="Anular validação">✕</button>`:''}
+        </div>`;
+      });
+    }
+    s+='</div>';
   }
-  const visiveis=admin?vals:vals.filter(v=>MY_NAMES.includes(v.amigo));
-  s+='<div class="mlist">';
-  if(!visiveis.length){
-    s+='<div class="empty sf">'+(admin?'Ainda ninguém validou as contas deste ano.':(MY_NAMES.length?'Ainda não validaste as tuas contas.':'Liga a tua conta a um membro para poderes validar.'))+'</div>';
-  } else {
-    visiveis.slice().sort((a,b)=>(a.amigo||'').localeCompare(b.amigo||'','pt')).forEach(v=>{
-      const podeAnular=admin||MY_NAMES.includes(v.amigo);
-      const por=v.validado_por_amigo||'';
-      const porDif=por&&por!==v.amigo;   // validado por outra pessoa (cônjuge/admin)
-      let sub='Validado '+fmtDataHora(v.validado_em);
-      if(por)sub+=' · por '+por+(porDif?' (em nome de '+v.amigo+')':'');
-      if(admin&&v.validado_por_email)sub+=' · '+v.validado_por_email;
-      s+=`<div class="val-row">
-        <span class="val-ic">✓</span>
-        <div class="val-txt"><div class="val-name">${v.amigo}</div><small>${sub}</small></div>
-        ${podeAnular?`<button class="val-x write-action" onclick="removerValidacao('${(v.amigo||'').replace(/'/g,"\\'")}')" title="Anular validação">✕</button>`:''}
-      </div>`;
-    });
-  }
-  s+='</div>';
   return s;
 }
 function marcaGuardado(){setSync('live','guardado · '+new Date().toLocaleTimeString('pt-PT',{hour:'2-digit',minute:'2-digit'}));}
