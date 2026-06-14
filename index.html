@@ -311,8 +311,14 @@ body.dividas-saldadas .fab.gold{display:none!important}
 .val-row .val-name{font-size:15px;font-weight:600;color:var(--ink)}
 .val-row .val-txt small{display:block;font-size:11px;color:var(--faint);margin-top:1px;word-break:break-word}
 .val-row .val-x{background:var(--panel2);border:1px solid var(--line);color:var(--muted);border-radius:8px;width:30px;height:30px;font-size:14px;cursor:pointer;flex:none}
-.val-check{display:flex;align-items:center;gap:10px;padding:11px 12px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;margin-bottom:8px;font-size:14px;color:var(--ink);cursor:pointer}
-.val-check input{width:18px;height:18px;flex:none}
+.val-check{display:flex;align-items:center;gap:11px;padding:13px 14px;background:var(--panel2);border:1px solid var(--line);border-radius:11px;margin-bottom:9px;font-size:14px;color:var(--ink);cursor:pointer;-webkit-tap-highlight-color:transparent}
+.val-check span{flex:1;min-width:0;line-height:1.3}
+.val-check input[type=checkbox]{-webkit-appearance:none;appearance:none;margin:0;flex:none;width:24px;height:24px;min-width:24px;border:2px solid var(--line);border-radius:7px;background:var(--panel);cursor:pointer;position:relative;box-sizing:border-box;transition:background .12s,border-color .12s}
+.val-check input[type=checkbox]:checked{background:var(--green);border-color:var(--green)}
+.val-check input[type=checkbox]:checked::after{content:"";position:absolute;left:7px;top:3px;width:6px;height:11px;border:solid #fff;border-width:0 2.5px 2.5px 0;transform:rotate(45deg)}
+.val-check input[type=checkbox]:disabled{opacity:.5;cursor:default}
+.val-check:has(input:disabled){cursor:default;opacity:.85}
+.val-block-t{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:4px 2px 9px}
 
 /* Guest filter */
 .guest-filter{margin-bottom:10px}
@@ -1040,6 +1046,21 @@ function dividasTodasSaldadas(){
 function validacoesDoAno(){if(!DATA||!DATA._sbId)return[];return VALIDACOES.filter(v=>v.evento_id===DATA._sbId);}
 function meuNomePrincipal(){if(!_sbSession)return'';const me=USER_AMIGOS.find(u=>u.email===_sbSession.user.email);return me?me.amigo:'';}
 function fmtDataHora(iso){if(!iso)return'';const d=new Date(iso);if(isNaN(d))return'';return d.toLocaleDateString('pt-PT')+' '+d.toLocaleTimeString('pt-PT',{hour:'2-digit',minute:'2-digit'});}
+function amigoTemUtilizador(nome){return USER_AMIGOS.some(u=>u.amigo===nome);}
+function conjugeDe(nome){for(const c of CONJUGES){if(c.amigo_a===nome)return c.amigo_b;if(c.amigo_b===nome)return c.amigo_a;}return null;}
+// O agregado (próprio + cônjuge) tem pelo menos um utilizador ativo?
+function agregadoTemUtilizador(nome){if(amigoTemUtilizador(nome))return true;const c=conjugeDe(nome);return c?amigoTemUtilizador(c):false;}
+// Amigos que o admin pode validar: membros sem utilizador no agregado, fora do próprio agregado do admin.
+function amigosSemUtilizador(){
+  if(!isAdmin()||!DATA)return[];
+  const out=[];
+  (DATA.membros||[]).forEach(m=>{
+    const n=m.nome;
+    if(!n||MY_NAMES.includes(n)||agregadoTemUtilizador(n))return;
+    if(out.indexOf(n)<0)out.push(n);
+  });
+  return out;
+}
 
 function updateContasUI(){
   document.body.classList.toggle('contas-fechadas',contasFechadas());
@@ -1069,35 +1090,50 @@ async function reabrirContas(){
   }catch(e){setSync('err','erro ao guardar');toast(permErrorMsg(e),'bad');}
 }
 
+function valChkRow(nome,label,checked){
+  return `<label class="val-check"><input type="checkbox" class="val-chk" data-nome="${(nome||'').replace(/"/g,'&quot;')}" ${checked?'checked':''}><span>${label}</span></label>`;
+}
 function abrirValModal(){
   if(!_sbSession){toast('Inicia sessão para validar','bad');return;}
+  if(!contasFechadas()){toast('Só podes validar depois de as contas estarem fechadas','bad');return;}
+  const admin=isAdmin();
   const meuNome=meuNomePrincipal();
   const conj=MY_NAMES.filter(n=>n!==meuNome);
+  const semUser=admin?amigosSemUtilizador():[];
+  const temProprias=!!(meuNome||conj.length);
   let f='';
-  if(meuNome)f+=`<label class="val-check"><input type="checkbox" id="val-self" checked disabled><span>As minhas contas (${meuNome})</span></label>`;
-  conj.forEach(n=>{f+=`<label class="val-check"><input type="checkbox" class="val-conj" data-nome="${n.replace(/"/g,'&quot;')}" checked><span>Contas de ${n} (cônjuge)</span></label>`;});
-  if(!meuNome&&!conj.length)f='<div class="empty">Não tens nenhum membro associado à tua conta. Liga-a nas Definições.</div>';
+  if(temProprias){
+    if(admin&&semUser.length)f+='<div class="val-block-t">As tuas contas</div>';
+    if(meuNome)f+=valChkRow(meuNome,`As minhas contas (${meuNome})`,true);
+    conj.forEach(n=>{f+=valChkRow(n,`Contas de ${n} (cônjuge)`,true);});
+  }
+  if(semUser.length){
+    f+='<div class="val-block-t"'+(temProprias?' style="margin-top:14px"':'')+'>Amigos sem utilizador</div>';
+    semUser.forEach(n=>{const c=conjugeDe(n);f+=valChkRow(n,c?`${n} <span style="color:var(--faint)">(c/ ${c})</span>`:n,true);});
+  }
+  const temAlgo=temProprias||semUser.length;
+  if(!temAlgo)f='<div class="empty">Não há contas que possas validar. Liga a tua conta a um membro nas Definições.</div>';
   document.getElementById('val-form').innerHTML=f;
-  document.getElementById('val-save').style.display=(meuNome||conj.length)?'':'none';
+  document.getElementById('val-save').style.display=temAlgo?'':'none';
   document.getElementById('val-bg').classList.add('show');
   document.body.classList.add('no-scroll');
 }
 function closeValModal(){document.getElementById('val-bg').classList.remove('show');document.body.classList.remove('no-scroll');}
 function confirmarValidacaoUI(){
-  const meuNome=meuNomePrincipal();
   const amigos=[];
-  if(meuNome)amigos.push(meuNome);
-  document.querySelectorAll('#val-form .val-conj').forEach(c=>{if(c.checked&&amigos.indexOf(c.dataset.nome)<0)amigos.push(c.dataset.nome);});
-  if(!amigos.length){toast('Nada para validar','bad');return;}
+  document.querySelectorAll('#val-form .val-chk').forEach(c=>{if(c.checked&&amigos.indexOf(c.dataset.nome)<0)amigos.push(c.dataset.nome);});
+  if(!amigos.length){toast('Nada selecionado para validar','bad');return;}
   closeValModal();
   confirmarValidacao(amigos);
 }
 async function confirmarValidacao(amigos){
   if(!_sbSession){toast('Sessão expirada — volta a entrar','bad');return;}
   if(!DATA||!DATA._sbId){toast('Sem ligação à base de dados — recarrega','bad');return;}
+  if(!contasFechadas()){toast('Só podes validar com as contas fechadas','bad');return;}
   const email=_sbSession.user.email;
+  const porAmigo=meuNomePrincipal();
   const agora=new Date().toISOString();
-  const rows=amigos.map(a=>({evento_id:DATA._sbId,amigo:a,validado_por_email:email,validado_em:agora}));
+  const rows=amigos.map(a=>({evento_id:DATA._sbId,amigo:a,validado_por_email:email,validado_por_amigo:porAmigo,validado_em:agora}));
   setSync('load','a guardar…');
   try{
     const ret=await queueWrite(()=>sbReq('POST','validacoes?on_conflict=evento_id,amigo',rows,{Prefer:'resolution=merge-duplicates,return=representation'}));
@@ -1106,7 +1142,7 @@ async function confirmarValidacao(amigos){
       const i=VALIDACOES.findIndex(v=>v.evento_id===r.evento_id&&v.amigo===r.amigo);
       if(i>=0)VALIDACOES[i]=Object.assign({},VALIDACOES[i],fromRet);else VALIDACOES.push(fromRet);
     });
-    marcaGuardado();renderAll();toast(amigos.length>1?'Contas validadas ✓':'Contas validadas ✓','ok');
+    marcaGuardado();renderAll();toast(amigos.length>1?'Contas validadas ✓':'Conta validada ✓','ok');
   }catch(e){setSync('err','erro ao guardar');toast(permErrorMsg(e),'bad');}
 }
 async function removerValidacao(amigo){
@@ -1160,8 +1196,13 @@ function secContasHtml(){
   s+='<div class="sec-title sf" style="margin-top:22px">Validação de Contas</div>';
   const vals=validacoesDoAno();
   const meuNome=meuNomePrincipal();
-  if(_sbSession&&MY_NAMES.length){
-    s+=`<button class="btn prim sf write-action" style="margin-bottom:12px;width:100%" onclick="abrirValModal()">✓ Validar contas</button>`;
+  const podeValidar=_sbSession&&(MY_NAMES.length||(admin&&amigosSemUtilizador().length));
+  if(podeValidar){
+    if(fechadas){
+      s+=`<button class="btn prim sf write-action" style="margin-bottom:12px;width:100%" onclick="abrirValModal()">✓ Validar contas</button>`;
+    } else {
+      s+=`<p class="sf" style="font-size:11px;color:var(--faint);margin:0 2px 12px">Validação disponível depois de as contas serem fechadas.</p>`;
+    }
   }
   const visiveis=admin?vals:vals.filter(v=>MY_NAMES.includes(v.amigo));
   s+='<div class="mlist">';
@@ -1170,8 +1211,11 @@ function secContasHtml(){
   } else {
     visiveis.slice().sort((a,b)=>(a.amigo||'').localeCompare(b.amigo||'','pt')).forEach(v=>{
       const podeAnular=admin||MY_NAMES.includes(v.amigo);
-      const porTerceiro=v.validado_por_email&&meuNome&&v.amigo!==meuNome;
-      const sub=admin?('Validado '+fmtDataHora(v.validado_em)+' · '+(v.validado_por_email||'')):('Validado '+fmtDataHora(v.validado_em)+(porTerceiro?' · pelo teu agregado':''));
+      const por=v.validado_por_amigo||'';
+      const porDif=por&&por!==v.amigo;   // validado por outra pessoa (cônjuge/admin)
+      let sub='Validado '+fmtDataHora(v.validado_em);
+      if(por)sub+=' · por '+por+(porDif?' (em nome de '+v.amigo+')':'');
+      if(admin&&v.validado_por_email)sub+=' · '+v.validado_por_email;
       s+=`<div class="val-row">
         <span class="val-ic">✓</span>
         <div class="val-txt"><div class="val-name">${v.amigo}</div><small>${sub}</small></div>
@@ -2028,7 +2072,7 @@ async function carregar(){
       sbFetch(`${SB_URL}/rest/v1/eventos?select=${encodeURIComponent(sel)}&order=ano.asc`,{headers:sbHeaders(),cache:'no-store'}),
       sbFetch(`${SB_URL}/rest/v1/user_amigos?select=email,amigo`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null),
       sbFetch(`${SB_URL}/rest/v1/conjuges?select=amigo_a,amigo_b`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null),
-      sbFetch(`${SB_URL}/rest/v1/validacoes?select=evento_id,amigo,validado_por_email,validado_em`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null)
+      sbFetch(`${SB_URL}/rest/v1/validacoes?select=evento_id,amigo,validado_por_email,validado_por_amigo,validado_em`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null)
     ]);
     if(!res.ok)throw new Error('HTTP '+res.status);
     const rows=await res.json();
