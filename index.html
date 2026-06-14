@@ -239,6 +239,8 @@ body.no-scroll{overflow:hidden;position:fixed;width:100%;}
 .sd-other.open .sd-chev{transform:rotate(180deg)}
 .sd-other .sd-other-body{display:none!important;padding:0 10px 10px}
 .sd-other.open .sd-other-body{display:flex!important}
+.sd-chip.sd-ro{cursor:default}
+.sd-chip.sd-ro:active{transform:none}
 
 /* Card action buttons (edit/delete) */
 .card-actions{display:flex;gap:4px;margin-left:auto;flex-shrink:0}
@@ -2138,13 +2140,14 @@ function updateSdChips(){
   if(!debtors.length){container.classList.remove('sd-grouped');container.innerHTML='<div class="empty sf" style="width:100%">Sem dívidas ativas por pagar</div>';recalcSdVal();return;}
 
   let mine='',other='',otherN=0;
+  const rel=_relatedNames(who); // próprio/cônjuge = relativo a quem paga
   // Convidados primeiro, depois próprio — dentro de cada grupo
   debtors.forEach(m=>{
     const guestDebt=Math.max(0,m.AA);
     const isDefault=m.nome===who;
     if(guestDebt>0.005){
       const chip=_sdChip('conv:'+m.nome,m.nome,true,guestDebt,isDefault,'toggleSdChip');
-      if(MY_NAMES.includes(m.nome))mine+=chip;else{other+=chip;otherN++;}
+      if(rel.has(m.nome))mine+=chip;else{other+=chip;otherN++;}
     }
   });
   debtors.forEach(m=>{
@@ -2152,33 +2155,45 @@ function updateSdChips(){
     const isDefault=m.nome===who;
     if(ownDebt>0.005){
       const chip=_sdChip('own:'+m.nome,m.nome,false,ownDebt,isDefault,'toggleSdChip');
-      if(MY_NAMES.includes(m.nome))mine+=chip;else{other+=chip;otherN++;}
+      if(rel.has(m.nome))mine+=chip;else{other+=chip;otherN++;}
     }
   });
-  _sdRenderGroups(container,mine,other,otherN,false); // outros colapsado por omissão
+  _sdRenderGroups(container,mine,other,otherN,false,false); // criação: outros colapsado
   recalcSdVal();
 }
 
 function toggleSdChip(el){el.classList.toggle('on');recalcSdVal();}
 
 /* Helpers partilhados de chips de saldar (criação + edição) */
-function _sdChip(key,nome,isConv,amt,isOn,handler){
-  return `<div class="sd-chip${isOn?' on':''}" onclick="${handler}(this)" data-key="${key}">
-    <span class="sd-dot"></span>${nome}${isConv?' <span style="font-size:10px;opacity:.6">conv.</span>':''}<span class="sd-amt">${eur(amt)}</span></div>`;
+function _sdChip(key,nome,isConv,amt,isOn,handler,ro){
+  const click=ro?'':` onclick="${handler}(this)"`;
+  const amtHtml=amt>0.005?`<span class="sd-amt">${eur(amt)}</span>`:'';
+  return `<div class="sd-chip${isOn?' on':''}${ro?' sd-ro':''}"${click} data-key="${key}">
+    <span class="sd-dot"></span>${nome}${isConv?' <span style="font-size:10px;opacity:.6">conv.</span>':''}${amtHtml}</div>`;
+}
+/* Nomes "do próprio" relativos a quem paga: o próprio + cônjuge(s). */
+function _relatedNames(payer){
+  const s=new Set();
+  if(payer)s.add(payer);
+  CONJUGES.forEach(c=>{if(c.amigo_a===payer)s.add(c.amigo_b);if(c.amigo_b===payer)s.add(c.amigo_a);});
+  return s;
 }
 function toggleSdGroup(hdr){const g=hdr.closest('.sd-other');if(g)g.classList.toggle('open');}
 /* Renderiza chips separando próprio/cônjuge das dívidas de outros.
-   Só agrupa (com "outros" colapsado) quando ambos os grupos existem. */
-function _sdRenderGroups(container,mine,other,otherN,openOther){
-  const grouped=!!(mine&&other);
-  container.classList.toggle('sd-grouped',grouped);
-  if(!grouped){container.innerHTML=(mine||other);return;}
-  container.innerHTML=
-    `<div class="sd-group-lbl sf">Próprio e cônjuge</div><div class="sd-list">${mine}</div>`+
-    `<div class="sd-other${openOther?' open':''}">`+
-      `<div class="sd-group-hdr sf" onclick="toggleSdGroup(this)"><span>Dívidas de outros<span class="sd-gn">${otherN}</span></span><span class="sd-chev">▾</span></div>`+
-      `<div class="sd-list sd-other-body">${other}</div>`+
-    `</div>`;
+   openOther: secção "outros" aberta por omissão.
+   labelOtherAlways: rotula "Dívidas de outros" mesmo sem grupo próprio
+   (usado na consulta — sinaliza que este pagamento saldou dívidas de terceiros). */
+function _sdRenderGroups(container,mine,other,otherN,openOther,labelOtherAlways){
+  const useGroups=!!(mine&&other)||!!(other&&labelOtherAlways);
+  if(!useGroups){container.classList.remove('sd-grouped');container.innerHTML=(mine||other);return;}
+  container.classList.add('sd-grouped');
+  let html='';
+  if(mine)html+=`<div class="sd-group-lbl sf">Próprio e cônjuge</div><div class="sd-list">${mine}</div>`;
+  html+=`<div class="sd-other${openOther?' open':''}">`+
+    `<div class="sd-group-hdr sf" onclick="toggleSdGroup(this)"><span>Dívidas de outros<span class="sd-gn">${otherN}</span></span><span class="sd-chev">▾</span></div>`+
+    `<div class="sd-list sd-other-body">${other}</div>`+
+  `</div>`;
+  container.innerHTML=html;
 }
 
 function recalcSdVal(){
@@ -2458,7 +2473,9 @@ function editCfEntry(source,idx){
   document.body.classList.add('no-scroll');
 }
 
-/* Saldar dívida chips for edit modal */
+/* Detalhe de um pagamento: mostra SÓ as dívidas efetivamente pagas (consulta).
+   Agrupa por relação com quem pagou; o bloco "Dívidas de outros" só aparece se
+   este pagamento tiver realmente saldado dívidas de terceiros. */
 function updateEditSdChips(){
   if(!CALC)return;
   const container=document.getElementById('esd-chips');
@@ -2466,50 +2483,24 @@ function updateEditSdChips(){
   const who=document.getElementById('ecf-who')?.value||'';
   const ms=CALC.membros;
   const selKeys=editingCf?.selectedKeys||[];
-  // Não-admin: só pode ver as dívidas que ESTE pagamento saldou — nunca dívidas pendentes de terceiros
-  if(!isAdmin()){
-    let roHtml='';
-    selKeys.forEach(key=>{
-      const isConv=key.startsWith('conv:');
-      const nome=isConv?key.slice(5):(key.startsWith('own:')?key.slice(4):key);
-      const m=ms.find(x=>x.nome===nome);
-      const amt=m?(isConv?Math.max(0,m.AA):Math.max(0,rnd(m.V-m.Y-m.W-m.X,2))):0;
-      roHtml+=`<div class="sd-chip on" data-key="${key}">
-        <span class="sd-dot"></span>${nome}${isConv?' <span style="font-size:10px;opacity:.6">conv.</span>':''}${amt>0.005?`<span class="sd-amt">${eur(amt)}</span>`:''}</div>`;
-    });
-    container.innerHTML=roHtml||'<div class="empty sf" style="width:100%">Sem dívidas associadas</div>';
+  if(!selKeys.length){
+    container.classList.remove('sd-grouped');
+    container.innerHTML='<div class="empty sf" style="width:100%">Sem dívidas associadas — pagamento livre / adiantamento</div>';
     recalcEditSdVal(false);
     return;
   }
-  const debtors=ms.filter(m=>{
-    if(m.saldoFinal>=-0.005 && !selKeys.some(k=>k.includes(m.nome))) return false;
-    const ownDebt=Math.max(0,rnd(m.V-m.Y-m.W-m.X,2));
-    const guestDebt=Math.max(0,m.AA);
-    return ownDebt>0.005||guestDebt>0.005;
+  const rel=_relatedNames(who); // próprio/cônjuge = relativo a quem pagou
+  let mine='',other='',otherN=0;
+  selKeys.forEach(key=>{
+    const isConv=key.startsWith('conv:');
+    const nome=isConv?key.slice(5):(key.startsWith('own:')?key.slice(4):key);
+    const m=ms.find(x=>x.nome===nome);
+    const amt=m?(isConv?Math.max(0,m.AA):Math.max(0,rnd(m.V-m.Y-m.W-m.X,2))):0;
+    const chip=_sdChip(key,nome,isConv,amt,true,'toggleEditSdChip',true); // ro: é consulta do que foi pago
+    if(rel.has(nome))mine+=chip;else{other+=chip;otherN++;}
   });
-  if(!debtors.length){container.classList.remove('sd-grouped');container.innerHTML='<div class="empty sf" style="width:100%">Sem dívidas ativas por pagar</div>';return;}
-  let mine='',other='',otherN=0,otherSel=0;
-  // Convidados primeiro, depois próprio — dentro de cada grupo
-  debtors.forEach(m=>{
-    const guestDebt=Math.max(0,m.AA);
-    const key='conv:'+m.nome;
-    const isOn=selKeys.includes(key);
-    if(guestDebt>0.005){
-      const chip=_sdChip(key,m.nome,true,guestDebt,isOn,'toggleEditSdChip');
-      if(MY_NAMES.includes(m.nome))mine+=chip;else{other+=chip;otherN++;if(isOn)otherSel++;}
-    }
-  });
-  debtors.forEach(m=>{
-    const ownDebt=Math.max(0,rnd(m.V-m.Y-m.W-m.X,2));
-    const key='own:'+m.nome;
-    const isOn=selKeys.includes(key);
-    if(ownDebt>0.005){
-      const chip=_sdChip(key,m.nome,false,ownDebt,isOn,'toggleEditSdChip');
-      if(MY_NAMES.includes(m.nome))mine+=chip;else{other+=chip;otherN++;if(isOn)otherSel++;}
-    }
-  });
-  // Se este pagamento já saldava dívida de outros, abrir a secção para a seleção ficar visível
-  _sdRenderGroups(container,mine,other,otherN,otherSel>0);
+  // "Dívidas de outros" (se existir) é a exceção → mostrar aberto
+  _sdRenderGroups(container,mine,other,otherN,true,true);
   recalcEditSdVal(false); // ao abrir, NÃO reescrever o valor guardado
 }
 function toggleEditSdChip(el){
