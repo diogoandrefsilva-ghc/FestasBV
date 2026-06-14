@@ -2434,6 +2434,21 @@ function updateEditSdChips(){
   const who=document.getElementById('ecf-who')?.value||'';
   const ms=CALC.membros;
   const selKeys=editingCf?.selectedKeys||[];
+  // Não-admin: só pode ver as dívidas que ESTE pagamento saldou — nunca dívidas pendentes de terceiros
+  if(!isAdmin()){
+    let roHtml='';
+    selKeys.forEach(key=>{
+      const isConv=key.startsWith('conv:');
+      const nome=isConv?key.slice(5):(key.startsWith('own:')?key.slice(4):key);
+      const m=ms.find(x=>x.nome===nome);
+      const amt=m?(isConv?Math.max(0,m.AA):Math.max(0,rnd(m.V-m.Y-m.W-m.X,2))):0;
+      roHtml+=`<div class="sd-chip on" data-key="${key}">
+        <span class="sd-dot"></span>${nome}${isConv?' <span style="font-size:10px;opacity:.6">conv.</span>':''}${amt>0.005?`<span class="sd-amt">${eur(amt)}</span>`:''}</div>`;
+    });
+    container.innerHTML=roHtml||'<div class="empty sf" style="width:100%">Sem dívidas associadas</div>';
+    recalcEditSdVal(false);
+    return;
+  }
   const debtors=ms.filter(m=>{
     if(m.saldoFinal>=-0.005 && !selKeys.some(k=>k.includes(m.nome))) return false;
     const ownDebt=Math.max(0,rnd(m.V-m.Y-m.W-m.X,2));
