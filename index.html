@@ -106,7 +106,7 @@ body::before{content:"";position:fixed;top:0;left:0;right:0;height:env(safe-area
 .rs-row.open .rs-arrow{transform:rotate(180deg)}
 .rs-detail{max-height:0;overflow:hidden;transition:max-height .25s ease;background:var(--panel2);border-top:0 solid transparent}
 .rs-row.open .rs-detail{max-height:320px;border-top:1px solid var(--line)}
-.rs-row.open .rs-detail:has(.rs-sub.open){max-height:2200px}
+.rs-row.open .rs-detail:has(.rs-sub.open){max-height:3200px}
 .rs-detail-inner{padding:9px 15px 12px}
 .rs-it{display:flex;justify-content:space-between;align-items:center;padding:5px 0;font-size:12.5px;border-bottom:1px solid rgba(110,75,25,.10)}
 .rs-it:last-child{border-bottom:none}
@@ -119,11 +119,14 @@ body::before{content:"";position:fixed;top:0;left:0;right:0;height:env(safe-area
 .rs-exp .sub-arrow{display:inline-block;color:var(--faint);font-size:8.5px;margin-left:7px;transition:transform .2s;vertical-align:1px}
 .rs-exp.open .sub-arrow{transform:rotate(180deg)}
 .rs-sub{max-height:0;overflow:hidden;transition:max-height .25s ease}
-.rs-sub.open{max-height:900px;border-bottom:1px solid rgba(110,75,25,.10)}
+.rs-sub.open{max-height:1300px;border-bottom:1px solid rgba(110,75,25,.10)}
 .rs-sub-it{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:4px 2px 4px 24px;font-size:11.5px;color:var(--muted);border-bottom:1px dashed rgba(110,75,25,.12)}
 .rs-sub-it:last-child{border-bottom:none}
 .rs-sub-it .k{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .rs-sub-it .v{font-weight:600;color:var(--ink);font-variant-numeric:tabular-nums;flex-shrink:0}
+.rs-formula{padding:6px 2px 7px 24px;font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums;line-height:1.5;border-bottom:none}
+.rs-formula .res{display:block;color:var(--ink);font-weight:700;margin-top:2px;font-size:11.5px}
+.rs-sub .rs-sub-it+.rs-formula{border-top:1px solid rgba(110,75,25,.10)}
 
 /* Cards */
 .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:13px 14px;margin-bottom:8px;box-shadow:0 1px 4px rgba(80,55,20,.07)}
@@ -4073,6 +4076,12 @@ function toggleRsSub(el,ev){
 function renderResumo(){
   if(!CALC)return;
   const ms=CALC.membros;
+  // parâmetros do ano (para fórmulas no detalhe)
+  const BN3=rnd(CALC.BN3||0,2), sumF=CALC.sumF||0;
+  const missao=DATA.evento.missaoPoupanca||0;
+  const fundo=DATA.evento.fundoReserva||0;
+  const arredonda=!!DATA.evento.arredondaTotal;
+  const fmtF=x=>Number(x||0).toLocaleString('pt-PT',{maximumFractionDigits:2});
   // ordem cronológica dos slots (segundo refeicoesDef)
   const ord={};(DATA.refeicoesDef||[]).forEach((rd,i)=>{ord[rd.dia+'|'+rd.ref]=i;});
   const nrm=r=>r==='Tarde'?'Lanche':r;
@@ -4087,7 +4096,7 @@ function renderResumo(){
     const refeCome=rnd(refsCome.reduce((a,x)=>a+x.v,0),2);
     const refeBebe=rnd(refsBebe.reduce((a,x)=>a+x.v,0),2);
     const convsList=[...(m._convs||[])].sort((a,b)=>oKey(a)-oKey(b)).map(x=>({k:`${x.nome} — ${x.dia} · ${x.ref}`,v:rnd(x.q,2)}));
-    return{nome:m.nome,i:ms.indexOf(m),refeCome,refeBebe,amigos,poup,quota,refsCome,refsBebe,convsList,tot:rnd(refeCome+refeBebe+amigos+poup+quota,2)};
+    return{nome:m.nome,i:ms.indexOf(m),refeCome,refeBebe,amigos,poup,quota,fator:m.fator||0,outras:rnd(m.T||0,2),refsCome,refsBebe,convsList,tot:rnd(refeCome+refeBebe+amigos+poup+quota,2)};
   }).sort((a,b)=>b.tot-a.tot);
   const T=rows.reduce((a,g)=>({refeCome:a.refeCome+g.refeCome,refeBebe:a.refeBebe+g.refeBebe,amigos:a.amigos+g.amigos,poup:a.poup+g.poup,quota:a.quota+g.quota,tot:a.tot+g.tot}),{refeCome:0,refeBebe:0,amigos:0,poup:0,quota:0,tot:0});
   // agregado do grupo por dia/refeição
@@ -4106,21 +4115,44 @@ function renderResumo(){
     return`<div class="rs-it rs-exp" onclick="toggleRsSub(this,event)"><span class="k">${icon} ${lbl}<span class="sub-arrow">▼</span></span><span class="v">${eur(total)}</span></div>
       <div class="rs-sub">${list.map(it=>`<div class="rs-sub-it"><span class="k">${it.k}</span><span class="v">${eur(it.v)}</span></div>`).join('')}</div>`;
   };
-  const det=g=>`<div class="rs-detail"><div class="rs-detail-inner sf">
+  // Quota Extra de um membro — fator + fórmula que dá o valor
+  const quotaDet=g=>{
+    if(g.quota<=0.005) return `<div class="rs-it"><span class="k">➕ Quota Extra</span><span class="v">—</span></div>`;
+    return `<div class="rs-it rs-exp" onclick="toggleRsSub(this,event)"><span class="k">➕ Quota Extra<span class="sub-arrow">▼</span></span><span class="v">${eur(g.quota)}</span></div>
+      <div class="rs-sub">
+        <div class="rs-sub-it"><span class="k">Base distribuível</span><span class="v">${eur(BN3)}</span></div>
+        <div class="rs-sub-it"><span class="k">Fator do membro</span><span class="v">${fmtF(g.fator)} de ${fmtF(sumF)}</span></div>
+        <div class="rs-formula">${eur(BN3)} × ${fmtF(g.fator)} ÷ ${fmtF(sumF)}<span class="res">= ${eur(g.quota)}</span></div>
+      </div>`;
+  };
+  // Poupança de um membro — decomposição (missão + outras + arredondamento)
+  const poupDet=g=>{
+    if(g.poup<=0.005) return `<div class="rs-it"><span class="k">🐖 Poupança</span><span class="v">—</span></div>`;
+    const arred=rnd(g.poup-missao-g.outras,2);
+    let li='';
+    if(missao>0.005) li+=`<div class="rs-sub-it"><span class="k">Missão Poupança</span><span class="v">${eur(missao)}</span></div>`;
+    if(g.outras>0.005) li+=`<div class="rs-sub-it"><span class="k">Outras contribuições</span><span class="v">${eur(g.outras)}</span></div>`;
+    if(arred>0.005) li+=`<div class="rs-sub-it"><span class="k">Arredondamento</span><span class="v">${eur(arred)}</span></div>`;
+    return `<div class="rs-it rs-exp" onclick="toggleRsSub(this,event)"><span class="k">🐖 Poupança<span class="sub-arrow">▼</span></span><span class="v">${eur(g.poup)}</span></div>
+      <div class="rs-sub">${li}<div class="rs-formula"><span class="res">= ${eur(g.poup)}</span></div></div>`;
+  };
+  // det(g): para uma pessoa → fórmula individual; para o grupo → contribuição de cada membro
+  const det=(g,grupo)=>`<div class="rs-detail"><div class="rs-detail-inner sf">
       ${expIt('🍽','Refeições',g.refeCome,g.refsCome)}
       ${g.refeBebe>0.005?expIt('🍺','Só bebida',g.refeBebe,g.refsBebe):''}
       ${expIt('👥','Amigos',g.amigos,g.convsList)}
-      <div class="rs-it"><span class="k">➕ Quota Extra</span><span class="v">${g.quota>0.005?eur(g.quota):'—'}</span></div>
-      <div class="rs-it"><span class="k">🐖 Poupança</span><span class="v">${g.poup>0.005?eur(g.poup):'—'}</span></div>
+      ${grupo?expIt('➕','Quota Extra',g.quota,g.quotaList):quotaDet(g)}
+      ${grupo?expIt('🐖','Poupança',g.poup,g.poupList):poupDet(g)}
     </div></div>`;
   let h=`<details class="calc-help sf">
     <summary><span class="ch-ico">ⓘ</span> De onde vêm a Quota Extra e a Poupança? <span class="chev">›</span></summary>
     <div class="calc-help-body">
-      <p><b>Quota Extra</b> — é a fatia da despesa do evento que <b>não</b> ficou coberta pelo que cada um consumiu: tira-se ao total geral as <b>refeições dos membros</b>, os <b>pagamentos dos convidados</b> e os <b>mealheiros</b>. O que sobra (mais o <b>Fundo de Reserva</b>, se estiver definido) é repartido por todos conforme o <b>fator</b> de cada membro.</p>
+      <p><b>Quota Extra</b> — é a fatia da despesa do evento que <b>não</b> ficou coberta pelo que cada um consumiu: tira-se ao total geral as <b>refeições dos membros</b>, os <b>pagamentos dos convidados</b> e os <b>mealheiros</b>. O que sobra (mais o <b>Fundo de Reserva</b>) é repartido por todos conforme o <b>fator</b> de cada membro.</p>
       <p style="font-variant-numeric:tabular-nums">Quota = (despesa total − refeições − convidados − mealheiros + Fundo de Reserva) × fator do membro ÷ soma dos fatores.</p>
       <p><b>Poupança</b> — é o que se põe de lado para o futuro. Junta a <b>Missão Poupança</b> definida no evento (igual para todos) com eventuais <b>outras contribuições</b> do membro.</p>
-      <p style="font-variant-numeric:tabular-nums">Poupança = Missão Poupança + outras contribuições.</p>
-      <p>Com a opção <b>Arredonda Total</b> ligada, somam-se ainda os cêntimos que faltam para arredondar (refeições + quota) ao euro acima — essa diferença também entra na poupança.</p>
+      <p style="font-variant-numeric:tabular-nums">Poupança = Missão Poupança + outras contribuições${arredonda?' + arredondamento':''}.</p>
+      ${arredonda?'<p>A opção <b>Arredonda Total</b> está <b>ligada</b>: os cêntimos que faltam para arredondar (refeições + quota) ao euro acima também entram na poupança.</p>':'<p>A opção <b>Arredonda Total</b> está desligada este ano.</p>'}
+      <p style="font-variant-numeric:tabular-nums;border-top:1px solid var(--line);padding-top:7px">Este ano — base distribuível <b>${eur(BN3)}</b> · soma dos fatores <b>${fmtF(sumF)}</b> · Missão Poupança <b>${eur(missao)}</b>/membro · Fundo de Reserva <b>${eur(fundo)}</b>.</p>
     </div>
   </details>`;
   h+='<div class="sec-title sf">Despesa por Membro</div><div class="mlist">';
@@ -4134,12 +4166,14 @@ function renderResumo(){
       </div>${det(g)}</div>`;
   });
   if(rows.length){
+    const quotaList=rows.filter(g=>g.quota>0.005).map(g=>({k:g.nome,v:g.quota}));
+    const poupList=rows.filter(g=>g.poup>0.005).map(g=>({k:g.nome,v:g.poup}));
     h+=`<div class="rs-row rs-grand">
       <div class="rs-head" onclick="this.parentElement.classList.toggle('open')">
         <div class="av" style="background:var(--gold)">Σ</div>
         <div class="nm">Total do Grupo<small>${rows.length} membros</small></div>
         <div class="amt">${eur(rnd(T.tot,2))}</div><span class="rs-arrow">▼</span>
-      </div>${det({refeCome:rnd(T.refeCome,2),refeBebe:rnd(T.refeBebe,2),amigos:rnd(T.amigos,2),poup:rnd(T.poup,2),quota:rnd(T.quota,2),refsCome:T.refsCome,refsBebe:T.refsBebe,convsList:T.convsList})}</div>`;
+      </div>${det({refeCome:rnd(T.refeCome,2),refeBebe:rnd(T.refeBebe,2),amigos:rnd(T.amigos,2),poup:rnd(T.poup,2),quota:rnd(T.quota,2),refsCome:T.refsCome,refsBebe:T.refsBebe,convsList:T.convsList,quotaList,poupList},true)}</div>`;
   }
   h+='</div>';
   document.getElementById('view-resumo').innerHTML=h;
