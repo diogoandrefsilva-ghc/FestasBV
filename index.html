@@ -2128,7 +2128,7 @@ async function carregar(){
       _sbId: ev.id,
       evento:{nome:ev.nome,ano:ev.ano,tesoureiro:ev.tesoureiro,arredondaTotal:!!ev.arredonda_total,missaoPoupanca:N(ev.missao_poupanca),fundoReserva:N(ev.fundo_reserva),contasFechadas:!!ev.contas_fechadas,contasFechadasEm:ev.contas_fechadas_em||null,contasFechadasPor:ev.contas_fechadas_por||null},
       membros:(ev.membros||[]).sort((a,b)=>a.nome.localeCompare(b.nome,'pt')).map(m=>({
-        _id:m.id,nome:m.nome,fator:N(m.fator),sobras:N(m.sobras),outras:N(m.outras),
+        _id:m.id,nome:m.nome,fator:N(m.fator),outras:N(m.outras),
         presencas:(m.presencas||[]).map(p=>({k:`${p.dia}|${p.ref}`,modo:p.modo==='bebe'?'bebe':'come'}))
       })),
       refeicoesDef:(ev.refeicoes_def||[]).map(r=>({data:r.data,dia:r.dia,ref:r.ref,prato:r.prato||'',peso:N(r.peso),minMEO:N(r.min_meo),minConv:N(r.min_conv),extraConv:N(r.extra_conv)})),
@@ -2192,7 +2192,7 @@ async function sbGuardarEvento(y,slot){
     // membros com return=representation para mapear nome -> id (FK das presenças)
     let idByNome=null;
     if(y.membros.length){
-      const mres=await sbReq('POST','membros',y.membros.map(m=>({evento_id:eid,nome:m.nome,fator:m.fator||0,sobras:m.sobras||0,outras:m.outras||0})),{Prefer:'return=representation'});
+      const mres=await sbReq('POST','membros',y.membros.map(m=>({evento_id:eid,nome:m.nome,fator:m.fator||0,outras:m.outras||0})),{Prefer:'return=representation'});
       idByNome={};mres.forEach(r=>idByNome[r.nome]=r.id);
       y.membros.forEach(m=>{if(idByNome[m.nome])m._id=idByNome[m.nome];});
       const pres=[];
@@ -3063,7 +3063,7 @@ async function addNewYear(){
   if(!tesVal){toast('Escolhe o tesoureiro entre os membros','bad');return;}
   if(!NY_MEMBROS.find(m=>m.nome===tesVal)){toast('O tesoureiro tem de pertencer ao plantel','bad');return;}
 
-  const membros=NY_MEMBROS.map(m=>({nome:m.nome,fator:m.fator,presencas:[],sobras:0,outras:0}));
+  const membros=NY_MEMBROS.map(m=>({nome:m.nome,fator:m.fator,presencas:[],outras:0}));
 
   const newYear={
     evento:{nome:'MEO '+yearVal,ano:yearVal,tesoureiro:tesVal,arredondaTotal:false,missaoPoupanca:0,fundoReserva:0},
@@ -3128,7 +3128,7 @@ async function addMember(){
   const fator=parseFloat(document.getElementById('adm-new-fator').value)||1;
   if(!nome){toast('Indica o nome','bad');return;}
   if(DATA.membros.find(m=>m.nome===nome)){toast(nome+' já existe no plantel','bad');return;}
-  DATA.membros.push({nome,fator,presencas:[],sobras:0,outras:0});
+  DATA.membros.push({nome,fator,presencas:[],outras:0});
   const ok=await pushToGitHub('Adicionar '+nome+' ao plantel');
   if(ok){
     CALC=calcular(JSON.parse(JSON.stringify(DATA)));
