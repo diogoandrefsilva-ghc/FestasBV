@@ -4110,10 +4110,20 @@ function renderResumo(){
       ${expIt('🍽','Refeições',g.refeCome,g.refsCome)}
       ${g.refeBebe>0.005?expIt('🍺','Só bebida',g.refeBebe,g.refsBebe):''}
       ${expIt('👥','Amigos',g.amigos,g.convsList)}
-      <div class="rs-it"><span class="k">🐖 Poupança</span><span class="v">${g.poup>0.005?eur(g.poup):'—'}</span></div>
       <div class="rs-it"><span class="k">➕ Quota Extra</span><span class="v">${g.quota>0.005?eur(g.quota):'—'}</span></div>
+      <div class="rs-it"><span class="k">🐖 Poupança</span><span class="v">${g.poup>0.005?eur(g.poup):'—'}</span></div>
     </div></div>`;
-  let h='<div class="sec-title sf">Despesa por Membro</div><div class="mlist">';
+  let h=`<details class="calc-help sf">
+    <summary><span class="ch-ico">ⓘ</span> De onde vêm a Quota Extra e a Poupança? <span class="chev">›</span></summary>
+    <div class="calc-help-body">
+      <p><b>Quota Extra</b> — é a fatia da despesa do evento que <b>não</b> ficou coberta pelo que cada um consumiu: tira-se ao total geral as <b>refeições dos membros</b>, os <b>pagamentos dos convidados</b> e os <b>mealheiros</b>. O que sobra (mais o <b>Fundo de Reserva</b>, se estiver definido) é repartido por todos conforme o <b>fator</b> de cada membro.</p>
+      <p style="font-variant-numeric:tabular-nums">Quota = (despesa total − refeições − convidados − mealheiros + Fundo de Reserva) × fator do membro ÷ soma dos fatores.</p>
+      <p><b>Poupança</b> — é o que se põe de lado para o futuro. Junta a <b>Missão Poupança</b> definida no evento (igual para todos) com eventuais <b>outras contribuições</b> do membro.</p>
+      <p style="font-variant-numeric:tabular-nums">Poupança = Missão Poupança + outras contribuições.</p>
+      <p>Com a opção <b>Arredonda Total</b> ligada, somam-se ainda os cêntimos que faltam para arredondar (refeições + quota) ao euro acima — essa diferença também entra na poupança.</p>
+    </div>
+  </details>`;
+  h+='<div class="sec-title sf">Despesa por Membro</div><div class="mlist">';
   if(!rows.length) h+='<div class="empty sf">Sem membros.</div>';
   rows.forEach(g=>{
     const tag=g.nome===DATA.evento.tesoureiro?' · tesoureiro':'';
