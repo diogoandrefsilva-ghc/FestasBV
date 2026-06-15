@@ -2438,6 +2438,26 @@ function setMealSubtype(el, sub){
   document.getElementById('meal-outros-fields').style.display = sub==='outros' ? '' : 'none';
 }
 
+/* Adiantamentos de um membro = pagamentos "Pagar Dívida" SEM dívida associada (ref vazio).
+   São genéricos (não presos a uma dívida específica), por isso abatem-se direto nas chips.
+   NÃO inclui reembolsos (têm ref "Reembolso…") nem pagamentos saldar com dívida (ref own:/conv:). */
+function _adiantamentosDe(nome){
+  const pg=(CALC&&CALC.pagamentos)||[];
+  return rnd(pg.filter(p=>p.de===nome && !(p.ref&&p.ref.trim())).reduce((a,p)=>a+(+p.valor||0),0),2);
+}
+/* Dívidas em aberto de um membro, já líquidas dos adiantamentos que fez.
+   O adiantamento abate primeiro a dívida própria; o que sobrar abate a dos convidados. */
+function _dividasEmAberto(m){
+  const adiant=_adiantamentosDe(m.nome);
+  let prop=Math.max(0,rnd(m.V-m.Y-m.W-m.X,2));
+  let conv=Math.max(0,rnd(m.AA,2));
+  const abP=Math.min(prop,adiant);
+  prop=rnd(prop-abP,2);
+  const resto=rnd(adiant-abP,2);
+  conv=rnd(Math.max(0,conv-resto),2);
+  return {prop,conv};
+}
+
 function updateSdChips(){
   if(!CALC)return;
   const container=document.getElementById('sd-chips');
@@ -2447,9 +2467,8 @@ function updateSdChips(){
   // Only show members with active (unsettled) debts — saldoFinal < 0
   const debtors=ms.filter(m=>{
     if(m.saldoFinal>=- 0.005) return false; // already settled
-    const ownDebt=Math.max(0,rnd(m.V-m.Y-m.W-m.X,2));
-    const guestDebt=Math.max(0,m.AA);
-    return ownDebt>0.005||guestDebt>0.005;
+    const d=_dividasEmAberto(m);
+    return d.prop>0.005||d.conv>0.005;
   });
 
   if(!debtors.length){container.classList.remove('sd-grouped');container.innerHTML='<div class="empty sf" style="width:100%">Sem dívidas ativas por pagar</div>';recalcSdVal();return;}
@@ -2458,7 +2477,7 @@ function updateSdChips(){
   const rel=_relatedNames(who); // próprio/cônjuge = relativo a quem paga
   // Convidados primeiro, depois próprio — dentro de cada grupo
   debtors.forEach(m=>{
-    const guestDebt=Math.max(0,m.AA);
+    const guestDebt=_dividasEmAberto(m).conv;
     const isDefault=m.nome===who;
     if(guestDebt>0.005){
       const chip=_sdChip('conv:'+m.nome,m.nome,true,guestDebt,isDefault,'toggleSdChip');
@@ -2466,7 +2485,7 @@ function updateSdChips(){
     }
   });
   debtors.forEach(m=>{
-    const ownDebt=Math.max(0,rnd(m.V-m.Y-m.W-m.X,2));
+    const ownDebt=_dividasEmAberto(m).prop;
     const isDefault=m.nome===who;
     if(ownDebt>0.005){
       const chip=_sdChip('own:'+m.nome,m.nome,false,ownDebt,isDefault,'toggleSdChip');
@@ -2520,10 +2539,10 @@ function recalcSdVal(){
     const key=chip.dataset.key;
     if(key.startsWith('own:')){
       const nome=key.slice(4);const m=ms.find(x=>x.nome===nome);
-      if(m)total+=Math.max(0,rnd(m.V-m.Y-m.W-m.X,2));
+      if(m)total+=_dividasEmAberto(m).prop;
     } else if(key.startsWith('conv:')){
       const nome=key.slice(5);const m=ms.find(x=>x.nome===nome);
-      if(m)total+=Math.max(0,m.AA);
+      if(m)total+=_dividasEmAberto(m).conv;
     }
   });
   total=rnd(total,2);
@@ -2658,8 +2677,8 @@ async function saveCashFlow(){
     if(covParts.length>1){
       let expectedTotal=0;
       covParts.forEach(key=>{
-        if(key.startsWith('own:')){const nome=key.slice(4);const m=CALC.membros.find(x=>x.nome===nome);if(m)expectedTotal+=Math.max(0,rnd(m.V-m.Y-m.W-m.X,2));}
-        else if(key.startsWith('conv:')){const nome=key.slice(5);const m=CALC.membros.find(x=>x.nome===nome);if(m)expectedTotal+=Math.max(0,m.AA);}
+        if(key.startsWith('own:')){const nome=key.slice(4);const m=CALC.membros.find(x=>x.nome===nome);if(m)expectedTotal+=_dividasEmAberto(m).prop;}
+        else if(key.startsWith('conv:')){const nome=key.slice(5);const m=CALC.membros.find(x=>x.nome===nome);if(m)expectedTotal+=_dividasEmAberto(m).conv;}
       });
       expectedTotal=rnd(expectedTotal,2);
       if(Math.abs(val-expectedTotal)>0.01){toast('Com múltiplas dívidas, o valor tem de ser o total','bad');document.getElementById('pay-save').disabled=false;return;}
@@ -2836,7 +2855,7 @@ function updateEditSdChips(){
     const isConv=key.startsWith('conv:');
     const nome=isConv?key.slice(5):(key.startsWith('own:')?key.slice(4):key);
     const m=ms.find(x=>x.nome===nome);
-    const amt=m?(isConv?Math.max(0,m.AA):Math.max(0,rnd(m.V-m.Y-m.W-m.X,2))):0;
+    const amt=m?(isConv?_dividasEmAberto(m).conv:_dividasEmAberto(m).prop):0;
     const chip=_sdChip(key,nome,isConv,amt,true,'toggleEditSdChip'); // clicável: permite re-selecionar p/ recalcular o valor
     if(rel.has(nome))mine+=chip;else{other+=chip;otherN++;}
   });
@@ -2863,10 +2882,10 @@ function recalcEditSdVal(apply){
     const key=chip.dataset.key;
     if(key.startsWith('own:')){
       const nome=key.slice(4);const m=ms.find(x=>x.nome===nome);
-      if(m)total+=Math.max(0,rnd(m.V-m.Y-m.W-m.X,2));
+      if(m)total+=_dividasEmAberto(m).prop;
     } else if(key.startsWith('conv:')){
       const nome=key.slice(5);const m=ms.find(x=>x.nome===nome);
-      if(m)total+=Math.max(0,m.AA);
+      if(m)total+=_dividasEmAberto(m).conv;
     }
   });
   total=rnd(total,2);
