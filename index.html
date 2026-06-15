@@ -479,6 +479,14 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .calc-help-body p{margin:0 0 7px}
 .calc-help-body p:last-child{margin-bottom:0}
 .calc-help-body b{color:var(--ink);font-weight:600}
+.cf-extra-box{margin-top:14px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.cf-extra-box summary{cursor:pointer;padding:11px 13px;font-size:12.5px;font-weight:600;color:var(--muted);list-style:none;display:flex;align-items:center;gap:6px;-webkit-tap-highlight-color:transparent}
+.cf-extra-box summary::-webkit-details-marker{display:none}
+.cf-extra-box summary .chev{margin-left:auto;color:var(--faint);transition:transform .2s;display:inline-block;font-size:18px;line-height:1}
+.cf-extra-box[open] summary .chev{transform:rotate(90deg)}
+.cf-extra-box[open] summary{border-bottom:1px solid var(--line)}
+.cf-extra-body{padding:11px 13px}
+.cf-extra-body label{display:block;margin-bottom:5px}
 .refdef-add-bar{margin-top:10px;display:flex;gap:8px;align-items:center}
 .refdef-add-btn{display:flex;align-items:center;gap:6px;padding:10px 16px;border-radius:10px;border:1.5px dashed var(--line);background:transparent;color:var(--barrete);font-size:13px;font-weight:600;cursor:pointer;transition:.15s;flex:1;justify-content:center}
 .refdef-add-btn:active{background:rgba(30,122,77,.06);transform:scale(.97)}
@@ -1399,9 +1407,20 @@ function calcular(data){
 
   const mealBy={};for(const x of mealheiros)mealBy[x.quem]=(mealBy[x.quem]||0)+x.valor;
 
+  // Contribuições/poupança extra registadas em pagamentos de dívida (Opção B):
+  // o p.extra está incluído no p.valor; aqui acresce-se à poupança de quem pagou,
+  // por cima das "outras" históricas do membro. Reembolsos nunca têm extra.
+  const extraBy={};
+  for(const p of pag){
+    if(!p||!p.de)continue;
+    if(p.ref&&p.ref.startsWith('Reembolso'))continue;
+    const e=+p.extra||0;
+    if(e>0)extraBy[p.de]=rnd((extraBy[p.de]||0)+e,2);
+  }
+
   for(const m of membros){
     m.R=sumF>0?Math.max(rnd(BN3*m.fator/sumF,2),0):0;
-    m.T=m.outras||0;
+    m.T=rnd((m.outras||0)+(extraBy[m.nome]||0),2);
     if(arredondaTotal){
       m.U=rnd(roundup(m.Sown+m.R,0)-m.R-m.Sown+missaoPoupanca+m.T,2);
     } else {
@@ -2116,7 +2135,7 @@ async function carregar(){
       despesas:(ev.despesas||[]).map(d=>({_id:d.id,quem:d.quem,dataDesp:d.data_desp,dataValor:d.data_valor,desc:d.descricao,tipo:d.tipo,valor:N(d.valor),obs:d.observacoes||''})),
       convidados:(ev.convidados||[]).map(c=>({_id:c.id,membro:c.membro,nome:c.nome,data:c.data,dia:c.dia,ref:c.ref,pagante:c.pagante?'Sim':'Não',preco:N(c.preco)})),
       mealheiros:(ev.mealheiros||[]).map(m=>({quem:m.quem,data:m.data,valor:N(m.valor),subtipo:m.subtipo,desc:m.descricao})),
-      pagamentos:(ev.pagamentos||[]).map(p=>({de:p.de,para:p.para,valor:N(p.valor),ref:p.ref,data:p.data}))
+      pagamentos:(ev.pagamentos||[]).map(p=>({de:p.de,para:p.para,valor:N(p.valor),ref:p.ref,data:p.data,extra:N(p.extra)}))
     }));
     ALL_YEARS.sort((a,b)=>(a.evento.ano||0)-(b.evento.ano||0));
     // Restaurar onde o utilizador estava (ano + separadores), senão ano mais recente
@@ -2193,7 +2212,7 @@ async function sbGuardarEvento(y,slot){
     if(y.mealheiros&&y.mealheiros.length)
       await sbReq('POST','mealheiros',y.mealheiros.map(m=>({evento_id:eid,quem:m.quem,data:m.data||null,valor:m.valor,subtipo:m.subtipo||'lata',descricao:m.desc||''})));
     if(y.pagamentos&&y.pagamentos.length)
-      await sbReq('POST','pagamentos',y.pagamentos.map(p=>({evento_id:eid,de:p.de,para:p.para,valor:p.valor,ref:p.ref||'',data:p.data||null})));
+      await sbReq('POST','pagamentos',y.pagamentos.map(p=>({evento_id:eid,de:p.de,para:p.para,valor:p.valor,ref:p.ref||'',data:p.data||null,extra:p.extra||0})));
     // Propagar ids novos para o estado vivo (o replace recria todas as linhas)
     [ALL_YEARS[slot],(DATA&&DATA.evento&&DATA.evento.ano===ev.ano)?DATA:null].forEach(T=>{
       if(!T)return;
@@ -2314,7 +2333,16 @@ function updateCfForm(){
         <div><label>Valor (€)</label><input type="number" id="cf-val" step="0.01" min="0.01" placeholder="0,00" inputmode="decimal"></div>
         <div><label>Data</label><input type="date" id="cf-date" value="${today}"></div>
       </div>
-      <div class="note" id="cf-val-hint"></div>`;
+      <div class="note" id="cf-val-hint"></div>
+      <details class="cf-extra-box" id="cf-extra-box">
+        <summary><span>🐖 Contribuição extra (poupança)</span><span class="chev">›</span></summary>
+        <div class="cf-extra-body">
+          <p class="note" style="margin-top:0">Raro. Usa quando alguém arredonda para cima — ex.: a dívida é 34€, entrega 35€; esse 1€ a mais entra na poupança do grupo e fica associado a este pagamento.</p>
+          <label>Valor extra (€)</label>
+          <input type="number" id="cf-extra" step="0.01" min="0" placeholder="0,00" inputmode="decimal" oninput="updateExtraTotal()">
+          <div class="note" id="cf-total-hint"></div>
+        </div>
+      </details>`;
     setTimeout(updateSdChips,10);
   }
 }
@@ -2511,6 +2539,15 @@ function recalcSdVal(){
       if(hint)hint.textContent='Podes ajustar o valor para pagamento parcial';
     }
   } else if(valEl){valEl.readOnly=false;valEl.style.opacity='1';if(hint)hint.textContent='Sem dívidas selecionadas — será registado como pagamento livre / adiantamento.';}
+  updateExtraTotal();
+}
+// Atualiza só o aviso "Total a entregar" — NÃO mexe no campo Valor (preserva pagamentos parciais)
+function updateExtraTotal(){
+  const totalHint=document.getElementById('cf-total-hint');
+  if(!totalHint)return;
+  const extra=parseFloat(document.getElementById('cf-extra')?.value)||0;
+  const base=parseFloat(document.getElementById('cf-val')?.value)||0;
+  totalHint.textContent=extra>0?`Total a entregar: ${eur(rnd(base+extra,2))} (${eur(base)} dívida + ${eur(extra)} poupança)`:'';
 }
 
 function openPayModal(){
@@ -2626,9 +2663,11 @@ async function saveCashFlow(){
       expectedTotal=rnd(expectedTotal,2);
       if(Math.abs(val-expectedTotal)>0.01){toast('Com múltiplas dívidas, o valor tem de ser o total','bad');document.getElementById('pay-save').disabled=false;return;}
     }
+    const extra=rnd(Math.max(0,parseFloat(document.getElementById('cf-extra')?.value)||0),2);
     const ref=covParts.join(', ');
-    DATA.pagamentos.push({de:who,para:tes,valor:rnd(val,2),ref,data:date});
-    commitMsg=`Saldar: ${who} → ${tes} ${eur(val)}`;
+    // p.valor = dinheiro real entregue (dívida + extra). p.extra = fatia que é poupança.
+    DATA.pagamentos.push({de:who,para:tes,valor:rnd(val+extra,2),ref,data:date,extra});
+    commitMsg=`Saldar: ${who} → ${tes} ${eur(rnd(val+extra,2))}`+(extra>0?` (poupança +${eur(extra)})`:'');
   }
 
   const ok=await pushToGitHub(commitMsg);
@@ -2708,16 +2747,26 @@ function editCfEntry(source,idx){
     const p=DATA.pagamentos[idx];
     // Parse existing ref to know which chips are selected
     const selectedKeys=(p.ref||'').split(/,\s*/).map(x=>x.trim()).filter(Boolean);
+    const pExtra=+p.extra||0;
+    const valDivida=rnd((+p.valor||0)-pExtra,2); // campo Valor mostra só a parte da dívida
     f.innerHTML=`
       <label>Quem pagou?</label>
       <select id="ecf-who" onchange="updateEditSdChips()">${memberOptions(p.de)}</select>
       <label>Que dívidas pagou?</label>
       <div class="sd-list" id="esd-chips"></div>
       <div class="inline-row" style="margin-top:14px">
-        <div><label>Valor (€)</label><input type="number" id="ecf-val" step="0.01" value="${p.valor}" inputmode="decimal"></div>
+        <div><label>Valor (€)</label><input type="number" id="ecf-val" step="0.01" value="${valDivida}" inputmode="decimal"></div>
         <div><label>Data</label><input type="date" id="ecf-date" value="${p.data||''}"></div>
       </div>
-      <div class="note" id="ecf-val-hint"></div>`;
+      <div class="note" id="ecf-val-hint"></div>
+      <details class="cf-extra-box"${pExtra>0?' open':''}>
+        <summary><span>🐖 Contribuição extra (poupança)</span><span class="chev">›</span></summary>
+        <div class="cf-extra-body">
+          <p class="note" style="margin-top:0">Fatia deste pagamento que vai para a poupança do grupo (ex.: arredondou a dívida para cima).</p>
+          <label>Valor extra (€)</label>
+          <input type="number" id="ecf-extra" step="0.01" min="0" value="${pExtra||''}" placeholder="0,00" inputmode="decimal">
+        </div>
+      </details>`;
     editingCf.selectedKeys=selectedKeys;
     setTimeout(()=>updateEditSdChips(),10);
   } else if(editType==='despesa'){
@@ -2862,7 +2911,11 @@ async function saveEditCf(){
     } else if(editType==='saldar'){
       p.de=document.getElementById('ecf-who').value;
       p.para=tes;
-      p.valor=parseFloat(document.getElementById('ecf-val').value)||p.valor;
+      const valDivida=parseFloat(document.getElementById('ecf-val').value);
+      const extra=rnd(Math.max(0,parseFloat(document.getElementById('ecf-extra')?.value)||0),2);
+      const base=isNaN(valDivida)?rnd((+p.valor||0)-(+p.extra||0),2):valDivida;
+      p.valor=rnd(base+extra,2);
+      p.extra=extra;
       p.data=document.getElementById('ecf-date').value;
       const covParts=[];
       document.querySelectorAll('#esd-chips .sd-chip.on').forEach(chip=>{covParts.push(chip.dataset.key);});
