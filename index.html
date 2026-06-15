@@ -2837,7 +2837,7 @@ function updateEditSdChips(){
     const nome=isConv?key.slice(5):(key.startsWith('own:')?key.slice(4):key);
     const m=ms.find(x=>x.nome===nome);
     const amt=m?(isConv?Math.max(0,m.AA):Math.max(0,rnd(m.V-m.Y-m.W-m.X,2))):0;
-    const chip=_sdChip(key,nome,isConv,amt,true,'toggleEditSdChip',true); // ro: é consulta do que foi pago
+    const chip=_sdChip(key,nome,isConv,amt,true,'toggleEditSdChip'); // clicável: permite re-selecionar p/ recalcular o valor
     if(rel.has(nome))mine+=chip;else{other+=chip;otherN++;}
   });
   // "Dívidas de outros" (se existir) é a exceção → mostrar aberto
