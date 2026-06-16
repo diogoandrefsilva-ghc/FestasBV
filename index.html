@@ -302,6 +302,9 @@ body.contas-fechadas .cf-entrada{display:none!important}
 body.contas-fechadas.no-admin .fab.gold{display:none!important}
 /* Dívidas todas saldadas → não há mais cash-flows a registar */
 body.dividas-saldadas .fab.gold{display:none!important}
+/* O handle de mover acompanha o FAB: só aparece se houver botão para arrastar */
+body.contas-fechadas.no-admin .fab-drag-handle{display:none!important}
+body.dividas-saldadas .fab-drag-handle{display:none!important}
 
 /* ── Estado das contas ── */
 .contas-card{background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:15px;box-shadow:0 1px 4px rgba(80,55,20,.07)}
@@ -729,7 +732,7 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 
 <div class="fabs" id="fab-container">
   <button class="fab gold write-action" onclick="openPayModal()" title="Registar Cash Flow">💰</button>
-  <div class="fab-drag-handle" id="fab-drag">⋮⋮</div>
+  <div class="fab-drag-handle write-action" id="fab-drag">⋮⋮</div>
 </div>
 
 <div class="sheet-bg" id="sheet-bg" onclick="closeSheet()"></div>
