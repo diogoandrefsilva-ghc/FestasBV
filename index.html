@@ -468,6 +468,35 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .refdef-indireto .rc.b{background:rgba(46,111,168,.12);color:var(--blue)}
 .refdef-indireto .rc.cv{background:rgba(196,144,32,.16);color:#9A6E0E}
 .refdef-indireto .rc.g{background:rgba(111,92,66,.12);color:var(--muted)}
+/* Sub-cards do card de refeição: indiretos · diretos · custo da refeição */
+.rdc{width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:11px;padding:10px 12px;margin-top:8px}
+.rdc-hdr{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+.rdc-lbl{font-family:var(--display);font-size:11.5px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--campino)}
+.rdc-lbl-green{color:var(--green)}
+.rdc-tot{font-size:16px;font-weight:700;color:var(--gold);font-variant-numeric:tabular-nums}
+.rdc-tot-sm{font-size:12px;font-weight:600;color:var(--muted);font-variant-numeric:tabular-nums}
+.rdc-peso{display:flex;align-items:center;gap:8px;margin-top:8px}
+.rdc-peso-lbl{font-family:var(--display);font-size:12.5px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--ink);white-space:nowrap}
+.rdc-peso-lbl b{color:var(--gold)}
+.rdc-peso-rule{flex:1;height:1px;background:linear-gradient(90deg,var(--line),transparent)}
+.rdc-chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:7px}
+.rdc-chips .rc{font-size:11px;font-weight:400;padding:2px 7px;border-radius:5px;white-space:nowrap}
+.rdc-chips .rc.b{background:rgba(46,111,168,.12);color:var(--blue)}
+.rdc-chips .rc.cv{background:rgba(196,144,32,.16);color:#9A6E0E}
+.rdc-chips .rc.g{background:rgba(111,92,66,.12);color:var(--muted)}
+.rdc-sub{font-size:11.5px;color:var(--faint);margin-top:4px}
+.rdc-unit{display:flex;justify-content:space-between;align-items:baseline;margin-top:8px;padding-top:7px;border-top:1px solid rgba(110,75,25,.14);font-size:11.5px;color:var(--muted)}
+.rdc-unit-v{font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums}
+.rdc-hero{background:rgba(168,123,20,.09);border-color:var(--gold)}
+.rdc-people{font-size:11.5px;color:var(--muted);margin-top:5px}
+.rdc-people b{color:var(--ink)}
+.rdc-cells{display:flex;gap:8px;margin-top:9px;align-items:stretch}
+.rdc-cell{flex:1;background:var(--panel);border-radius:8px;padding:8px 10px;text-align:center}
+.rdc-cell-k{font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--faint);font-weight:600}
+.rdc-cell-v{font-size:19px;font-weight:700;color:var(--ink);margin-top:1px;font-variant-numeric:tabular-nums}
+.rdc-cell-v-gold{color:var(--gold)}
+.rdc-bebe{font-size:11px;color:var(--blue);font-weight:700;margin-top:3px;display:flex;align-items:center;justify-content:center;gap:3px;font-variant-numeric:tabular-nums}
+.rdc-bebe svg{flex-shrink:0}
 .refdef-actions{display:flex;gap:4px;flex-shrink:0}
 .refdef-del{width:26px;height:26px;border-radius:7px;border:1px solid var(--line);background:transparent;color:var(--red);font-size:13px;display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:.5;transition:.12s}
 .refdef-del:active{opacity:1;background:rgba(179,64,47,.1);transform:scale(.9)}
@@ -1787,49 +1816,55 @@ function renderAll(){
         const totDisp=calcRef&&calcRef.custoTotal?eur(calcRef.custoTotal):'—';
         const unitDisp=calcRef&&calcRef.custoUnit?eur(calcRef.custoUnit):'—';
         const diretosDisp=calcRef?eur(calcRef.dirRef):'—';
-        // Linha 1 (container leve): peso indireto aplicado sobre bebidas/cerveja/gerais
-        let indiretoHtml='';
+        // Três sub-cards: custos indiretos · custos diretos · custo da refeição
+        let costCards='';
         if(calcRef){
+          const indTot=calcRef.I||0;
+          const dirTot=calcRef.dirRef||0;
+          let indPP=calcRef.custoUnitBebe||0;
+          if(indPP===0&&indTot>0&&calcRef.D>0)indPP=rnd(indTot/calcRef.D,2);
+          let dirPP=dirTot>0?rnd((calcRef.custoUnit||0)-(calcRef.custoUnitBebe||0),2):0;
+          if(dirPP<0)dirPP=0;
           const ind=[
             {c:'b',lbl:'Bebidas',v:calcRef.cBebidas},
             {c:'cv',lbl:'Cerveja',v:calcRef.cCerveja},
             {c:'g',lbl:'Gerais',v:calcRef.cGerais}
           ].filter(x=>x.v>0);
-          if(rd.peso!=null||ind.length){
-            indiretoHtml='<div class="refdef-indireto sf">'+
-              (rd.peso!=null?`<span class="rdi-peso">Peso ${pesoDisplay}</span>`:'')+
-              (ind.length?'<span class="rdi-arrow">→</span>'+ind.map(x=>`<span class="rc ${x.c}">${x.lbl} ${eur(x.v)}</span>`).join(''):'')+
-            '</div>';
+          const chipsHtml=ind.map(x=>`<span class="rc ${x.c}">${x.lbl} ${eur(x.v)}</span>`).join('');
+          const pesoHtml=rd.peso!=null?`<div class="rdc-peso"><span class="rdc-peso-lbl">Peso <b>${pesoDisplay}</b></span><span class="rdc-peso-rule"></span></div>`:'';
+          costCards+=`<div class="rdc sf">
+            <div class="rdc-hdr"><span class="rdc-lbl">Custos indiretos</span><span class="rdc-tot">${eur(indTot)}</span></div>
+            ${pesoHtml}${chipsHtml?`<div class="rdc-chips">${chipsHtml}</div>`:''}
+            <div class="rdc-unit"><span>Por pessoa</span><span class="rdc-unit-v">${eur(indPP)}</span></div>
+          </div>`;
+          costCards+=`<div class="rdc sf">
+            <div class="rdc-hdr"><span class="rdc-lbl">Custos diretos</span><span class="rdc-tot">${eur(dirTot)}</span></div>
+            <div class="rdc-sub">Compras da refeição</div>
+            <div class="rdc-unit"><span>Por pessoa</span><span class="rdc-unit-v">${eur(dirPP)}</span></div>
+          </div>`;
+          if(calcRef.D>0){
+            const membrosCount=calcRef.D-calcRef.E;
+            const bebeIc='<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><path d="M16 10h2a3 3 0 0 1 0 6h-2"/><path d="M5 8h11v10a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2z"/><path d="M5 8a3.5 3.5 0 0 1 3.5-3.5h4A3.5 3.5 0 0 1 16 8"/></svg>';
+            costCards+=`<div class="rdc rdc-hero sf">
+              <div class="rdc-hdr"><span class="rdc-lbl rdc-lbl-green">Custo da refeição</span><span class="rdc-tot-sm">total ${eur(calcRef.custoTotal)}</span></div>
+              <div class="rdc-people"><b>${membrosCount}</b> membros${calcRef.E?` · <b>${calcRef.E}</b> convidados`:''}</div>
+              <div class="rdc-cells">
+                <div class="rdc-cell"><div class="rdc-cell-k">Membro</div><div class="rdc-cell-v rdc-cell-v-gold">${eur(calcRef.P)}</div>${calcRef.temBebe?`<div class="rdc-bebe">${bebeIc}<span>${eur(calcRef.custoUnitBebe)}</span></div>`:''}</div>
+                ${calcRef.Q?`<div class="rdc-cell"><div class="rdc-cell-k">Convidado</div><div class="rdc-cell-v">${eur(calcRef.Q)}</div></div>`:''}
+              </div>
+            </div>`;
+          } else {
+            costCards+=`<div class="rdc rdc-hero sf"><div class="rdc-people" style="text-align:center;padding:3px 0">Sem presenças marcadas</div></div>`;
           }
         }
         r+=`<div class="refdef-row refdef-click" style="flex-wrap:wrap" onclick="openRefdefModal(${rd._idx})">
           <span class="refdef-icon">${icon}</span>
           <div class="refdef-info">
             <div class="refdef-ref sf">${rd.ref}${rd.prato?`<span class="refdef-prato sf"> · ${escHtml(rd.prato)}</span>`:''}</div>
-            ${indiretoHtml}
-            <div class="refdef-params sf">
-              <span>Compras Refeição ${diretosDisp}</span>
-              <span>Custo Total ${totDisp}</span>
-              <span>Unit. ${unitDisp}</span>
-              ${calcRef&&calcRef.temBebe?`<span class="rc-bebe">Só bebida ${eur(calcRef.custoUnitBebe)}</span>`:''}
-            </div>
           </div>
-          <span class="refdef-chevron sf">›</span>`;
-        // Merged: custo info if there are people
-        if(calcRef&&calcRef.D>0){
-          const membrosCount=calcRef.D-calcRef.E;
-          r+=`<div style="width:100%;margin-top:6px;padding:8px 12px;background:rgba(0,0,0,.18);border-radius:8px;display:flex;justify-content:space-between;align-items:center;font-size:12px" class="sf">
-            <div style="display:flex;flex-direction:column;gap:2px">
-              <span style="color:var(--muted)"><span style="font-weight:700;color:var(--ink)">${membrosCount}</span> membros</span>
-              ${calcRef.E?`<span style="color:var(--muted)"><span style="font-weight:700;color:var(--ink)">${calcRef.E}</span> convidados</span>`:'<span style="color:var(--faint);font-size:11px">sem convidados</span>'}
-            </div>
-            <div style="display:flex;flex-direction:column;gap:2px;text-align:right">
-              <span style="font-size:10px;color:var(--faint);font-weight:400">membro <span style="font-weight:700;color:var(--gold);font-size:12px">${eur(calcRef.P)}</span></span>
-              ${calcRef.Q?`<span style="font-size:10px;color:var(--faint);font-weight:400">convidado <span style="font-weight:700;color:var(--ink);font-size:12px">${eur(calcRef.Q)}</span></span>`:''}
-            </div>
-          </div>`;
-        }
-        r+=`</div>`;
+          <span class="refdef-chevron sf">›</span>
+          ${costCards}
+        </div>`;
       });
       r+='</div>';
     });
