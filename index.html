@@ -490,26 +490,32 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .rdc-hero{background:rgba(168,123,20,.09);border-color:var(--gold)}
 .rdc-people{font-size:11.5px;color:var(--muted);margin-top:5px}
 .rdc-people b{color:var(--ink)}
-.rdc-cells{display:flex;gap:8px;margin-top:9px;align-items:stretch}
-.rdc-cell{flex:1;background:var(--panel);border-radius:8px;padding:8px 10px;text-align:center}
+.rdc-cells{display:flex;gap:8px;margin-top:8px;align-items:stretch}
+.rdc-cell{flex:1;background:var(--panel);border-radius:8px;padding:6px 10px 7px;text-align:center}
 .rdc-cell-k{font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--faint);font-weight:600}
-.rdc-cell-v{font-size:19px;font-weight:700;color:var(--ink);margin-top:1px;font-variant-numeric:tabular-nums}
+.rdc-cell-v{font-size:18px;font-weight:700;color:var(--ink);margin-top:0;font-variant-numeric:tabular-nums}
 .rdc-cell-v-gold{color:var(--gold)}
 .rdc-bebe{font-size:11px;color:var(--blue);font-weight:700;margin-top:3px;display:flex;align-items:center;justify-content:center;gap:3px;font-variant-numeric:tabular-nums}
 .rdc-bebe svg{flex-shrink:0}
-/* Barra de navegação por refeição (dá a volta, sem scroll lateral) */
-.refnav{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 6px}
-.refnav-chip{display:flex;align-items:center;gap:6px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:6px 11px 7px;cursor:pointer;font-family:inherit;color:var(--muted);transition:.14s;line-height:1}
+/* Barra de navegação por refeição — quadrados numa só linha (estilo dos convidados) */
+.refnav{display:flex;flex-wrap:nowrap;gap:5px;margin:10px 0 8px}
+.refnav-chip{flex:1 1 0;min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-height:52px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:6px 4px;cursor:pointer;font-family:inherit;transition:.12s;overflow:hidden}
 .refnav-chip:active{transform:scale(.96)}
-.refnav-chip .rn-ico{font-size:15px}
-.refnav-chip .rn-txt{display:flex;flex-direction:column;gap:1px;align-items:flex-start;min-width:0}
-.refnav-chip .rn-day{font-family:var(--display);font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--faint)}
-.refnav-chip .rn-ref{font-size:12.5px;font-weight:600;color:var(--ink);letter-spacing:-.2px}
-.refnav-chip.on{background:var(--campino-escuro);border-color:var(--campino-escuro)}
-.refnav-chip.on .rn-day{color:#EFC9A8}
-.refnav-chip.on .rn-ref{color:#fff}
+.refnav-chip .rn-ico{font-size:16px;line-height:1}
+.refnav-chip .rn-txt{display:flex;flex-direction:column;align-items:center;gap:1px;min-width:0;max-width:100%}
+.refnav-chip .rn-day{font-family:var(--display);font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--ink);line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.refnav-chip .rn-ref{font-size:8px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.02em;line-height:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.refnav-chip.on{border-color:var(--barrete);background:var(--panel2);box-shadow:0 0 0 1px var(--barrete) inset}
+.refnav-chip.on .rn-ref{color:var(--ink)}
 /* Nota "= custo para quem só bebe" no card dos indiretos */
-.rdc-note{font-size:10.5px;color:var(--blue);margin-top:5px;text-align:right;letter-spacing:.01em}
+.rdc-note{font-size:10px;color:var(--blue);font-weight:600;letter-spacing:.01em}
+.rdc-cell-btn{cursor:pointer;transition:.12s}
+.rdc-cell-btn:active{transform:scale(.97)}
+.rdc-cell-arrow{font-size:11px;color:var(--faint);transition:transform .2s}
+.rdc-cell-btn.open .rdc-cell-arrow{transform:rotate(90deg)}
+.rdc-ppl{display:flex;flex-wrap:wrap;gap:5px;margin-top:9px;padding-top:9px;border-top:1px solid rgba(110,75,25,.14)}
+.rdc-ppl-it{font-size:11px;background:var(--panel);border:1px solid var(--line);border-radius:7px;padding:3px 8px;color:var(--ink);font-weight:600}
+.rdc-ppl-it small{color:var(--faint);font-weight:400}
 /* Contagem dentro das células membro/convidado */
 .rdc-cell-k{display:inline-flex;align-items:center;gap:5px;justify-content:center}
 .rdc-cell-n{background:rgba(110,75,25,.12);color:var(--muted);font-size:9.5px;font-weight:700;padding:1px 6px;border-radius:20px;letter-spacing:0}
@@ -1683,6 +1689,7 @@ let REF_SEL=0;
 function setRefMeal(i){REF_SEL=i;lsSet('fbv_refmeal',String(i));
   document.querySelectorAll('.refnav-chip').forEach(e=>e.classList.toggle('on',+e.dataset.i===i));
   document.querySelectorAll('.refmeal').forEach(e=>{e.style.display=(+e.dataset.i===i?'':'none');});}
+function togglePeople(id){const e=document.getElementById(id);if(!e)return;const show=(e.style.display==='none'||!e.style.display);e.style.display=show?'flex':'none';const c=document.querySelector('[data-tgt="'+id+'"]');if(c)c.classList.toggle('open',show);}
 
 /* ── Classify a cash-flow entry ── */
 function cfType(p){
@@ -1846,28 +1853,37 @@ function renderAll(){
         ].filter(x=>x.v>0);
         const chipsHtml=ind.map(x=>`<span class="rc ${x.c}">${x.lbl} ${eur(x.v)}</span>`).join('');
         const pesoHtml=rd.peso!=null?`<div class="rdc-peso"><span class="rdc-peso-lbl">Peso <b>${pesoDisplay}</b></span><span class="rdc-peso-rule"></span></div>`:'';
+        const notaBebe=calcRef.temBebe?' <span class="rdc-note">= custo p/ quem só bebe</span>':'';
         costCards+=`<div class="rdc sf">
           <div class="rdc-hdr"><span class="rdc-lbl">Custos indiretos</span><span class="rdc-tot">${eur(indTot)}</span></div>
           ${pesoHtml}${chipsHtml?`<div class="rdc-chips">${chipsHtml}</div>`:''}
-          <div class="rdc-unit"><span>Por pessoa</span><span class="rdc-unit-v">${eur(indPP)}</span></div>
-          <div class="rdc-note">= Custo para quem só bebe</div>
+          <div class="rdc-unit"><span>Por pessoa${notaBebe}</span><span class="rdc-unit-v">${eur(indPP)}</span></div>
         </div>`;
+        const dirItems=(DATA.despesas||[]).filter(x=>x.tipo===rd.ref&&x.dataValor===rd.data);
+        const dirDetalhe=dirItems.length?`<details class="rdc-det" onclick="event.stopPropagation()"><summary>Detalhe das compras <span class="rdc-det-arrow">›</span></summary><div class="rdc-det-body">${dirItems.map(it=>`<div class="rdc-det-it"><span class="k">${escHtml(it.desc||'(sem descrição)')}${it.quem?`<small> · ${escHtml(it.quem)}</small>`:''}</span><span class="v">${eur(it.valor||0)}</span></div>`).join('')}</div></details>`:'';
         costCards+=`<div class="rdc sf">
           <div class="rdc-hdr"><span class="rdc-lbl">Custos diretos</span><span class="rdc-tot">${eur(dirTot)}</span></div>
           <div class="rdc-sub">Compras da refeição</div>
           <div class="rdc-unit"><span>Por pessoa</span><span class="rdc-unit-v">${eur(dirPP)}</span></div>
+          ${dirDetalhe}
         </div>`;
         const membrosCount=Math.max(0,calcRef.D-calcRef.E);
-        const dirItems=(DATA.despesas||[]).filter(x=>x.tipo===rd.ref&&x.dataValor===rd.data);
-        const dirDetalhe=dirItems.length?`<details class="rdc-det" onclick="event.stopPropagation()"><summary>Detalhe dos custos diretos <span class="rdc-det-arrow">›</span></summary><div class="rdc-det-body">${dirItems.map(it=>`<div class="rdc-det-it"><span class="k">${escHtml(it.desc||'(sem descrição)')}${it.quem?`<small> · ${escHtml(it.quem)}</small>`:''}</span><span class="v">${eur(it.valor||0)}</span></div>`).join('')}</div></details>`:'';
-        const membroCell=`<div class="rdc-cell"><div class="rdc-cell-k">Membro${membrosCount?`<span class="rdc-cell-n">${membrosCount}</span>`:''}</div><div class="rdc-cell-v rdc-cell-v-gold">${calcRef.D>0?eur(calcRef.P):'<span class="rdc-na">N/A</span>'}</div></div>`;
-        const convCell=`<div class="rdc-cell"><div class="rdc-cell-k">Convidado${calcRef.E?`<span class="rdc-cell-n">${calcRef.E}</span>`:''}</div><div class="rdc-cell-v">${calcRef.E?eur(calcRef.Q):'<span class="rdc-na">N/A</span>'}</div></div>`;
+        const rkey=`${rd.dia}|${rd.ref==='Lanche'?'Tarde':rd.ref}`;
+        const membrosCome=(DATA.membros||[]).filter(m=>(m.presencas||[]).some(p=>p.k===rkey&&p.modo==='come')).map(m=>m.nome).sort((a,b)=>a.localeCompare(b,'pt'));
+        const guestsPay=(DATA.convidados||[]).filter(g=>g.dia===rd.dia&&g.ref===rd.ref&&g.pagante==='Sim');
+        const pid='rdp'+rd._idx;
+        const memPanel=membrosCome.length?`<div class="rdc-ppl" id="${pid}m" style="display:none" onclick="event.stopPropagation()">${membrosCome.map(n=>`<span class="rdc-ppl-it">${escHtml(n)}</span>`).join('')}</div>`:'';
+        const guestPanel=guestsPay.length?`<div class="rdc-ppl" id="${pid}g" style="display:none" onclick="event.stopPropagation()">${guestsPay.map(g=>`<span class="rdc-ppl-it">${escHtml(g.nome)}${g.membro?`<small> · ${escHtml(g.membro)}</small>`:''}</span>`).join('')}</div>`:'';
+        const memAttrs=membrosCome.length?`class="rdc-cell rdc-cell-btn" data-tgt="${pid}m" onclick="event.stopPropagation();togglePeople('${pid}m')"`:'class="rdc-cell"';
+        const guestAttrs=guestsPay.length?`class="rdc-cell rdc-cell-btn" data-tgt="${pid}g" onclick="event.stopPropagation();togglePeople('${pid}g')"`:'class="rdc-cell"';
+        const membroCell=`<div ${memAttrs}><div class="rdc-cell-k">Membro${membrosCount?`<span class="rdc-cell-n">${membrosCount}</span>`:''}${membrosCome.length?'<span class="rdc-cell-arrow">›</span>':''}</div><div class="rdc-cell-v rdc-cell-v-gold">${calcRef.D>0?eur(calcRef.P):'<span class="rdc-na">N/A</span>'}</div></div>`;
+        const convCell=`<div ${guestAttrs}><div class="rdc-cell-k">Convidado${calcRef.E?`<span class="rdc-cell-n">${calcRef.E}</span>`:''}${guestsPay.length?'<span class="rdc-cell-arrow">›</span>':''}</div><div class="rdc-cell-v">${calcRef.E?eur(calcRef.Q):'<span class="rdc-na">N/A</span>'}</div></div>`;
         const presNota=calcRef.D>0?'':'<div class="rdc-sempres">Sem presenças marcadas</div>';
         costCards+=`<div class="rdc rdc-hero sf">
           <div class="rdc-hdr"><span class="rdc-lbl rdc-lbl-green">Custo da refeição</span><span class="rdc-tot">${eur(calcRef.custoTotal)}</span></div>
           ${presNota}
           <div class="rdc-cells">${membroCell}${convCell}</div>
-          ${dirDetalhe}
+          ${memPanel}${guestPanel}
         </div>`;
       }
       r+=`<div class="refmeal" data-i="${rd._idx}" style="${rd._idx===sel?'':'display:none'}">
