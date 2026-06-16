@@ -4230,8 +4230,8 @@ function renderResumo(){
         <li><b>Homens</b> — mais assíduos <b>1.00</b>; menos assíduos <b>0.50</b>.</li>
         <li><b>Mulheres</b> — mais assíduas <b>0.25</b>; menos assíduas entre <b>0.20</b> e <b>0.10</b>.</li>
       </ul>
-      <p style="font-variant-numeric:tabular-nums">Quota do membro = total a repartir × fator ÷ soma dos fatores.</p>
       <p style="font-variant-numeric:tabular-nums">Total a repartir = <b>${eur(cDesp)}</b> <i style="color:var(--faint)">(despesas)</i> − <b>${eur(cRef)}</b> <i style="color:var(--faint)">(receita de refeições dos membros)</i> − <b>${eur(cConv)}</b> <i style="color:var(--faint)">(receita convidados)</i> − <b>${eur(cMeal)}</b> <i style="color:var(--faint)">(receita mealheiros)</i> + <b>${eur(fundo)}</b> <i style="color:var(--faint)">(fundo de reserva)</i> = <b>${eur(BN3)}</b>.</p>
+      <p style="font-variant-numeric:tabular-nums">Quota do membro = <b>${eur(BN3)}</b> × fator ÷ soma dos fatores.</p>
       <p style="border-top:1px solid var(--line);padding-top:9px"><b>Poupança</b> — sobre o valor final de cada membro (já depois da quota extra) acrescem dois valores:</p>
       <ul style="margin:6px 0 0;padding-left:18px;line-height:1.55">
         <li><b>Missão Poupança</b> — valor fixo por ano (<b>${eur(missao)}</b> este ano).</li>
