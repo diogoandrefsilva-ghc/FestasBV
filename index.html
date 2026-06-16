@@ -1785,7 +1785,7 @@ function renderAll(){
     const onc=`onclick="openMember('${m.nome.replace(/'/g,"\\'")}')"`;
     if(Math.abs(sf)<0.005){
       return `<div class="mrow" ${onc}>
-        ${av(m.nome,ms.indexOf(m))}<div class="nm">${m.nome}<span class="badge paid">saldado</span><small>sem dívida${tag}</small></div>
+        ${av(m.nome,ms.indexOf(m))}<div class="nm">${m.nome}<small>sem dívida${tag}</small></div>
         <div class="amt zero">${eur(0)}</div><div class="chev">›</div></div>`;
     }
     const cls=sf>0?'pos':'neg';
@@ -1942,11 +1942,8 @@ function renderAll(){
   r+=`<details class="calc-help sf" style="margin-top:14px">
     <summary><span class="ch-ico">ⓘ</span> Como se calculam os custos? <span class="chev">›</span></summary>
     <div class="calc-help-body">
-      <p><b>Indiretos</b> — as despesas de <b>bebidas</b>, <b>cerveja</b> e <b>gerais</b> juntam-se numa bolsa comum. O <b>peso</b> (%) de cada refeição define a fatia que lhe toca. O valor por pessoa é o que paga quem <b>só bebe</b>.</p>
-      <p><b>Diretos</b> — o que se gastou especificamente naquela refeição (o almoço/jantar em si).</p>
+      <p><b>Indiretos</b> — as despesas de <b>bebidas</b>, <b>cerveja</b> e <b>gerais</b> juntam-se numa bolsa comum. O <b>peso</b> (%) de cada refeição define a fatia que lhe toca.</p>      <p><b>Diretos</b> — o que se gastou especificamente naquela refeição (o almoço/jantar em si).</p>
       <p><b>Custo da refeição</b> = diretos + indiretos.</p>
-      <p><b>Membro</b> = o maior valor entre o <b>mínimo MEO</b> e o unitário (diretos + indiretos por pessoa).</p>
-      <p><b>Convidado</b> = unitário arredondado para cima + <b>extra por convidado</b>, nunca abaixo do <b>mínimo de convidado</b>.</p>
     </div>
   </details>`;
   r+='</div>';
