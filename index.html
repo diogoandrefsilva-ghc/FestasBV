@@ -279,6 +279,7 @@ body.read-only .pres-selall-btn{display:none!important}
 body.read-only .pres-guest-add{display:none!important}
 body.read-only .pl-del{display:none!important}
 body.read-only .pl-fator input{pointer-events:none!important;opacity:.7}
+body.read-only .pl-sexo{pointer-events:none!important;opacity:.55}
 .readonly-banner{display:none;text-align:center;font-size:11px;color:var(--muted);background:rgba(46,111,168,.08);border:1px solid rgba(46,111,168,.25);border-radius:10px;padding:8px 14px;margin:12px 0 0}
 body.read-only .readonly-banner{display:block}
 
@@ -292,6 +293,7 @@ body.contas-fechadas .pres-guest-add,
 body.contas-fechadas .pl-del{display:none!important}
 body.contas-fechadas .pres-btn{pointer-events:none!important;opacity:.7}
 body.contas-fechadas .pl-fator input{pointer-events:none!important;opacity:.7}
+body.contas-fechadas .pl-sexo{pointer-events:none!important;opacity:.55}
 /* No modal de cash-flows, esconder entradas de apuramento (despesa/mealheiro) com contas fechadas */
 body.contas-fechadas .cf-entrada{display:none!important}
 /* Pós-fecho só o admin regista pagamentos */
@@ -352,6 +354,11 @@ body.dividas-saldadas .fab.gold{display:none!important}
 .pl-item .pl-fator input:focus{outline:none;border-color:var(--barrete)}
 .pl-item .pl-del{width:26px;height:26px;border-radius:7px;border:1px solid var(--line);background:transparent;color:var(--red);font-size:14px;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:.12s;flex-shrink:0;opacity:.6}
 .pl-item .pl-del:hover{opacity:1;background:rgba(179,64,47,.1)}
+.pl-item .pl-sexo{display:inline-flex;align-items:center;justify-content:center;width:34px;height:30px;flex-shrink:0;border:1px solid var(--line);border-radius:8px;background:var(--panel);cursor:pointer;padding:0;transition:transform .1s,background .15s,border-color .15s,color .15s}
+.pl-item .pl-sexo svg{width:17px;height:17px;display:block}
+.pl-item .pl-sexo.m{color:#3f6ea8;background:rgba(63,110,168,.10);border-color:rgba(63,110,168,.32)}
+.pl-item .pl-sexo.f{color:#c25670;background:rgba(194,86,112,.10);border-color:rgba(194,86,112,.32)}
+.pl-item .pl-sexo:active{transform:scale(.9)}
 .modal label input[type="checkbox"]{width:auto!important;display:inline;vertical-align:middle}
 header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
 
@@ -824,8 +831,8 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
             </select>
           </div>
           <div style="background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px 12px">
-            <div style="font-size:13px;font-weight:600">Limiar fator máx.</div>
-            <div style="font-size:11px;color:var(--faint);margin-bottom:6px">% peso p/ fator máx (modo variável)</div>
+            <div style="font-size:13px;font-weight:600">% Peso p/ Fator Máx</div>
+            <div style="font-size:11px;color:var(--faint);margin-bottom:6px">Se fator variável</div>
             <input type="number" id="adm-fator-thr" step="5" min="0" max="100" placeholder="70" onchange="saveParams()" style="font-size:14px;padding:8px 10px" inputmode="numeric">
           </div>
         </div>
@@ -1323,6 +1330,8 @@ function presModo(m,key){const p=(m.presencas||[]).find(p=>p&&p.k===key);return 
 // ── Fator das quotas: fixo (manual) ou variável (calculado pelas presenças) ──
 const FATOR_THRESHOLD_DEFAULT=0.70;
 function fmtFator(x){return Number(x||0).toLocaleString('pt-PT',{maximumFractionDigits:2});}
+const SEX_M_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="14" r="5.2"/><line x1="14" y1="10" x2="20" y2="4"/><polyline points="15 4 20 4 20 9"/></svg>';
+const SEX_F_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="9" r="5.2"/><line x1="12" y1="14.2" x2="12" y2="21"/><line x1="9" y1="18" x2="15" y2="18"/></svg>';
 function _fatorPesoByKey(data){
   // peso de cada refeição, indexado pela chave de presença "dia|ref" (Lanche guarda-se como Tarde)
   const map={};
@@ -3040,6 +3049,16 @@ function loadParams(){
   if(fmEl)fmEl.value=DATA.evento.fatorModo||'fixo';
   const ftEl=document.getElementById('adm-fator-thr');
   if(ftEl)ftEl.value=Math.round(((DATA.evento.fatorThreshold!=null?DATA.evento.fatorThreshold:FATOR_THRESHOLD_DEFAULT))*100);
+  _syncThrLock();
+}
+function _syncThrLock(){
+  const fm=document.getElementById('adm-fator-modo');
+  const ft=document.getElementById('adm-fator-thr');
+  if(!fm||!ft)return;
+  const off=fm.value!=='variavel';
+  ft.disabled=off;
+  ft.style.opacity=off?'.45':'';
+  ft.style.cursor=off?'not-allowed':'';
 }
 function updateToggleKnob(on){
   const knob=document.getElementById('adm-arredonda-knob');
@@ -3056,6 +3075,7 @@ async function saveParams(){
   DATA.evento.fundoReserva=parseFloat(document.getElementById('adm-fundo').value)||0;
   const fmEl=document.getElementById('adm-fator-modo');
   if(fmEl)DATA.evento.fatorModo=(fmEl.value==='variavel')?'variavel':'fixo';
+  _syncThrLock();
   const ftEl=document.getElementById('adm-fator-thr');
   if(ftEl){let p=parseFloat(ftEl.value);if(isNaN(p))p=70;p=Math.min(100,Math.max(0,p));DATA.evento.fatorThreshold=rnd(p/100,2);}
   const ok=await pushToGitHub('Atualizar parametrizações '+DATA.evento.ano);
@@ -3190,7 +3210,7 @@ function renderPlantel(){
       : `<input type="number" value="${m.fator}" step="0.05" min="0" onchange="updateFator(${i},this.value)" title="Fator">`;
     h+=`<div class="pl-item">
       <span class="pl-name">${m.nome}${isTes?' <span style="font-size:10px;color:var(--gold)">tesoureiro</span>':''}</span>
-      <button class="pl-sexo" onclick="toggleSexo(${i})" title="Sexo (afeta o fator variável)" style="background:none;border:1px solid var(--line);border-radius:6px;padding:3px 8px;font-size:14px;line-height:1;cursor:pointer;color:var(--ink)">${m.sexo==='F'?'♀':'♂'}</button>
+      <button class="pl-sexo ${m.sexo==='F'?'f':'m'}" onclick="toggleSexo(${i})" title="${m.sexo==='F'?'Mulher':'Homem'} — toca para alternar">${m.sexo==='F'?SEX_F_SVG:SEX_M_SVG}</button>
       <span class="pl-fator">${fatorCell}</span>
       <button class="pl-del" onclick="removeMember(${i})" title="Remover"${isTes?' disabled style="opacity:.2;cursor:default"':''}>✕</button>
     </div>`;
@@ -3257,7 +3277,7 @@ async function toggleSexo(idx){
   if(ok){
     CALC=calcular(JSON.parse(JSON.stringify(DATA)));
     renderAll();renderPlantel();
-    toast(m.nome+': '+(m.sexo==='F'?'♀ mulher':'♂ homem')+' ✓','ok');
+    toast(m.nome+': '+(m.sexo==='F'?'Mulher':'Homem')+' ✓','ok');
   }else{
     m.sexo=(m.sexo==='F')?'M':'F';renderPlantel();
   }
