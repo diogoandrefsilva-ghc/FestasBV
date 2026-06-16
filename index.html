@@ -1874,7 +1874,7 @@ function renderAll(){
       const pesoDisplay=rd.peso!=null?(Number(((rd.peso||0)*100).toFixed(2)).toLocaleString('pt-PT',{maximumFractionDigits:2})+'%'):'—';
       // Três sub-cards: custos indiretos · custos diretos · custo da refeição
       let costCards='';
-      if(calcRef&&isAdmin()){
+      if(calcRef){
         const indTot=calcRef.I||0;
         const dirTot=calcRef.dirRef||0;
         let indPP=calcRef.custoUnitBebe||0;
@@ -1923,12 +1923,12 @@ function renderAll(){
       }
       r+=`<div class="refmeal" data-i="${rd._idx}" style="${rd._idx===sel?'':'display:none'}">
         <div class="refdef-day-hdr sf">${rd.dia} · ${rd.data}</div>
-        <div class="refdef-row refdef-click" style="flex-wrap:wrap" onclick="openRefdefModal(${rd._idx})">
+        <div class="refdef-row${isAdmin()?' refdef-click':''}" style="flex-wrap:wrap"${isAdmin()?` onclick="openRefdefModal(${rd._idx})"`:''}>
           <span class="refdef-icon">${icon}</span>
           <div class="refdef-info">
             <div class="refdef-ref sf">${rd.ref}${rd.prato?`<span class="refdef-prato sf"> · ${escHtml(rd.prato)}</span>`:''}</div>
           </div>
-          <span class="refdef-chevron sf">›</span>
+          ${isAdmin()?'<span class="refdef-chevron sf">›</span>':''}
           ${costCards}
         </div>
       </div>`;
