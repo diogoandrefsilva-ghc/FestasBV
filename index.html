@@ -1288,9 +1288,7 @@ function secContasHtml(){
         const podeAnular=admin||MY_NAMES.includes(v.amigo);
         const por=v.validado_por_amigo||'';
         const porDif=por&&por!==v.amigo;   // validado por outra pessoa (cônjuge/admin)
-        let sub='Validado '+fmtDataHora(v.validado_em);
-        if(por)sub+=' · por '+por+(porDif?' (em nome de '+v.amigo+')':'');
-        if(admin&&v.validado_por_email)sub+=' · '+v.validado_por_email;
+        let sub='Validado '+fmtDataHora(v.validado_em)+(por?' por '+por:'');
         s+=`<div class="val-row">
           <span class="val-ic">✓</span>
           <div class="val-txt"><div class="val-name">${v.amigo}</div><small>${sub}</small></div>
@@ -1811,8 +1809,8 @@ function renderAll(){
             <div class="refdef-ref sf">${rd.ref}${rd.prato?`<span class="refdef-prato sf"> · ${escHtml(rd.prato)}</span>`:''}</div>
             ${indiretoHtml}
             <div class="refdef-params sf">
-              <span>Diretos ${diretosDisp}</span>
-              <span>Total ${totDisp}</span>
+              <span>Compras Refeição ${diretosDisp}</span>
+              <span>Custo Total ${totDisp}</span>
               <span>Unit. ${unitDisp}</span>
               ${calcRef&&calcRef.temBebe?`<span class="rc-bebe">Só bebida ${eur(calcRef.custoUnitBebe)}</span>`:''}
             </div>
