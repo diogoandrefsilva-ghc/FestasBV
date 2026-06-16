@@ -755,7 +755,7 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
       </div>
       <div>
         <label>Peso indireto (%)</label>
-        <input type="number" id="rd-peso" step="5" min="0" max="100" value="0" placeholder="0" inputmode="decimal">
+        <input type="number" id="rd-peso" step="0.5" min="0" max="100" value="0" placeholder="0" inputmode="decimal">
       </div>
       <div>
         <label>Extra conv. (€)</label>
@@ -1723,6 +1723,17 @@ function renderAll(){
   let r='';
   r+='<div class="sub-tabs sf"><div class="sub-tab'+(REF_SUB==='calendario'?' on':'')+'" data-sub="calendario" onclick="setRefSub(\'calendario\')">📅 Calendário</div><div class="sub-tab'+(REF_SUB==='presencas'?' on':'')+'" data-sub="presencas" onclick="setRefSub(\'presencas\')">✋ Presenças</div></div>';
 
+  // ── Alerta admin: peso das refeições tem de somar 100% ──
+  if(isAdmin()&&DATA.refeicoesDef&&DATA.refeicoesDef.length){
+    const somaPeso=DATA.refeicoesDef.reduce((a,rd)=>a+(rd.peso!=null?(+rd.peso||0):0),0);
+    if(Math.abs(somaPeso-1)>0.0001){
+      const pct=Number((somaPeso*100).toFixed(2)).toLocaleString('pt-PT',{maximumFractionDigits:2});
+      const dif=Number(((somaPeso-1)*100).toFixed(2));
+      const difTxt=(dif>0?'+':'')+dif.toLocaleString('pt-PT',{maximumFractionDigits:2});
+      r+=`<div style="background:rgba(224,83,63,.10);border:1px solid rgba(224,83,63,.42);color:#9c3a2c;border-radius:10px;padding:10px 14px;margin:0 0 12px;font-size:12.5px;line-height:1.45;font-weight:600">⚠️ O peso das refeições soma <b>${pct}%</b> (${difTxt} p.p.) — devia somar <b>100%</b>. Ajusta os pesos, senão a bolsa indireta e os fatores variáveis ficam errados.</div>`;
+    }
+  }
+
   // ── SUB 1: Calendário (merged: definição + custo por pessoa) ──
   r+='<div id="ref-sub-calendario" style="'+(REF_SUB==='calendario'?'':'display:none')+'">';
   r+=`<details class="calc-help sf">
@@ -1754,7 +1765,7 @@ function renderAll(){
         const icon=rd.ref==='Almoço'?'🍳':rd.ref==='Jantar'?'🍖':'🍺';
         // Find calculated data for this meal
         const calcRef=CALC.refeicoes.find(x=>x.data===rd.data&&x.ref===rd.ref);
-        const pesoDisplay=rd.peso!=null?Math.round((rd.peso||0)*100)+'%':'—';
+        const pesoDisplay=rd.peso!=null?(Number(((rd.peso||0)*100).toFixed(2)).toLocaleString('pt-PT',{maximumFractionDigits:2})+'%'):'—';
         const totDisp=calcRef&&calcRef.custoTotal?eur(calcRef.custoTotal):'—';
         const unitDisp=calcRef&&calcRef.custoUnit?eur(calcRef.custoUnit):'—';
         const diretosDisp=calcRef?eur(calcRef.dirRef):'—';
@@ -3749,7 +3760,7 @@ function openRefdefModal(editIdx){
     document.getElementById('rd-data').value=rd.data||'';
     document.getElementById('rd-ref').value=rd.ref||'Jantar';
     document.getElementById('rd-prato').value=rd.prato||'';
-    document.getElementById('rd-peso').value=rd.peso!=null?Math.round(rd.peso*100):0;
+    document.getElementById('rd-peso').value=rd.peso!=null?Number((rd.peso*100).toFixed(2)):0;
     document.getElementById('rd-minmeo').value=rd.minMEO||0;
     document.getElementById('rd-minconv').value=rd.minConv||10;
     document.getElementById('rd-extraconv').value=rd.extraConv||2;
