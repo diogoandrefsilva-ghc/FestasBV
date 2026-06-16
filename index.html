@@ -4198,7 +4198,7 @@ function renderResumo(){
     if(g.quota<=0.005) return `<div class="rs-it"><span class="k">➕ Quota Extra</span><span class="v">—</span></div>`;
     return `<div class="rs-it rs-exp" onclick="toggleRsSub(this,event)"><span class="k">➕ Quota Extra<span class="sub-arrow">▼</span></span><span class="v">${eur(g.quota)}</span></div>
       <div class="rs-sub">
-        <div class="rs-sub-it"><span class="k">Base distribuível</span><span class="v">${eur(BN3)}</span></div>
+        <div class="rs-sub-it"><span class="k">Total a repartir</span><span class="v">${eur(BN3)}</span></div>
         <div class="rs-sub-it"><span class="k">Fator do membro</span><span class="v">${fmtF(g.fator)} de ${fmtF(sumF)}</span></div>
         <div class="rs-formula">${eur(BN3)} × ${fmtF(g.fator)} ÷ ${fmtF(sumF)}<span class="res">= ${eur(g.quota)}</span></div>
       </div>`;
