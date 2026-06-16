@@ -497,6 +497,36 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .rdc-cell-v-gold{color:var(--gold)}
 .rdc-bebe{font-size:11px;color:var(--blue);font-weight:700;margin-top:3px;display:flex;align-items:center;justify-content:center;gap:3px;font-variant-numeric:tabular-nums}
 .rdc-bebe svg{flex-shrink:0}
+/* Barra de navegação por refeição (dá a volta, sem scroll lateral) */
+.refnav{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 6px}
+.refnav-chip{display:flex;align-items:center;gap:6px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:6px 11px 7px;cursor:pointer;font-family:inherit;color:var(--muted);transition:.14s;line-height:1}
+.refnav-chip:active{transform:scale(.96)}
+.refnav-chip .rn-ico{font-size:15px}
+.refnav-chip .rn-txt{display:flex;flex-direction:column;gap:1px;align-items:flex-start;min-width:0}
+.refnav-chip .rn-day{font-family:var(--display);font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--faint)}
+.refnav-chip .rn-ref{font-size:12.5px;font-weight:600;color:var(--ink);letter-spacing:-.2px}
+.refnav-chip.on{background:var(--campino-escuro);border-color:var(--campino-escuro)}
+.refnav-chip.on .rn-day{color:#EFC9A8}
+.refnav-chip.on .rn-ref{color:#fff}
+/* Nota "= custo para quem só bebe" no card dos indiretos */
+.rdc-note{font-size:10.5px;color:var(--blue);margin-top:5px;text-align:right;letter-spacing:.01em}
+/* Contagem dentro das células membro/convidado */
+.rdc-cell-k{display:inline-flex;align-items:center;gap:5px;justify-content:center}
+.rdc-cell-n{background:rgba(110,75,25,.12);color:var(--muted);font-size:9.5px;font-weight:700;padding:1px 6px;border-radius:20px;letter-spacing:0}
+.rdc-na{font-size:15px;font-weight:600;color:#BBB3A4}
+.rdc-sempres{font-size:11.5px;color:var(--faint);text-align:center;margin-top:6px}
+/* Detalhe colapsável dos custos diretos dentro do card de custo */
+.rdc-det{margin-top:10px;border-top:1px solid rgba(110,75,25,.14);padding-top:8px}
+.rdc-det summary{list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;font-size:11px;font-weight:600;letter-spacing:.04em;color:var(--muted);user-select:none}
+.rdc-det summary::-webkit-details-marker{display:none}
+.rdc-det-arrow{font-size:14px;color:var(--faint);transition:transform .2s}
+.rdc-det[open] .rdc-det-arrow{transform:rotate(90deg)}
+.rdc-det-body{margin-top:7px}
+.rdc-det-it{display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:4px 0;font-size:11.5px;border-bottom:1px solid rgba(110,75,25,.08)}
+.rdc-det-it:last-child{border-bottom:none}
+.rdc-det-it .k{color:var(--muted);min-width:0}
+.rdc-det-it .k small{color:var(--faint)}
+.rdc-det-it .v{font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums;white-space:nowrap}
 .refdef-actions{display:flex;gap:4px;flex-shrink:0}
 .refdef-del{width:26px;height:26px;border-radius:7px;border:1px solid var(--line);background:transparent;color:var(--red);font-size:13px;display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:.5;transition:.12s}
 .refdef-del:active{opacity:1;background:rgba(179,64,47,.1);transform:scale(.9)}
@@ -1649,6 +1679,10 @@ let REF_SUB='calendario';
 function setRefSub(s){REF_SUB=s;lsSet('fbv_refsub',s);document.querySelectorAll('.sub-tab').forEach(e=>e.classList.toggle('on',e.dataset.sub===s));
   document.getElementById('ref-sub-calendario').style.display=s==='calendario'?'':'none';
   document.getElementById('ref-sub-presencas').style.display=s==='presencas'?'':'none';}
+let REF_SEL=0;
+function setRefMeal(i){REF_SEL=i;lsSet('fbv_refmeal',String(i));
+  document.querySelectorAll('.refnav-chip').forEach(e=>e.classList.toggle('on',+e.dataset.i===i));
+  document.querySelectorAll('.refmeal').forEach(e=>{e.style.display=(+e.dataset.i===i?'':'none');});}
 
 /* ── Classify a cash-flow entry ── */
 function cfType(p){
@@ -1783,94 +1817,84 @@ function renderAll(){
 
   // ── SUB 1: Calendário (merged: definição + custo por pessoa) ──
   r+='<div id="ref-sub-calendario" style="'+(REF_SUB==='calendario'?'':'display:none')+'">';
-  r+=`<details class="calc-help sf">
-    <summary><span class="ch-ico">ⓘ</span> Como se calculam os custos? <span class="chev">›</span></summary>
-    <div class="calc-help-body">
-      <p><b>Indireto</b> — as despesas de <b>bebidas</b>, <b>cerveja</b> e <b>gerais</b> juntam-se numa bolsa comum. O <b>peso</b> (%) de cada refeição define a fatia dessa bolsa que lhe toca.</p>
-      <p><b>Diretos</b> — o que se gastou especificamente naquela refeição (o almoço/jantar em si).</p>
-      <p><b>Total refeição</b> = diretos + indiretos (bebidas + cerveja + gerais).</p>
-      <p><b>Unitário</b> = total ÷ pessoas presentes nessa refeição.</p>
-      <p><b>Custo por membro</b> = o maior valor entre o <b>mínimo MEO</b> e o unitário.</p>
-      <p><b>Convidado</b> = unitário arredondado para cima + <b>extra por convidado</b>, nunca abaixo do <b>mínimo de convidado</b>.</p>
-    </div>
-  </details>`;
   if(!DATA.refeicoesDef||!DATA.refeicoesDef.length){
     r+='<div class="refdef-empty sf">Nenhuma refeição definida para este ano.<br>Adiciona dias e refeições para começar.</div>';
   } else {
-    // Group by day
-    const dayOrder=[];const dayMap={};
-    DATA.refeicoesDef.forEach((rd,i)=>{
-      if(!dayMap[rd.dia]){dayMap[rd.dia]={dia:rd.dia,data:rd.data,refs:[]};dayOrder.push(rd.dia);}
-      dayMap[rd.dia].refs.push({...rd,_idx:i});
-    });
+    const icoOf=ref=>ref==='Almoço'?'🍳':ref==='Jantar'?'🍖':'🍺';
+    const meals=DATA.refeicoesDef.map((rd,i)=>({...rd,_idx:i}));
+    let sel=REF_SEL;if(sel<0||sel>=meals.length)sel=0;REF_SEL=sel;
+    // Barra de navegação horizontal — um chip por refeição (dá a volta, sem scroll lateral)
+    r+='<div class="refnav sf">'+meals.map(m=>`<button class="refnav-chip${m._idx===sel?' on':''}" data-i="${m._idx}" onclick="setRefMeal(${m._idx})"><span class="rn-ico">${icoOf(m.ref)}</span><span class="rn-txt"><span class="rn-day">${m.dia}</span><span class="rn-ref">${m.ref}</span></span></button>`).join('')+'</div>';
     r+='<div class="refdef-cards">';
-    dayOrder.forEach(dia=>{
-      const dg=dayMap[dia];
-      r+=`<div class="refdef-day">`;
-      r+=`<div class="refdef-day-hdr sf">${dia} · ${dg.data}</div>`;
-      dg.refs.forEach(rd=>{
-        const icon=rd.ref==='Almoço'?'🍳':rd.ref==='Jantar'?'🍖':'🍺';
-        // Find calculated data for this meal
-        const calcRef=CALC.refeicoes.find(x=>x.data===rd.data&&x.ref===rd.ref);
-        const pesoDisplay=rd.peso!=null?(Number(((rd.peso||0)*100).toFixed(2)).toLocaleString('pt-PT',{maximumFractionDigits:2})+'%'):'—';
-        const totDisp=calcRef&&calcRef.custoTotal?eur(calcRef.custoTotal):'—';
-        const unitDisp=calcRef&&calcRef.custoUnit?eur(calcRef.custoUnit):'—';
-        const diretosDisp=calcRef?eur(calcRef.dirRef):'—';
-        // Três sub-cards: custos indiretos · custos diretos · custo da refeição
-        let costCards='';
-        if(calcRef){
-          const indTot=calcRef.I||0;
-          const dirTot=calcRef.dirRef||0;
-          let indPP=calcRef.custoUnitBebe||0;
-          if(indPP===0&&indTot>0&&calcRef.D>0)indPP=rnd(indTot/calcRef.D,2);
-          let dirPP=dirTot>0?rnd((calcRef.custoUnit||0)-(calcRef.custoUnitBebe||0),2):0;
-          if(dirPP<0)dirPP=0;
-          const ind=[
-            {c:'b',lbl:'Bebidas',v:calcRef.cBebidas},
-            {c:'cv',lbl:'Cerveja',v:calcRef.cCerveja},
-            {c:'g',lbl:'Gerais',v:calcRef.cGerais}
-          ].filter(x=>x.v>0);
-          const chipsHtml=ind.map(x=>`<span class="rc ${x.c}">${x.lbl} ${eur(x.v)}</span>`).join('');
-          const pesoHtml=rd.peso!=null?`<div class="rdc-peso"><span class="rdc-peso-lbl">Peso <b>${pesoDisplay}</b></span><span class="rdc-peso-rule"></span></div>`:'';
-          costCards+=`<div class="rdc sf">
-            <div class="rdc-hdr"><span class="rdc-lbl">Custos indiretos</span><span class="rdc-tot">${eur(indTot)}</span></div>
-            ${pesoHtml}${chipsHtml?`<div class="rdc-chips">${chipsHtml}</div>`:''}
-            <div class="rdc-unit"><span>Por pessoa</span><span class="rdc-unit-v">${eur(indPP)}</span></div>
-          </div>`;
-          costCards+=`<div class="rdc sf">
-            <div class="rdc-hdr"><span class="rdc-lbl">Custos diretos</span><span class="rdc-tot">${eur(dirTot)}</span></div>
-            <div class="rdc-sub">Compras da refeição</div>
-            <div class="rdc-unit"><span>Por pessoa</span><span class="rdc-unit-v">${eur(dirPP)}</span></div>
-          </div>`;
-          if(calcRef.D>0){
-            const membrosCount=calcRef.D-calcRef.E;
-            const bebeIc='<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><path d="M16 10h2a3 3 0 0 1 0 6h-2"/><path d="M5 8h11v10a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2z"/><path d="M5 8a3.5 3.5 0 0 1 3.5-3.5h4A3.5 3.5 0 0 1 16 8"/></svg>';
-            costCards+=`<div class="rdc rdc-hero sf">
-              <div class="rdc-hdr"><span class="rdc-lbl rdc-lbl-green">Custo da refeição</span><span class="rdc-tot-sm">total ${eur(calcRef.custoTotal)}</span></div>
-              <div class="rdc-people"><b>${membrosCount}</b> membros${calcRef.E?` · <b>${calcRef.E}</b> convidados`:''}</div>
-              <div class="rdc-cells">
-                <div class="rdc-cell"><div class="rdc-cell-k">Membro</div><div class="rdc-cell-v rdc-cell-v-gold">${eur(calcRef.P)}</div>${calcRef.temBebe?`<div class="rdc-bebe">${bebeIc}<span>${eur(calcRef.custoUnitBebe)}</span></div>`:''}</div>
-                ${calcRef.Q?`<div class="rdc-cell"><div class="rdc-cell-k">Convidado</div><div class="rdc-cell-v">${eur(calcRef.Q)}</div></div>`:''}
-              </div>
-            </div>`;
-          } else {
-            costCards+=`<div class="rdc rdc-hero sf"><div class="rdc-people" style="text-align:center;padding:3px 0">Sem presenças marcadas</div></div>`;
-          }
-        }
-        r+=`<div class="refdef-row refdef-click" style="flex-wrap:wrap" onclick="openRefdefModal(${rd._idx})">
+    meals.forEach(rd=>{
+      const icon=icoOf(rd.ref);
+      const calcRef=CALC.refeicoes.find(x=>x.data===rd.data&&x.ref===rd.ref);
+      const pesoDisplay=rd.peso!=null?(Number(((rd.peso||0)*100).toFixed(2)).toLocaleString('pt-PT',{maximumFractionDigits:2})+'%'):'—';
+      // Três sub-cards: custos indiretos · custos diretos · custo da refeição
+      let costCards='';
+      if(calcRef){
+        const indTot=calcRef.I||0;
+        const dirTot=calcRef.dirRef||0;
+        let indPP=calcRef.custoUnitBebe||0;
+        if(indPP===0&&indTot>0&&calcRef.D>0)indPP=rnd(indTot/calcRef.D,2);
+        let dirPP=dirTot>0?rnd((calcRef.custoUnit||0)-(calcRef.custoUnitBebe||0),2):0;
+        if(dirPP<0)dirPP=0;
+        const ind=[
+          {c:'b',lbl:'Bebidas',v:calcRef.cBebidas},
+          {c:'cv',lbl:'Cerveja',v:calcRef.cCerveja},
+          {c:'g',lbl:'Gerais',v:calcRef.cGerais}
+        ].filter(x=>x.v>0);
+        const chipsHtml=ind.map(x=>`<span class="rc ${x.c}">${x.lbl} ${eur(x.v)}</span>`).join('');
+        const pesoHtml=rd.peso!=null?`<div class="rdc-peso"><span class="rdc-peso-lbl">Peso <b>${pesoDisplay}</b></span><span class="rdc-peso-rule"></span></div>`:'';
+        costCards+=`<div class="rdc sf">
+          <div class="rdc-hdr"><span class="rdc-lbl">Custos indiretos</span><span class="rdc-tot">${eur(indTot)}</span></div>
+          ${pesoHtml}${chipsHtml?`<div class="rdc-chips">${chipsHtml}</div>`:''}
+          <div class="rdc-unit"><span>Por pessoa</span><span class="rdc-unit-v">${eur(indPP)}</span></div>
+          <div class="rdc-note">= Custo para quem só bebe</div>
+        </div>`;
+        costCards+=`<div class="rdc sf">
+          <div class="rdc-hdr"><span class="rdc-lbl">Custos diretos</span><span class="rdc-tot">${eur(dirTot)}</span></div>
+          <div class="rdc-sub">Compras da refeição</div>
+          <div class="rdc-unit"><span>Por pessoa</span><span class="rdc-unit-v">${eur(dirPP)}</span></div>
+        </div>`;
+        const membrosCount=Math.max(0,calcRef.D-calcRef.E);
+        const dirItems=(DATA.despesas||[]).filter(x=>x.tipo===rd.ref&&x.dataValor===rd.data);
+        const dirDetalhe=dirItems.length?`<details class="rdc-det" onclick="event.stopPropagation()"><summary>Detalhe dos custos diretos <span class="rdc-det-arrow">›</span></summary><div class="rdc-det-body">${dirItems.map(it=>`<div class="rdc-det-it"><span class="k">${escHtml(it.desc||'(sem descrição)')}${it.quem?`<small> · ${escHtml(it.quem)}</small>`:''}</span><span class="v">${eur(it.valor||0)}</span></div>`).join('')}</div></details>`:'';
+        const membroCell=`<div class="rdc-cell"><div class="rdc-cell-k">Membro${membrosCount?`<span class="rdc-cell-n">${membrosCount}</span>`:''}</div><div class="rdc-cell-v rdc-cell-v-gold">${calcRef.D>0?eur(calcRef.P):'<span class="rdc-na">N/A</span>'}</div></div>`;
+        const convCell=`<div class="rdc-cell"><div class="rdc-cell-k">Convidado${calcRef.E?`<span class="rdc-cell-n">${calcRef.E}</span>`:''}</div><div class="rdc-cell-v">${calcRef.E?eur(calcRef.Q):'<span class="rdc-na">N/A</span>'}</div></div>`;
+        const presNota=calcRef.D>0?'':'<div class="rdc-sempres">Sem presenças marcadas</div>';
+        costCards+=`<div class="rdc rdc-hero sf">
+          <div class="rdc-hdr"><span class="rdc-lbl rdc-lbl-green">Custo da refeição</span><span class="rdc-tot">${eur(calcRef.custoTotal)}</span></div>
+          ${presNota}
+          <div class="rdc-cells">${membroCell}${convCell}</div>
+          ${dirDetalhe}
+        </div>`;
+      }
+      r+=`<div class="refmeal" data-i="${rd._idx}" style="${rd._idx===sel?'':'display:none'}">
+        <div class="refdef-day-hdr sf">${rd.dia} · ${rd.data}</div>
+        <div class="refdef-row refdef-click" style="flex-wrap:wrap" onclick="openRefdefModal(${rd._idx})">
           <span class="refdef-icon">${icon}</span>
           <div class="refdef-info">
             <div class="refdef-ref sf">${rd.ref}${rd.prato?`<span class="refdef-prato sf"> · ${escHtml(rd.prato)}</span>`:''}</div>
           </div>
           <span class="refdef-chevron sf">›</span>
           ${costCards}
-        </div>`;
-      });
-      r+='</div>';
+        </div>
+      </div>`;
     });
     r+='</div>';
   }
   r+=`<div class="refdef-add-bar"><button class="refdef-add-btn sf write-action admin-only" onclick="openRefdefModal()">＋ Adicionar Refeição</button></div>`;
+  r+=`<details class="calc-help sf" style="margin-top:14px">
+    <summary><span class="ch-ico">ⓘ</span> Como se calculam os custos? <span class="chev">›</span></summary>
+    <div class="calc-help-body">
+      <p><b>Indiretos</b> — as despesas de <b>bebidas</b>, <b>cerveja</b> e <b>gerais</b> juntam-se numa bolsa comum. O <b>peso</b> (%) de cada refeição define a fatia que lhe toca. O valor por pessoa é o que paga quem <b>só bebe</b>.</p>
+      <p><b>Diretos</b> — o que se gastou especificamente naquela refeição (o almoço/jantar em si).</p>
+      <p><b>Custo da refeição</b> = diretos + indiretos.</p>
+      <p><b>Membro</b> = o maior valor entre o <b>mínimo MEO</b> e o unitário (diretos + indiretos por pessoa).</p>
+      <p><b>Convidado</b> = unitário arredondado para cima + <b>extra por convidado</b>, nunca abaixo do <b>mínimo de convidado</b>.</p>
+    </div>
+  </details>`;
   r+='</div>';
 
   // ── SUB 2: Presenças ──
@@ -2260,6 +2284,8 @@ async function carregar(){
     YEAR_IDX=yi>=0?yi:ALL_YEARS.length-1;
     const savedSub=lsGet('fbv_refsub');
     if(savedSub==='calendario'||savedSub==='presencas')REF_SUB=savedSub;
+    const savedMeal=parseInt(lsGet('fbv_refmeal'),10);
+    if(Number.isInteger(savedMeal)&&savedMeal>=0)REF_SEL=savedMeal;
     selectYear();
     const savedTab=lsGet('fbv_tab');
     if(['saldos','resumo','refeicoes','cashflows'].includes(savedTab))setTab(savedTab);
