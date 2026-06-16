@@ -813,6 +813,22 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
             <input type="number" id="adm-fundo" step="10" min="0" placeholder="0" onchange="saveParams()" style="font-size:14px;padding:8px 10px" inputmode="decimal">
           </div>
         </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px">
+          <div style="background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px 12px">
+            <div style="font-size:13px;font-weight:600">Fator das quotas</div>
+            <div style="font-size:11px;color:var(--faint);margin-bottom:6px">Como é definido</div>
+            <select id="adm-fator-modo" onchange="saveParams()" class="sf" style="width:100%;font-size:14px;padding:8px 10px;-webkit-appearance:none;appearance:none;min-width:0;max-width:100%;box-sizing:border-box;background:var(--panel);border:1px solid var(--line);border-radius:8px;color:var(--ink)">
+              <option value="fixo">Fixo (manual)</option>
+              <option value="variavel">Variável (presenças)</option>
+            </select>
+          </div>
+          <div style="background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px 12px">
+            <div style="font-size:13px;font-weight:600">Limiar fator máx.</div>
+            <div style="font-size:11px;color:var(--faint);margin-bottom:6px">% peso p/ fator máx (modo variável)</div>
+            <input type="number" id="adm-fator-thr" step="5" min="0" max="100" placeholder="70" onchange="saveParams()" style="font-size:14px;padding:8px 10px" inputmode="numeric">
+          </div>
+        </div>
       </div>
     </div>
 
@@ -1304,6 +1320,32 @@ const MODELO_BEBE_DESDE=2026;
 function presIdx(m,key){return(m.presencas||[]).findIndex(p=>p&&p.k===key);}
 function presModo(m,key){const p=(m.presencas||[]).find(p=>p&&p.k===key);return p?p.modo:null;}
 
+// ── Fator das quotas: fixo (manual) ou variável (calculado pelas presenças) ──
+const FATOR_THRESHOLD_DEFAULT=0.70;
+function fmtFator(x){return Number(x||0).toLocaleString('pt-PT',{maximumFractionDigits:2});}
+function _fatorPesoByKey(data){
+  // peso de cada refeição, indexado pela chave de presença "dia|ref" (Lanche guarda-se como Tarde)
+  const map={};
+  for(const r of (data.refeicoesDef||[])){const k=r.dia+'|'+(r.ref==='Lanche'?'Tarde':r.ref);map[k]=(+r.peso||0);}
+  return map;
+}
+function fatorVariavel(m,data){
+  // score = soma dos pesos das refeições onde esteve (come OU bebe). Pesos somam 100%.
+  const ev=data.evento||{};
+  const thr=(ev.fatorThreshold!=null&&ev.fatorThreshold!=='')?+ev.fatorThreshold:FATOR_THRESHOLD_DEFAULT;
+  const peso=_fatorPesoByKey(data);
+  let score=0,cnt=0;
+  (m.presencas||[]).forEach(p=>{if(!p||!p.k)return;score+=(peso[p.k]||0);cnt++;});
+  const F=(m.sexo==='F');
+  if(cnt===0)return 0;                 // nunca veio
+  if(score>=thr)return F?0.25:1;       // >= limiar (peso) → fator máximo
+  if(cnt>=2)return F?0.20:0.50;        // veio >1x mas abaixo do limiar
+  return F?0.10:0.25;                  // veio só 1x
+}
+function fatorEfetivo(m,data){
+  return (data&&data.evento&&data.evento.fatorModo==='variavel')?fatorVariavel(m,data):(+m.fator||0);
+}
+
 function calcular(data){
   const{evento,membros,despesas,convidados,mealheiros,refeicoesDef,pagamentos}=data;
   const pag=pagamentos||[];
@@ -1403,7 +1445,7 @@ function calcular(data){
   const missaoPoupanca=evento.missaoPoupanca||0;
   const arredondaTotal=evento.arredondaTotal!==undefined?evento.arredondaTotal:false;
   const BN3=baseQuota<=0?0:rnd(baseQuota+fundoReserva,2);
-  const sumF=membros.reduce((a,m)=>a+m.fator,0);
+  const sumF=membros.reduce((a,m)=>{m.fatorEf=fatorEfetivo(m,data);return a+m.fatorEf;},0);
 
   const mealBy={};for(const x of mealheiros)mealBy[x.quem]=(mealBy[x.quem]||0)+x.valor;
 
@@ -1419,7 +1461,7 @@ function calcular(data){
   }
 
   for(const m of membros){
-    m.R=sumF>0?Math.max(rnd(BN3*m.fator/sumF,2),0):0;
+    m.R=sumF>0?Math.max(rnd(BN3*(m.fatorEf!=null?m.fatorEf:m.fator)/sumF,2),0):0;
     // poupança extra agora vem só dos pagamentos (campo legado membros.outras removido)
     m.T=rnd(extraBy[m.nome]||0,2);
     if(arredondaTotal){
@@ -2003,7 +2045,7 @@ function openMember(nome){
   const quotaExtra=rnd((m.R||0)+(m.U||0),2);
   if(quotaExtra>0){
     h+='<div class="bd-title sf">Quota Extra</div>';
-    if(m.R>0){h+=`<div class="li"><span class="lbl">Quota adicional<small>fator ${m.fator}</small></span><span class="val minus">${eur(m.R)}</span></div>`;}
+    if(m.R>0){h+=`<div class="li"><span class="lbl">Quota adicional<small>fator ${fmtFator(m.fatorEf!=null?m.fatorEf:m.fator)}</small></span><span class="val minus">${eur(m.R)}</span></div>`;}
     if(m.U>0){h+=`<div class="li"><span class="lbl">Missão poupança</span><span class="val minus">${eur(m.U)}</span></div>`;}
   }
 
@@ -2127,9 +2169,9 @@ async function carregar(){
     const N=v=>v==null?0:Number(v);
     ALL_YEARS=rows.map(ev=>({
       _sbId: ev.id,
-      evento:{nome:ev.nome,ano:ev.ano,tesoureiro:ev.tesoureiro,arredondaTotal:!!ev.arredonda_total,missaoPoupanca:N(ev.missao_poupanca),fundoReserva:N(ev.fundo_reserva),contasFechadas:!!ev.contas_fechadas,contasFechadasEm:ev.contas_fechadas_em||null,contasFechadasPor:ev.contas_fechadas_por||null},
+      evento:{nome:ev.nome,ano:ev.ano,tesoureiro:ev.tesoureiro,arredondaTotal:!!ev.arredonda_total,missaoPoupanca:N(ev.missao_poupanca),fundoReserva:N(ev.fundo_reserva),fatorModo:ev.fator_modo||'fixo',fatorThreshold:ev.fator_threshold!=null?N(ev.fator_threshold):FATOR_THRESHOLD_DEFAULT,contasFechadas:!!ev.contas_fechadas,contasFechadasEm:ev.contas_fechadas_em||null,contasFechadasPor:ev.contas_fechadas_por||null},
       membros:(ev.membros||[]).sort((a,b)=>a.nome.localeCompare(b.nome,'pt')).map(m=>({
-        _id:m.id,nome:m.nome,fator:N(m.fator),
+        _id:m.id,nome:m.nome,fator:N(m.fator),sexo:m.sexo==='F'?'F':'M',
         presencas:(m.presencas||[]).map(p=>({k:`${p.dia}|${p.ref}`,modo:p.modo==='bebe'?'bebe':'come'}))
       })),
       refeicoesDef:(ev.refeicoes_def||[]).map(r=>({data:r.data,dia:r.dia,ref:r.ref,prato:r.prato||'',peso:N(r.peso),minMEO:N(r.min_meo),minConv:N(r.min_conv),extraConv:N(r.extra_conv)})),
@@ -2176,7 +2218,7 @@ async function sbGuardarEvento(y,slot){
   try{
     setSync('load','a guardar…');
     const ev=y.evento;
-    const evRow={nome:ev.nome,ano:ev.ano,tesoureiro:ev.tesoureiro,arredonda_total:!!ev.arredondaTotal,missao_poupanca:ev.missaoPoupanca||0,fundo_reserva:ev.fundoReserva||0};
+    const evRow={nome:ev.nome,ano:ev.ano,tesoureiro:ev.tesoureiro,arredonda_total:!!ev.arredondaTotal,missao_poupanca:ev.missaoPoupanca||0,fundo_reserva:ev.fundoReserva||0,fator_modo:ev.fatorModo==='variavel'?'variavel':'fixo',fator_threshold:ev.fatorThreshold!=null?ev.fatorThreshold:FATOR_THRESHOLD_DEFAULT};
     let eid=y._sbId;
     if(!eid){
       const ins=await sbReq('POST','eventos',evRow,{Prefer:'return=representation'});
@@ -2193,7 +2235,7 @@ async function sbGuardarEvento(y,slot){
     // membros com return=representation para mapear nome -> id (FK das presenças)
     let idByNome=null;
     if(y.membros.length){
-      const mres=await sbReq('POST','membros',y.membros.map(m=>({evento_id:eid,nome:m.nome,fator:m.fator||0})),{Prefer:'return=representation'});
+      const mres=await sbReq('POST','membros',y.membros.map(m=>({evento_id:eid,nome:m.nome,fator:m.fator||0,sexo:m.sexo==='F'?'F':'M'})),{Prefer:'return=representation'});
       idByNome={};mres.forEach(r=>idByNome[r.nome]=r.id);
       y.membros.forEach(m=>{if(idByNome[m.nome])m._id=idByNome[m.nome];});
       const pres=[];
@@ -2994,6 +3036,10 @@ function loadParams(){
   updateToggleKnob(arredonda);
   document.getElementById('adm-missao').value=missao||'';
   document.getElementById('adm-fundo').value=fundo||'';
+  const fmEl=document.getElementById('adm-fator-modo');
+  if(fmEl)fmEl.value=DATA.evento.fatorModo||'fixo';
+  const ftEl=document.getElementById('adm-fator-thr');
+  if(ftEl)ftEl.value=Math.round(((DATA.evento.fatorThreshold!=null?DATA.evento.fatorThreshold:FATOR_THRESHOLD_DEFAULT))*100);
 }
 function updateToggleKnob(on){
   const knob=document.getElementById('adm-arredonda-knob');
@@ -3008,6 +3054,10 @@ async function saveParams(){
   DATA.evento.arredondaTotal=arredonda;
   DATA.evento.missaoPoupanca=parseFloat(document.getElementById('adm-missao').value)||0;
   DATA.evento.fundoReserva=parseFloat(document.getElementById('adm-fundo').value)||0;
+  const fmEl=document.getElementById('adm-fator-modo');
+  if(fmEl)DATA.evento.fatorModo=(fmEl.value==='variavel')?'variavel':'fixo';
+  const ftEl=document.getElementById('adm-fator-thr');
+  if(ftEl){let p=parseFloat(ftEl.value);if(isNaN(p))p=70;p=Math.min(100,Math.max(0,p));DATA.evento.fatorThreshold=rnd(p/100,2);}
   const ok=await pushToGitHub('Atualizar parametrizações '+DATA.evento.ano);
   if(ok){
     CALC=calcular(JSON.parse(JSON.stringify(DATA)));
@@ -3083,10 +3133,10 @@ async function addNewYear(){
   if(!tesVal){toast('Escolhe o tesoureiro entre os membros','bad');return;}
   if(!NY_MEMBROS.find(m=>m.nome===tesVal)){toast('O tesoureiro tem de pertencer ao plantel','bad');return;}
 
-  const membros=NY_MEMBROS.map(m=>({nome:m.nome,fator:m.fator,presencas:[]}));
+  const membros=NY_MEMBROS.map(m=>({nome:m.nome,fator:m.fator,presencas:[],sexo:m.sexo||'M'}));
 
   const newYear={
-    evento:{nome:'MEO '+yearVal,ano:yearVal,tesoureiro:tesVal,arredondaTotal:false,missaoPoupanca:0,fundoReserva:0},
+    evento:{nome:'MEO '+yearVal,ano:yearVal,tesoureiro:tesVal,arredondaTotal:false,missaoPoupanca:0,fundoReserva:0,fatorModo:'fixo',fatorThreshold:FATOR_THRESHOLD_DEFAULT},
     membros,
     despesas:[],
     convidados:[],
@@ -3134,9 +3184,14 @@ function renderPlantel(){
   let h='';
   DATA.membros.forEach((m,i)=>{
     const isTes=m.nome===DATA.evento.tesoureiro;
+    const varModo=DATA.evento&&DATA.evento.fatorModo==='variavel';
+    const fatorCell=varModo
+      ? `<span title="Calculado pelas presenças" style="font-weight:700">${fmtFator(fatorVariavel(m,DATA))}</span>`
+      : `<input type="number" value="${m.fator}" step="0.05" min="0" onchange="updateFator(${i},this.value)" title="Fator">`;
     h+=`<div class="pl-item">
       <span class="pl-name">${m.nome}${isTes?' <span style="font-size:10px;color:var(--gold)">tesoureiro</span>':''}</span>
-      <span class="pl-fator"><input type="number" value="${m.fator}" step="0.05" min="0" onchange="updateFator(${i},this.value)" title="Fator"></span>
+      <button class="pl-sexo" onclick="toggleSexo(${i})" title="Sexo (afeta o fator variável)" style="background:none;border:1px solid var(--line);border-radius:6px;padding:3px 8px;font-size:14px;line-height:1;cursor:pointer;color:var(--ink)">${m.sexo==='F'?'♀':'♂'}</button>
+      <span class="pl-fator">${fatorCell}</span>
       <button class="pl-del" onclick="removeMember(${i})" title="Remover"${isTes?' disabled style="opacity:.2;cursor:default"':''}>✕</button>
     </div>`;
   });
@@ -3148,7 +3203,7 @@ async function addMember(){
   const fator=parseFloat(document.getElementById('adm-new-fator').value)||1;
   if(!nome){toast('Indica o nome','bad');return;}
   if(DATA.membros.find(m=>m.nome===nome)){toast(nome+' já existe no plantel','bad');return;}
-  DATA.membros.push({nome,fator,presencas:[]});
+  DATA.membros.push({nome,fator,presencas:[],sexo:'M'});
   const ok=await pushToGitHub('Adicionar '+nome+' ao plantel');
   if(ok){
     CALC=calcular(JSON.parse(JSON.stringify(DATA)));
@@ -3191,6 +3246,20 @@ async function updateFator(idx,val){
     CALC=calcular(JSON.parse(JSON.stringify(DATA)));
     renderAll();
     toast('Fator atualizado ✓','ok');
+  }
+}
+
+async function toggleSexo(idx){
+  const m=DATA.membros[idx];
+  m.sexo=(m.sexo==='F')?'M':'F';
+  renderPlantel();
+  const ok=await pushToGitHub('Atualizar sexo de '+m.nome);
+  if(ok){
+    CALC=calcular(JSON.parse(JSON.stringify(DATA)));
+    renderAll();renderPlantel();
+    toast(m.nome+': '+(m.sexo==='F'?'♀ mulher':'♂ homem')+' ✓','ok');
+  }else{
+    m.sexo=(m.sexo==='F')?'M':'F';renderPlantel();
   }
 }
 
@@ -4023,7 +4092,7 @@ function buildPersonReport(pessoa){
   const isTes=m.nome===DATA.evento.tesoureiro;
 
   let h=`<h1>${evNome} ${ano} — ${pessoa}</h1>`;
-  h+=`<div class="subtitle">${DATA.evento.datas||''} · ${isTes?'Tesoureiro':'Membro'} · Fator: ${m.fator}</div>`;
+  h+=`<div class="subtitle">${DATA.evento.datas||''} · ${isTes?'Tesoureiro':'Membro'} · Fator: ${fmtFator(m.fatorEf!=null?m.fatorEf:m.fator)}</div>`;
 
   // Saldo hero
   const sf=m._sfEcra;
@@ -4066,7 +4135,7 @@ function buildPersonReport(pessoa){
   const quotaExtra=rnd((m.R||0)+(m.U||0),2);
   if(quotaExtra>0){
     h+='<h2>Quota</h2><table>';
-    if(m.R>0) h+=`<tr><td>Quota adicional (fator ${m.fator})</td><td class="right">${eur(m.R)}</td></tr>`;
+    if(m.R>0) h+=`<tr><td>Quota adicional (fator ${fmtFator(m.fatorEf!=null?m.fatorEf:m.fator)})</td><td class="right">${eur(m.R)}</td></tr>`;
     if(m.U>0) h+=`<tr><td>Missão poupança</td><td class="right">${eur(m.U)}</td></tr>`;
     h+=`<tr style="border-top:2px solid #ddd;font-weight:700"><td><b>Total</b></td><td class="right"><b>${eur(quotaExtra)}</b></td></tr>`;
     h+='</table>';
@@ -4174,7 +4243,7 @@ function renderResumo(){
     const refeCome=rnd(refsCome.reduce((a,x)=>a+x.v,0),2);
     const refeBebe=rnd(refsBebe.reduce((a,x)=>a+x.v,0),2);
     const convsList=[...(m._convs||[])].sort((a,b)=>oKey(a)-oKey(b)).map(x=>({k:`${x.nome} — ${x.dia} · ${x.ref}`,v:rnd(x.q,2)}));
-    return{nome:m.nome,i:ms.indexOf(m),refeCome,refeBebe,amigos,poup,quota,fator:m.fator||0,outras:rnd(m.T||0,2),refsCome,refsBebe,convsList,tot:rnd(refeCome+refeBebe+amigos+poup+quota,2)};
+    return{nome:m.nome,i:ms.indexOf(m),refeCome,refeBebe,amigos,poup,quota,fator:(m.fatorEf!=null?m.fatorEf:m.fator)||0,outras:rnd(m.T||0,2),refsCome,refsBebe,convsList,tot:rnd(refeCome+refeBebe+amigos+poup+quota,2)};
   }).sort((a,b)=>b.tot-a.tot);
   const T=rows.reduce((a,g)=>({refeCome:a.refeCome+g.refeCome,refeBebe:a.refeBebe+g.refeBebe,amigos:a.amigos+g.amigos,poup:a.poup+g.poup,quota:a.quota+g.quota,tot:a.tot+g.tot}),{refeCome:0,refeBebe:0,amigos:0,poup:0,quota:0,tot:0});
   // agregado do grupo por dia/refeição
@@ -4225,10 +4294,11 @@ function renderResumo(){
   let h=`<details class="calc-help sf">
     <summary><span class="ch-ico">ⓘ</span> De onde vêm a Quota Extra e a Poupança? <span class="chev">›</span></summary>
     <div class="calc-help-body">
-      <p><b>Quota Extra</b> — é calculada quando existe <b>défice</b> entre as despesas e as receitas, e é repartida por todos os membros. Não é igual para todos: cada membro tem um <b>fator</b>.</p>
+      <p><b>Quota Extra</b> — é calculada quando existe <b>défice</b> entre as despesas e as receitas, e é repartida por todos os membros. Não é igual para todos: cada membro tem um <b>fator</b>${DATA.evento.fatorModo==='variavel'?', calculado pelas presenças':' (definido manualmente este ano)'}.</p>
+      ${DATA.evento.fatorModo==='variavel'?`<p style="font-size:12px;color:var(--muted);margin:4px 0 6px">Conta como presença ter <b>comido ou só bebido</b>. O peso de cada refeição soma 100%; o limiar para fator máximo este ano é <b>${Math.round((DATA.evento.fatorThreshold!=null?DATA.evento.fatorThreshold:0.70)*100)}%</b>.</p>`:''}
       <ul style="margin:6px 0 8px;padding-left:18px;line-height:1.55">
-        <li><b>Homens</b> — mais assíduos <b>1.00</b>; menos assíduos <b>0.50</b>.</li>
-        <li><b>Mulheres</b> — mais assíduas <b>0.25</b>; menos assíduas entre <b>0.20</b> e <b>0.10</b>.</li>
+        <li><b>Homens</b> — ≥ limiar de presença <b>1.00</b>; veio &gt;1× <b>0.50</b>; veio 1× <b>0.25</b>; nunca <b>0</b>.</li>
+        <li><b>Mulheres</b> — ≥ limiar <b>0.25</b>; veio &gt;1× <b>0.20</b>; veio 1× <b>0.10</b>; nunca <b>0</b>.</li>
       </ul>
       <p style="font-variant-numeric:tabular-nums">Total a repartir = <b>${eur(cDesp)}</b> <i style="color:var(--faint)">(despesas)</i> − <b>${eur(cRef)}</b> <i style="color:var(--faint)">(receita de refeições dos membros)</i> − <b>${eur(cConv)}</b> <i style="color:var(--faint)">(receita convidados)</i> − <b>${eur(cMeal)}</b> <i style="color:var(--faint)">(receita mealheiros)</i> + <b>${eur(fundo)}</b> <i style="color:var(--faint)">(fundo de reserva)</i> = <b>${eur(BN3)}</b>.</p>
       <p style="font-variant-numeric:tabular-nums">Quota do membro = <b>${eur(BN3)}</b> × fator ÷ soma dos fatores.</p>
