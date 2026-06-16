@@ -839,6 +839,27 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
       </div>
     </div>
 
+    <!-- 1b. Limpeza (só admin) -->
+    <div class="settings-block admin-only">
+      <div class="settings-block-hdr" onclick="toggleSettingsBlock(this)">
+        <span class="sb-icon">🧹</span>
+        <span class="sb-title sf">Limpeza <span id="adm-limpeza-year" style="color:var(--ink)"></span></span>
+        <span class="sb-arrow sf">▼</span>
+      </div>
+      <div class="settings-block-body">
+        <div style="background:rgba(224,83,63,.10);border:1px solid rgba(224,83,63,.42);color:#9c3a2c;border-radius:10px;padding:10px 14px;margin-bottom:12px;font-size:12.5px;line-height:1.45">
+          <b>⚠️ Zona perigosa.</b> Estas ações apagam dados <b>só deste ano</b> e <b>não podem ser desfeitas</b>. Disponíveis apenas em anos abertos, até à data da 1ª refeição.
+        </div>
+        <div id="adm-limpeza-aviso" style="display:none;font-size:12px;color:var(--muted);background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 12px;margin-bottom:10px"></div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <button class="btn danger sf" id="btn-limpar-presencas" onclick="limparPresencas()" style="width:100%">🗑 Limpar presenças</button>
+          <p class="sf" style="font-size:11px;color:var(--faint);margin:-2px 0 4px">Apaga presenças e convidados deste ano. Mantém membros, fator e sexo.</p>
+          <button class="btn danger sf" id="btn-limpar-cashflows" onclick="limparCashflows()" style="width:100%">🗑 Limpar cash-flows</button>
+          <p class="sf" style="font-size:11px;color:var(--faint);margin:-2px 0 0">Apaga despesas, mealheiros, reembolsos e pagamentos de dívida deste ano.</p>
+        </div>
+      </div>
+    </div>
+
     <!-- 2. Plantel (só admin) -->
     <div class="settings-block admin-only">
       <div class="settings-block-hdr" onclick="toggleSettingsBlock(this)">
@@ -3039,6 +3060,7 @@ function openAdmin(){
   if(isAdmin()){sbRenderPedidos();sbRenderLigacoes();}
   loadParams();
   renderPlantel();
+  loadLimpeza();
   document.getElementById('admin-bg').classList.add('show');
   document.body.classList.add('no-scroll');
 }
@@ -3095,6 +3117,55 @@ async function saveParams(){
     renderAll();
     toast('Parametrizações guardadas ✓','ok');
   }
+}
+
+/* ── Limpeza (só admin · ano aberto · até à 1ª refeição) ── */
+function _hojeISO(){const d=new Date();const z=n=>String(n).padStart(2,'0');return d.getFullYear()+'-'+z(d.getMonth()+1)+'-'+z(d.getDate());}
+function _limpezaPermitida(){
+  if(!DATA||!DATA.evento)return{ok:false,motivo:'Sem dados carregados.'};
+  if(!isAdmin())return{ok:false,motivo:'Apenas o tesoureiro/admin pode limpar.'};
+  if(DATA.evento.contasFechadas)return{ok:false,motivo:'As contas deste ano estão fechadas.'};
+  const datas=(DATA.refeicoesDef||[]).map(r=>r.data).filter(Boolean).sort();
+  if(datas.length){
+    const first=datas[0];
+    if(_hojeISO()>first)return{ok:false,motivo:'Já passou a 1ª refeição ('+first+') — limpeza bloqueada.'};
+  }
+  return{ok:true,motivo:''};
+}
+function loadLimpeza(){
+  if(!DATA)return;
+  const yEl=document.getElementById('adm-limpeza-year');if(yEl)yEl.textContent=DATA.evento.ano||'';
+  const p=_limpezaPermitida();
+  ['btn-limpar-presencas','btn-limpar-cashflows'].forEach(id=>{
+    const b=document.getElementById(id);if(!b)return;
+    b.disabled=!p.ok;b.style.opacity=p.ok?'':'.4';b.style.cursor=p.ok?'pointer':'not-allowed';
+  });
+  const av=document.getElementById('adm-limpeza-aviso');
+  if(av){av.style.display=p.ok?'none':'block';av.textContent=p.ok?'':('🔒 '+p.motivo);}
+}
+async function limparPresencas(){
+  const p=_limpezaPermitida();if(!p.ok){toast(p.motivo,'bad');return;}
+  const ano=DATA.evento.ano;
+  const nPres=(DATA.membros||[]).reduce((a,m)=>a+((m.presencas||[]).length),0);
+  const nConv=(DATA.convidados||[]).length;
+  if(!nPres&&!nConv){toast('Não há presenças nem convidados para limpar em '+ano,'ok');return;}
+  if(!confirm('LIMPAR PRESENÇAS — '+ano+'\n\nVai apagar '+nPres+' presença(s) e '+nConv+' convidado(s).\nMembros, fator e sexo mantêm-se.\n\nSó afeta o ano '+ano+'. Esta ação NÃO pode ser desfeita.\n\nConfirmar?'))return;
+  (DATA.membros||[]).forEach(m=>{m.presencas=[];});
+  DATA.convidados=[];
+  const ok=await pushToGitHub('Limpar presenças e convidados '+ano);
+  if(ok){CALC=calcular(JSON.parse(JSON.stringify(DATA)));renderAll();loadLimpeza();toast('Presenças de '+ano+' limpas ✓','ok');}
+  else loadLimpeza();
+}
+async function limparCashflows(){
+  const p=_limpezaPermitida();if(!p.ok){toast(p.motivo,'bad');return;}
+  const ano=DATA.evento.ano;
+  const nDesp=(DATA.despesas||[]).length,nMeal=(DATA.mealheiros||[]).length,nPag=(DATA.pagamentos||[]).length;
+  if(!nDesp&&!nMeal&&!nPag){toast('Não há cash-flows para limpar em '+ano,'ok');return;}
+  if(!confirm('LIMPAR CASH-FLOWS — '+ano+'\n\nVai apagar:\n· '+nDesp+' despesa(s)\n· '+nMeal+' mealheiro(s)\n· '+nPag+' pagamento(s)/reembolso(s)\n\nSó afeta o ano '+ano+'. Esta ação NÃO pode ser desfeita.\n\nConfirmar?'))return;
+  DATA.despesas=[];DATA.mealheiros=[];DATA.pagamentos=[];
+  const ok=await pushToGitHub('Limpar cash-flows '+ano);
+  if(ok){CALC=calcular(JSON.parse(JSON.stringify(DATA)));renderAll();loadLimpeza();toast('Cash-flows de '+ano+' limpos ✓','ok');}
+  else loadLimpeza();
 }
 
 /* ── Add New Year ── */
