@@ -183,7 +183,7 @@ body.no-scroll{overflow:hidden;position:fixed;width:100%;}
 .fab-drag-handle{width:54px;height:20px;border-radius:10px;background:var(--panel);border:1px solid var(--line);color:var(--faint);font-size:11px;font-weight:700;letter-spacing:2px;display:flex;align-items:center;justify-content:center;cursor:grab;user-select:none;touch-action:none;opacity:.7;transition:.15s}
 .fab-drag-handle:active{cursor:grabbing;opacity:1;background:rgba(168,123,20,.12)}
 .fab.gold{background:var(--campino);color:#fff;box-shadow:0 6px 20px rgba(156,47,29,.4)}
-.fab.green{background:var(--barrete);color:#fff;font-size:20px;box-shadow:0 6px 20px rgba(30,122,77,.4)}
+.fab.green{background:var(--barrete);color:#fff;font-size:30px;font-weight:300;line-height:1;box-shadow:0 6px 20px rgba(30,122,77,.4)}
 body.read-only .fab.green,body.contas-fechadas .fab.green{display:none!important}
 .fab.dark{background:var(--panel);color:var(--muted);border:1px solid var(--line)}
 
@@ -733,8 +733,8 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 </div>
 
 <div class="fabs" id="fab-container">
-  <button class="fab green write-action" id="fab-guest" onclick="openGuestModal()" title="Adicionar Convidado" style="display:none">👤＋</button>
-  <button class="fab gold write-action" onclick="openPayModal()" title="Registar Cash Flow">💰</button>
+  <button class="fab green write-action" id="fab-guest" onclick="openGuestModal()" title="Adicionar Convidado" style="display:none">＋</button>
+  <button class="fab gold write-action" id="fab-cash" onclick="openPayModal()" title="Registar Cash Flow">💰</button>
   <div class="fab-drag-handle write-action" id="fab-drag">⋮⋮</div>
 </div>
 
@@ -1723,11 +1723,28 @@ function guestAddAllowed(){
   return true;
 }
 // FAB de convidado: só visível na aba Refeições › sub-aba Convidados (e se for permitido)
-function updateGuestFab(){
-  const f=document.getElementById('fab-guest');if(!f)return;
-  const show=(TAB==='refeicoes'&&REF_SUB==='convidados'&&guestAddAllowed());
-  f.style.display=show?'':'none';
+function updateFabs(){
+  const guest=document.getElementById('fab-guest');
+  const cash=document.getElementById('fab-cash');
+  const handle=document.getElementById('fab-drag');
+  let anyVisible=false;
+  // Convidado: só na aba Refeições › Convidados (e se permitido)
+  if(guest){
+    const show=(TAB==='refeicoes'&&REF_SUB==='convidados'&&guestAddAllowed());
+    guest.style.display=show?'':'none';
+    if(show)anyVisible=true;
+  }
+  // Cash-flow: só na aba Cash-Flows (regras de fecho/saldado continuam a esconder via CSS !important)
+  if(cash){
+    const show=(TAB==='cashflows');
+    cash.style.display=show?'':'none';
+    if(show&&getComputedStyle(cash).display!=='none')anyVisible=true;
+  }
+  // Handle de arrastar: só faz sentido se houver pelo menos um FAB à vista
+  if(handle)handle.style.display=anyVisible?'':'none';
 }
+// Alias retrocompatível
+function updateGuestFab(){updateFabs();}
 let REF_SEL=0;
 function setRefMeal(i){REF_SEL=i;lsSet('fbv_refmeal',String(i));
   document.querySelectorAll('.refnav-chip').forEach(e=>e.classList.toggle('on',+e.dataset.i===i));
