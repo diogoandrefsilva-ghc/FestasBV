@@ -416,9 +416,11 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .pres-day-hdr{padding:6px 2px 2px!important;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--campino);font-weight:700;white-space:nowrap}
 .pres-ref-hdr{padding:2px 3px 5px!important;font-size:10.5px;color:var(--muted);font-weight:600;white-space:nowrap;min-width:36px}
 /* Linha-resumo: total que come por refeição, fixa junto ao cabeçalho */
-.pres-sum{font-size:11.5px;font-weight:700;color:var(--faint);padding:2px 2px 6px!important;border-bottom:2px solid var(--campino);white-space:nowrap}
+.pres-sum{font-size:11.5px;font-weight:700;color:var(--faint);padding:3px 2px!important;border-top:1px solid var(--line);border-bottom:1px solid var(--line);white-space:nowrap}
 .pres-sum.has{color:var(--green)}
-.pres-sum-corner{text-align:left!important;padding:2px 0 6px 2px!important;font-size:9px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.pres-sum-corner{text-align:right!important;padding:3px 5px 3px 0!important;font-size:8.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+/* Espaço entre os totais e o início da grelha de pessoas */
+.pres-gap td{height:10px;padding:0!important;border:none!important;background:var(--bg)}
 .pres-name{position:sticky;left:0;z-index:1;background:var(--bg);text-align:left!important;padding:0 10px 0 0!important;white-space:nowrap}
 .pres-name-inner{display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--line)}
 .pres-name-av{width:26px;height:26px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:10px;color:#241600;flex-shrink:0}
@@ -3580,13 +3582,14 @@ function renderPresencaGrid(){
       h+=`<th class="pres-sum sf${total>0?' has':''}">${total||'—'}</th>`;
     });
   });
-  h+=`<th class="pres-sum sf has">${sumComeAll}</th>`;
+  h+='<th class="pres-sum sf"></th>';
   h+='</tr>';
 
   h+='</thead>';
 
   // Member rows
   h+='<tbody>';
+  h+='<tr class="pres-gap"><td colspan="'+(totalSlots+2)+'"></td></tr>';
   // Ordem das linhas: próprio → cônjuge → restantes (alfabética), igual ao Resumo.
   // Preserva-se o índice original (oi) porque togglePresenca/data-member dependem dele.
   const _meuP=meuNomePrincipal();
@@ -3627,8 +3630,7 @@ function renderPresencaGrid(){
       h+=`<td class="pres-count sf${count>0?' has':''}">${count}</td>`;
     });
   });
-  const totalMemComem=mbrs.reduce((a,m)=>a+(m.presencas||[]).filter(p=>p.modo==='come').length,0);
-  h+=`<td class="pres-count sf has">${totalMemComem}</td>`;
+  h+='<td class="pres-count sf"></td>';
   h+='</tr>';
 
   // 2) Membros (que só bebem)
@@ -3638,9 +3640,9 @@ function renderPresencaGrid(){
     totalBebeAll+=c;return c;
   })).flat();
   let bi=0;
-  h+='<tr><td class="pres-name" style="border-bottom:none"><span class="sf" style="font-size:10px;color:var(--blue);padding-left:2px;display:flex;align-items:center;gap:3px">'+BEER_SVG_SM+' Membros <span class="pres-sub">(que só bebem)</span></span></td>';
+  h+='<tr><td class="pres-name" style="border-bottom:none"><span class="sf" style="font-size:10px;color:var(--faint);padding-left:2px">Membros <span class="pres-sub">(só bebem)</span></span></td>';
   days.forEach(d=>{d.slots.forEach(()=>{const c=bebeRow[bi++];h+=`<td class="pres-count sf${c>0?' has':''}" style="${c>0?'color:var(--blue)':''}">${c||'—'}</td>`;});});
-  h+=`<td class="pres-count sf${totalBebeAll>0?' has':''}" style="${totalBebeAll>0?'color:var(--blue)':''}">${totalBebeAll||'—'}</td>`;
+  h+='<td class="pres-count sf"></td>';
   h+='</tr>';
 
   // 3) Convidados
@@ -3656,7 +3658,7 @@ function renderPresencaGrid(){
       h+=`<td class="pres-count sf${guestCount>0?' has':''}" style="${guestCount>0?'color:var(--gold)':''}">${guestCount||'—'}</td>`;
     });
   });
-  h+=`<td class="pres-count sf${totalGuestAll>0?' has':''}" style="${totalGuestAll>0?'color:var(--gold)':''}">${totalGuestAll||'—'}</td>`;
+  h+='<td class="pres-count sf"></td>';
   h+='</tr>';
   h+='</tfoot></table></div>';
   h+='</div>';
@@ -3685,11 +3687,10 @@ function renderGuestSection(){
     // Base de convidados conforme o filtro de membro ativo
     const baseGuests=guestFilterMember==='all'?DATA.convidados:DATA.convidados.filter(g=>g.membro===guestFilterMember);
     const refOrd={Almoço:0,Lanche:1,Jantar:2};
-    // Refeições com convidados (>0) para o filtro atual — só estas viram chip
+    // Todas as refeições viram chip no filtro (mesmo as que têm 0 convidados)
     const mealChips=(DATA.refeicoesDef||[]).slice()
       .sort((a,b)=>a.data.localeCompare(b.data)||(refOrd[a.ref]||0)-(refOrd[b.ref]||0))
-      .map(rd=>({rd,key:rd.dia+'|'+rd.ref,n:baseGuests.filter(g=>g.dia===rd.dia&&g.ref===rd.ref).length}))
-      .filter(x=>x.n>0);
+      .map(rd=>({rd,key:rd.dia+'|'+rd.ref,n:baseGuests.filter(g=>g.dia===rd.dia&&g.ref===rd.ref).length}));
     // Se o filtro de refeição apontar para algo sem convidados (ex: mudou o membro), volta a "Todas"
     if(guestFilterMeal!=='all' && !mealChips.some(x=>x.key===guestFilterMeal)) guestFilterMeal='all';
 
@@ -3707,13 +3708,13 @@ function renderGuestSection(){
       return(refOrd[a.ref]||0)-(refOrd[b.ref]||0);
     });
 
-    // Cards de refeição (filtro) — uma linha, sem scroll. Só refeições com convidados.
+    // Cards de refeição (filtro) — uma linha. Todas as refeições, mesmo as de 0 convidados.
     if(mealChips.length){
       h+='<div class="guest-meal-chips sf">';
       h+=`<button class="guest-meal-chip gmc-all${guestFilterMeal==='all'?' on':''}" onclick="setGuestMeal('all')"><span class="gmc-dia">Todas</span><span class="gmc-badge">${baseGuests.length}</span></button>`;
       mealChips.forEach(({rd,key,n})=>{
         const rc={'Almoço':'almoco','Lanche':'lanche','Jantar':'jantar'}[rd.ref]||'';
-        h+=`<button class="guest-meal-chip${guestFilterMeal===key?' on':''}" onclick="setGuestMeal('${key}')">
+        h+=`<button class="guest-meal-chip${guestFilterMeal===key?' on':''}${n===0?' empty':''}" onclick="setGuestMeal('${key}')">
           <span class="gmc-dia">${rd.dia}</span>
           <span class="gmc-ref r-${rc}">${rd.ref}</span>
           <span class="gmc-badge">${n}</span>
