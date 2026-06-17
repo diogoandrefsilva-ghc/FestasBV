@@ -340,7 +340,9 @@ body.dividas-saldadas .fab-drag-handle{display:none!important}
 .guest-meal-chip{flex:1 1 0;min-width:0;display:flex;flex-direction:column;align-items:center;gap:2px;min-height:52px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:6px 3px 4px;cursor:pointer;transition:.12s;font-family:inherit;overflow:hidden}
 .guest-meal-chip .gmc-dia{font-size:11px;font-weight:700;color:var(--ink);line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
 .guest-meal-chip .gmc-ref{font-size:7px;font-weight:600;color:var(--muted);line-height:1;text-transform:uppercase;letter-spacing:.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
-.guest-meal-chip.gmc-all .gmc-dia{margin-top:4px}
+.guest-meal-chip.gmc-all{background:rgba(168,123,20,.07);border-color:rgba(168,123,20,.32)}
+.guest-meal-chip.gmc-all .gmc-dia{color:var(--gold)}
+.guest-meal-chip .gmc-ref.gmc-all-ref{color:var(--faint)}
 .guest-meal-chip .gmc-ref.r-almoco{color:var(--gold)}
 .guest-meal-chip .gmc-ref.r-jantar{color:#6946A0}
 .guest-meal-chip .gmc-ref.r-lanche{color:var(--blue)}
@@ -3711,7 +3713,7 @@ function renderGuestSection(){
     // Cards de refeição (filtro) — uma linha. Todas as refeições, mesmo as de 0 convidados.
     if(mealChips.length){
       h+='<div class="guest-meal-chips sf">';
-      h+=`<button class="guest-meal-chip gmc-all${guestFilterMeal==='all'?' on':''}" onclick="setGuestMeal('all')"><span class="gmc-dia">Todas</span><span class="gmc-badge">${baseGuests.length}</span></button>`;
+      h+=`<button class="guest-meal-chip gmc-all${guestFilterMeal==='all'?' on':''}" onclick="setGuestMeal('all')"><span class="gmc-dia">Todas</span><span class="gmc-ref gmc-all-ref">Total</span><span class="gmc-badge">${baseGuests.length}</span></button>`;
       mealChips.forEach(({rd,key,n})=>{
         const rc={'Almoço':'almoco','Lanche':'lanche','Jantar':'jantar'}[rd.ref]||'';
         h+=`<button class="guest-meal-chip${guestFilterMeal===key?' on':''}${n===0?' empty':''}" onclick="setGuestMeal('${key}')">
@@ -3740,6 +3742,7 @@ function renderGuestSection(){
         </div>
         ${paysBadge}
         ${(isAdmin()||(MY_NAMES.includes(g.membro)&&diaEditavel(g.dia)))?`<div class="card-actions">
+          <button class="card-act edit write-action" onclick="editGuest(${g._idx})" title="Editar"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>
           <button class="card-act del write-action" onclick="deleteGuest(${g._idx})" title="Remover">✕</button>
         </div>`:''}
       </div>`;
@@ -3842,6 +3845,67 @@ async function deleteGuest(idx){
     CALC=calcular(JSON.parse(JSON.stringify(DATA)));
     renderAll();
     toast('Convidado removido ✓','ok');
+  }catch(e){
+    setSync('err','erro ao guardar');
+    toast(permErrorMsg(e),'bad');
+  }
+}
+
+function editGuest(idx){
+  const g=DATA.convidados[idx];
+  if(!g)return;
+  if(!isAdmin()&&(!MY_NAMES.includes(g.membro)||!diaEditavel(g.dia))){
+    toast('Não podes editar este convidado','bad');return;
+  }
+  const rd=(DATA.refeicoesDef||[]).find(r=>r.dia===g.dia);
+  const dataDia=diaExtenso((rd&&rd.data)||g.data)||g.dia;
+  const html=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+    <h3 style="margin-bottom:0">Editar Convidado</h3>
+    <button onclick="this.closest('.modal-bg').classList.remove('show');document.body.classList.remove('no-scroll')" style="background:var(--panel2);border:1px solid var(--line);color:var(--muted);border-radius:9px;width:32px;height:32px;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0">✕</button>
+  </div>
+  <div class="sf" style="font-size:11px;color:var(--faint);margin:-4px 0 12px">${dataDia} · ${g.ref} — convidado por ${g.membro}</div>
+  <label>Nome do convidado</label>
+  <input type="text" id="guest-edit-nome" placeholder="Nome" value="${escHtml(g.nome)}">
+  <label>Pagante?</label>
+  <select id="guest-edit-pagante"><option value="Sim"${g.pagante==='Sim'?' selected':''}>Sim — paga a quota</option><option value="Não"${g.pagante!=='Sim'?' selected':''}>Não — é oferta</option></select>
+  <div class="mbtns"><button class="btn prim" onclick="saveGuestEdit(${idx})">Guardar</button></div>`;
+  let bg=document.getElementById('guest-modal-bg');
+  if(!bg){
+    bg=document.createElement('div');bg.id='guest-modal-bg';bg.className='modal-bg';
+    bg.innerHTML='<div class="modal" id="guest-modal-inner"></div>';
+    document.body.appendChild(bg);
+    bg.addEventListener('click',e=>{if(e.target===bg){bg.classList.remove('show');document.body.classList.remove('no-scroll');}});
+  }
+  document.getElementById('guest-modal-inner').innerHTML=html;
+  bg.classList.add('show');
+  document.body.classList.add('no-scroll');
+}
+
+async function saveGuestEdit(idx){
+  const g=DATA.convidados[idx];
+  if(!g)return;
+  const nome=(document.getElementById('guest-edit-nome').value||'').trim();
+  const pagante=document.getElementById('guest-edit-pagante').value;
+  if(!nome){toast('Indica o nome do convidado','bad');return;}
+  if(!isAdmin()&&(!MY_NAMES.includes(g.membro)||!diaEditavel(g.dia))){
+    toast('Não podes editar este convidado','bad');return;
+  }
+  const bg=document.getElementById('guest-modal-bg');
+  if(nome===g.nome&&pagante===g.pagante){
+    if(bg){bg.classList.remove('show');document.body.classList.remove('no-scroll');}
+    return;
+  }
+  if(!g._id){toast('Sem ligação à base de dados — recarrega a página','bad');return;}
+  setSync('load','a guardar…');
+  try{
+    await queueWrite(()=>sbReq('PATCH',`convidados?id=eq.${g._id}`,{nome,pagante:pagante==='Sim'}));
+    g.nome=nome;g.pagante=pagante;
+    syncMirror();
+    marcaGuardado();
+    if(bg){bg.classList.remove('show');document.body.classList.remove('no-scroll');}
+    CALC=calcular(JSON.parse(JSON.stringify(DATA)));
+    renderAll();
+    toast('Convidado atualizado ✓','ok');
   }catch(e){
     setSync('err','erro ao guardar');
     toast(permErrorMsg(e),'bad');
