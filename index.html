@@ -3521,7 +3521,7 @@ async function toggleSexo(idx){
 /* ═══ PRESENÇAS GRID ═══ */
 function renderPresencaGrid(){
   if(!DATA||!DATA.refeicoesDef||!DATA.refeicoesDef.length||!DATA.membros||!DATA.membros.length)
-    return '<div class="sec-title sf" style="margin-top:18px">Presenças</div><div class="empty sf">Define refeições e membros primeiro</div>';
+    return '<div class="empty sf" style="margin-top:18px">Define refeições e membros primeiro</div>';
 
   const refs=DATA.refeicoesDef;
   const mbrs=DATA.membros;
@@ -3539,13 +3539,7 @@ function renderPresencaGrid(){
   const hoje=hojeISO();
   const adm=isAdmin();
 
-  let h='<div class="pres-section">';
-  h+='<div class="sec-title sf" style="margin-top:18px">Presenças</div>';
-  h+='<div class="pres-legend sf">';
-  h+='<div class="pres-legend-item"><div class="pres-legend-dot" style="background:var(--green)"></div> Come</div>';
-  h+='<div class="pres-legend-item"><div class="pres-legend-dot" style="background:var(--blue)"></div> Só bebe</div>';
-  h+='<div class="pres-legend-item"><div class="pres-legend-dot" style="background:var(--line)"></div> Ausente</div>';
-  h+='</div>';
+  let h='<div class="pres-section" style="margin-top:14px">';
 
   h+='<div class="pres-scroll">';
   h+='<table class="pres-table">';
@@ -3584,7 +3578,18 @@ function renderPresencaGrid(){
 
   // Member rows
   h+='<tbody>';
-  mbrs.forEach((m,mi)=>{
+  // Ordem das linhas: próprio → cônjuge → restantes (alfabética), igual ao Resumo.
+  // Preserva-se o índice original (oi) porque togglePresenca/data-member dependem dele.
+  const _meuP=meuNomePrincipal();
+  const _conjP=MY_NAMES.filter(n=>n!==_meuP);
+  const _rankP=n=>n===_meuP?0:(_conjP.includes(n)?1:2);
+  const mbrsOrd=mbrs.map((m,oi)=>({m,oi})).sort((a,b)=>{
+    const ra=_rankP(a.m.nome),rb=_rankP(b.m.nome);
+    if(ra!==rb)return ra-rb;
+    return a.m.nome.localeCompare(b.m.nome,'pt');
+  });
+  mbrsOrd.forEach(({m,oi})=>{
+    const mi=oi;
     const pres=m.presencas||[];
     const memberCount=pres.length;
     h+='<tr>';
