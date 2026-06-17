@@ -183,6 +183,8 @@ body.no-scroll{overflow:hidden;position:fixed;width:100%;}
 .fab-drag-handle{width:54px;height:20px;border-radius:10px;background:var(--panel);border:1px solid var(--line);color:var(--faint);font-size:11px;font-weight:700;letter-spacing:2px;display:flex;align-items:center;justify-content:center;cursor:grab;user-select:none;touch-action:none;opacity:.7;transition:.15s}
 .fab-drag-handle:active{cursor:grabbing;opacity:1;background:rgba(168,123,20,.12)}
 .fab.gold{background:var(--campino);color:#fff;box-shadow:0 6px 20px rgba(156,47,29,.4)}
+.fab.green{background:var(--barrete);color:#fff;font-size:20px;box-shadow:0 6px 20px rgba(30,122,77,.4)}
+body.read-only .fab.green,body.contas-fechadas .fab.green{display:none!important}
 .fab.dark{background:var(--panel);color:var(--muted);border:1px solid var(--line)}
 
 /* Modal */
@@ -376,7 +378,7 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 
 /* ═══ REFEIÇÕES SUB-TABS ═══ */
 .sub-tabs{display:flex;gap:0;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:3px;margin-bottom:14px}
-.sub-tab{flex:1;text-align:center;font-family:var(--display);font-size:14px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);padding:8px 4px;border-radius:7px;cursor:pointer;transition:.18s}
+.sub-tab{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:center;font-family:var(--display);font-size:14px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);padding:8px 4px;border-radius:7px;cursor:pointer;transition:.18s}
 .sub-tab.on{background:var(--campino);color:#fff}
 
 /* Guest attendance in presenças */
@@ -476,7 +478,7 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 /* Sub-cards do card de refeição: indiretos · diretos · custo da refeição */
 .rdc{width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:11px;padding:10px 12px;margin-top:8px}
 .rdc-hdr{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
-.rdc-lbl{font-family:var(--display);font-size:11.5px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--campino)}
+.rdc-lbl{font-family:var(--display);font-size:13.5px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--campino)}
 .rdc-lbl-green{color:var(--green)}
 .rdc-tot{font-size:16px;font-weight:700;color:var(--gold);font-variant-numeric:tabular-nums}
 .rdc-tot-sm{font-size:12px;font-weight:600;color:var(--muted);font-variant-numeric:tabular-nums}
@@ -731,6 +733,7 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 </div>
 
 <div class="fabs" id="fab-container">
+  <button class="fab green write-action" id="fab-guest" onclick="openGuestModal()" title="Adicionar Convidado" style="display:none">👤＋</button>
   <button class="fab gold write-action" onclick="openPayModal()" title="Registar Cash Flow">💰</button>
   <div class="fab-drag-handle write-action" id="fab-drag">⋮⋮</div>
 </div>
@@ -1699,12 +1702,32 @@ function setTab(t){TAB=t;document.querySelectorAll('.tab').forEach(e=>e.classLis
   // Hero only visible in saldos tab
   const hero=document.getElementById('hero-card');
   if(hero)hero.style.display=t==='saldos'?'':'none';
+  updateGuestFab();
 }
 
 let REF_SUB='calendario';
 function setRefSub(s){REF_SUB=s;lsSet('fbv_refsub',s);document.querySelectorAll('.sub-tab').forEach(e=>e.classList.toggle('on',e.dataset.sub===s));
   document.getElementById('ref-sub-calendario').style.display=s==='calendario'?'':'none';
-  document.getElementById('ref-sub-presencas').style.display=s==='presencas'?'':'none';}
+  document.getElementById('ref-sub-presencas').style.display=s==='presencas'?'':'none';
+  const cv=document.getElementById('ref-sub-convidados');if(cv)cv.style.display=s==='convidados'?'':'none';
+  updateGuestFab();}
+// Mesmas regras do antigo botão "+ Adicionar Convidado"
+function guestAddAllowed(){
+  if(!DATA||!DATA.refeicoesDef||!DATA.refeicoesDef.length)return false;
+  if(document.body.classList.contains('read-only'))return false;
+  if(document.body.classList.contains('contas-fechadas'))return false;
+  if(!isAdmin()){
+    if(!MY_NAMES.length)return false;
+    if(!(DATA.refeicoesDef||[]).some(rd=>rd.data>=hojeISO()))return false;
+  }
+  return true;
+}
+// FAB de convidado: só visível na aba Refeições › sub-aba Convidados (e se for permitido)
+function updateGuestFab(){
+  const f=document.getElementById('fab-guest');if(!f)return;
+  const show=(TAB==='refeicoes'&&REF_SUB==='convidados'&&guestAddAllowed());
+  f.style.display=show?'':'none';
+}
 let REF_SEL=0;
 function setRefMeal(i){REF_SEL=i;lsSet('fbv_refmeal',String(i));
   document.querySelectorAll('.refnav-chip').forEach(e=>e.classList.toggle('on',+e.dataset.i===i));
@@ -1847,7 +1870,7 @@ function renderAll(){
 
   // REFEIÇÕES — sub-tabbed: Calendário + Presenças
   let r='';
-  r+='<div class="sub-tabs sf"><div class="sub-tab'+(REF_SUB==='calendario'?' on':'')+'" data-sub="calendario" onclick="setRefSub(\'calendario\')">📅 Calendário</div><div class="sub-tab'+(REF_SUB==='presencas'?' on':'')+'" data-sub="presencas" onclick="setRefSub(\'presencas\')">✋ Presenças</div></div>';
+  r+='<div class="sub-tabs sf"><div class="sub-tab'+(REF_SUB==='calendario'?' on':'')+'" data-sub="calendario" onclick="setRefSub(\'calendario\')">📅 Calendário</div><div class="sub-tab'+(REF_SUB==='presencas'?' on':'')+'" data-sub="presencas" onclick="setRefSub(\'presencas\')">✋ Presenças</div><div class="sub-tab'+(REF_SUB==='convidados'?' on':'')+'" data-sub="convidados" onclick="setRefSub(\'convidados\')">👥 Convidados</div></div>';
 
   // ── Alerta admin: peso das refeições tem de somar 100% ──
   if(isAdmin()&&DATA.refeicoesDef&&DATA.refeicoesDef.length){
@@ -1925,7 +1948,7 @@ function renderAll(){
         </div>`;
       }
       r+=`<div class="refmeal" data-i="${rd._idx}" style="${rd._idx===sel?'':'display:none'}">
-        <div class="refdef-day-hdr sf">${rd.dia} · ${rd.data}</div>
+        <div class="refdef-day-hdr sf">${diaExtenso(rd.data)||rd.dia} · ${rd.data}</div>
         <div class="refdef-row${isAdmin()?' refdef-click':''}" style="flex-wrap:wrap"${isAdmin()?` onclick="openRefdefModal(${rd._idx})"`:''}>
           <span class="refdef-icon">${icon}</span>
           <div class="refdef-info">
@@ -1954,7 +1977,10 @@ function renderAll(){
     r+='<div class="perm-hint sf">👤 A tua conta ainda não está ligada a um membro do plantel. Pede ao administrador para te ligar e poderes marcar presenças, convidados e despesas.</div>';
   }
   r+=renderPresencaGrid();
-  r+=renderGuestAddButton();
+  r+='</div>';
+
+  // ── SUB 3: Convidados ──
+  r+='<div id="ref-sub-convidados" style="'+(REF_SUB==='convidados'?'':'display:none')+'">';
   r+=renderGuestSection();
   r+='</div>';
 
@@ -1965,6 +1991,7 @@ function renderAll(){
 
   // Populate payment modal selects
   updateCfForm();
+  updateGuestFab();
 }
 
 let cfFilterType='all';
@@ -2334,7 +2361,7 @@ async function carregar(){
     const yi=ALL_YEARS.findIndex(y=>y.evento.ano===savedAno);
     YEAR_IDX=yi>=0?yi:ALL_YEARS.length-1;
     const savedSub=lsGet('fbv_refsub');
-    if(savedSub==='calendario'||savedSub==='presencas')REF_SUB=savedSub;
+    if(savedSub==='calendario'||savedSub==='presencas'||savedSub==='convidados')REF_SUB=savedSub;
     const savedMeal=parseInt(lsGet('fbv_refmeal'),10);
     if(Number.isInteger(savedMeal)&&savedMeal>=0)REF_SEL=savedMeal;
     selectYear();
@@ -3691,7 +3718,7 @@ function renderGuestSection(){
       if(groupKey!==currentGroup){
         currentGroup=groupKey;
         const icon=g.ref==='Almoço'?'🍳':g.ref==='Jantar'?'🍖':'🍺';
-        h+=`<div style="font-size:11px;color:var(--gold);font-weight:700;letter-spacing:.1em;text-transform:uppercase;margin:12px 0 6px;display:flex;align-items:center;gap:6px" class="sf"><span>${icon}</span>${g.dia} · ${g.ref}</div>`;
+        h+=`<div style="font-size:11px;color:var(--gold);font-weight:700;letter-spacing:.1em;text-transform:uppercase;margin:12px 0 6px;display:flex;align-items:center;gap:6px" class="sf"><span>${icon}</span>${diaExtenso(diaToDate[g.dia]||g.data)||g.dia} · ${g.ref}</div>`;
       }
       const paysBadge=g.pagante==='Sim'?'':'<span class="pg-badge free sf">Oferta</span>';
       h+=`<div class="pres-guest-card">
@@ -3708,15 +3735,6 @@ function renderGuestSection(){
   }
   h+='</div>';
   return h;
-}
-
-function renderGuestAddButton(){
-  if(!DATA||!DATA.refeicoesDef||!DATA.refeicoesDef.length)return'';
-  if(!isAdmin()){
-    if(!MY_NAMES.length)return'';
-    if(!(DATA.refeicoesDef||[]).some(rd=>rd.data>=hojeISO()))return'';
-  }
-  return `<button class="pres-guest-add sf write-action" onclick="openGuestModal()" style="margin-top:10px">＋ Adicionar Convidado</button>`;
 }
 
 function myMemberOptions(sel){
@@ -3971,6 +3989,13 @@ function editRefdef(idx){openRefdefModal(idx);}
 function dataToDia(dateStr){
   const d=new Date(dateStr+'T12:00:00');
   return['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'][d.getDay()];
+}
+// Dia da semana por extenso a partir da data ISO (ex: "Sábado"). Fallback vazio se inválida.
+function diaExtenso(dataStr){
+  const d=new Date((dataStr||'')+'T12:00:00');
+  if(isNaN(d))return'';
+  const s=d.toLocaleDateString('pt-PT',{weekday:'long'});
+  return s.charAt(0).toUpperCase()+s.slice(1);
 }
 
 async function saveRefdef(){
