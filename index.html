@@ -1053,6 +1053,20 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
       </div>
     </div>
 
+    <!-- 3c. Histórico de alterações (visível a todos os autenticados) -->
+    <div class="settings-block">
+      <div class="settings-block-hdr" onclick="toggleSettingsBlock(this);abrirHistoricoSeVazio()">
+        <span class="sb-icon">📜</span>
+        <span class="sb-title sf">Histórico</span>
+        <span class="sb-arrow sf">▼</span>
+      </div>
+      <div class="settings-block-body">
+        <p style="font-size:12px;color:var(--muted);margin-bottom:10px;line-height:1.5">Quem alterou presenças e convidados, e quando. Últimas 100 alterações deste ano.</p>
+        <div class="mbtns" style="margin-bottom:10px"><button class="btn" onclick="openHistorico()">🔄 Atualizar</button></div>
+        <div id="hist-list"><div class="note">Abre para carregar…</div></div>
+      </div>
+    </div>
+
     <!-- 4. Conta (Supabase) -->
     <div class="settings-block">
       <div class="settings-block-hdr" onclick="toggleSettingsBlock(this)">
@@ -2517,6 +2531,66 @@ async function sbGuardarEvento(y,slot){
   }
 }
 
+/* ═══ HISTÓRICO — auditoria append-only (alimenta também a notificação Telegram) ═══ */
+function sbLog(tipo,accao,alvo,detalhe){
+  // Fire-and-forget: regista a ação na tabela 'historico'. Nunca bloqueia nem
+  // faz falhar a ação principal. O Database Webhook do Telegram dispara daqui.
+  try{
+    if(!_sbSession||!DATA||!DATA._sbId)return;
+    sbReq('POST','historico',[{
+      evento_id:DATA._sbId,
+      autor_email:_sbSession.user.email,
+      autor_amigo:meuNomePrincipal()||null,
+      tipo,accao,alvo,
+      detalhe:detalhe||{}
+    }]).catch(()=>{});
+  }catch(_){}
+}
+
+async function openHistorico(){
+  const el=document.getElementById('hist-list');
+  if(!el)return;
+  if(!_sbSession){el.innerHTML='<div class="note">Inicia sessão para ver o histórico.</div>';return;}
+  if(!DATA||!DATA._sbId){el.innerHTML='<div class="note">Sem ano selecionado.</div>';return;}
+  el.innerHTML='<div class="note">A carregar…</div>';
+  try{
+    const rows=await sbReq('GET',`historico?evento_id=eq.${DATA._sbId}&select=ts,autor_email,autor_amigo,tipo,accao,alvo,detalhe&order=ts.desc&limit=100`);
+    el.dataset.loaded='1';
+    if(!rows||!rows.length){el.innerHTML='<div class="note">Ainda não há alterações registadas este ano.</div>';return;}
+    el.innerHTML=rows.map(r=>{
+      const d=r.detalhe||{};
+      const quando=new Date(r.ts).toLocaleString('pt-PT',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+      const quem=escHtml(r.autor_amigo||r.autor_email||'?');
+      const icon=r.tipo==='presenca'?'✋':'👥';
+      const slot=[d.dia,d.ref].filter(Boolean).join(' · ');
+      let txt;
+      if(r.tipo==='presenca'){
+        const ac=r.accao==='marcou'?'marcou presença de':r.accao==='removeu'?'removeu presença de':'mudou presença de';
+        const modo=d.modo==='bebe'?' (só bebida)':'';
+        txt=`${ac} <b>${escHtml(r.alvo)}</b>${slot?' — '+escHtml(slot):''}${modo}`;
+      }else{
+        const ac=r.accao==='adicionou'?'adicionou convidado':r.accao==='removeu'?'removeu convidado':'editou convidado';
+        const porQuem=d.membro?' (por '+escHtml(d.membro)+')':'';
+        txt=`${ac} <b>${escHtml(r.alvo)}</b>${slot?' — '+escHtml(slot):''}${porQuem}`;
+      }
+      return `<div style="display:flex;gap:8px;padding:8px 0;border-bottom:1px solid var(--line)">
+        <span style="flex-shrink:0">${icon}</span>
+        <div style="flex:1;min-width:0;font-size:12.5px;line-height:1.4">
+          <div style="color:var(--ink)">${txt}</div>
+          <div style="font-size:11px;color:var(--faint);margin-top:2px">${quem} · ${quando}</div>
+        </div>
+      </div>`;
+    }).join('');
+  }catch(e){
+    el.innerHTML='<div class="note">Erro ao carregar histórico: '+escHtml(e.message||'')+'</div>';
+  }
+}
+
+function abrirHistoricoSeVazio(){
+  const el=document.getElementById('hist-list');
+  if(el&&el.dataset.loaded!=='1')openHistorico();
+}
+
 /* ═══ CASH FLOW MODAL ═══ */
 let cfDir='reembolso';
 
@@ -3857,6 +3931,7 @@ async function saveGuest(){
       {Prefer:'return=representation'}));
     if(!DATA.convidados)DATA.convidados=[];
     DATA.convidados.push({_id:ins&&ins[0]?ins[0].id:null,nome,membro,dia,ref,pagante});
+    sbLog('convidado','adicionou',nome,{membro,dia,ref,pagante});
     syncMirror();
     marcaGuardado();
     const bg=document.getElementById('guest-modal-bg');
@@ -3881,6 +3956,7 @@ async function deleteGuest(idx){
   try{
     await queueWrite(()=>sbReq('DELETE',`convidados?id=eq.${g._id}`));
     DATA.convidados.splice(idx,1);
+    sbLog('convidado','removeu',g.nome,{membro:g.membro,dia:g.dia,ref:g.ref});
     syncMirror();
     marcaGuardado();
     CALC=calcular(JSON.parse(JSON.stringify(DATA)));
@@ -3938,8 +4014,10 @@ async function saveGuestEdit(idx){
   }
   if(!g._id){toast('Sem ligação à base de dados — recarrega a página','bad');return;}
   setSync('load','a guardar…');
+  const _ant={nome:g.nome,pagante:g.pagante};
   try{
     await queueWrite(()=>sbReq('PATCH',`convidados?id=eq.${g._id}`,{nome,pagante:pagante==='Sim'}));
+    sbLog('convidado','editou',nome,{membro:g.membro,dia:g.dia,ref:g.ref,de:_ant,para:{nome,pagante}});
     g.nome=nome;g.pagante=pagante;
     syncMirror();
     marcaGuardado();
@@ -3983,6 +4061,7 @@ async function togglePresenca(memberIdx,slotKey,btn){
         await sbReq('PATCH',`presencas?membro_id=eq.${m._id}&dia=eq.${enc(dia)}&ref=eq.${enc(ref)}`,{modo:'bebe'});
       else
         await sbReq('DELETE',`presencas?membro_id=eq.${m._id}&dia=eq.${enc(dia)}&ref=eq.${enc(ref)}`);
+      sbLog('presenca',next===null?'removeu':(next==='come'?'marcou':'mudou'),m.nome,{dia,ref,modo:next});
       btn.classList.remove('saving');
       marcaGuardado();
       clearTimeout(presDebounce);
