@@ -573,6 +573,10 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .rdc-det-arrow{font-size:14px;color:var(--faint);transition:transform .2s}
 .rdc-det[open] .rdc-det-arrow{transform:rotate(90deg)}
 .rdc-det-body{margin-top:7px}
+.rdc-det-chips{margin-top:7px;border-top:none;padding-top:0}
+.rdc-det-chips>summary{gap:8px}
+.rdc-det-chips>summary .rdc-chips{margin-top:0;flex:1}
+.rdc-det-chips .rdc-det-body{margin-top:8px;border-top:1px solid rgba(110,75,25,.08);padding-top:8px}
 .rdc-det-it{display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:4px 0;font-size:11.5px;border-bottom:1px solid rgba(110,75,25,.08)}
 .rdc-det-it:last-child{border-bottom:none}
 .rdc-det-it .k{color:var(--muted);min-width:0}
@@ -1976,12 +1980,16 @@ function renderAll(){
           <div class="rdc-unit"><span>Por pessoa${notaBebe}</span><span class="rdc-unit-v">${eur(indPP)}</span></div>
         </div>`;
         const dirItems=(DATA.despesas||[]).filter(x=>x.tipo===rd.ref&&x.dataValor===rd.data);
-        const dirDetalhe=dirItems.length?`<details class="rdc-det" onclick="event.stopPropagation()"><summary>Detalhe das compras <span class="rdc-det-arrow">›</span></summary><div class="rdc-det-body">${dirItems.map(it=>`<div class="rdc-det-it"><span class="k">${escHtml(it.desc||'(sem descrição)')}${it.quem?`<small> · ${escHtml(it.quem)}</small>`:''}</span><span class="v">${eur(it.valor||0)}</span></div>`).join('')}</div></details>`:'';
-        const drChip=dirTot>0?`<div class="rdc-chips"><span class="rc cv">Despesa Refeição ${eur(dirTot)}</span></div>`:'';
+        const dirDetBody=dirItems.length?`<div class="rdc-det-body">${dirItems.map(it=>`<div class="rdc-det-it"><span class="k">${escHtml(it.desc||'(sem descrição)')}${it.quem?`<small> · ${escHtml(it.quem)}</small>`:''}</span><span class="v">${eur(it.valor||0)}</span></div>`).join('')}</div>`:'';
+        let dirChipsRow='';
+        if(dirTot>0){
+          const drChip=`<div class="rdc-chips"><span class="rc cv">Despesa Refeição ${eur(dirTot)}</span></div>`;
+          dirChipsRow=dirItems.length?`<details class="rdc-det rdc-det-chips" onclick="event.stopPropagation()"><summary>${drChip}<span class="rdc-det-arrow">›</span></summary>${dirDetBody}</details>`:drChip;
+        }
         costCards+=`<div class="rdc sf">
           <div class="rdc-hdr"><span class="rdc-lbl">Custos diretos</span><span class="rdc-tot">${eur(dirTot)}</span></div>
           <div class="rdc-peso"><span class="rdc-peso-lbl">Compras</span><span class="rdc-peso-rule"></span></div>
-          ${drChip}${dirDetalhe}
+          ${dirChipsRow}
           <div class="rdc-unit"><span>Por pessoa</span><span class="rdc-unit-v">${eur(dirPP)}</span></div>
         </div>`;
         const membrosCount=Math.max(0,calcRef.D-calcRef.E);
