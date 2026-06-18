@@ -70,20 +70,12 @@ Deno.serve(async (req) => {
 });
 
 function formatar(r: any): string {
-  const quem = r.autor_amigo || r.autor_email;
-  const d = r.detalhe || {};
-  const slot = [d.dia, d.ref].filter(Boolean).join(" · ");
-  if (r.tipo === "presenca") {
-    const ac = r.accao === "marcou" ? "marcou presença de"
-             : r.accao === "removeu" ? "removeu presença de"
-             : "mudou presença de";
-    const modo = d.modo === "bebe" ? " (só bebida)" : "";
-    return `✋ <b>${quem}</b> ${ac} <b>${r.alvo}</b>${slot ? " — " + slot : ""}${modo}`;
-  }
-  const ac = r.accao === "adicionou" ? "adicionou convidado"
-           : r.accao === "removeu" ? "removeu convidado"
-           : "editou convidado";
-  return `👥 <b>${quem}</b> ${ac} <b>${r.alvo}</b>${slot ? " — " + slot : ""}`;
+  // A frase em linguagem natural já vem pronta da app, gravada em detalhe.frase.
+  // (Mantém-se um fallback simples para linhas antigas sem frase.)
+  const icon = r.tipo === "presenca" ? "✋" : "👥";
+  const frase = (r.detalhe && r.detalhe.frase)
+    || `${r.autor_amigo || r.autor_email} alterou ${r.alvo}`;
+  return `${icon} ${frase}`;
 }
 ```
 
