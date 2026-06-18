@@ -425,17 +425,17 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .pres-sum-corner{text-align:right!important;padding:3px 5px 3px 0!important;font-size:8.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
 /* Espaço entre os totais e o início da grelha de pessoas */
 .pres-gap td{height:10px;padding:0!important;border:none!important;background:var(--bg)}
-.pres-name{position:sticky;left:0;z-index:1;background:var(--bg);text-align:left!important;padding:0 10px 0 0!important;white-space:nowrap}
-.pres-name-inner{display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--line)}
+.pres-name{position:sticky;left:0;z-index:1;background:var(--bg);text-align:left!important;padding:0 10px 0 0!important;white-space:nowrap;border-bottom:1px solid rgba(168,140,90,.35)}
+.pres-name-inner{display:flex;align-items:center;gap:8px;padding:5px 0}
 .pres-name-av{width:26px;height:26px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:10px;color:#241600;flex-shrink:0}
-.pres-name-txt{font-size:12.5px;font-weight:600;max-width:104px;line-height:1.12;white-space:normal;word-break:break-word;overflow-wrap:anywhere}
+.pres-name-txt{font-size:12.5px;font-weight:600;white-space:nowrap;line-height:1.12}
 /* Ecrãs estreitos: encolher coluna dos nomes para reduzir scroll horizontal na grelha */
 @media (max-width:430px){
-  .pres-corner{min-width:78px}
+  .pres-corner{min-width:0}
   .pres-name{padding-right:4px!important}
   .pres-name-inner{gap:5px}
   .pres-name-av{width:21px;height:21px;border-radius:6px;font-size:8.5px;flex-shrink:0}
-  .pres-name-txt{font-size:11px;max-width:54px;line-height:1.1}
+  .pres-name-txt{font-size:11.5px;line-height:1.1}
   .pres-day-hdr{padding:5px 1px 2px!important;letter-spacing:.04em}
   .pres-date{font-size:8px}
   .pres-lock{font-size:7px}
@@ -447,7 +447,13 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
   .pres-btn.on::after{font-size:12px}
   .pres-btn .beer-ic{width:18px;height:18px}
   .pres-count{font-size:9px}
-  .pres-member-count{min-width:22px;font-size:10px}
+  .pres-member-count{min-width:24px;font-size:10px}
+}
+@media (max-width:360px){
+  .pres-name-txt{font-size:11px}
+  .pres-btn{width:27px;height:27px}
+  .pres-name-av{width:20px;height:20px}
+  .pres-name-inner{gap:4px}
 }
 .pres-cell{padding:3px 2px!important;border-bottom:1px solid rgba(168,140,90,.35)}
 .pres-btn{width:32px;height:32px;border-radius:8px;border:1.5px solid var(--line);background:var(--panel);cursor:pointer;transition:.15s;display:flex;align-items:center;justify-content:center;margin:0 auto;position:relative;overflow:hidden}
@@ -463,7 +469,7 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .rc-bebe{background:rgba(46,111,168,.12);color:var(--blue);padding:1px 4px;border-radius:4px}
 .pres-count{font-size:10px;font-weight:700;color:var(--faint);text-align:center;padding:4px 0;border-top:2px solid var(--line)}
 .pres-count.has{color:var(--green)}
-.pres-member-count{font-size:11px;font-weight:700;color:var(--muted);padding:3px 0;text-align:right;min-width:30px;border-bottom:1px solid rgba(168,140,90,.35)}
+.pres-member-count{font-size:11px;font-weight:700;color:var(--muted);padding:3px 0;text-align:right;min-width:30px;white-space:nowrap;border-bottom:1px solid rgba(168,140,90,.35)}
 .pres-member-count.full{color:var(--green)}
 
 /* Stats row at bottom */
