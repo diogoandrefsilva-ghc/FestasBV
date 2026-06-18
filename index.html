@@ -437,7 +437,7 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
   .pres-name-av{width:21px;height:21px;border-radius:6px;font-size:8.5px;flex-shrink:0}
   .pres-name-txt{font-size:11px;line-height:1.1}
   .pres-foot-h{font-size:9px}
-  .pres-foot-sub{font-size:9px;padding-left:9px}
+  .pres-foot-sub{font-size:9px}
   .pres-day-hdr{padding:5px 1px 2px!important;letter-spacing:.04em}
   .pres-date{font-size:8px}
   .pres-lock{font-size:7px}
@@ -454,7 +454,7 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 @media (max-width:360px){
   .pres-name-txt{font-size:10.5px}
   .pres-foot-h{font-size:8.5px}
-  .pres-foot-sub{font-size:8.5px;padding-left:8px}
+  .pres-foot-sub{font-size:8.5px}
   .pres-btn{width:27px;height:27px}
   .pres-name-av{width:20px;height:20px}
   .pres-name-inner{gap:4px}
@@ -476,10 +476,12 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .pres-member-count{font-size:11px;font-weight:700;color:var(--muted);padding:3px 0;text-align:right;min-width:30px;white-space:nowrap;border-bottom:1px solid rgba(168,140,90,.35)}
 .pres-member-count.full{color:var(--green)}
 .pres-foot-h{font-size:10px;font-weight:700;color:var(--muted);padding-left:2px;letter-spacing:.02em}
-.pres-foot-sub{font-size:10px;color:var(--faint);padding-left:12px}
+.pres-foot-sub{font-size:10px;color:var(--faint)}
+.pres-name.pres-foot-cell{text-align:right!important;padding-right:5px!important}
 .pres-foot-top,.pres-foot-topcell{border-top:2px solid var(--line)}
 .pres-foot-mid,.pres-foot-midcell{border-top:1px solid var(--line)}
-.pres-row-self>td,.pres-row-other1>td{border-top:1.5px solid var(--line)}
+.pres-row-self>td{border-top:2px solid var(--line)}
+.pres-row-other1>td{border-top:1.5px solid var(--line)}
 
 /* Stats row at bottom */
 .pres-stats{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
@@ -3585,7 +3587,7 @@ function renderPresencaGrid(){
   days.forEach(d=>{
     const isToday=d.data===hoje;
     const isPast=d.data<hoje;
-    h+=`<th class="pres-day-hdr sf${isToday?' today':''}${isPast&&!adm?' past':''}" colspan="${d.slots.length}">${d.dia}<div class="pres-date" style="color:${isToday?'var(--gold)':'var(--faint)'}">${isToday?'hoje':d.data.slice(5)}${isPast&&!adm?' <span class="pres-lock">🔒</span>':''}</div></th>`;
+    h+=`<th class="pres-day-hdr sf${isToday?' today':''}${isPast&&!adm?' past':''}" colspan="${d.slots.length}">${d.dia}<div class="pres-date" style="color:${isToday?'var(--gold)':'var(--faint)'}">${isToday?'hoje':d.data.slice(5)}</div></th>`;
   });
   h+='<th class="pres-day-hdr sf"></th></tr>';
 
@@ -3666,13 +3668,13 @@ function renderPresencaGrid(){
   h+='<td class="pres-count sf pres-foot-topcell"></td></tr>';
 
   // Membros que comem
-  h+='<tr><td class="pres-name" style="border-bottom:none"><span class="sf pres-foot-sub">Membros</span></td>';
+  h+='<tr><td class="pres-name pres-foot-cell" style="border-bottom:none"><span class="sf pres-foot-sub">Membros</span></td>';
   days.forEach(d=>{d.slots.forEach(s=>{const count=mbrs.filter(m=>presModo(m,s.key)==='come').length;h+=`<td class="pres-count sf${count>0?' has':''}">${count}</td>`;});});
   h+='<td class="pres-count sf"></td></tr>';
 
   // Convidados (também comem)
   let totalGuestAll=0;
-  h+='<tr><td class="pres-name" style="border-bottom:none"><span class="sf pres-foot-sub">Convidados</span></td>';
+  h+='<tr><td class="pres-name pres-foot-cell" style="border-bottom:none"><span class="sf pres-foot-sub">Convidados</span></td>';
   days.forEach(d=>{d.slots.forEach(s=>{const parts=s.key.split('|');const slotDia=parts[0];const slotRef=parts[1]==='Tarde'?'Lanche':parts[1];const guestCount=(DATA.convidados||[]).filter(g=>g.dia===slotDia&&g.ref===slotRef).length;totalGuestAll+=guestCount;h+=`<td class="pres-count sf${guestCount>0?' has':''}" style="${guestCount>0?'color:var(--gold)':''}">${guestCount||'—'}</td>`;});});
   h+='<td class="pres-count sf"></td></tr>';
 
@@ -3685,7 +3687,7 @@ function renderPresencaGrid(){
 
   // Membros que só bebem
   let bi=0;
-  h+='<tr><td class="pres-name" style="border-bottom:none"><span class="sf pres-foot-sub">Membros</span></td>';
+  h+='<tr><td class="pres-name pres-foot-cell" style="border-bottom:none"><span class="sf pres-foot-sub">Membros</span></td>';
   days.forEach(d=>{d.slots.forEach(()=>{const c=bebeRow[bi++];h+=`<td class="pres-count sf${c>0?' has':''}" style="${c>0?'color:var(--blue)':''}">${c||'—'}</td>`;});});
   h+='<td class="pres-count sf"></td></tr>';
 
