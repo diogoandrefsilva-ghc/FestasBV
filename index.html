@@ -435,7 +435,9 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
   .pres-name{padding-right:4px!important}
   .pres-name-inner{gap:5px}
   .pres-name-av{width:21px;height:21px;border-radius:6px;font-size:8.5px;flex-shrink:0}
-  .pres-name-txt{font-size:11.5px;line-height:1.1}
+  .pres-name-txt{font-size:11px;line-height:1.1}
+  .pres-foot-lbl{font-size:9px}
+  .pres-sub{font-size:7.5px}
   .pres-day-hdr{padding:5px 1px 2px!important;letter-spacing:.04em}
   .pres-date{font-size:8px}
   .pres-lock{font-size:7px}
@@ -450,7 +452,9 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
   .pres-member-count{min-width:24px;font-size:10px}
 }
 @media (max-width:360px){
-  .pres-name-txt{font-size:11px}
+  .pres-name-txt{font-size:10.5px}
+  .pres-foot-lbl{font-size:8.5px}
+  .pres-sub{font-size:7px}
   .pres-btn{width:27px;height:27px}
   .pres-name-av{width:20px;height:20px}
   .pres-name-inner{gap:4px}
@@ -471,6 +475,9 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .pres-count.has{color:var(--green)}
 .pres-member-count{font-size:11px;font-weight:700;color:var(--muted);padding:3px 0;text-align:right;min-width:30px;white-space:nowrap;border-bottom:1px solid rgba(168,140,90,.35)}
 .pres-member-count.full{color:var(--green)}
+.pres-foot-lbl{font-size:10px;color:var(--faint);padding-left:2px}
+.pres-foot-top{border-top:2px solid var(--line)}
+.pres-minisep td{height:7px;padding:0!important;border:none!important;background:var(--bg)}
 
 /* Stats row at bottom */
 .pres-stats{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
@@ -3622,8 +3629,11 @@ function renderPresencaGrid(){
     if(ra!==rb)return ra-rb;
     return a.m.nome.localeCompare(b.m.nome,'pt');
   });
+  const _hasMine=mbrsOrd.some(x=>_rankP(x.m.nome)<2);
+  let _sepDone=false;
   mbrsOrd.forEach(({m,oi})=>{
     const mi=oi;
+    if(_hasMine&&!_sepDone&&_rankP(m.nome)===2){h+='<tr class="pres-minisep"><td colspan="'+(totalSlots+2)+'"></td></tr>';_sepDone=true;}
     const pres=m.presencas||[];
     const memberCount=pres.length;
     h+='<tr>';
@@ -3645,7 +3655,7 @@ function renderPresencaGrid(){
 
   // ── Rodapé: totalizadores por refeição ──
   // 1) Membros (que comem)
-  h+='<tfoot><tr><td class="pres-name" style="border-bottom:none"><span class="sf" style="font-size:10px;color:var(--faint);padding-left:2px">Membros <span class="pres-sub">(que comem)</span></span></td>';
+  h+='<tfoot><tr><td class="pres-name pres-foot-top" style="border-bottom:none"><span class="sf pres-foot-lbl">Membros <span class="pres-sub">(que comem)</span></span></td>';
   days.forEach(d=>{
     d.slots.forEach(s=>{
       const count=mbrs.filter(m=>presModo(m,s.key)==='come').length;
@@ -3662,13 +3672,13 @@ function renderPresencaGrid(){
     totalBebeAll+=c;return c;
   })).flat();
   let bi=0;
-  h+='<tr><td class="pres-name" style="border-bottom:none"><span class="sf" style="font-size:10px;color:var(--faint);padding-left:2px">Membros <span class="pres-sub">(só bebem)</span></span></td>';
+  h+='<tr><td class="pres-name" style="border-bottom:none"><span class="sf pres-foot-lbl">Membros <span class="pres-sub">(só bebem)</span></span></td>';
   days.forEach(d=>{d.slots.forEach(()=>{const c=bebeRow[bi++];h+=`<td class="pres-count sf${c>0?' has':''}" style="${c>0?'color:var(--blue)':''}">${c||'—'}</td>`;});});
   h+='<td class="pres-count sf"></td>';
   h+='</tr>';
 
   // 3) Convidados
-  h+='<tr><td class="pres-name" style="border-bottom:none"><span class="sf" style="font-size:10px;color:var(--faint);padding-left:2px">Convidados</span></td>';
+  h+='<tr><td class="pres-name" style="border-bottom:none"><span class="sf pres-foot-lbl">Convidados</span></td>';
   let totalGuestAll=0;
   days.forEach(d=>{
     d.slots.forEach(s=>{
