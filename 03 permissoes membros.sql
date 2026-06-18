@@ -159,6 +159,19 @@ CREATE POLICY presencas_self_del ON festasbv.presencas
     AND festasbv.membro_meu(membro_id)
     AND festasbv.dia_aberto_membro(membro_id, dia)
   );
+DROP POLICY IF EXISTS presencas_self_upd ON festasbv.presencas;
+CREATE POLICY presencas_self_upd ON festasbv.presencas
+  FOR UPDATE TO authenticated
+  USING (
+    festasbv.is_allowed()
+    AND festasbv.membro_meu(membro_id)
+    AND festasbv.dia_aberto_membro(membro_id, dia)
+  )
+  WITH CHECK (
+    festasbv.is_allowed()
+    AND festasbv.membro_meu(membro_id)
+    AND festasbv.dia_aberto_membro(membro_id, dia)
+  );
 
 -- 5b) CONVIDADOS: adicionar/editar/remover convidados próprios
 --     ou do cônjuge, apenas enquanto a data do dia não passou.
