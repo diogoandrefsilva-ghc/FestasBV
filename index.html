@@ -436,8 +436,8 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
   .pres-name-inner{gap:5px}
   .pres-name-av{width:21px;height:21px;border-radius:6px;font-size:8.5px;flex-shrink:0}
   .pres-name-txt{font-size:11px;line-height:1.1}
-  .pres-foot-lbl{font-size:9px}
-  .pres-sub{font-size:7.5px}
+  .pres-foot-h{font-size:9px}
+  .pres-foot-sub{font-size:9px;padding-left:9px}
   .pres-day-hdr{padding:5px 1px 2px!important;letter-spacing:.04em}
   .pres-date{font-size:8px}
   .pres-lock{font-size:7px}
@@ -453,8 +453,8 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 }
 @media (max-width:360px){
   .pres-name-txt{font-size:10.5px}
-  .pres-foot-lbl{font-size:8.5px}
-  .pres-sub{font-size:7px}
+  .pres-foot-h{font-size:8.5px}
+  .pres-foot-sub{font-size:8.5px;padding-left:8px}
   .pres-btn{width:27px;height:27px}
   .pres-name-av{width:20px;height:20px}
   .pres-name-inner{gap:4px}
@@ -475,9 +475,11 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .pres-count.has{color:var(--green)}
 .pres-member-count{font-size:11px;font-weight:700;color:var(--muted);padding:3px 0;text-align:right;min-width:30px;white-space:nowrap;border-bottom:1px solid rgba(168,140,90,.35)}
 .pres-member-count.full{color:var(--green)}
-.pres-foot-lbl{font-size:10px;color:var(--faint);padding-left:2px}
-.pres-foot-top{border-top:2px solid var(--line)}
-.pres-minisep td{height:7px;padding:0!important;border:none!important;background:var(--bg)}
+.pres-foot-h{font-size:10px;font-weight:700;color:var(--muted);padding-left:2px;letter-spacing:.02em}
+.pres-foot-sub{font-size:10px;color:var(--faint);padding-left:12px}
+.pres-foot-top,.pres-foot-topcell{border-top:2px solid var(--line)}
+.pres-foot-mid,.pres-foot-midcell{border-top:1px solid var(--line)}
+.pres-row-self>td,.pres-row-other1>td{border-top:1.5px solid var(--line)}
 
 /* Stats row at bottom */
 .pres-stats{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
@@ -3630,15 +3632,18 @@ function renderPresencaGrid(){
     return a.m.nome.localeCompare(b.m.nome,'pt');
   });
   const _hasMine=mbrsOrd.some(x=>_rankP(x.m.nome)<2);
-  let _sepDone=false;
+  let _sepDone=false,_selfDone=false;
   mbrsOrd.forEach(({m,oi})=>{
     const mi=oi;
-    if(_hasMine&&!_sepDone&&_rankP(m.nome)===2){h+='<tr class="pres-minisep"><td colspan="'+(totalSlots+2)+'"></td></tr>';_sepDone=true;}
+    const _r=_rankP(m.nome);
+    const _rowCls=[];
+    if(_hasMine&&!_selfDone&&_r<2){_rowCls.push('pres-row-self');_selfDone=true;}
+    if(_hasMine&&!_sepDone&&_r===2){_rowCls.push('pres-row-other1');_sepDone=true;}
     const pres=m.presencas||[];
     const memberCount=pres.length;
-    h+='<tr>';
+    h+=`<tr${_rowCls.length?` class="${_rowCls.join(' ')}"`:''}>`;
     const meu=MY_NAMES.includes(m.nome);
-    h+=`<td class="pres-name"><div class="pres-name-inner"><div class="pres-name-av" style="background:${AVCOL[mi%AVCOL.length]}">${m.nome.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase()}</div><span class="pres-name-txt sf">${m.nome}</span>${meu&&!adm?'<span class="mine-dot" title="Podes gerir esta pessoa"></span>':''}</div></td>`;
+    h+=`<td class="pres-name"><div class="pres-name-inner"><div class="pres-name-av" style="background:${AVCOL[mi%AVCOL.length]}">${m.nome.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase()}</div><span class="pres-name-txt sf">${m.nome}</span></div></td>`;
     days.forEach(d=>{
       const isToday=d.data===hoje;
       const pode=adm||(meu&&d.data>=hoje);
@@ -3653,45 +3658,37 @@ function renderPresencaGrid(){
   });
   h+='</tbody>';
 
-  // ── Rodapé: totalizadores por refeição ──
-  // 1) Membros (que comem)
-  h+='<tfoot><tr><td class="pres-name pres-foot-top" style="border-bottom:none"><span class="sf pres-foot-lbl">Membros <span class="pres-sub">(que comem)</span></span></td>';
-  days.forEach(d=>{
-    d.slots.forEach(s=>{
-      const count=mbrs.filter(m=>presModo(m,s.key)==='come').length;
-      h+=`<td class="pres-count sf${count>0?' has':''}">${count}</td>`;
-    });
-  });
-  h+='<td class="pres-count sf"></td>';
-  h+='</tr>';
+  // ── Rodapé: totalizadores agrupados (que comem · só bebem) ──
+  // Grupo "Que comem" — linha grossa de separação por cima
+  h+='<tfoot>';
+  h+='<tr><td class="pres-name pres-foot-top" style="border-bottom:none"><span class="sf pres-foot-h">Que comem</span></td>';
+  days.forEach(d=>d.slots.forEach(()=>{h+='<td class="pres-count sf pres-foot-topcell"></td>';}));
+  h+='<td class="pres-count sf pres-foot-topcell"></td></tr>';
 
-  // 2) Membros (que só bebem)
-  let totalBebeAll=0;
-  const bebeRow=days.map(d=>d.slots.map(s=>{
-    const c=mbrs.filter(m=>presModo(m,s.key)==='bebe').length;
-    totalBebeAll+=c;return c;
-  })).flat();
-  let bi=0;
-  h+='<tr><td class="pres-name" style="border-bottom:none"><span class="sf pres-foot-lbl">Membros <span class="pres-sub">(só bebem)</span></span></td>';
-  days.forEach(d=>{d.slots.forEach(()=>{const c=bebeRow[bi++];h+=`<td class="pres-count sf${c>0?' has':''}" style="${c>0?'color:var(--blue)':''}">${c||'—'}</td>`;});});
-  h+='<td class="pres-count sf"></td>';
-  h+='</tr>';
+  // Membros que comem
+  h+='<tr><td class="pres-name" style="border-bottom:none"><span class="sf pres-foot-sub">Membros</span></td>';
+  days.forEach(d=>{d.slots.forEach(s=>{const count=mbrs.filter(m=>presModo(m,s.key)==='come').length;h+=`<td class="pres-count sf${count>0?' has':''}">${count}</td>`;});});
+  h+='<td class="pres-count sf"></td></tr>';
 
-  // 3) Convidados
-  h+='<tr><td class="pres-name" style="border-bottom:none"><span class="sf pres-foot-lbl">Convidados</span></td>';
+  // Convidados (também comem)
   let totalGuestAll=0;
-  days.forEach(d=>{
-    d.slots.forEach(s=>{
-      const parts=s.key.split('|');
-      const slotDia=parts[0];
-      const slotRef=parts[1]==='Tarde'?'Lanche':parts[1];
-      const guestCount=(DATA.convidados||[]).filter(g=>g.dia===slotDia&&g.ref===slotRef).length;
-      totalGuestAll+=guestCount;
-      h+=`<td class="pres-count sf${guestCount>0?' has':''}" style="${guestCount>0?'color:var(--gold)':''}">${guestCount||'—'}</td>`;
-    });
-  });
-  h+='<td class="pres-count sf"></td>';
-  h+='</tr>';
+  h+='<tr><td class="pres-name" style="border-bottom:none"><span class="sf pres-foot-sub">Convidados</span></td>';
+  days.forEach(d=>{d.slots.forEach(s=>{const parts=s.key.split('|');const slotDia=parts[0];const slotRef=parts[1]==='Tarde'?'Lanche':parts[1];const guestCount=(DATA.convidados||[]).filter(g=>g.dia===slotDia&&g.ref===slotRef).length;totalGuestAll+=guestCount;h+=`<td class="pres-count sf${guestCount>0?' has':''}" style="${guestCount>0?'color:var(--gold)':''}">${guestCount||'—'}</td>`;});});
+  h+='<td class="pres-count sf"></td></tr>';
+
+  // Grupo "Só bebem" — linha leve de separação por cima
+  let totalBebeAll=0;
+  const bebeRow=days.map(d=>d.slots.map(s=>{const c=mbrs.filter(m=>presModo(m,s.key)==='bebe').length;totalBebeAll+=c;return c;})).flat();
+  h+='<tr><td class="pres-name pres-foot-mid" style="border-bottom:none"><span class="sf pres-foot-h">Só bebem</span></td>';
+  days.forEach(d=>d.slots.forEach(()=>{h+='<td class="pres-count sf pres-foot-midcell"></td>';}));
+  h+='<td class="pres-count sf pres-foot-midcell"></td></tr>';
+
+  // Membros que só bebem
+  let bi=0;
+  h+='<tr><td class="pres-name" style="border-bottom:none"><span class="sf pres-foot-sub">Membros</span></td>';
+  days.forEach(d=>{d.slots.forEach(()=>{const c=bebeRow[bi++];h+=`<td class="pres-count sf${c>0?' has':''}" style="${c>0?'color:var(--blue)':''}">${c||'—'}</td>`;});});
+  h+='<td class="pres-count sf"></td></tr>';
+
   h+='</tfoot></table></div>';
   h+='</div>';
   return h;
