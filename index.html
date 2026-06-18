@@ -1977,11 +1977,12 @@ function renderAll(){
         </div>`;
         const dirItems=(DATA.despesas||[]).filter(x=>x.tipo===rd.ref&&x.dataValor===rd.data);
         const dirDetalhe=dirItems.length?`<details class="rdc-det" onclick="event.stopPropagation()"><summary>Detalhe das compras <span class="rdc-det-arrow">›</span></summary><div class="rdc-det-body">${dirItems.map(it=>`<div class="rdc-det-it"><span class="k">${escHtml(it.desc||'(sem descrição)')}${it.quem?`<small> · ${escHtml(it.quem)}</small>`:''}</span><span class="v">${eur(it.valor||0)}</span></div>`).join('')}</div></details>`:'';
+        const drChip=dirTot>0?`<div class="rdc-chips"><span class="rc cv">Despesa Refeição ${eur(dirTot)}</span></div>`:'';
         costCards+=`<div class="rdc sf">
           <div class="rdc-hdr"><span class="rdc-lbl">Custos diretos</span><span class="rdc-tot">${eur(dirTot)}</span></div>
-          <div class="rdc-sub">Compras da refeição</div>
+          <div class="rdc-peso"><span class="rdc-peso-lbl">Compras</span><span class="rdc-peso-rule"></span></div>
+          ${drChip}${dirDetalhe}
           <div class="rdc-unit"><span>Por pessoa</span><span class="rdc-unit-v">${eur(dirPP)}</span></div>
-          ${dirDetalhe}
         </div>`;
         const membrosCount=Math.max(0,calcRef.D-calcRef.E);
         const rkey=`${rd.dia}|${rd.ref==='Lanche'?'Tarde':rd.ref}`;
