@@ -2535,16 +2535,59 @@ async function sbGuardarEvento(y,slot){
 function sbLog(tipo,accao,alvo,detalhe){
   // Fire-and-forget: regista a ação na tabela 'historico'. Nunca bloqueia nem
   // faz falhar a ação principal. O Database Webhook do Telegram dispara daqui.
+  // A frase em linguagem natural é construída AQUI e guardada na linha, para a
+  // app e o Telegram mostrarem o mesmo texto sem duplicar lógica.
   try{
     if(!_sbSession||!DATA||!DATA._sbId)return;
+    const autor=meuNomePrincipal()||null;
+    const det=Object.assign({},detalhe||{});
+    det.frase=fraseHistorico(tipo,accao,alvo,autor,det);
     sbReq('POST','historico',[{
       evento_id:DATA._sbId,
       autor_email:_sbSession.user.email,
-      autor_amigo:meuNomePrincipal()||null,
+      autor_amigo:autor,
       tipo,accao,alvo,
-      detalhe:detalhe||{}
+      detalhe:det
     }]).catch(()=>{});
   }catch(_){}
+}
+
+/* Redação das entradas do histórico (app + Telegram). */
+function _diaNat(dia){
+  const k=(dia||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().slice(0,3);
+  const map={seg:['segunda','na'],ter:['terça','na'],qua:['quarta','na'],qui:['quinta','na'],sex:['sexta','na'],sab:['sábado','no'],dom:['domingo','no']};
+  const e=map[k];return e?{nome:e[0],prep:e[1]}:{nome:dia||'',prep:'em'};
+}
+function _refNat(ref){
+  const r=(ref||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+  if(r.startsWith('alm'))return {noun:'almoço',verb:'almoçar'};
+  if(r.startsWith('tar')||r.startsWith('lan'))return {noun:'lanche',verb:'lanchar'};
+  return {noun:'jantar',verb:'jantar'};
+}
+function fraseHistorico(tipo,accao,alvo,autor,d){
+  const A=autor||'Alguém';
+  const dn=_diaNat(d.dia), rn=_refNat(d.ref);
+  const diaStr=`${dn.prep} ${dn.nome}`;       // "na sexta"
+  const refDia=`${rn.noun} de ${dn.nome}`;     // "jantar de sexta"
+  if(tipo==='convidado'){
+    const dono=(d.membro&&d.membro!==autor)?` (convidado de ${d.membro})`:'';
+    if(accao==='removeu')return `${A} já não vai levar ${alvo} ao ${refDia}${dono}`;
+    if(accao==='editou')return `${A} alterou o convidado ${alvo} no ${refDia}${dono}`;
+    return `${A} vai levar ${alvo} ao ${refDia}${dono}`;
+  }
+  // presença: usa a transição origem(de) -> destino(para)
+  const de=('de'in d)?d.de:undefined;
+  const para=('para'in d)?d.para:(d.modo!==undefined?d.modo:undefined);
+  const self=!!(autor&&alvo&&autor===alvo);
+  const alvoTxt=self?'':` de ${alvo}`;
+  if(de==null&&para==='come') return `${A} confirmou presença${alvoTxt} no ${refDia}`;
+  if(de==null&&para==='bebe') return self?`${A} confirmou que vai só beber ${diaStr}`:`${A} confirmou que ${alvo} vai só beber ${diaStr}`;
+  if(de==='come'&&para==='bebe') return self?`${A} afinal só vai beber ${diaStr}`:`${A} mudou ${alvo} para só beber ${diaStr}`;
+  if(de==='bebe'&&para==='come') return self?`${A} afinal vai ${rn.verb} ${diaStr}`:`${A} mudou ${alvo} para ${rn.verb} ${diaStr}`;
+  if(de==='come'&&para==null) return self?`${A} afinal não vai ${rn.verb} ${diaStr}`:`${A} tirou ${alvo} do ${refDia}`;
+  if(de==='bebe'&&para==null) return self?`${A} afinal não vai beber ${diaStr}`:`${A} cancelou a bebida${alvoTxt} ${diaStr}`;
+  if(para==null) return self?`${A} saiu do ${refDia}`:`${A} tirou ${alvo} do ${refDia}`;
+  return self?`${A} atualizou a presença no ${refDia}`:`${A} atualizou a presença de ${alvo} no ${refDia}`;
 }
 
 /* Log de presenças com debounce por célula: persiste-se cada toque na BD,
@@ -2559,7 +2602,7 @@ function scheduleLogPresenca(m,dia,ref,origemTap,finalTap){
   if(!e){e={origem:origemTap,alvo:m.nome,dia,ref,timer:null};_presLogPend.set(key,e);} // origem = estado antes da rajada
   e.final=finalTap;
   if(e.timer)clearTimeout(e.timer);
-  e.timer=setTimeout(()=>_flushPresLog(key),1200);
+  e.timer=setTimeout(()=>_flushPresLog(key),2500);
 }
 function _flushPresLog(key){
   const e=_presLogPend.get(key);
@@ -2568,7 +2611,7 @@ function _flushPresLog(key){
   _presLogPend.delete(key);
   if(e.origem===e.final)return;                       // voltou ao mesmo -> nada a registar
   const accao=e.origem===null?'marcou':(e.final===null?'removeu':'mudou');
-  sbLog('presenca',accao,e.alvo,{dia:e.dia,ref:e.ref,modo:e.final});
+  sbLog('presenca',accao,e.alvo,{dia:e.dia,ref:e.ref,de:e.origem,para:e.final});
 }
 function flushPresLogs(){for(const k of [..._presLogPend.keys()])_flushPresLog(k);}
 
@@ -2588,23 +2631,28 @@ async function openHistorico(){
       const quem=escHtml(r.autor_amigo||r.autor_email||'?');
       const icon=r.tipo==='presenca'?'✋':'👥';
       const slot=[d.dia,d.ref].filter(Boolean).join(' · ');
-      let txt;
-      if(r.tipo==='presenca'){
+      let txt,sub;
+      if(d.frase){
+        txt=escHtml(d.frase);
+        sub=quando;
+      }else if(r.tipo==='presenca'){
         let ac,modo='';
         if(r.accao==='marcou'){ac='marcou presença de';if(d.modo==='bebe')modo=' (só bebida)';}
         else if(r.accao==='removeu'){ac='removeu presença de';}
         else{ac='mudou presença de';modo=d.modo==='bebe'?' (para só bebida)':' (para refeição completa)';}
         txt=`${ac} <b>${escHtml(r.alvo)}</b>${slot?' — '+escHtml(slot):''}${modo}`;
+        sub=`${quem} · ${quando}`;
       }else{
         const ac=r.accao==='adicionou'?'adicionou convidado':r.accao==='removeu'?'removeu convidado':'editou convidado';
         const porQuem=d.membro?' (por '+escHtml(d.membro)+')':'';
         txt=`${ac} <b>${escHtml(r.alvo)}</b>${slot?' — '+escHtml(slot):''}${porQuem}`;
+        sub=`${quem} · ${quando}`;
       }
       return `<div style="display:flex;gap:8px;padding:8px 0;border-bottom:1px solid var(--line)">
         <span style="flex-shrink:0">${icon}</span>
         <div style="flex:1;min-width:0;font-size:12.5px;line-height:1.4">
           <div style="color:var(--ink)">${txt}</div>
-          <div style="font-size:11px;color:var(--faint);margin-top:2px">${quem} · ${quando}</div>
+          <div style="font-size:11px;color:var(--faint);margin-top:2px">${sub}</div>
         </div>
       </div>`;
     }).join('');
