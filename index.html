@@ -2547,6 +2547,31 @@ function sbLog(tipo,accao,alvo,detalhe){
   }catch(_){}
 }
 
+/* Log de presenças com debounce por célula: persiste-se cada toque na BD,
+   mas só se regista no histórico a mudança LÍQUIDA após a pessoa assentar
+   (~1.2s sem mais toques). Assim os estados de passagem obrigatórios do
+   ciclo (come→bebe→vazio, bebe→vazio→come) não enchem o histórico, e voltar
+   ao estado inicial não regista nada. */
+const _presLogPend=new Map();   // key "membroId|dia|ref" -> {origem, final, alvo, dia, ref, timer}
+function scheduleLogPresenca(m,dia,ref,origemTap,finalTap){
+  const key=m._id+'|'+dia+'|'+ref;
+  let e=_presLogPend.get(key);
+  if(!e){e={origem:origemTap,alvo:m.nome,dia,ref,timer:null};_presLogPend.set(key,e);} // origem = estado antes da rajada
+  e.final=finalTap;
+  if(e.timer)clearTimeout(e.timer);
+  e.timer=setTimeout(()=>_flushPresLog(key),1200);
+}
+function _flushPresLog(key){
+  const e=_presLogPend.get(key);
+  if(!e)return;
+  if(e.timer)clearTimeout(e.timer);
+  _presLogPend.delete(key);
+  if(e.origem===e.final)return;                       // voltou ao mesmo -> nada a registar
+  const accao=e.origem===null?'marcou':(e.final===null?'removeu':'mudou');
+  sbLog('presenca',accao,e.alvo,{dia:e.dia,ref:e.ref,modo:e.final});
+}
+function flushPresLogs(){for(const k of [..._presLogPend.keys()])_flushPresLog(k);}
+
 async function openHistorico(){
   const el=document.getElementById('hist-list');
   if(!el)return;
@@ -2565,8 +2590,10 @@ async function openHistorico(){
       const slot=[d.dia,d.ref].filter(Boolean).join(' · ');
       let txt;
       if(r.tipo==='presenca'){
-        const ac=r.accao==='marcou'?'marcou presença de':r.accao==='removeu'?'removeu presença de':'mudou presença de';
-        const modo=d.modo==='bebe'?' (só bebida)':'';
+        let ac,modo='';
+        if(r.accao==='marcou'){ac='marcou presença de';if(d.modo==='bebe')modo=' (só bebida)';}
+        else if(r.accao==='removeu'){ac='removeu presença de';}
+        else{ac='mudou presença de';modo=d.modo==='bebe'?' (para só bebida)':' (para refeição completa)';}
         txt=`${ac} <b>${escHtml(r.alvo)}</b>${slot?' — '+escHtml(slot):''}${modo}`;
       }else{
         const ac=r.accao==='adicionou'?'adicionou convidado':r.accao==='removeu'?'removeu convidado':'editou convidado';
@@ -4066,8 +4093,9 @@ async function togglePresenca(memberIdx,slotKey,btn){
         const up=await sbReq('POST','presencas?on_conflict=membro_id,dia,ref',[{membro_id:m._id,dia,ref,modo:next}],{Prefer:'resolution=merge-duplicates,return=representation'});
         mudou=Array.isArray(up)&&up.length>0;
       }
-      // Só regista no histórico depois de confirmar que a BD mudou de facto.
-      if(mudou)sbLog('presenca',next===null?'removeu':(next==='come'?'marcou':'mudou'),m.nome,{dia,ref,modo:next});
+      // Persiste cada toque, mas regista no histórico só a mudança líquida
+      // depois de assentar (ver scheduleLogPresenca) — sem estados de passagem.
+      if(mudou)scheduleLogPresenca(m,dia,ref,cur,next);
       btn.classList.remove('saving');
       marcaGuardado();
       clearTimeout(presDebounce);
@@ -5058,6 +5086,10 @@ async function sbDelConjuge(a,b){
 /* GO */
 sbInit();
 document.addEventListener('visibilitychange',async()=>{if(!document.hidden&&_sbSession&&!_writeBusy){await sbEnsureFresh();carregar();}});
+// Ao ir para segundo plano / fechar: fecha já os logs de presença pendentes
+// (caso a pessoa marque algo e saia antes do debounce de 1.2s disparar).
+document.addEventListener('visibilitychange',()=>{if(document.hidden){try{flushPresLogs();}catch(_){}}});
+window.addEventListener('pagehide',()=>{try{flushPresLogs();}catch(_){}});
 document.getElementById('admin-bg').addEventListener('click',e=>{if(e.target.id==='admin-bg')closeAdmin();});
 document.getElementById('pay-bg').addEventListener('click',e=>{if(e.target.id==='pay-bg')closePayModal();});
 document.getElementById('edit-cf-bg').addEventListener('click',e=>{if(e.target.id==='edit-cf-bg')closeEditCf();});
