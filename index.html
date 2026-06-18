@@ -4055,13 +4055,19 @@ async function togglePresenca(memberIdx,slotKey,btn){
 
   queueWrite(async()=>{
     try{
-      if(cur===null&&next==='come')
-        await sbReq('POST','presencas?on_conflict=membro_id,dia,ref',[{membro_id:m._id,dia,ref,modo:'come'}],{Prefer:'resolution=ignore-duplicates'});
-      else if(next==='bebe')
-        await sbReq('PATCH',`presencas?membro_id=eq.${m._id}&dia=eq.${enc(dia)}&ref=eq.${enc(ref)}`,{modo:'bebe'});
-      else
-        await sbReq('DELETE',`presencas?membro_id=eq.${m._id}&dia=eq.${enc(dia)}&ref=eq.${enc(ref)}`);
-      sbLog('presenca',next===null?'removeu':(next==='come'?'marcou':'mudou'),m.nome,{dia,ref,modo:next});
+      // Upsert idempotente: converge SEMPRE a BD para o modo pretendido,
+      // independentemente do estado anterior (mata os no-ops silenciosos).
+      // return=representation devolve a linha afetada -> confirma que mudou.
+      let mudou=false;
+      if(next===null){
+        const del=await sbReq('DELETE',`presencas?membro_id=eq.${m._id}&dia=eq.${enc(dia)}&ref=eq.${enc(ref)}`,undefined,{Prefer:'return=representation'});
+        mudou=Array.isArray(del)&&del.length>0;   // só "removeu" se havia mesmo linha
+      }else{
+        const up=await sbReq('POST','presencas?on_conflict=membro_id,dia,ref',[{membro_id:m._id,dia,ref,modo:next}],{Prefer:'resolution=merge-duplicates,return=representation'});
+        mudou=Array.isArray(up)&&up.length>0;
+      }
+      // Só regista no histórico depois de confirmar que a BD mudou de facto.
+      if(mudou)sbLog('presenca',next===null?'removeu':(next==='come'?'marcou':'mudou'),m.nome,{dia,ref,modo:next});
       btn.classList.remove('saving');
       marcaGuardado();
       clearTimeout(presDebounce);
