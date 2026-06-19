@@ -3,13 +3,42 @@
 // presenças ou convidados. Dispara do Database Webhook em festasbv.historico
 // (evento INSERT). A frase já vem redigida da app, no campo detalhe.frase.
 //
+// Switch ON/OFF: lê a flag festasbv.config.notif_telegram. Se estiver "false",
+// não envia (o histórico fica sempre registado — só o envio é que para).
+//
 // Secrets necessários (Edge Functions -> Secrets):
 //   TELEGRAM_BOT_TOKEN   token do @BotFather
 //   TELEGRAM_CHAT_ID     o teu chat_id
+// (SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY são injetados automaticamente.)
 
 const TG_TOKEN = Deno.env.get("TELEGRAM_BOT_TOKEN")!;
 const TG_CHAT  = Deno.env.get("TELEGRAM_CHAT_ID")!;
 const ADMIN    = "diogo.andre.f.silva@gmail.com";
+const SB_URL   = Deno.env.get("SUPABASE_URL")!;
+const SB_SRV   = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+// Lê a flag global do switch. Fail-open: se a leitura falhar (erro transitório),
+// assume LIGADO — mais vale uma notificação a mais do que perdê-las por um glitch.
+async function notifLigadas(): Promise<boolean> {
+  try {
+    const r = await fetch(
+      `${SB_URL}/rest/v1/config?chave=eq.notif_telegram&select=valor`,
+      {
+        headers: {
+          apikey: SB_SRV,
+          Authorization: `Bearer ${SB_SRV}`,
+          "Accept-Profile": "festasbv",
+        },
+      },
+    );
+    if (!r.ok) return true;
+    const rows = await r.json();
+    if (!Array.isArray(rows) || rows.length === 0) return true;
+    return rows[0].valor === "true";
+  } catch (_) {
+    return true;
+  }
+}
 
 Deno.serve(async (req) => {
   try {
@@ -23,6 +52,11 @@ Deno.serve(async (req) => {
     // Não me notificar a mim próprio (mas o histórico regista na mesma)
     if ((record.autor_email ?? "") === ADMIN) {
       return new Response("skip-admin", { status: 200 });
+    }
+
+    // Switch ON/OFF na app: se desligado, não envia (histórico já está gravado)
+    if (!(await notifLigadas())) {
+      return new Response("skip-off", { status: 200 });
     }
 
     await fetch(`https://api.telegram.org/bot${TG_TOKEN}/sendMessage`, {
