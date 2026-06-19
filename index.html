@@ -977,6 +977,28 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
       </div>
     </div>
 
+    <!-- 1c. Notificações Telegram (só admin) -->
+    <div class="settings-block admin-only">
+      <div class="settings-block-hdr" onclick="toggleSettingsBlock(this)">
+        <span class="sb-icon">🔔</span>
+        <span class="sb-title sf">Notificações Telegram</span>
+        <span class="sb-arrow sf">▼</span>
+      </div>
+      <div class="settings-block-body">
+        <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--panel2);border:1px solid var(--line);border-radius:10px">
+          <div style="flex:1">
+            <div style="font-size:13px;font-weight:600">Avisos no Telegram</div>
+            <div style="font-size:11px;color:var(--faint);line-height:1.4">Receber aviso quando outra pessoa altera presenças ou convidados. O histórico fica sempre registado.</div>
+          </div>
+          <label style="position:relative;width:44px;height:24px;margin:0;flex-shrink:0">
+            <input type="checkbox" id="adm-notif" onchange="saveNotif()" style="opacity:0;width:0;height:0;position:absolute">
+            <span style="position:absolute;inset:0;background:var(--line);border-radius:12px;cursor:pointer;transition:.2s"></span>
+            <span id="adm-notif-knob" style="position:absolute;top:2px;left:2px;width:20px;height:20px;background:var(--ink);border-radius:50%;transition:.2s"></span>
+          </label>
+        </div>
+      </div>
+    </div>
+
     <!-- 2. Plantel (só admin) -->
     <div class="settings-block admin-only">
       <div class="settings-block-hdr" onclick="toggleSettingsBlock(this)">
@@ -3409,7 +3431,7 @@ function openAdmin(){
   if(em)em.textContent=_sbSession?_sbSession.user.email:'—';
   const adm=document.getElementById('adm-pedidos-wrap');
   if(adm)adm.style.display=isAdmin()?'':'none';
-  if(isAdmin()){sbRenderPedidos();sbRenderLigacoes();}
+  if(isAdmin()){sbRenderPedidos();sbRenderLigacoes();loadNotif();}
   loadParams();
   renderPlantel();
   loadLimpeza();
@@ -3450,6 +3472,32 @@ function updateToggleKnob(on){
   const track=knob?.previousElementSibling;
   if(knob){knob.style.left=on?'22px':'2px';}
   if(track){track.style.background=on?'var(--gold)':'var(--line)';}
+}
+/* ── Notificações Telegram (só admin · flag global em festasbv.config) ── */
+function _setNotifKnob(on){
+  const knob=document.getElementById('adm-notif-knob');
+  const track=knob?.previousElementSibling;
+  if(knob)knob.style.left=on?'22px':'2px';
+  if(track)track.style.background=on?'var(--gold)':'var(--line)';
+}
+async function loadNotif(){
+  const cb=document.getElementById('adm-notif');if(!cb)return;
+  try{
+    const rows=await sbReq('GET','config?chave=eq.notif_telegram&select=valor');
+    const on=Array.isArray(rows)&&rows[0]?(rows[0].valor==='true'):true;
+    cb.checked=on;_setNotifKnob(on);
+  }catch(_){cb.checked=true;_setNotifKnob(true);}
+}
+async function saveNotif(){
+  const cb=document.getElementById('adm-notif');if(!cb)return;
+  const on=cb.checked;_setNotifKnob(on);
+  try{
+    await sbReq('PATCH','config?chave=eq.notif_telegram',{valor:on?'true':'false'});
+    toast(on?'Notificações ligadas ✓':'Notificações desligadas ✓','ok');
+  }catch(e){
+    cb.checked=!on;_setNotifKnob(!on);   // reverte o visual se a gravação falhar
+    toast('Erro ao guardar: '+e.message,'bad');
+  }
 }
 async function saveParams(){
   if(!DATA)return;
@@ -3500,12 +3548,18 @@ async function limparPresencas(){
   const ano=DATA.evento.ano;
   const nPres=(DATA.membros||[]).reduce((a,m)=>a+((m.presencas||[]).length),0);
   const nConv=(DATA.convidados||[]).length;
-  if(!nPres&&!nConv){toast('Não há presenças nem convidados para limpar em '+ano,'ok');return;}
-  if(!confirm('LIMPAR PRESENÇAS — '+ano+'\n\nVai apagar '+nPres+' presença(s) e '+nConv+' convidado(s).\nMembros, fator e sexo mantêm-se.\n\nSó afeta o ano '+ano+'. Esta ação NÃO pode ser desfeita.\n\nConfirmar?'))return;
+  // contar linhas de histórico do ano (para o aviso e para saber se há algo a limpar)
+  let nHist=0;
+  try{const hr=await sbReq('GET',`historico?evento_id=eq.${DATA._sbId}&select=ts`);nHist=Array.isArray(hr)?hr.length:0;}catch(_){}
+  if(!nPres&&!nConv&&!nHist){toast('Não há presenças, convidados nem histórico para limpar em '+ano,'ok');return;}
+  if(!confirm('LIMPAR PRESENÇAS — '+ano+'\n\nVai apagar '+nPres+' presença(s), '+nConv+' convidado(s) e '+nHist+' registo(s) de histórico.\nMembros, fator e sexo mantêm-se.\n\nSó afeta o ano '+ano+'. Esta ação NÃO pode ser desfeita.\n\nConfirmar?'))return;
   (DATA.membros||[]).forEach(m=>{m.presencas=[];});
   DATA.convidados=[];
   const ok=await pushToGitHub('Limpar presenças e convidados '+ano);
-  if(ok){CALC=calcular(JSON.parse(JSON.stringify(DATA)));renderAll();loadLimpeza();toast('Presenças de '+ano+' limpas ✓','ok');}
+  if(ok){
+    try{await sbReq('DELETE',`historico?evento_id=eq.${DATA._sbId}`);}catch(_){}   // limpa também o histórico do ano
+    CALC=calcular(JSON.parse(JSON.stringify(DATA)));renderAll();loadLimpeza();toast('Presenças e histórico de '+ano+' limpos ✓','ok');
+  }
   else loadLimpeza();
 }
 async function limparCashflows(){
