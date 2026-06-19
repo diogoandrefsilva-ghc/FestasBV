@@ -201,9 +201,9 @@ CREATE TABLE festasbv.historico (
 );
 
 -- ---------------------------------------------------------------------
--- Índices (nas FKs / colunas de lookup). Recuperados dos scripts
--- originais (01 e 04). As UNIQUE constraints já criam índice próprio;
--- estes cobrem as FKs sem unique (acelera deletes em cascata).
+-- Índices não-únicos (verificados via pg_indexes contra o estado real).
+-- As PK e UNIQUE constraints já criam o seu próprio índice; estes cobrem
+-- as FKs em evento_id/membro_id (aceleram deletes em cascata e lookups).
 -- ---------------------------------------------------------------------
 
 CREATE INDEX ON festasbv.membros       (evento_id);
@@ -213,6 +213,7 @@ CREATE INDEX ON festasbv.despesas      (evento_id);
 CREATE INDEX ON festasbv.convidados    (evento_id);
 CREATE INDEX ON festasbv.mealheiros    (evento_id);
 CREATE INDEX ON festasbv.pagamentos    (evento_id);
+CREATE INDEX idx_validacoes_evento ON festasbv.validacoes (evento_id);
 CREATE INDEX historico_evento_ts_idx ON festasbv.historico (evento_id, ts DESC);
 
 -- ---------------------------------------------------------------------

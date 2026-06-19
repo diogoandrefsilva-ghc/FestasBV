@@ -30,6 +30,28 @@ Numa BD limpa, correr por esta ordem (há dependências entre eles):
 - **policies.sql** — leitura para `is_allowed()`, escrita total para `is_admin()`,
   e regras "self" (cada amigo só mexe no que é seu, e só com o dia aberto).
 
+## Modelo de permissões
+
+Imposto no Postgres via RLS (a UI esconde o que não se pode, mas mesmo pela
+consola do browser o Supabase recusa). Resumo do que está em `policies.sql`:
+
+| Ação                                          | Admin    | Amigo ligado                          | Conta não ligada |
+|-----------------------------------------------|----------|---------------------------------------|------------------|
+| Ver tudo (saldos, cash-flows, relatórios)     | ✅        | ✅                                     | ✅                |
+| Marcar presenças                              | ✅ sempre | ✅ próprias + cônjuge, até à data do dia | ❌              |
+| Convidados (adicionar/editar/remover)         | ✅ sempre | ✅ próprios + cônjuge, até à data do dia | ❌              |
+| Registar despesas                             | ✅        | ✅ próprias + cônjuge (só inserir)      | ❌               |
+| Validar contas (`validacoes`)                 | ✅        | ✅ próprias + cônjuge                   | ❌               |
+| Editar/apagar cash-flows                      | ✅        | ❌                                     | ❌               |
+| Mealheiros, reembolsos, pagamentos            | ✅        | ❌                                     | ❌               |
+| Fechar/reabrir contas (trigger `guard_fecho`) | ✅        | ❌                                     | ❌               |
+| Parametrizações, plantel, refeições, novo ano | ✅        | ❌                                     | ❌               |
+| Config (`notif_telegram`), aprovar acessos    | ✅        | ❌                                     | ❌               |
+
+Quem pode mexer no quê resolve-se por nome via `user_amigos` (conta → amigo) +
+`conjuges` (casais, nos dois sentidos) — ver `meus_amigos()` / `meu_amigo()`.
+A regra "até à data" usa `CURRENT_DATE` no servidor (`dia_aberto_*`).
+
 ## ⚠️ Segredos — nunca commitar
 
 - A **service_role key** (JWT com `role: service_role`) ignora todo o RLS.
