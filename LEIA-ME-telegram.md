@@ -11,25 +11,25 @@ Ação na app  →  INSERT em festasbv.historico  →  Database Webhook  →  Ed
 A app já escreve no histórico (função `sbLog`) e mostra-o no bloco **Definições →
 Histórico**. Só falta ligar o Telegram. 6 passos.
 
----
+-----
 
 ## 1. Correr o SQL
 
 Abre o **SQL Editor** do Supabase e corre o ficheiro `04 historico festasbv.sql`.
-Cria a tabela `historico` + RLS + GRANTs. (Não precisas mexer em "Exposed schemas".)
+Cria a tabela `historico` + RLS + GRANTs. (Não precisas mexer em “Exposed schemas”.)
 
----
+-----
 
 ## 2. Criar o bot e apanhar o teu chat_id
 
 1. No Telegram, fala com **@BotFather** → `/newbot` → dá-lhe nome → ele dá-te um
    **token** tipo `123456:ABC-DEF...`. Guarda.
-2. Carrega em **Start** / envia uma mensagem qualquer ao teu novo bot.
-3. Abre no browser (mete o teu token):
+1. Carrega em **Start** / envia uma mensagem qualquer ao teu novo bot.
+1. Abre no browser (mete o teu token):
    `https://api.telegram.org/bot<TOKEN>/getUpdates`
-4. No JSON, procura `result[].message.chat.id` — esse número é o teu **chat_id**.
+1. No JSON, procura `result[].message.chat.id` — esse número é o teu **chat_id**.
 
----
+-----
 
 ## 3. Guardar os segredos no Supabase
 
@@ -39,7 +39,7 @@ Em **Edge Functions → Secrets** (ou via CLI):
 supabase secrets set TELEGRAM_BOT_TOKEN=123456:ABC-DEF... TELEGRAM_CHAT_ID=987654321
 ```
 
----
+-----
 
 ## 4. A Edge Function
 
@@ -88,7 +88,7 @@ supabase functions deploy notif-festas
 (Se preferires sem CLI: cria a função pelo dashboard em **Edge Functions → Deploy
 a new function**, cola o código e os secrets do passo 3.)
 
----
+-----
 
 ## 5. O Database Webhook
 
@@ -97,12 +97,12 @@ No dashboard: **Database → Webhooks → Create a new hook**.
 - **Table:** `festasbv` → `historico`
 - **Events:** só **Insert** (deixa Update/Delete desligados)
 - **Type:** **Supabase Edge Functions** → escolhe `notif-festas`
-  (assim a autenticação fica tratada; se usares "HTTP Request" genérico, mete o
+  (assim a autenticação fica tratada; se usares “HTTP Request” genérico, mete o
   header `Authorization: Bearer <ANON_KEY>` e o URL da função)
 
 Guarda.
 
----
+-----
 
 ## 6. Testar
 
@@ -113,7 +113,7 @@ Em segundos deves receber algo como:
 
 Se não chegar: **Edge Functions → notif-festas → Logs** mostra o que aconteceu.
 
----
+-----
 
 ## Notas
 
