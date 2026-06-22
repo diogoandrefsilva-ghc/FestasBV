@@ -417,7 +417,7 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .pres-corner{min-width:90px;position:sticky;left:0;z-index:3;background:var(--bg)!important}
 .pres-day-hdr{padding:6px 2px 2px!important;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--campino);font-weight:700;white-space:nowrap}
 .pres-ref-hdr{padding:2px 3px 5px!important;font-size:10.5px;color:var(--muted);font-weight:600;white-space:nowrap;min-width:36px}
-.pres-date{font-size:9px;font-weight:500;letter-spacing:0;text-transform:none;margin-top:1px}
+.pres-date{font-size:8px;font-weight:500;letter-spacing:0;text-transform:none;margin-top:1px}
 .pres-lock{font-size:8px;opacity:.7}
 /* Linha-resumo: total que come por refeição, fixa junto ao cabeçalho */
 .pres-sum{font-size:11.5px;font-weight:700;color:var(--faint);padding:3px 2px!important;border-top:1px solid var(--line);border-bottom:1px solid var(--line);white-space:nowrap}
@@ -439,7 +439,7 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
   .pres-foot-h{font-size:9px}
   .pres-foot-sub{font-size:9px}
   .pres-day-hdr{padding:5px 1px 2px!important;letter-spacing:.04em}
-  .pres-date{font-size:8px}
+  .pres-date{font-size:7px}
   .pres-lock{font-size:7px}
   .pres-ref-hdr{min-width:0;font-size:9px;padding:2px 1px 4px!important}
   .pres-sum{font-size:10px;padding:3px 1px!important}
@@ -3820,7 +3820,7 @@ function renderPresencaGrid(){
   days.forEach(d=>{
     const isToday=d.data===hoje;
     const isPast=d.data<hoje;
-    h+=`<th class="pres-day-hdr sf${isToday?' today':''}${isPast&&!adm?' past':''}" colspan="${d.slots.length}">${d.dia}<div class="pres-date" style="color:${isToday?'var(--gold)':'var(--faint)'}">${isToday?'hoje':d.data.slice(5)}</div></th>`;
+    h+=`<th class="pres-day-hdr sf${isToday?' today':''}${isPast&&!adm?' past':''}" colspan="${d.slots.length}">${d.dia}<div class="pres-date" style="color:${isToday?'var(--gold)':'var(--faint)'}">${isToday?'hoje':fmtDiaMes(d.data)}</div></th>`;
   });
   h+='<th class="pres-day-hdr sf"></th></tr>';
 
@@ -4303,6 +4303,14 @@ function editRefdef(idx){openRefdefModal(idx);}
 function dataToDia(dateStr){
   const d=new Date(dateStr+'T12:00:00');
   return['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'][d.getDay()];
+}
+// Data curta no formato dd/mmm em português (ex: "8/ago"). Vazio se inválida.
+function fmtDiaMes(ds){
+  if(!ds)return'';
+  const dt=new Date(ds+'T12:00:00');
+  if(isNaN(dt))return ds;
+  const mes=['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'][dt.getMonth()];
+  return dt.getDate()+'/'+mes;
 }
 // Dia da semana por extenso a partir da data ISO (ex: "Sábado"). Fallback vazio se inválida.
 function diaExtenso(dataStr){
