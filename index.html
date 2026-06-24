@@ -17,6 +17,20 @@
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
+<!-- Splash de arranque (tapa o estado cru do HTML enquanto o JS inicializa) -->
+<div id="fbv-splash" style="position:fixed;inset:0;z-index:100000;background:#6E2012;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;transition:opacity .26s ease;">
+    <div style="font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:38px;letter-spacing:.14em;color:#fff;text-transform:uppercase;">Festas BV</div>
+    <div style="width:30px;height:30px;border:3px solid rgba(255,255,255,.22);border-top-color:#F3D9A8;border-radius:50%;animation:fbvspin .8s linear infinite;"></div>
+</div>
+<style>@keyframes fbvspin{to{transform:rotate(360deg)}}</style>
+<script>
+window.fbvEsconderSplash = function(){
+    var s = document.getElementById('fbv-splash');
+    if (s && s.style.display !== 'none') { s.style.opacity = '0'; setTimeout(function(){ if (s) s.style.display = 'none'; }, 280); }
+};
+setTimeout(function(){ if (window.fbvEsconderSplash) window.fbvEsconderSplash(); }, 6000);
+</script>
+
 <!-- ═══ Páginas de autenticação (Supabase) ═══ -->
 <div class="auth-page" id="page-login">
   <h2>Festas BV</h2>

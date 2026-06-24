@@ -3880,6 +3880,7 @@ async function sbInit(){
 function sbMostrarLogin(){
   document.getElementById('page-login').style.display='flex';
   document.getElementById('page-sem-acesso').style.display='none';
+  if(window.fbvEsconderSplash)window.fbvEsconderSplash();
 }
 
 async function sbAposLogin(){
@@ -3893,11 +3894,13 @@ async function sbAposLogin(){
   if(!Array.isArray(data)||data.length===0){
     document.getElementById('page-sem-acesso').style.display='flex';
     document.getElementById('sem-acesso-email').textContent=`Sessão iniciada como ${email}. Esta conta não tem acesso à app.`;
+    if(window.fbvEsconderSplash)window.fbvEsconderSplash();
     return;
   }
   document.getElementById('page-sem-acesso').style.display='none';
   updateReadOnlyMode();
   await carregar();
+  if(window.fbvEsconderSplash)window.fbvEsconderSplash();
 }
 
 async function sbLoginGoogle(){
