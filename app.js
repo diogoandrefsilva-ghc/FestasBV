@@ -2725,6 +2725,46 @@ function shopMealOptions(ref,selData){
   return `<option value="">— refeição —</option>`+meals.map(r=>`<option value="${r.data}"${selData===r.data?' selected':''}>${fmtDiaMes(r.data)}${r.prato?' · '+r.prato:''}</option>`).join('');
 }
 function shopCanWrite(){return !!_sbSession&&(isAdmin()||MY_NAMES.length>0);}
+// Normaliza quantidades em texto livre (1KG / 3 kilos / 500 gr → 1 kg / 3 kg / 500 g).
+// Converte g≥1000→kg e ml≥1000→L. Se não reconhecer, mantém o texto tal como veio.
+const _QTY_UNITS={
+  kg:['kg','kgs','kilo','kilos','quilo','quilos','kilograma','kilogramas','quilograma','quilogramas','kilog','kgr'],
+  g:['g','gr','grs','grama','gramas','grm'],
+  l:['l','lt','lts','litro','litros'],
+  ml:['ml','mls','mililitro','mililitros'],
+  un:['un','uni','unid','unidade','unidades','u','x','peca','pecas'],
+  duzia:['duzia','duzias'],
+  pacote:['pacote','pacotes','pct','pack','packs','embalagem','embalagens'],
+  lata:['lata','latas'],
+  garrafa:['garrafa','garrafas'],
+  caixa:['caixa','caixas','cx'],
+  saco:['saco','sacos'],
+  grade:['grade','grades'],
+  fatia:['fatia','fatias'],
+  molho:['molho','molhos']
+};
+function normalizeQty(raw){
+  let s=(raw||'').trim().replace(/\s+/g,' ');
+  if(!s)return '';
+  const m=s.match(/^(\d+(?:[.,]\d+)?)\s*(.*)$/);   // número + resto
+  if(!m)return s;                                   // sem número → deixa como está
+  let num=parseFloat(m[1].replace(',','.'));
+  let rest=(m[2]||'').trim();
+  const norm=rest.toLowerCase().replace(/\.$/,'').normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  let unit=null;
+  for(const k in _QTY_UNITS){if(_QTY_UNITS[k].includes(norm)){unit=k;break;}}
+  if(unit==='g'&&num>=1000){num=num/1000;unit='kg';}
+  else if(unit==='ml'&&num>=1000){num=num/1000;unit='l';}
+  const fmt=n=>String(Math.round(n*1000)/1000).replace('.',',');
+  const label=(u,n)=>{
+    if(u==='kg')return 'kg';if(u==='g')return 'g';if(u==='l')return 'L';if(u==='ml')return 'ml';if(u==='un')return 'un';
+    const pl={duzia:['dúzia','dúzias'],pacote:['pacote','pacotes'],lata:['lata','latas'],garrafa:['garrafa','garrafas'],caixa:['caixa','caixas'],saco:['saco','sacos'],grade:['grade','grades'],fatia:['fatia','fatias'],molho:['molho','molhos']};
+    return pl[u]?(n===1?pl[u][0]:pl[u][1]):u;
+  };
+  if(unit)return `${fmt(num)} ${label(unit,num)}`;
+  if(rest)return `${fmt(num)} ${rest}`;   // unidade desconhecida → nº normalizado + texto original
+  return fmt(num);                        // só número
+}
 // Nomes com que reclamo artigos (próprio + cônjuge; admin sem membro → 'Admin')
 function myClaimNames(){const s=new Set(MY_NAMES);const p=myPrimaryName()||(isAdmin()?'Admin':'');if(p)s.add(p);return s;}
 function shopMine(it){return !!it.tratadoPor&&myClaimNames().has(it.tratadoPor);}
@@ -2733,25 +2773,26 @@ function shopCanEditItem(it){return isAdmin()||(it.criadoPor&&myClaimNames().has
 function shopItemCard(it){
   const meal=shopIsMeal(it.tipo)&&it.dataValor;
   const badge=meal?`<span class="cmp-badge meal">${shopTipoIcon(it.tipo)} ${fmtDiaMes(it.dataValor)}</span>`:`<span class="cmp-badge">${shopTipoIcon(it.tipo)} ${it.tipo}</span>`;
-  const qtd=it.quantidade?`<span class="cmp-qtd">${escHtml(it.quantidade)}</span>`:'';
-  const editBtn=shopCanEditItem(it)?`<button class="cmp-del write-action" title="Editar" onclick="openShopItemModal(${it._id})">✎</button>`:'';
+  const qtdTxt=normalizeQty(it.quantidade);
+  const qtd=qtdTxt?`<span class="cmp-qtd">${escHtml(qtdTxt)}</span>`:'';
+  // Editar/eliminar vivem no detalhe (toca no artigo). No cartão só ações rápidas.
   let statusRow;
   if(it.tratadoPor){
     const mine=shopMine(it);
     statusRow=`<div class="cmp-status">
       <span class="cmp-trata ${it.noCarrinho?'incart':''}">${it.noCarrinho?'✅ no carrinho':'🧑‍🍳 '+escHtml(it.tratadoPor)}</span>
-      <div class="cmp-acts write-action">${mine?`<button class="cmp-mini ${it.noCarrinho?'on':''}" onclick="toggleCart(${it._id})">${it.noCarrinho?'Tirar do carrinho':'🛒 No carrinho'}</button><button class="cmp-mini" onclick="unclaimItem(${it._id})">Largar</button>`:''}</div>
+      <div class="cmp-acts write-action">${mine?`<button class="cmp-mini ${it.noCarrinho?'on':''}" onclick="event.stopPropagation();toggleCart(${it._id})">${it.noCarrinho?'Tirar do carrinho':'🛒 No carrinho'}</button><button class="cmp-mini" onclick="event.stopPropagation();unclaimItem(${it._id})">Largar</button>`:''}</div>
     </div>`;
   }else{
     statusRow=`<div class="cmp-status">
       <span class="cmp-trata free">Por tratar</span>
-      <div class="cmp-acts write-action"><button class="cmp-mini prim" onclick="claimItem(${it._id})">✋ Eu trato</button></div>
+      <div class="cmp-acts write-action"><button class="cmp-mini prim" onclick="event.stopPropagation();claimItem(${it._id})">✋ Eu trato</button></div>
     </div>`;
   }
-  return `<div class="cmp-item${it.noCarrinho?' incart':''}">
+  return `<div class="cmp-item cmp-tap${it.noCarrinho?' incart':''}" onclick="openShopItemModal(${it._id})">
     <div class="cmp-item-top">
       <div class="cmp-artigo">${escHtml(it.artigo)}${qtd}</div>
-      <div class="cmp-item-right">${badge}${editBtn}<button class="cmp-del write-action" title="Remover" onclick="deleteShopItem(${it._id})">✕</button></div>
+      <div class="cmp-item-right">${badge}<span class="cmp-chev-r">›</span></div>
     </div>
     ${statusRow}
   </div>`;
@@ -2823,25 +2864,35 @@ function renderComprados(){
     <div class="cmp-done-body">${cards.map(c=>c.html).join('')}</div>`;
 }
 
-/* ── Adicionar / Editar artigo ── */
+/* ── Detalhe / Adicionar / Editar artigo ──
+   Tocar num artigo abre o detalhe (editar/eliminar só aqui, e só para o autor
+   ou o admin). O botão "＋ Artigo" abre em modo de criação. */
 let editingItemId=null;
 function openShopItemModal(id){
-  if(!shopCanWrite()){toast('Sem permissão','bad');return;}
-  editingItemId=id||null;
   const it=id!=null?shopArr().find(x=>x._id===id):null;
   if(id!=null&&!it){toast('Artigo não encontrado','bad');return;}
-  if(it&&!shopCanEditItem(it)){toast('Só o autor ou o admin podem editar','bad');return;}
-  document.getElementById('shop-item-title').textContent=it?'Editar Artigo':'Adicionar Artigo';
-  document.getElementById('shop-item-save').textContent=it?'Guardar':'Adicionar';
+  // Criar exige permissão de escrita; abrir o detalhe de um artigo é livre
+  if(!it&&!shopCanWrite()){toast('Sem permissão','bad');return;}
+  editingItemId=id||null;
+  const canEdit=it?shopCanEditItem(it):true;   // criação = pode
+  document.getElementById('shop-item-title').textContent=it?(canEdit?'Editar Artigo':'Detalhe do Artigo'):'Adicionar Artigo';
   document.getElementById('shop-artigo').value=it?it.artigo:'';
-  document.getElementById('shop-qtd').value=it?it.quantidade:'';
+  document.getElementById('shop-qtd').value=it?normalizeQty(it.quantidade):'';
   document.getElementById('shop-tipo').value=it?it.tipo:'Gerais';
   shopTipoChanged();
   if(it&&shopIsMeal(it.tipo))document.getElementById('shop-ref').value=it.dataValor||'';
+  // Campos editáveis só quem pode; senão, detalhe em leitura
+  document.querySelectorAll('#shop-item-modal input,#shop-item-modal select').forEach(el=>{el.disabled=!canEdit;el.style.opacity=canEdit?'':'.75';});
+  const saveBtn=document.getElementById('shop-item-save');
+  saveBtn.textContent=it?'Guardar':'Adicionar';
+  saveBtn.style.display=canEdit?'':'none';
+  const delBtn=document.getElementById('shop-item-del');
+  delBtn.style.display=(it&&canEdit)?'':'none';
   document.getElementById('shop-item-bg').classList.add('show');
   document.body.classList.add('no-scroll');
-  setTimeout(()=>document.getElementById('shop-artigo').focus(),50);
+  if(!it)setTimeout(()=>document.getElementById('shop-artigo').focus(),50);
 }
+function deleteShopItemFromModal(){if(editingItemId!=null){const id=editingItemId;closeShopItemModal();deleteShopItem(id);}}
 function closeShopItemModal(){document.getElementById('shop-item-bg').classList.remove('show');document.body.classList.remove('no-scroll');editingItemId=null;}
 function shopTipoChanged(){
   const tipo=document.getElementById('shop-tipo').value;
@@ -2852,7 +2903,7 @@ function shopTipoChanged(){
 async function saveShopItem(){
   if(!DATA._sbId){toast('Sem ligação — recarrega a página','bad');return;}
   const artigo=(document.getElementById('shop-artigo').value||'').trim();
-  const qtd=(document.getElementById('shop-qtd').value||'').trim();
+  const qtd=normalizeQty(document.getElementById('shop-qtd').value);
   const tipo=document.getElementById('shop-tipo').value;
   if(!artigo){toast('Indica o artigo','bad');return;}
   let dataValor=null;

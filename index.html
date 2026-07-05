@@ -164,7 +164,7 @@ setTimeout(function(){ if (window.fbvEsconderSplash) window.fbvEsconderSplash();
     </div>
     <div class="inline-row">
       <div style="flex:2"><label>Artigo</label><input type="text" id="shop-artigo" maxlength="60" placeholder="Ex: Bacalhau"></div>
-      <div style="flex:1"><label>Qtd.</label><input type="text" id="shop-qtd" maxlength="16" placeholder="Ex: 2 kg"></div>
+      <div style="flex:1"><label>Qtd.</label><input type="text" id="shop-qtd" maxlength="20" placeholder="Ex: 2 kg" onblur="this.value=normalizeQty(this.value)"></div>
     </div>
     <label>Tipo de despesa</label>
     <select id="shop-tipo" onchange="shopTipoChanged()">
@@ -180,7 +180,8 @@ setTimeout(function(){ if (window.fbvEsconderSplash) window.fbvEsconderSplash();
       <select id="shop-ref"></select>
     </div>
     <div class="mbtns">
-      <button class="btn ghost" onclick="closeShopItemModal()">Cancelar</button>
+      <button class="btn ghost" onclick="closeShopItemModal()">Fechar</button>
+      <button class="btn danger" id="shop-item-del" onclick="deleteShopItemFromModal()" style="display:none">Eliminar</button>
       <button class="btn prim" id="shop-item-save" onclick="saveShopItem()">Adicionar</button>
     </div>
     <div class="note">Fica na lista partilhada do grupo.</div>
