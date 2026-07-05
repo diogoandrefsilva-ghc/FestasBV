@@ -2478,6 +2478,16 @@ async function limparCashflows(){
   const nDesp=(DATA.despesas||[]).length,nMeal=(DATA.mealheiros||[]).length,nPag=(DATA.pagamentos||[]).length;
   if(!nDesp&&!nMeal&&!nPag){toast('Não há cash-flows para limpar em '+ano,'ok');return;}
   if(!confirm('LIMPAR CASH-FLOWS — '+ano+'\n\nVai apagar:\n· '+nDesp+' despesa(s)\n· '+nMeal+' mealheiro(s)\n· '+nPag+' pagamento(s)/reembolso(s)\n\nSó afeta o ano '+ano+'. Esta ação NÃO pode ser desfeita.\n\nConfirmar?'))return;
+  // Repor na lista os artigos que estavam "comprados" (as despesas vão desaparecer;
+  // sem isto ficariam órfãos). A rede de segurança no cliente já os mostraria como
+  // pendentes, mas aqui limpa-se também o estado na BD.
+  const boughtIds=(DATA.shoplist||[]).filter(x=>x.estado==='comprado'&&x._id!=null).map(x=>x._id);
+  if(boughtIds.length){
+    try{
+      await queueWrite(()=>sbReq('PATCH',`shoplist?id=in.(${boughtIds.join(',')})`,{estado:'pendente',compra_id:null,cf_desc:null,comprado_em:null}));
+      DATA.shoplist.forEach(it=>{if(it.estado==='comprado')Object.assign(it,{estado:'pendente',compraId:null,cfDesc:null,compradoEm:null});});
+    }catch(e){toast('Aviso: artigos da lista não repostos — '+e.message,'bad');}
+  }
   DATA.despesas=[];DATA.mealheiros=[];DATA.pagamentos=[];
   const ok=await pushToGitHub('Limpar cash-flows '+ano);
   if(ok){CALC=calcular(JSON.parse(JSON.stringify(DATA)));renderAll();loadLimpeza();toast('Cash-flows de '+ano+' limpos ✓','ok');}
@@ -2694,6 +2704,11 @@ async function toggleSexo(idx){
 
 const SHOP_TIPOS=['Gerais','Bebidas','Almoço','Jantar','Renda','Cerveja'];
 function shopArr(){if(DATA&&!DATA.shoplist)DATA.shoplist=[];return (DATA&&DATA.shoplist)||[];}
+// Um artigo só está mesmo "comprado" se ainda existir alguma despesa com o seu
+// compra_id. Se as despesas foram apagadas por outra via (ex.: Limpar cash-flows),
+// o artigo é tratado como pendente — nunca fica órfão/invisível na lista.
+function shopBacked(it){return !!it.compraId&&(DATA.despesas||[]).some(d=>d.compraId===it.compraId);}
+function shopIsPending(it){return it.estado!=='comprado'||!shopBacked(it);}
 function shopTipoIcon(t){return{Gerais:'🧾',Bebidas:'🥤',Almoço:'🍳',Jantar:'🌙',Renda:'🏠',Cerveja:'🍺'}[t]||'🛒';}
 function shopIsMeal(t){return t==='Almoço'||t==='Jantar';}
 function shopGroupKey(it){return it.tipo+'|'+(it.dataValor||'');}
@@ -2745,7 +2760,7 @@ function shopItemCard(it){
 function renderCompras(){
   const el=document.getElementById('view-compras');if(!el||!DATA)return;
   const items=shopArr();
-  const pend=items.filter(x=>x.estado!=='comprado');
+  const pend=items.filter(shopIsPending);
   const canW=shopCanWrite();
   const fechadas=contasFechadas();
   const ord={};SHOP_TIPOS.forEach((t,i)=>ord[t]=i);
@@ -2906,7 +2921,7 @@ function openCompra(compraId){
       compraEdit.lines.push({tipo:d.tipo,dataValor:d.dataValor||null,valor:d.valor,obs:d.obs||''});
     });
   }else{
-    const seed=shopArr().filter(x=>x.estado!=='comprado'&&shopMine(x));
+    const seed=shopArr().filter(x=>shopIsPending(x)&&shopMine(x));
     const gmap={};
     seed.forEach(it=>{const k=shopGroupKey(it);(gmap[k]=gmap[k]||{tipo:it.tipo,dataValor:it.dataValor||null,items:[]}).items.push(it);});
     const ord={};SHOP_TIPOS.forEach((t,i)=>ord[t]=i);
@@ -2932,8 +2947,8 @@ function openCompra(compraId){
   shopBuyDescCount();
 
   // Picker de artigos
-  const pend=shopArr().filter(x=>x.estado!=='comprado');
-  const pickItems=isEdit?linked.concat(pend):pend;
+  const pend=shopArr().filter(shopIsPending);
+  const pickItems=isEdit?linked.concat(pend.filter(x=>x.compraId!==compraId)):pend;
   let pl='';
   if(pickItems.length){
     pl='<div class="cmp-pick sf">Artigos da lista</div>';
