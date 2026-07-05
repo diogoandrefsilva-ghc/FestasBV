@@ -159,7 +159,7 @@ setTimeout(function(){ if (window.fbvEsconderSplash) window.fbvEsconderSplash();
 <div class="modal-bg" id="shop-item-bg">
   <div class="modal" id="shop-item-modal">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-      <h3 style="margin-bottom:0">Adicionar Artigo</h3>
+      <h3 style="margin-bottom:0" id="shop-item-title">Adicionar Artigo</h3>
       <button onclick="closeShopItemModal()" style="background:var(--panel2);border:1px solid var(--line);color:var(--muted);border-radius:9px;width:32px;height:32px;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0">✕</button>
     </div>
     <div class="inline-row">
@@ -187,11 +187,11 @@ setTimeout(function(){ if (window.fbvEsconderSplash) window.fbvEsconderSplash();
   </div>
 </div>
 
-<!-- Registar Compra (associar cash-flow à lista) modal -->
+<!-- Registar / Editar Compra (associar cash-flows à lista) modal -->
 <div class="modal-bg" id="shop-buy-bg">
   <div class="modal" id="shop-buy-modal">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-      <h3 style="margin-bottom:0">Registar Compra</h3>
+      <h3 style="margin-bottom:0" id="shop-buy-title">Registar Compra</h3>
       <button onclick="closeShopBuyModal()" style="background:var(--panel2);border:1px solid var(--line);color:var(--muted);border-radius:9px;width:32px;height:32px;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0">✕</button>
     </div>
     <div class="inline-row">
@@ -200,12 +200,12 @@ setTimeout(function(){ if (window.fbvEsconderSplash) window.fbvEsconderSplash();
     </div>
     <label>Descritivo <span class="cf-desc-count" id="shop-buy-desc-count">0/30</span></label>
     <input type="text" id="shop-buy-desc" maxlength="30" placeholder="Ex: Continente" oninput="shopBuyDescCount()">
-    <p class="note" style="margin:14px 0 6px">Reparte o total pago pelos grupos. Cada grupo vira um cash-flow com o tipo/refeição correto.</p>
-    <div id="shop-buy-groups"></div>
-    <div id="shop-buy-total" class="note" style="margin-top:8px;font-weight:700;color:var(--ink)"></div>
+    <div id="shop-buy-body"></div>
+    <div id="shop-buy-total" class="note" style="margin-top:10px;font-weight:700;color:var(--ink)"></div>
     <div class="mbtns">
       <button class="btn ghost" onclick="closeShopBuyModal()">Cancelar</button>
-      <button class="btn prim" id="shop-buy-save" onclick="saveBuy()">Registar compra</button>
+      <button class="btn danger" id="shop-buy-del" onclick="deleteCompra()" style="display:none">Apagar</button>
+      <button class="btn prim" id="shop-buy-save" onclick="saveCompra()">Registar compra</button>
     </div>
   </div>
 </div>

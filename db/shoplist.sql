@@ -1,7 +1,8 @@
 -- =====================================================================
 -- FestasBV — Migração: Lista de Compras (festasbv.shoplist)
--- Correr UMA VEZ no SQL Editor do Supabase (projeto festasbv).
--- Depende de: schema.sql (eventos) e functions.sql (is_allowed/is_admin).
+-- Correr no SQL Editor do Supabase (projeto festasbv).
+-- É IDEMPOTENTE: pode ser corrido mais que uma vez sem erro.
+-- Depende de: schema.sql (eventos/despesas) e functions.sql (is_allowed/is_admin).
 -- Ordem: schema.sql -> functions.sql -> policies.sql -> ESTE ficheiro.
 --
 -- NOTA sobre IDs: ao contrário das tabelas legadas, esta usa IDENTITY,
@@ -31,6 +32,10 @@ CREATE TABLE IF NOT EXISTS festasbv.shoplist (
 
 CREATE INDEX IF NOT EXISTS shoplist_evento_idx ON festasbv.shoplist (evento_id);
 
+-- Ligação da compra ao cash-flow: cada despesa criada a partir de uma compra
+-- da lista fica marcada com o mesmo token. Permite reabrir a compra ao editar.
+ALTER TABLE festasbv.despesas ADD COLUMN IF NOT EXISTS compra_id text;
+
 -- GRANTs (sem isto: HTTP 403 / 42501)
 GRANT ALL ON TABLE festasbv.shoplist TO anon, authenticated;
 
@@ -39,6 +44,12 @@ ALTER TABLE festasbv.shoplist ENABLE ROW LEVEL SECURITY;
 
 -- Lista partilhada: qualquer membro autorizado vê e edita (adicionar, marcar
 -- "eu trato", pôr no carrinho, registar como comprado, remover). Admin tudo.
+DROP POLICY IF EXISTS shoplist_sel   ON festasbv.shoplist;
+DROP POLICY IF EXISTS shoplist_ins   ON festasbv.shoplist;
+DROP POLICY IF EXISTS shoplist_upd   ON festasbv.shoplist;
+DROP POLICY IF EXISTS shoplist_del   ON festasbv.shoplist;
+DROP POLICY IF EXISTS shoplist_admin ON festasbv.shoplist;
+
 CREATE POLICY shoplist_sel ON festasbv.shoplist
   FOR SELECT TO authenticated
   USING (festasbv.is_allowed());

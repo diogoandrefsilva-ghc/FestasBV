@@ -1042,7 +1042,7 @@ function renderCashFlows(){
       if(dd)dia=dd;
     }
     const prevista=!d.dataDesp&&!d.dataValor;
-    allCf.push({type:'despesa',date:d.dataDesp||d.dataValor||'',label:'Despesa',icon:'🛒',sub:d.tipo||'Gerais',dia,prevista,obs:d.obs||'',
+    allCf.push({type:'despesa',date:d.dataDesp||d.dataValor||'',label:'Despesa',icon:'🛒',sub:d.tipo||'Gerais',dia,prevista,obs:d.obs||'',fromList:!!d.compraId,
       line1:d.desc||'(sem descrição)',line2:`${prevista?'pagará':'pagou'} ${d.quem}`,valor:d.valor,
       sign:'neg',source:'despesas',idx:i,people:[d.quem]});
   });
@@ -1151,7 +1151,7 @@ function renderCashFlows(){
       <div class="cf-badge">${cf.prevista?'📌':cf.icon}</div>
       <div class="cf-main"><div class="top"><div class="desc">${cf.line1}</div>
       <div class="v cf-${cf.sign}">${sgn}${eur(cf.valor)}</div></div>
-      <div class="meta"><span class="chip t b-${cf.type}">${cf.label}</span>${cf.type==='despesa'&&cf.sub?`<span class="chip sub s-${cf.sub.toLowerCase().normalize('NFD').replace(/[^a-z]/g,'')}">${cf.sub}${cf.dia?' · '+cf.dia:''}</span>`:''}${cf.prevista?`<span class="chip prevista">prevista</span>`:''}${cf.line2?`<span class="chip">${truncRef(cf.line2)}</span>`:''}
+      <div class="meta"><span class="chip t b-${cf.type}">${cf.label}</span>${cf.type==='despesa'&&cf.sub?`<span class="chip sub s-${cf.sub.toLowerCase().normalize('NFD').replace(/[^a-z]/g,'')}">${cf.sub}${cf.dia?' · '+cf.dia:''}</span>`:''}${cf.fromList?`<span class="chip chip-lista">🛒 lista</span>`:''}${cf.prevista?`<span class="chip prevista">prevista</span>`:''}${cf.line2?`<span class="chip">${truncRef(cf.line2)}</span>`:''}
       </div>${cf.obs?`<div class="cf-obs">${escHtml(cf.obs)}</div>`:''}</div></div>`;
   });
   document.getElementById('view-cashflows').innerHTML=pp;
@@ -1357,7 +1357,7 @@ async function carregar(){
         presencas:(m.presencas||[]).map(p=>({k:`${p.dia}|${p.ref}`,modo:p.modo==='bebe'?'bebe':'come'}))
       })),
       refeicoesDef:(ev.refeicoes_def||[]).map(r=>({data:r.data,dia:r.dia,ref:r.ref,prato:r.prato||'',peso:N(r.peso),minMEO:N(r.min_meo),minConv:N(r.min_conv),extraConv:N(r.extra_conv)})),
-      despesas:(ev.despesas||[]).map(d=>({_id:d.id,quem:d.quem,dataDesp:d.data_desp,dataValor:d.data_valor,desc:d.descricao,tipo:d.tipo,valor:N(d.valor),obs:d.observacoes||''})),
+      despesas:(ev.despesas||[]).map(d=>({_id:d.id,quem:d.quem,dataDesp:d.data_desp,dataValor:d.data_valor,desc:d.descricao,tipo:d.tipo,valor:N(d.valor),obs:d.observacoes||'',compraId:d.compra_id||null})),
       convidados:(ev.convidados||[]).map(c=>({_id:c.id,membro:c.membro,nome:c.nome,data:c.data,dia:c.dia,ref:c.ref,pagante:c.pagante?'Sim':'Não',preco:N(c.preco)})),
       mealheiros:(ev.mealheiros||[]).map(m=>({quem:m.quem,data:m.data,valor:N(m.valor),subtipo:m.subtipo,desc:m.descricao})),
       pagamentos:(ev.pagamentos||[]).map(p=>({de:p.de,para:p.para,valor:N(p.valor),ref:p.ref,data:p.data,extra:N(p.extra)})),
@@ -1430,7 +1430,7 @@ async function sbGuardarEvento(y,slot){
     if(y.refeicoesDef&&y.refeicoesDef.length)
       await sbReq('POST','refeicoes_def',y.refeicoesDef.map(r=>({evento_id:eid,data:r.data,dia:r.dia,ref:r.ref,prato:r.prato||null,peso:r.peso||0,min_meo:r.minMEO||0,min_conv:r.minConv||0,extra_conv:r.extraConv||0})));
     if(y.despesas&&y.despesas.length){
-      const dres=await sbReq('POST','despesas',y.despesas.map(d=>({evento_id:eid,quem:d.quem,data_desp:d.dataDesp||null,data_valor:d.dataValor||null,descricao:d.desc||'',tipo:d.tipo,valor:d.valor,observacoes:d.obs||null})),{Prefer:'return=representation'});
+      const dres=await sbReq('POST','despesas',y.despesas.map(d=>({evento_id:eid,quem:d.quem,data_desp:d.dataDesp||null,data_valor:d.dataValor||null,descricao:d.desc||'',tipo:d.tipo,valor:d.valor,observacoes:d.obs||null,compra_id:d.compraId||null})),{Prefer:'return=representation'});
       if(Array.isArray(dres))dres.forEach((r,i)=>{if(y.despesas[i])y.despesas[i]._id=r.id;});
     }
     if(y.convidados&&y.convidados.length){
@@ -1989,7 +1989,7 @@ async function saveCashFlow(){
       const ins=await queueWrite(()=>sbReq('POST','despesas',
         [{evento_id:DATA._sbId,quem:who,data_desp:dDesp||null,data_valor:date2||null,descricao:descD||'(sem descrição)',tipo,valor:rnd(val,2),observacoes:obs||null}],
         {Prefer:'return=representation'}));
-      DATA.despesas.push({_id:ins&&ins[0]?ins[0].id:null,quem:who,dataDesp:dDesp,dataValor:date2,desc:descD||'(sem descrição)',tipo,valor:rnd(val,2),obs});
+      DATA.despesas.push({_id:ins&&ins[0]?ins[0].id:null,quem:who,dataDesp:dDesp,dataValor:date2,desc:descD||'(sem descrição)',tipo,valor:rnd(val,2),obs,compraId:null});
       syncMirror();
       marcaGuardado();
       document.getElementById('pay-save').disabled=false;
@@ -2061,6 +2061,11 @@ async function saveCashFlow(){
 let editingCf=null;
 
 function openCfDetail(source,idx){
+  // Cash-flow que veio de uma compra da lista → abre o editor da compra (não o de despesa avulsa)
+  if(source==='despesas'){
+    const d=DATA.despesas[idx];
+    if(d&&d.compraId){openCompra(d.compraId);return;}
+  }
   editCfEntry(source,idx);
   const et=editingCf&&editingCf.editType;
   // Pós-fecho: despesas e mealheiros (entradas de apuramento) ficam só de leitura; pagamentos continuam editáveis
@@ -2679,18 +2684,21 @@ async function toggleSexo(idx){
 /* ═══ COMPRAS / SHOPLIST ═══
    Lista partilhada de artigos em falta. Fluxo:
    1) alguém adiciona artigos (artigo, qtd, tipo, e se Almoço/Jantar a refeição alvo)
-   2) alguém marca "Eu trato"  3) durante as compras marca "no carrinho"
-   4) ao registar a compra, o total é repartido por grupos (tipo+refeição) e cada
-      grupo vira UMA despesa com o tipo/data-valor correto → a distribuição pelas
-      refeições respeita automaticamente as datas da lista (o motor calcular() já
-      aloca Almoço/Jantar com data_valor diretamente à refeição). */
+   2) alguém marca "Eu trato" (passa para "O meu carrinho")
+   3) durante as compras marca "no carrinho" físico
+   4) ao registar a compra, define-se uma LINHA por grupo (tipo+refeição) mais os
+      "outros gastos" avulsos. Cada linha vira UMA despesa marcada com o mesmo
+      compra_id → a distribuição pelas refeições respeita as datas da lista (o motor
+      calcular() aloca Almoço/Jantar com data_valor diretamente à refeição) e a compra
+      pode ser reaberta e editada como um todo a partir do cash-flow. */
 
 const SHOP_TIPOS=['Gerais','Bebidas','Almoço','Jantar','Renda','Cerveja'];
 function shopArr(){if(DATA&&!DATA.shoplist)DATA.shoplist=[];return (DATA&&DATA.shoplist)||[];}
 function shopTipoIcon(t){return{Gerais:'🧾',Bebidas:'🥤',Almoço:'🍳',Jantar:'🌙',Renda:'🏠',Cerveja:'🍺'}[t]||'🛒';}
+function shopIsMeal(t){return t==='Almoço'||t==='Jantar';}
 function shopGroupKey(it){return it.tipo+'|'+(it.dataValor||'');}
 function shopGroupLabel(tipo,dataValor){
-  if((tipo==='Almoço'||tipo==='Jantar')&&dataValor){
+  if(shopIsMeal(tipo)&&dataValor){
     const rd=(DATA.refeicoesDef||[]).find(r=>r.ref===tipo&&r.data===dataValor);
     return `${shopTipoIcon(tipo)} ${tipo} ${fmtDiaMes(dataValor)}`+(rd&&rd.prato?` · ${rd.prato}`:'');
   }
@@ -2698,107 +2706,133 @@ function shopGroupLabel(tipo,dataValor){
 }
 function shopMealOptions(ref,selData){
   const meals=(DATA.refeicoesDef||[]).filter(r=>r.ref===ref).slice().sort((a,b)=>(a.data||'').localeCompare(b.data||''));
-  if(!meals.length)return `<option value="">(sem ${ref.toLowerCase()}s definidos)</option>`;
-  return meals.map(r=>`<option value="${r.data}"${selData===r.data?' selected':''}>${fmtDiaMes(r.data)}${r.prato?' · '+r.prato:''}</option>`).join('');
+  if(!meals.length)return `<option value="">(sem ${ref.toLowerCase()}s)</option>`;
+  return `<option value="">— refeição —</option>`+meals.map(r=>`<option value="${r.data}"${selData===r.data?' selected':''}>${fmtDiaMes(r.data)}${r.prato?' · '+r.prato:''}</option>`).join('');
 }
 function shopCanWrite(){return !!_sbSession&&(isAdmin()||MY_NAMES.length>0);}
+// Nomes com que reclamo artigos (próprio + cônjuge; admin sem membro → 'Admin')
+function myClaimNames(){const s=new Set(MY_NAMES);const p=myPrimaryName()||(isAdmin()?'Admin':'');if(p)s.add(p);return s;}
+function shopMine(it){return !!it.tratadoPor&&myClaimNames().has(it.tratadoPor);}
+function shopCanEditItem(it){return isAdmin()||(it.criadoPor&&myClaimNames().has(it.criadoPor));}
+
+function shopItemCard(it){
+  const meal=shopIsMeal(it.tipo)&&it.dataValor;
+  const badge=meal?`<span class="cmp-badge meal">${shopTipoIcon(it.tipo)} ${fmtDiaMes(it.dataValor)}</span>`:`<span class="cmp-badge">${shopTipoIcon(it.tipo)} ${it.tipo}</span>`;
+  const qtd=it.quantidade?`<span class="cmp-qtd">${escHtml(it.quantidade)}</span>`:'';
+  const editBtn=shopCanEditItem(it)?`<button class="cmp-del write-action" title="Editar" onclick="openShopItemModal(${it._id})">✎</button>`:'';
+  let statusRow;
+  if(it.tratadoPor){
+    const mine=shopMine(it);
+    statusRow=`<div class="cmp-status">
+      <span class="cmp-trata ${it.noCarrinho?'incart':''}">${it.noCarrinho?'✅ no carrinho':'🧑‍🍳 '+escHtml(it.tratadoPor)}</span>
+      <div class="cmp-acts write-action">${mine?`<button class="cmp-mini ${it.noCarrinho?'on':''}" onclick="toggleCart(${it._id})">${it.noCarrinho?'Tirar do carrinho':'🛒 No carrinho'}</button><button class="cmp-mini" onclick="unclaimItem(${it._id})">Largar</button>`:''}</div>
+    </div>`;
+  }else{
+    statusRow=`<div class="cmp-status">
+      <span class="cmp-trata free">Por tratar</span>
+      <div class="cmp-acts write-action"><button class="cmp-mini prim" onclick="claimItem(${it._id})">✋ Eu trato</button></div>
+    </div>`;
+  }
+  return `<div class="cmp-item${it.noCarrinho?' incart':''}">
+    <div class="cmp-item-top">
+      <div class="cmp-artigo">${escHtml(it.artigo)}${qtd}</div>
+      <div class="cmp-item-right">${badge}${editBtn}<button class="cmp-del write-action" title="Remover" onclick="deleteShopItem(${it._id})">✕</button></div>
+    </div>
+    ${statusRow}
+  </div>`;
+}
 
 function renderCompras(){
   const el=document.getElementById('view-compras');if(!el||!DATA)return;
   const items=shopArr();
   const pend=items.filter(x=>x.estado!=='comprado');
-  const comp=items.filter(x=>x.estado==='comprado');
   const canW=shopCanWrite();
   const fechadas=contasFechadas();
+  const ord={};SHOP_TIPOS.forEach((t,i)=>ord[t]=i);
+  const sortF=(a,b)=>(ord[a.tipo]-ord[b.tipo])||((a.dataValor||'').localeCompare(b.dataValor||''))||a.artigo.localeCompare(b.artigo,'pt');
+  const mine=pend.filter(shopMine).sort(sortF);
+  const falta=pend.filter(x=>!shopMine(x)).sort(sortF);
 
   let h='';
   h+=`<div class="cmp-hdr">
-    <div class="cmp-hdr-title sf">🛒 Lista de Compras <span class="cmp-count">${pend.length}</span></div>
+    <div class="cmp-hdr-title sf">🛒 Compras <span class="cmp-count">${pend.length}</span></div>
     <button class="btn prim write-action" onclick="openShopItemModal()" ${canW?'':'disabled'}>＋ Artigo</button>
   </div>`;
 
-  // Ordena: por tipo (ordem canónica) e depois por data-valor/artigo
-  const ord={};SHOP_TIPOS.forEach((t,i)=>ord[t]=i);
-  const pendSorted=pend.slice().sort((a,b)=>
-    (ord[a.tipo]-ord[b.tipo])||((a.dataValor||'').localeCompare(b.dataValor||''))||a.artigo.localeCompare(b.artigo,'pt'));
-
-  if(!pendSorted.length){
-    h+='<div class="empty sf" style="margin:14px 0">Lista vazia — adiciona os artigos em falta.</div>';
+  // ── O meu carrinho (artigos que disse que tratava) ──
+  h+=`<div class="cmp-sec-hdr sf">🛒 O meu carrinho <span class="cmp-count">${mine.length}</span></div>`;
+  if(!mine.length){
+    h+='<div class="empty sf">Ainda não estás a tratar de nenhum artigo. Marca <b>Eu trato</b> nos que fores buscar.</div>';
   }else{
-    h+='<div class="cmp-list">';
-    pendSorted.forEach(it=>{
-      const mealBadge=(it.tipo==='Almoço'||it.tipo==='Jantar')&&it.dataValor?`<span class="cmp-badge meal">${shopTipoIcon(it.tipo)} ${fmtDiaMes(it.dataValor)}</span>`:`<span class="cmp-badge">${shopTipoIcon(it.tipo)} ${it.tipo}</span>`;
-      const qtd=it.quantidade?`<span class="cmp-qtd">${it.quantidade}</span>`:'';
-      let statusRow='';
-      if(it.tratadoPor){
-        statusRow=`<div class="cmp-status">
-          <span class="cmp-trata ${it.noCarrinho?'incart':''}">${it.noCarrinho?'✅ no carrinho':'🧑‍🍳 '+it.tratadoPor}</span>
-          <div class="cmp-acts write-action">
-            <button class="cmp-mini ${it.noCarrinho?'on':''}" onclick="toggleCart(${it._id})">${it.noCarrinho?'Tirar do carrinho':'🛒 No carrinho'}</button>
-            <button class="cmp-mini" onclick="unclaimItem(${it._id})">Largar</button>
-          </div>
-        </div>`;
-      }else{
-        statusRow=`<div class="cmp-status">
-          <span class="cmp-trata free">Por tratar</span>
-          <div class="cmp-acts write-action"><button class="cmp-mini prim" onclick="claimItem(${it._id})">✋ Eu trato</button></div>
-        </div>`;
-      }
-      h+=`<div class="cmp-item${it.noCarrinho?' incart':''}">
-        <div class="cmp-item-top">
-          <div class="cmp-artigo">${it.artigo}${qtd}</div>
-          <div class="cmp-item-right">${mealBadge}<button class="cmp-del write-action" title="Remover" onclick="deleteShopItem(${it._id})">✕</button></div>
-        </div>
-        ${statusRow}
-      </div>`;
-    });
-    h+='</div>';
-    if(fechadas){
-      h+='<div class="empty sf" style="margin-top:12px">Contas fechadas — não é possível registar compras.</div>';
-    }else{
-      h+=`<button class="btn prim write-action" style="width:100%;margin-top:14px" onclick="openShopBuyModal()" ${canW?'':'disabled'}>💰 Registar compra</button>`;
-    }
+    h+='<div class="cmp-list">'+mine.map(shopItemCard).join('')+'</div>';
+  }
+  if(fechadas){
+    h+='<div class="empty sf" style="margin-top:10px">Contas fechadas — não é possível registar compras.</div>';
+  }else{
+    h+=`<button class="btn prim write-action" style="width:100%;margin-top:12px" onclick="openCompra(null)" ${canW?'':'disabled'}>💰 Registar compra</button>`;
   }
 
-  // Comprados (histórico, agrupado por compra)
-  if(comp.length){
-    const byCompra={};
-    comp.forEach(it=>{const k=it.compraId||('x'+it._id);(byCompra[k]=byCompra[k]||[]).push(it);});
-    h+=`<div class="cmp-done-hdr sf" onclick="this.nextElementSibling.classList.toggle('open');this.classList.toggle('open')">
-      <span>✅ Comprados <span class="cmp-count">${comp.length}</span></span><span class="cmp-chev">▾</span></div>`;
-    h+='<div class="cmp-done-body">';
-    Object.values(byCompra).sort((a,b)=>((b[0].compradoEm||'').localeCompare(a[0].compradoEm||''))).forEach(grp=>{
-      const g0=grp[0];
-      const dt=g0.compradoEm?fmtDataHora(g0.compradoEm).split(' ')[0]:'';
-      h+=`<div class="cmp-done-card">
-        <div class="cmp-done-top"><b>${g0.cfDesc||'Compra'}</b><span class="cmp-done-meta">${dt}</span></div>
-        <div class="cmp-done-items">${grp.map(it=>`${it.artigo}${it.quantidade?' ('+it.quantidade+')':''} <span class="cmp-done-badge">${shopTipoIcon(it.tipo)}${(it.tipo==='Almoço'||it.tipo==='Jantar')&&it.dataValor?' '+fmtDiaMes(it.dataValor):''}</span>`).join(' · ')}</div>
-      </div>`;
-    });
-    h+='</div>';
-  }
+  // ── Em falta (por tratar ou tratados por outros) ──
+  h+=`<div class="cmp-sec-hdr sf" style="margin-top:22px">📝 Em falta <span class="cmp-count">${falta.length}</span></div>`;
+  if(!falta.length)h+='<div class="empty sf">Nada em falta 🎉</div>';
+  else h+='<div class="cmp-list">'+falta.map(shopItemCard).join('')+'</div>';
+
+  // ── Comprados (a partir das despesas ligadas a uma compra) ──
+  h+=renderComprados();
 
   el.innerHTML=h;
 }
 
-/* ── Adicionar artigo ── */
-function openShopItemModal(){
+function renderComprados(){
+  const withC=(DATA.despesas||[]).filter(d=>d.compraId);
+  if(!withC.length)return '';
+  const groups={};
+  withC.forEach(d=>{(groups[d.compraId]=groups[d.compraId]||[]).push(d);});
+  const cards=Object.keys(groups).map(cid=>{
+    const ds=groups[cid];
+    const total=rnd(ds.reduce((a,d)=>a+(+d.valor||0),0),2);
+    const desc=(ds.find(d=>d.desc&&d.desc!=='Compras')||ds[0]).desc||'Compra';
+    const date=ds.map(d=>d.dataDesp).filter(Boolean).sort()[0]||'';
+    const lines=ds.map(d=>{
+      const meal=shopIsMeal(d.tipo)&&d.dataValor?' '+fmtDiaMes(d.dataValor):'';
+      return `<div class="cmp-done-line"><span>${shopTipoIcon(d.tipo)} ${d.tipo}${meal}${d.obs?' · <i>'+escHtml(d.obs)+'</i>':''}</span><span class="cmp-done-val">${eur(d.valor)}</span></div>`;
+    }).join('');
+    return {cid,date,html:`<div class="cmp-done-card" onclick="openCompra('${cid}')">
+      <div class="cmp-done-top"><b>${escHtml(desc)}</b><span class="cmp-done-meta">${date?fmtDiaMes(date):''} · ${eur(total)}</span></div>
+      <div class="cmp-done-lines">${lines}</div>
+      <div class="cmp-done-edit sf">editar compra ›</div>
+    </div>`};
+  }).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  return `<div class="cmp-done-hdr sf" onclick="this.nextElementSibling.classList.toggle('open');this.classList.toggle('open')">
+      <span>✅ Comprados <span class="cmp-count">${cards.length}</span></span><span class="cmp-chev">▾</span></div>
+    <div class="cmp-done-body">${cards.map(c=>c.html).join('')}</div>`;
+}
+
+/* ── Adicionar / Editar artigo ── */
+let editingItemId=null;
+function openShopItemModal(id){
   if(!shopCanWrite()){toast('Sem permissão','bad');return;}
-  document.getElementById('shop-artigo').value='';
-  document.getElementById('shop-qtd').value='';
-  document.getElementById('shop-tipo').value='Gerais';
+  editingItemId=id||null;
+  const it=id!=null?shopArr().find(x=>x._id===id):null;
+  if(id!=null&&!it){toast('Artigo não encontrado','bad');return;}
+  if(it&&!shopCanEditItem(it)){toast('Só o autor ou o admin podem editar','bad');return;}
+  document.getElementById('shop-item-title').textContent=it?'Editar Artigo':'Adicionar Artigo';
+  document.getElementById('shop-item-save').textContent=it?'Guardar':'Adicionar';
+  document.getElementById('shop-artigo').value=it?it.artigo:'';
+  document.getElementById('shop-qtd').value=it?it.quantidade:'';
+  document.getElementById('shop-tipo').value=it?it.tipo:'Gerais';
   shopTipoChanged();
+  if(it&&shopIsMeal(it.tipo))document.getElementById('shop-ref').value=it.dataValor||'';
   document.getElementById('shop-item-bg').classList.add('show');
   document.body.classList.add('no-scroll');
   setTimeout(()=>document.getElementById('shop-artigo').focus(),50);
 }
-function closeShopItemModal(){document.getElementById('shop-item-bg').classList.remove('show');document.body.classList.remove('no-scroll');}
+function closeShopItemModal(){document.getElementById('shop-item-bg').classList.remove('show');document.body.classList.remove('no-scroll');editingItemId=null;}
 function shopTipoChanged(){
   const tipo=document.getElementById('shop-tipo').value;
   const wrap=document.getElementById('shop-ref-wrap');
-  const isMeal=tipo==='Almoço'||tipo==='Jantar';
-  wrap.style.display=isMeal?'':'none';
-  if(isMeal)document.getElementById('shop-ref').innerHTML=shopMealOptions(tipo,'');
+  wrap.style.display=shopIsMeal(tipo)?'':'none';
+  if(shopIsMeal(tipo))document.getElementById('shop-ref').innerHTML=shopMealOptions(tipo,'');
 }
 async function saveShopItem(){
   if(!DATA._sbId){toast('Sem ligação — recarrega a página','bad');return;}
@@ -2807,21 +2841,28 @@ async function saveShopItem(){
   const tipo=document.getElementById('shop-tipo').value;
   if(!artigo){toast('Indica o artigo','bad');return;}
   let dataValor=null;
-  if(tipo==='Almoço'||tipo==='Jantar'){
+  if(shopIsMeal(tipo)){
     dataValor=document.getElementById('shop-ref').value||'';
     if(!dataValor){toast('Escolhe a refeição (ou define-a em Refeições)','bad');return;}
   }
-  const criadoPor=myPrimaryName()||(isAdmin()?'Admin':'');
   const btn=document.getElementById('shop-item-save');btn.disabled=true;
   setSync('load','a guardar…');
   try{
-    const ins=await queueWrite(()=>sbReq('POST','shoplist',
-      [{evento_id:DATA._sbId,artigo,quantidade:qtd,tipo,data_valor:dataValor,estado:'pendente',criado_por:criadoPor}],
-      {Prefer:'return=representation'}));
-    shopArr().push({_id:ins&&ins[0]?ins[0].id:null,artigo,quantidade:qtd,tipo,dataValor,estado:'pendente',tratadoPor:null,noCarrinho:false,compraId:null,cfDesc:null,valor:null,criadoPor,criadoEm:new Date().toISOString(),compradoEm:null});
+    if(editingItemId!=null){
+      const it=shopArr().find(x=>x._id===editingItemId);
+      await queueWrite(()=>sbReq('PATCH',`shoplist?id=eq.${editingItemId}`,{artigo,quantidade:qtd,tipo,data_valor:dataValor}));
+      if(it)Object.assign(it,{artigo,quantidade:qtd,tipo,dataValor});
+      toast('Artigo atualizado ✓','ok');
+    }else{
+      const criadoPor=myPrimaryName()||(isAdmin()?'Admin':'');
+      const ins=await queueWrite(()=>sbReq('POST','shoplist',
+        [{evento_id:DATA._sbId,artigo,quantidade:qtd,tipo,data_valor:dataValor,estado:'pendente',criado_por:criadoPor}],
+        {Prefer:'return=representation'}));
+      shopArr().push({_id:ins&&ins[0]?ins[0].id:null,artigo,quantidade:qtd,tipo,dataValor,estado:'pendente',tratadoPor:null,noCarrinho:false,compraId:null,cfDesc:null,valor:null,criadoPor,criadoEm:new Date().toISOString(),compradoEm:null});
+      toast('Artigo adicionado ✓','ok');
+    }
     syncMirror();marcaGuardado();
     btn.disabled=false;closeShopItemModal();renderCompras();
-    toast('Artigo adicionado ✓','ok');
   }catch(e){setSync('err','erro ao guardar');btn.disabled=false;toast(permErrorMsg(e),'bad');}
 }
 
@@ -2848,102 +2889,173 @@ async function deleteShopItem(id){
   }catch(e){setSync('err','erro ao guardar');toast(permErrorMsg(e),'bad');}
 }
 
-/* ── Registar compra: repartir o total pelos grupos e criar as despesas ── */
-let shopBuyGroups=[];       // grupos derivados dos artigos escolhidos
-let shopBuyAlloc={};        // {safeKey: valor} — preserva o que já foi escrito
-function openShopBuyModal(){
+/* ── Registar / Editar compra ──────────────────────────────────────────
+   Estado: compraEdit = { id, lines:[{tipo,dataValor,valor,obs}] }.
+   Os artigos escolhidos (picker) são marcados como comprados e ligados ao
+   mesmo compra_id; cada linha vira uma despesa. */
+let compraEdit={id:null,lines:[]};
+function openCompra(compraId){
   if(!shopCanWrite()){toast('Sem permissão','bad');return;}
-  if(contasFechadas()){toast('Contas fechadas — só pagamentos de dívidas','bad');return;}
-  const pend=shopArr().filter(x=>x.estado!=='comprado');
-  if(!pend.length){toast('Nada para comprar','bad');return;}
-  shopBuyAlloc={};
-  document.getElementById('shop-buy-who').innerHTML=isAdmin()?memberOptions(myPrimaryName()):myMemberOptions(myPrimaryName());
-  document.getElementById('shop-buy-date').value=new Date().toISOString().slice(0,10);
-  document.getElementById('shop-buy-desc').value='';
+  if(contasFechadas()&&!compraId){toast('Contas fechadas — só pagamentos de dívidas','bad');return;}
+  const isEdit=!!compraId;
+  compraEdit={id:compraId||null,lines:[]};
+  const linked=isEdit?shopArr().filter(x=>x.compraId===compraId):[];
+  // Linhas: (edição) reconstruídas das despesas da compra; (nova) semeadas dos meus artigos
+  if(isEdit){
+    (DATA.despesas||[]).filter(d=>d.compraId===compraId).forEach(d=>{
+      compraEdit.lines.push({tipo:d.tipo,dataValor:d.dataValor||null,valor:d.valor,obs:d.obs||''});
+    });
+  }else{
+    const seed=shopArr().filter(x=>x.estado!=='comprado'&&shopMine(x));
+    const gmap={};
+    seed.forEach(it=>{const k=shopGroupKey(it);(gmap[k]=gmap[k]||{tipo:it.tipo,dataValor:it.dataValor||null,items:[]}).items.push(it);});
+    const ord={};SHOP_TIPOS.forEach((t,i)=>ord[t]=i);
+    Object.values(gmap).sort((a,b)=>(ord[a.tipo]-ord[b.tipo])||((a.dataValor||'').localeCompare(b.dataValor||'')))
+      .forEach(g=>compraEdit.lines.push({tipo:g.tipo,dataValor:g.dataValor,valor:'',obs:g.items.map(i=>i.artigo+(i.quantidade?' ('+i.quantidade+')':'')).join(', ')}));
+  }
+  if(!compraEdit.lines.length)compraEdit.lines.push({tipo:'Gerais',dataValor:null,valor:'',obs:''});
+
+  // Cabeçalho
+  document.getElementById('shop-buy-title').textContent=isEdit?'Editar Compra':'Registar Compra';
+  document.getElementById('shop-buy-save').textContent=isEdit?'Guardar':'Registar compra';
+  // Editar/apagar uma compra já registada mexe em despesas → só admin (as despesas
+  // não têm policy de self-update/delete). Criar uma compra nova é permitido a membros.
+  const ro=isEdit&&!isAdmin();
+  document.getElementById('shop-buy-del').style.display=(isEdit&&isAdmin())?'':'none';
+  document.getElementById('shop-buy-save').style.display=ro?'none':'';
+  const who0=isEdit?((DATA.despesas.find(d=>d.compraId===compraId)||{}).quem||myPrimaryName()):myPrimaryName();
+  document.getElementById('shop-buy-who').innerHTML=isAdmin()?memberOptions(who0):myMemberOptions(who0);
+  const date0=isEdit?((DATA.despesas.find(d=>d.compraId===compraId)||{}).dataDesp||new Date().toISOString().slice(0,10)):new Date().toISOString().slice(0,10);
+  document.getElementById('shop-buy-date').value=date0;
+  const desc0=isEdit?((DATA.despesas.find(d=>d.compraId===compraId&&d.desc&&d.desc!=='Compras')||{}).desc||''):'';
+  document.getElementById('shop-buy-desc').value=desc0;
   shopBuyDescCount();
-  // Lista de artigos com checkbox (pré-selecciona os que estão no carrinho) + contentor dos grupos
-  const anyCart=pend.some(x=>x.noCarrinho);
-  let pl='<div class="cmp-pick sf">Artigos comprados</div>';
-  pend.slice().sort((a,b)=>a.artigo.localeCompare(b.artigo,'pt')).forEach(it=>{
-    const on=anyCart?it.noCarrinho:true;
-    pl+=`<label class="cmp-pick-row"><input type="checkbox" class="shop-pick" value="${it._id}" ${on?'checked':''} onchange="shopBuyRecalc()">
-      <span>${it.artigo}${it.quantidade?' <i>('+it.quantidade+')</i>':''}</span>
-      <span class="cmp-badge">${shopTipoIcon(it.tipo)}${(it.tipo==='Almoço'||it.tipo==='Jantar')&&it.dataValor?' '+fmtDiaMes(it.dataValor):' '+it.tipo}</span></label>`;
-  });
-  document.getElementById('shop-buy-groups').innerHTML=pl+'<div id="shop-buy-grouplist" style="margin-top:12px"></div>';
-  shopBuyRecalc();
+
+  // Picker de artigos
+  const pend=shopArr().filter(x=>x.estado!=='comprado');
+  const pickItems=isEdit?linked.concat(pend):pend;
+  let pl='';
+  if(pickItems.length){
+    pl='<div class="cmp-pick sf">Artigos da lista</div>';
+    pickItems.slice().sort((a,b)=>a.artigo.localeCompare(b.artigo,'pt')).forEach(it=>{
+      const on=isEdit?it.compraId===compraId:shopMine(it);
+      pl+=`<label class="cmp-pick-row"><input type="checkbox" class="shop-pick" value="${it._id}" ${on?'checked':''}>
+        <span>${escHtml(it.artigo)}${it.quantidade?' <i>('+escHtml(it.quantidade)+')</i>':''}</span>
+        <span class="cmp-badge">${shopTipoIcon(it.tipo)}${shopIsMeal(it.tipo)&&it.dataValor?' '+fmtDiaMes(it.dataValor):' '+it.tipo}</span></label>`;
+    });
+    pl+='<div class="note" style="margin-top:6px">Os artigos marcados saem da lista e ficam ligados a esta compra.</div>';
+  }
+  document.getElementById('shop-buy-body').innerHTML=(ro?'<div class="note" style="margin-bottom:10px">🔒 Só o administrador pode editar uma compra já registada.</div>':'')+pl+
+    '<div class="cmp-pick sf" style="margin-top:14px">Repartição do valor</div><div id="shop-buy-lines"></div>'+
+    (ro?'':'<button class="btn ghost" id="shop-buy-addline" style="width:100%;margin-top:8px" onclick="compraAddLine()">＋ Outro gasto</button>');
+  compraRenderLines();
+
+  // Modo leitura (membro a ver uma compra já registada): desativa todos os campos
+  const modal=document.getElementById('shop-buy-modal');
+  ['shop-buy-who','shop-buy-date','shop-buy-desc'].forEach(id=>{const e=document.getElementById(id);if(e){e.disabled=ro;e.style.opacity=ro?'.7':'';}});
+  if(ro)modal.querySelectorAll('#shop-buy-body input,#shop-buy-body select,#shop-buy-body button').forEach(el=>{el.disabled=true;el.style.opacity='.7';});
+
   document.getElementById('shop-buy-bg').classList.add('show');
   document.body.classList.add('no-scroll');
 }
 function closeShopBuyModal(){document.getElementById('shop-buy-bg').classList.remove('show');document.body.classList.remove('no-scroll');}
 function shopBuyDescCount(){const inp=document.getElementById('shop-buy-desc');const c=document.getElementById('shop-buy-desc-count');if(inp&&c){c.textContent=`${inp.value.length}/30`;c.classList.toggle('full',inp.value.length>=30);}}
-function _shopCheckedItems(){
-  const ids=[...document.querySelectorAll('.shop-pick:checked')].map(c=>+c.value);
-  return shopArr().filter(x=>ids.includes(x._id));
-}
-function shopBuyRecalc(){
-  const items=_shopCheckedItems();
-  const gmap={};
-  items.forEach(it=>{const k=shopGroupKey(it);if(!gmap[k])gmap[k]={key:k,safeKey:k.replace(/[^a-z0-9]/gi,'_'),tipo:it.tipo,dataValor:it.dataValor||null,label:shopGroupLabel(it.tipo,it.dataValor),items:[]};gmap[k].items.push(it);});
-  const ord={};SHOP_TIPOS.forEach((t,i)=>ord[t]=i);
-  shopBuyGroups=Object.values(gmap).sort((a,b)=>(ord[a.tipo]-ord[b.tipo])||((a.dataValor||'').localeCompare(b.dataValor||'')));
-  const cont=document.getElementById('shop-buy-grouplist');if(!cont)return;
-  if(!shopBuyGroups.length){cont.innerHTML='<div class="empty sf">Escolhe pelo menos um artigo.</div>';document.getElementById('shop-buy-total').textContent='';return;}
-  let h='';
-  shopBuyGroups.forEach(g=>{
-    const val=shopBuyAlloc[g.safeKey]!=null?shopBuyAlloc[g.safeKey]:'';
-    h+=`<div class="cmp-grp">
-      <div class="cmp-grp-hdr">${g.label}<span class="cmp-grp-n">${g.items.length}</span></div>
-      <div class="cmp-grp-items">${g.items.map(i=>i.artigo).join(', ')}</div>
-      <div class="cmp-grp-val"><span>€</span><input type="number" step="0.01" min="0" inputmode="decimal" placeholder="0,00" value="${val}" data-sk="${g.safeKey}" oninput="shopBuyAllocChanged(this)"></div>
+
+function compraRenderLines(){
+  const cont=document.getElementById('shop-buy-lines');if(!cont)return;
+  cont.innerHTML=compraEdit.lines.map((ln,i)=>{
+    const mealSel=shopIsMeal(ln.tipo)?`<select class="cmp-ln-meal" onchange="compraLineField(${i},'dataValor',this.value)">${shopMealOptions(ln.tipo,ln.dataValor)}</select>`:'';
+    return `<div class="cmp-ln">
+      <div class="cmp-ln-row1">
+        <select class="cmp-ln-tipo" onchange="compraLineTipo(${i},this.value)">${SHOP_TIPOS.map(t=>`<option value="${t}"${t===ln.tipo?' selected':''}>${t}</option>`).join('')}</select>
+        <div class="cmp-ln-val"><span>€</span><input type="number" step="0.01" min="0" inputmode="decimal" placeholder="0,00" value="${ln.valor===''||ln.valor==null?'':ln.valor}" oninput="compraLineField(${i},'valor',this.value)"></div>
+        <button class="cmp-ln-del" title="Remover linha" onclick="compraRemoveLine(${i})">✕</button>
+      </div>
+      ${mealSel?`<div class="cmp-ln-row2">${mealSel}</div>`:''}
+      <input class="cmp-ln-obs" type="text" placeholder="Descrição / artigos (opcional)" value="${escHtml(ln.obs||'')}" oninput="compraLineField(${i},'obs',this.value)">
     </div>`;
-  });
-  cont.innerHTML=h;
-  shopBuyUpdateTotal();
+  }).join('');
+  compraUpdateTotal();
 }
-function shopBuyAllocChanged(inp){const v=parseFloat(inp.value);shopBuyAlloc[inp.dataset.sk]=isNaN(v)?null:v;shopBuyUpdateTotal();}
-function shopBuyUpdateTotal(){
-  let tot=0;shopBuyGroups.forEach(g=>{const v=parseFloat(shopBuyAlloc[g.safeKey]);if(!isNaN(v))tot+=v;});
-  document.getElementById('shop-buy-total').textContent=`Total: ${eur(rnd(tot,2))}`;
+function compraLineField(i,field,value){if(!compraEdit.lines[i])return;compraEdit.lines[i][field]=field==='valor'?value:value;if(field==='valor')compraUpdateTotal();}
+function compraLineTipo(i,tipo){if(!compraEdit.lines[i])return;compraEdit.lines[i].tipo=tipo;if(!shopIsMeal(tipo))compraEdit.lines[i].dataValor=null;compraRenderLines();}
+function compraAddLine(){compraEdit.lines.push({tipo:'Gerais',dataValor:null,valor:'',obs:''});compraRenderLines();}
+function compraRemoveLine(i){compraEdit.lines.splice(i,1);if(!compraEdit.lines.length)compraEdit.lines.push({tipo:'Gerais',dataValor:null,valor:'',obs:''});compraRenderLines();}
+function compraUpdateTotal(){
+  let tot=0;compraEdit.lines.forEach(ln=>{const v=parseFloat(ln.valor);if(!isNaN(v))tot+=v;});
+  const el=document.getElementById('shop-buy-total');if(el)el.textContent=`Total: ${eur(rnd(tot,2))}`;
 }
-async function saveBuy(){
+
+async function saveCompra(){
   if(!DATA._sbId){toast('Sem ligação — recarrega a página','bad');return;}
   if(contasFechadas()){toast('Contas fechadas','bad');return;}
+  const isEdit=!!compraEdit.id;
   const who=document.getElementById('shop-buy-who').value;
   const date=document.getElementById('shop-buy-date').value;
   const desc=(document.getElementById('shop-buy-desc').value||'').trim().slice(0,30);
   if(!who){toast('Quem pagou?','bad');return;}
   if(!date){toast('Indica a data','bad');return;}
   if(!isAdmin()&&!MY_NAMES.includes(who)){toast('Só podes registar compras tuas ou do cônjuge','bad');return;}
-  const items=_shopCheckedItems();
-  if(!items.length){toast('Escolhe os artigos comprados','bad');return;}
-  shopBuyRecalc();
-  if(!shopBuyGroups.length){toast('Escolhe os artigos comprados','bad');return;}
-  // Cada grupo precisa de valor > 0
+  // Validar linhas
   const rows=[];
-  for(const g of shopBuyGroups){
-    const v=rnd(parseFloat(shopBuyAlloc[g.safeKey]),2);
-    if(!v||v<=0){toast(`Aloca um valor a "${g.label}"`,'bad');return;}
-    rows.push({evento_id:DATA._sbId,quem:who,data_desp:date,data_valor:g.dataValor||null,descricao:desc||'Compras',tipo:g.tipo,valor:v,observacoes:g.items.map(i=>i.artigo+(i.quantidade?' ('+i.quantidade+')':'')).join(', ')});
+  for(const ln of compraEdit.lines){
+    const v=rnd(parseFloat(ln.valor),2);
+    if(!v||v<=0){toast(`Preenche o valor de "${shopGroupLabel(ln.tipo,ln.dataValor)}"`,'bad');return;}
+    if(shopIsMeal(ln.tipo)&&!ln.dataValor){toast(`Escolhe a refeição em "${ln.tipo}"`,'bad');return;}
+    rows.push({tipo:ln.tipo,data_valor:shopIsMeal(ln.tipo)?ln.dataValor:null,valor:v,obs:(ln.obs||'').trim()});
   }
+  if(!rows.length){toast('Adiciona pelo menos uma linha','bad');return;}
+  const checkedIds=[...document.querySelectorAll('.shop-pick:checked')].map(c=>+c.value);
+  const compraId=compraEdit.id||('c'+Date.now());
+  const compradoEm=new Date().toISOString();
   const btn=document.getElementById('shop-buy-save');btn.disabled=true;
   setSync('load','a guardar…');
   try{
-    // 1) criar uma despesa por grupo (tipo/data-valor certos → distribuição correta)
-    const ins=await queueWrite(()=>sbReq('POST','despesas',rows,{Prefer:'return=representation'}));
-    rows.forEach((r,i)=>DATA.despesas.push({_id:ins&&ins[i]?ins[i].id:null,quem:r.quem,dataDesp:r.data_desp,dataValor:r.data_valor,desc:r.descricao,tipo:r.tipo,valor:r.valor,obs:r.observacoes}));
-    // 2) marcar os artigos como comprados e ligá-los a esta compra
-    const compraId='c'+Date.now();
-    const compradoEm=new Date().toISOString();
-    const ids=items.map(i=>i._id).filter(x=>x!=null);
-    if(ids.length){
-      await queueWrite(()=>sbReq('PATCH',`shoplist?id=in.(${ids.join(',')})`,{estado:'comprado',compra_id:compraId,cf_desc:desc||'Compras',comprado_em:compradoEm,no_carrinho:false}));
-      items.forEach(it=>Object.assign(it,{estado:'comprado',compraId,cfDesc:desc||'Compras',compradoEm,noCarrinho:false}));
+    // Edição: apaga as despesas antigas desta compra (BD + local)
+    if(isEdit){
+      await queueWrite(()=>sbReq('DELETE',`despesas?compra_id=eq.${enc(compraId)}`));
+      DATA.despesas=(DATA.despesas||[]).filter(d=>d.compraId!==compraId);
+    }
+    // Cria uma despesa por linha
+    const payload=rows.map(r=>({evento_id:DATA._sbId,quem:who,data_desp:date,data_valor:r.data_valor,descricao:desc||'Compras',tipo:r.tipo,valor:r.valor,observacoes:r.obs||null,compra_id:compraId}));
+    const ins=await queueWrite(()=>sbReq('POST','despesas',payload,{Prefer:'return=representation'}));
+    payload.forEach((r,i)=>DATA.despesas.push({_id:ins&&ins[i]?ins[i].id:null,quem:r.quem,dataDesp:r.data_desp,dataValor:r.data_valor,desc:r.descricao,tipo:r.tipo,valor:r.valor,obs:r.observacoes||'',compraId:compraId}));
+    // Artigos: os marcados ficam comprados; os que estavam ligados e foram desmarcados voltam à lista
+    const prevLinked=shopArr().filter(x=>x.compraId===compraId).map(x=>x._id);
+    const toBuy=checkedIds;
+    const toRelease=prevLinked.filter(id=>!checkedIds.includes(id));
+    if(toBuy.length){
+      await queueWrite(()=>sbReq('PATCH',`shoplist?id=in.(${toBuy.join(',')})`,{estado:'comprado',compra_id:compraId,cf_desc:desc||'Compras',comprado_em:compradoEm,no_carrinho:false}));
+      shopArr().forEach(it=>{if(toBuy.includes(it._id))Object.assign(it,{estado:'comprado',compraId,cfDesc:desc||'Compras',compradoEm,noCarrinho:false});});
+    }
+    if(toRelease.length){
+      await queueWrite(()=>sbReq('PATCH',`shoplist?id=in.(${toRelease.join(',')})`,{estado:'pendente',compra_id:null,cf_desc:null,comprado_em:null}));
+      shopArr().forEach(it=>{if(toRelease.includes(it._id))Object.assign(it,{estado:'pendente',compraId:null,cfDesc:null,compradoEm:null});});
     }
     syncMirror();marcaGuardado();
     btn.disabled=false;closeShopBuyModal();
     CALC=calcular(JSON.parse(JSON.stringify(DATA)));renderAll();
-    toast('Compra registada ✓','ok');
+    toast(isEdit?'Compra atualizada ✓':'Compra registada ✓','ok');
+  }catch(e){setSync('err','erro ao guardar');btn.disabled=false;toast(permErrorMsg(e),'bad');}
+}
+
+async function deleteCompra(){
+  const compraId=compraEdit.id;if(!compraId)return;
+  if(!confirm('Apagar esta compra? As despesas são removidas e os artigos voltam à lista.'))return;
+  const btn=document.getElementById('shop-buy-del');btn.disabled=true;
+  setSync('load','a guardar…');
+  try{
+    await queueWrite(()=>sbReq('DELETE',`despesas?compra_id=eq.${enc(compraId)}`));
+    DATA.despesas=(DATA.despesas||[]).filter(d=>d.compraId!==compraId);
+    const linked=shopArr().filter(x=>x.compraId===compraId).map(x=>x._id);
+    if(linked.length){
+      await queueWrite(()=>sbReq('PATCH',`shoplist?id=in.(${linked.join(',')})`,{estado:'pendente',compra_id:null,cf_desc:null,comprado_em:null}));
+      shopArr().forEach(it=>{if(linked.includes(it._id))Object.assign(it,{estado:'pendente',compraId:null,cfDesc:null,compradoEm:null});});
+    }
+    syncMirror();marcaGuardado();
+    btn.disabled=false;closeShopBuyModal();
+    CALC=calcular(JSON.parse(JSON.stringify(DATA)));renderAll();
+    toast('Compra apagada','ok');
   }catch(e){setSync('err','erro ao guardar');btn.disabled=false;toast(permErrorMsg(e),'bad');}
 }
 
