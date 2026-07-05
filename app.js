@@ -1042,7 +1042,7 @@ function renderCashFlows(){
       if(dd)dia=dd;
     }
     const prevista=!d.dataDesp&&!d.dataValor;
-    allCf.push({type:'despesa',date:d.dataDesp||d.dataValor||'',label:'Despesa',icon:'🛒',sub:d.tipo||'Gerais',dia,prevista,obs:d.obs||'',fromList:!!d.compraId,
+    allCf.push({type:'despesa',date:d.dataDesp||d.dataValor||'',label:'Despesa',icon:'🛒',sub:d.tipo||'Gerais',dia,prevista,obs:d.obs||'',fromList:!!d.compraId,compraId:d.compraId||null,quem:d.quem,
       line1:d.desc||'(sem descrição)',line2:`${prevista?'pagará':'pagou'} ${d.quem}`,valor:d.valor,
       sign:'neg',source:'despesas',idx:i,people:[d.quem]});
   });
@@ -1060,10 +1060,14 @@ function renderCashFlows(){
   // Visibilidade por utilizador (reembolsos/saldar restritos a não-admins)
   const visCf=allCf.filter(cfVisivel);
 
-  // Totais por tipo (sempre do conjunto completo — o resumo é o mapa, não o filtro)
+  // Agrupamento (só apresentação): as despesas da mesma compra da lista juntam-se
+  // num cartão. Uma compra conta como 1 movimento e o seu valor é a soma das linhas.
+  const visGrouped=groupCompraCfs(visCf);
+
+  // Totais por tipo (do conjunto completo, já agrupado — uma compra = 1 despesa)
   const tot={despesa:0,reembolso:0,mealheiro:0,saldar:0};
   const cnt={despesa:0,reembolso:0,mealheiro:0,saldar:0};
-  visCf.forEach(cf=>{tot[cf.type]=(tot[cf.type]||0)+cf.valor;cnt[cf.type]=(cnt[cf.type]||0)+1;});
+  visGrouped.forEach(cf=>{tot[cf.type]=(tot[cf.type]||0)+cf.valor;cnt[cf.type]=(cnt[cf.type]||0)+1;});
 
   // Pessoas para filtro
   const personSet=new Set();
@@ -1124,13 +1128,18 @@ function renderCashFlows(){
     });
   }
 
-  const filteredTotal=filtered.reduce((a,cf)=>a+cf.valor,0);
-  const showTotal=(cfFilterType!=='all'||cfFilterPerson!=='all')&&filtered.length>0;
+  // Agrupa para apresentação (exceto ao filtrar por sub-tipo — aí mostram-se as
+  // linhas individuais que correspondem ao filtro).
+  const display=(cfFilterSub==='all')?groupCompraCfs(filtered):filtered;
+  const totalCount=(cfFilterSub==='all')?visGrouped.length:visCf.length;
+
+  const filteredTotal=display.reduce((a,cf)=>a+cf.valor,0);
+  const showTotal=(cfFilterType!=='all'||cfFilterPerson!=='all')&&display.length>0;
   pp+=`<div class="sec-title sf" style="display:flex;justify-content:space-between;align-items:center">
-    <span>Movimentos (${filtered.length}${filtered.length!==visCf.length?' de '+visCf.length:''})</span>
+    <span>Movimentos (${display.length}${display.length!==totalCount?' de '+totalCount:''})</span>
     ${showTotal?`<span style="color:var(--gold);font-size:12px;font-weight:700;letter-spacing:0">${eur(filteredTotal)}</span>`:''}
   </div>`;
-  if(!filtered.length) pp+='<div class="empty sf">Nenhum movimento encontrado</div>';
+  if(!display.length) pp+='<div class="empty sf">Nenhum movimento encontrado</div>';
 
   // Agrupar por data, com cabeçalho legível e subtotal do dia
   const fmtDia=ds=>{
@@ -1140,13 +1149,24 @@ function renderCashFlows(){
     return dt.toLocaleDateString('pt-PT',{weekday:'short',day:'numeric',month:'short'}).replace(/\./g,'');
   };
   let lastDate=undefined;
-  filtered.forEach(cf=>{
+  display.forEach(cf=>{
     if(cf.date!==lastDate){
       lastDate=cf.date;
-      const dayItems=filtered.filter(x=>x.date===cf.date);
+      const dayItems=display.filter(x=>x.date===cf.date);
       pp+=`<div class="cf-group-hdr sf">${fmtDia(cf.date)}<span class="cfg-sum">${dayItems.length} mov.</span></div>`;
     }
     const sgn=cf.sign==='neg'?'−':cf.sign==='pos'?'+':'';
+    if(cf.isCompra){
+      // Cartão de compra da lista: resumo + linhas por refeição/tipo. Toca → editor da compra.
+      const lines=cf.lines.map(l=>`<div class="cf-compra-line"><span>${shopTipoIcon(l.sub)} ${l.sub}${l.dia?' · '+l.dia:''}${l.obs?' · <i>'+escHtml(l.obs)+'</i>':''}</span><span>−${eur(l.valor)}</span></div>`).join('');
+      pp+=`<div class="card cf-card b-despesa cf-compra" onclick="openCompra('${cf.compraId}')">
+        <div class="cf-badge">🛒</div>
+        <div class="cf-main"><div class="top"><div class="desc">${escHtml(cf.line1)}</div>
+        <div class="v cf-neg">−${eur(cf.valor)}</div></div>
+        <div class="meta"><span class="chip t b-despesa">Compra</span><span class="chip chip-lista">🛒 lista · ${cf.subN} ${cf.subN===1?'linha':'linhas'}</span>${cf.line2?`<span class="chip">${truncRef(cf.line2)}</span>`:''}</div>
+        <div class="cf-compra-lines">${lines}</div></div></div>`;
+      return;
+    }
     pp+=`<div class="card cf-card b-${cf.type}${cf.prevista?' cf-prevista':''}" onclick="openCfDetail('${cf.source}',${cf.idx})">
       <div class="cf-badge">${cf.prevista?'📌':cf.icon}</div>
       <div class="cf-main"><div class="top"><div class="desc">${cf.line1}</div>
@@ -1155,6 +1175,28 @@ function renderCashFlows(){
       </div>${cf.obs?`<div class="cf-obs">${escHtml(cf.obs)}</div>`:''}</div></div>`;
   });
   document.getElementById('view-cashflows').innerHTML=pp;
+}
+
+/* Agrupa as despesas da mesma compra da lista (compra_id) num único movimento.
+   Só apresentação: os cálculos e os filtros continuam a usar as despesas linha a linha. */
+function groupCompraCfs(list){
+  const out=[];const byId={};
+  list.forEach(cf=>{
+    if(cf.type==='despesa'&&cf.compraId){
+      let g=byId[cf.compraId];
+      if(!g){
+        g={type:'despesa',isCompra:true,compraId:cf.compraId,date:cf.date,icon:'🛒',label:'Compra',
+           line1:'',line2:cf.line2,valor:0,sign:'neg',people:cf.people?[...cf.people]:[],lines:[],_desc:''};
+        byId[cf.compraId]=g;out.push(g);
+      }
+      g.valor=rnd(g.valor+cf.valor,2);
+      g.lines.push({sub:cf.sub,dia:cf.dia,valor:cf.valor,obs:cf.obs});
+      if(cf.date&&(!g.date||cf.date<g.date))g.date=cf.date;   // dia mais antigo
+      if(!g._desc&&cf.line1&&cf.line1!=='Compras'&&cf.line1!=='(sem descrição)')g._desc=cf.line1;
+    }else out.push(cf);
+  });
+  out.forEach(g=>{if(g.isCompra){g.line1=g._desc||'Compra da lista';g.subN=g.lines.length;}});
+  return out;
 }
 
 function truncRef(s){return s.length>40?s.slice(0,37)+'…':s;}

@@ -771,3 +771,10 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .cmp-tap{cursor:pointer;transition:border-color .12s,background .12s}
 .cmp-tap:active{background:var(--panel2)}
 .cmp-chev-r{color:var(--faint);font-size:20px;line-height:1;font-weight:400;margin-left:2px}
+
+/* Cash-flows — cartão de compra agrupada */
+.cf-compra{cursor:pointer}
+.cf-compra-lines{margin-top:8px;display:flex;flex-direction:column;gap:3px;border-top:1px dashed var(--line);padding-top:7px}
+.cf-compra-line{display:flex;align-items:baseline;justify-content:space-between;gap:10px;font-size:12px;color:var(--muted);line-height:1.4}
+.cf-compra-line i{font-style:normal;color:var(--faint)}
+.cf-compra-line span:last-child{flex:0 0 auto;font-variant-numeric:tabular-nums;font-weight:600;color:var(--ink)}
