@@ -79,6 +79,7 @@ setTimeout(function(){ if (window.fbvEsconderSplash) window.fbvEsconderSplash();
   <div class="tab" data-tab="resumo" onclick="setTab('resumo')">Resumo</div>
   <div class="tab" data-tab="refeicoes" onclick="setTab('refeicoes')">Refeições</div>
   <div class="tab" data-tab="cashflows" onclick="setTab('cashflows')">Cash-Flows</div>
+  <div class="tab" data-tab="compras" onclick="setTab('compras')">Compras</div>
   <div class="tab" data-tab="definicoes" onclick="openAdmin()">⚙</div>
 </div>
 <div class="wrap">
@@ -95,6 +96,7 @@ setTimeout(function(){ if (window.fbvEsconderSplash) window.fbvEsconderSplash();
   <div id="view-resumo" style="display:none"></div>
   <div id="view-refeicoes" style="display:none"></div>
   <div id="view-cashflows" style="display:none"></div>
+  <div id="view-compras" style="display:none"></div>
 </div>
 
 <div class="fabs" id="fab-container">
@@ -149,6 +151,61 @@ setTimeout(function(){ if (window.fbvEsconderSplash) window.fbvEsconderSplash();
     <div class="mbtns admin-only write-action">
       <button class="btn danger" id="edit-cf-del" onclick="deleteCfFromDetail()">Apagar</button>
       <button class="btn prim" id="edit-cf-save" onclick="saveEditCf()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Adicionar Artigo à Lista de Compras modal -->
+<div class="modal-bg" id="shop-item-bg">
+  <div class="modal" id="shop-item-modal">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <h3 style="margin-bottom:0">Adicionar Artigo</h3>
+      <button onclick="closeShopItemModal()" style="background:var(--panel2);border:1px solid var(--line);color:var(--muted);border-radius:9px;width:32px;height:32px;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0">✕</button>
+    </div>
+    <div class="inline-row">
+      <div style="flex:2"><label>Artigo</label><input type="text" id="shop-artigo" maxlength="60" placeholder="Ex: Bacalhau"></div>
+      <div style="flex:1"><label>Qtd.</label><input type="text" id="shop-qtd" maxlength="16" placeholder="Ex: 2 kg"></div>
+    </div>
+    <label>Tipo de despesa</label>
+    <select id="shop-tipo" onchange="shopTipoChanged()">
+      <option value="Gerais">Gerais</option>
+      <option value="Bebidas">Bebidas</option>
+      <option value="Almoço">Almoço</option>
+      <option value="Jantar">Jantar</option>
+      <option value="Renda">Renda</option>
+      <option value="Cerveja">Cerveja</option>
+    </select>
+    <div id="shop-ref-wrap" style="display:none">
+      <label>Refeição a que se destina</label>
+      <select id="shop-ref"></select>
+    </div>
+    <div class="mbtns">
+      <button class="btn ghost" onclick="closeShopItemModal()">Cancelar</button>
+      <button class="btn prim" id="shop-item-save" onclick="saveShopItem()">Adicionar</button>
+    </div>
+    <div class="note">Fica na lista partilhada do grupo.</div>
+  </div>
+</div>
+
+<!-- Registar Compra (associar cash-flow à lista) modal -->
+<div class="modal-bg" id="shop-buy-bg">
+  <div class="modal" id="shop-buy-modal">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <h3 style="margin-bottom:0">Registar Compra</h3>
+      <button onclick="closeShopBuyModal()" style="background:var(--panel2);border:1px solid var(--line);color:var(--muted);border-radius:9px;width:32px;height:32px;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0">✕</button>
+    </div>
+    <div class="inline-row">
+      <div><label>Quem pagou?</label><select id="shop-buy-who"></select></div>
+      <div><label>Data</label><input type="date" id="shop-buy-date"></div>
+    </div>
+    <label>Descritivo <span class="cf-desc-count" id="shop-buy-desc-count">0/30</span></label>
+    <input type="text" id="shop-buy-desc" maxlength="30" placeholder="Ex: Continente" oninput="shopBuyDescCount()">
+    <p class="note" style="margin:14px 0 6px">Reparte o total pago pelos grupos. Cada grupo vira um cash-flow com o tipo/refeição correto.</p>
+    <div id="shop-buy-groups"></div>
+    <div id="shop-buy-total" class="note" style="margin-top:8px;font-weight:700;color:var(--ink)"></div>
+    <div class="mbtns">
+      <button class="btn ghost" onclick="closeShopBuyModal()">Cancelar</button>
+      <button class="btn prim" id="shop-buy-save" onclick="saveBuy()">Registar compra</button>
     </div>
   </div>
 </div>
