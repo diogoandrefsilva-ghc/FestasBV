@@ -675,11 +675,12 @@ const AVCOL=['#eeb64d','#e0533f','#2f9e77','#7fa8c9','#d98a3d','#43c98a','#c96f8
 function av(nome,i){return`<div class="av" style="background:${AVCOL[i%AVCOL.length]}">${nome.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase()}</div>`;}
 
 function setTab(t){TAB=t;document.querySelectorAll('.tab').forEach(e=>e.classList.toggle('on',e.dataset.tab===t));
-  if(['saldos','resumo','refeicoes','cashflows'].includes(t))lsSet('fbv_tab',t);
-  ['saldos','resumo','refeicoes','cashflows'].forEach(v=>document.getElementById('view-'+v).style.display=v===t?'':'none');
+  if(['saldos','resumo','refeicoes','cashflows','compras'].includes(t))lsSet('fbv_tab',t);
+  ['saldos','resumo','refeicoes','cashflows','compras'].forEach(v=>document.getElementById('view-'+v).style.display=v===t?'':'none');
   // Hero only visible in saldos tab
   const hero=document.getElementById('hero-card');
   if(hero)hero.style.display=t==='saldos'?'':'none';
+  if(t==='compras')renderCompras();
   updateGuestFab();
 }
 
@@ -991,6 +992,7 @@ function renderAll(){
 
   // Populate payment modal selects
   updateCfForm();
+  if(TAB==='compras')renderCompras();
   updateGuestFab();
 }
 
@@ -1329,17 +1331,22 @@ async function carregar(){
   setSync('load','a sincronizar…');
   try{
     const sel='*,membros(*,presencas(*)),refeicoes_def(*),despesas(*),convidados(*),mealheiros(*),pagamentos(*)';
-    const [res,uaRes,cjRes,vlRes]=await Promise.all([
+    // shoplist vai numa fetch SEPARADA e tolerante a falha: se a tabela ainda
+    // não existir (migração por correr) o resto da app continua a funcionar.
+    const [res,uaRes,cjRes,vlRes,slRes]=await Promise.all([
       sbFetch(`${SB_URL}/rest/v1/eventos?select=${encodeURIComponent(sel)}&order=ano.asc`,{headers:sbHeaders(),cache:'no-store'}),
       sbFetch(`${SB_URL}/rest/v1/user_amigos?select=email,amigo`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null),
       sbFetch(`${SB_URL}/rest/v1/conjuges?select=amigo_a,amigo_b`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null),
-      sbFetch(`${SB_URL}/rest/v1/validacoes?select=evento_id,amigo,validado_por_email,validado_por_amigo,validado_em`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null)
+      sbFetch(`${SB_URL}/rest/v1/validacoes?select=evento_id,amigo,validado_por_email,validado_por_amigo,validado_em`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null),
+      sbFetch(`${SB_URL}/rest/v1/shoplist?select=*`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null)
     ]);
     if(!res.ok)throw new Error('HTTP '+res.status);
     const rows=await res.json();
     USER_AMIGOS=(uaRes&&uaRes.ok)?await uaRes.json():[];
     CONJUGES=(cjRes&&cjRes.ok)?await cjRes.json():[];
     VALIDACOES=(vlRes&&vlRes.ok)?await vlRes.json():[];
+    const shopRows=(slRes&&slRes.ok)?await slRes.json():[];
+    const shopByEv={};shopRows.forEach(s=>{(shopByEv[s.evento_id]=shopByEv[s.evento_id]||[]).push(s);});
     computeMyNames();
     const N=v=>v==null?0:Number(v);
     ALL_YEARS=rows.map(ev=>({
@@ -1353,7 +1360,8 @@ async function carregar(){
       despesas:(ev.despesas||[]).map(d=>({_id:d.id,quem:d.quem,dataDesp:d.data_desp,dataValor:d.data_valor,desc:d.descricao,tipo:d.tipo,valor:N(d.valor),obs:d.observacoes||''})),
       convidados:(ev.convidados||[]).map(c=>({_id:c.id,membro:c.membro,nome:c.nome,data:c.data,dia:c.dia,ref:c.ref,pagante:c.pagante?'Sim':'Não',preco:N(c.preco)})),
       mealheiros:(ev.mealheiros||[]).map(m=>({quem:m.quem,data:m.data,valor:N(m.valor),subtipo:m.subtipo,desc:m.descricao})),
-      pagamentos:(ev.pagamentos||[]).map(p=>({de:p.de,para:p.para,valor:N(p.valor),ref:p.ref,data:p.data,extra:N(p.extra)}))
+      pagamentos:(ev.pagamentos||[]).map(p=>({de:p.de,para:p.para,valor:N(p.valor),ref:p.ref,data:p.data,extra:N(p.extra)})),
+      shoplist:(shopByEv[ev.id]||[]).map(s=>({_id:s.id,artigo:s.artigo,quantidade:s.quantidade||'',tipo:s.tipo,dataValor:s.data_valor,estado:s.estado||'pendente',tratadoPor:s.tratado_por||null,noCarrinho:!!s.no_carrinho,compraId:s.compra_id||null,cfDesc:s.cf_desc||null,valor:s.valor!=null?N(s.valor):null,criadoPor:s.criado_por||'',criadoEm:s.criado_em,compradoEm:s.comprado_em}))
     }));
     ALL_YEARS.sort((a,b)=>(a.evento.ano||0)-(b.evento.ano||0));
     // Restaurar onde o utilizador estava (ano + separadores), senão ano mais recente
@@ -1366,7 +1374,7 @@ async function carregar(){
     if(Number.isInteger(savedMeal)&&savedMeal>=0)REF_SEL=savedMeal;
     selectYear();
     const savedTab=lsGet('fbv_tab');
-    if(['saldos','resumo','refeicoes','cashflows'].includes(savedTab))setTab(savedTab);
+    if(['saldos','resumo','refeicoes','cashflows','compras'].includes(savedTab))setTab(savedTab);
     setSync('live','sincronizado · '+new Date().toLocaleTimeString('pt-PT',{hour:'2-digit',minute:'2-digit'}));
     updateReadOnlyMode();
   }catch(e){setSync('err','sem ligação');toast('Erro: '+e.message,'bad');}
@@ -2666,6 +2674,277 @@ async function toggleSexo(idx){
   }else{
     m.sexo=(m.sexo==='F')?'M':'F';renderPlantel();
   }
+}
+
+/* ═══ COMPRAS / SHOPLIST ═══
+   Lista partilhada de artigos em falta. Fluxo:
+   1) alguém adiciona artigos (artigo, qtd, tipo, e se Almoço/Jantar a refeição alvo)
+   2) alguém marca "Eu trato"  3) durante as compras marca "no carrinho"
+   4) ao registar a compra, o total é repartido por grupos (tipo+refeição) e cada
+      grupo vira UMA despesa com o tipo/data-valor correto → a distribuição pelas
+      refeições respeita automaticamente as datas da lista (o motor calcular() já
+      aloca Almoço/Jantar com data_valor diretamente à refeição). */
+
+const SHOP_TIPOS=['Gerais','Bebidas','Almoço','Jantar','Renda','Cerveja'];
+function shopArr(){if(DATA&&!DATA.shoplist)DATA.shoplist=[];return (DATA&&DATA.shoplist)||[];}
+function shopTipoIcon(t){return{Gerais:'🧾',Bebidas:'🥤',Almoço:'🍳',Jantar:'🌙',Renda:'🏠',Cerveja:'🍺'}[t]||'🛒';}
+function shopGroupKey(it){return it.tipo+'|'+(it.dataValor||'');}
+function shopGroupLabel(tipo,dataValor){
+  if((tipo==='Almoço'||tipo==='Jantar')&&dataValor){
+    const rd=(DATA.refeicoesDef||[]).find(r=>r.ref===tipo&&r.data===dataValor);
+    return `${shopTipoIcon(tipo)} ${tipo} ${fmtDiaMes(dataValor)}`+(rd&&rd.prato?` · ${rd.prato}`:'');
+  }
+  return `${shopTipoIcon(tipo)} ${tipo}`;
+}
+function shopMealOptions(ref,selData){
+  const meals=(DATA.refeicoesDef||[]).filter(r=>r.ref===ref).slice().sort((a,b)=>(a.data||'').localeCompare(b.data||''));
+  if(!meals.length)return `<option value="">(sem ${ref.toLowerCase()}s definidos)</option>`;
+  return meals.map(r=>`<option value="${r.data}"${selData===r.data?' selected':''}>${fmtDiaMes(r.data)}${r.prato?' · '+r.prato:''}</option>`).join('');
+}
+function shopCanWrite(){return !!_sbSession&&(isAdmin()||MY_NAMES.length>0);}
+
+function renderCompras(){
+  const el=document.getElementById('view-compras');if(!el||!DATA)return;
+  const items=shopArr();
+  const pend=items.filter(x=>x.estado!=='comprado');
+  const comp=items.filter(x=>x.estado==='comprado');
+  const canW=shopCanWrite();
+  const fechadas=contasFechadas();
+
+  let h='';
+  h+=`<div class="cmp-hdr">
+    <div class="cmp-hdr-title sf">🛒 Lista de Compras <span class="cmp-count">${pend.length}</span></div>
+    <button class="btn prim write-action" onclick="openShopItemModal()" ${canW?'':'disabled'}>＋ Artigo</button>
+  </div>`;
+
+  // Ordena: por tipo (ordem canónica) e depois por data-valor/artigo
+  const ord={};SHOP_TIPOS.forEach((t,i)=>ord[t]=i);
+  const pendSorted=pend.slice().sort((a,b)=>
+    (ord[a.tipo]-ord[b.tipo])||((a.dataValor||'').localeCompare(b.dataValor||''))||a.artigo.localeCompare(b.artigo,'pt'));
+
+  if(!pendSorted.length){
+    h+='<div class="empty sf" style="margin:14px 0">Lista vazia — adiciona os artigos em falta.</div>';
+  }else{
+    h+='<div class="cmp-list">';
+    pendSorted.forEach(it=>{
+      const mealBadge=(it.tipo==='Almoço'||it.tipo==='Jantar')&&it.dataValor?`<span class="cmp-badge meal">${shopTipoIcon(it.tipo)} ${fmtDiaMes(it.dataValor)}</span>`:`<span class="cmp-badge">${shopTipoIcon(it.tipo)} ${it.tipo}</span>`;
+      const qtd=it.quantidade?`<span class="cmp-qtd">${it.quantidade}</span>`:'';
+      let statusRow='';
+      if(it.tratadoPor){
+        statusRow=`<div class="cmp-status">
+          <span class="cmp-trata ${it.noCarrinho?'incart':''}">${it.noCarrinho?'✅ no carrinho':'🧑‍🍳 '+it.tratadoPor}</span>
+          <div class="cmp-acts write-action">
+            <button class="cmp-mini ${it.noCarrinho?'on':''}" onclick="toggleCart(${it._id})">${it.noCarrinho?'Tirar do carrinho':'🛒 No carrinho'}</button>
+            <button class="cmp-mini" onclick="unclaimItem(${it._id})">Largar</button>
+          </div>
+        </div>`;
+      }else{
+        statusRow=`<div class="cmp-status">
+          <span class="cmp-trata free">Por tratar</span>
+          <div class="cmp-acts write-action"><button class="cmp-mini prim" onclick="claimItem(${it._id})">✋ Eu trato</button></div>
+        </div>`;
+      }
+      h+=`<div class="cmp-item${it.noCarrinho?' incart':''}">
+        <div class="cmp-item-top">
+          <div class="cmp-artigo">${it.artigo}${qtd}</div>
+          <div class="cmp-item-right">${mealBadge}<button class="cmp-del write-action" title="Remover" onclick="deleteShopItem(${it._id})">✕</button></div>
+        </div>
+        ${statusRow}
+      </div>`;
+    });
+    h+='</div>';
+    if(fechadas){
+      h+='<div class="empty sf" style="margin-top:12px">Contas fechadas — não é possível registar compras.</div>';
+    }else{
+      h+=`<button class="btn prim write-action" style="width:100%;margin-top:14px" onclick="openShopBuyModal()" ${canW?'':'disabled'}>💰 Registar compra</button>`;
+    }
+  }
+
+  // Comprados (histórico, agrupado por compra)
+  if(comp.length){
+    const byCompra={};
+    comp.forEach(it=>{const k=it.compraId||('x'+it._id);(byCompra[k]=byCompra[k]||[]).push(it);});
+    h+=`<div class="cmp-done-hdr sf" onclick="this.nextElementSibling.classList.toggle('open');this.classList.toggle('open')">
+      <span>✅ Comprados <span class="cmp-count">${comp.length}</span></span><span class="cmp-chev">▾</span></div>`;
+    h+='<div class="cmp-done-body">';
+    Object.values(byCompra).sort((a,b)=>((b[0].compradoEm||'').localeCompare(a[0].compradoEm||''))).forEach(grp=>{
+      const g0=grp[0];
+      const dt=g0.compradoEm?fmtDataHora(g0.compradoEm).split(' ')[0]:'';
+      h+=`<div class="cmp-done-card">
+        <div class="cmp-done-top"><b>${g0.cfDesc||'Compra'}</b><span class="cmp-done-meta">${dt}</span></div>
+        <div class="cmp-done-items">${grp.map(it=>`${it.artigo}${it.quantidade?' ('+it.quantidade+')':''} <span class="cmp-done-badge">${shopTipoIcon(it.tipo)}${(it.tipo==='Almoço'||it.tipo==='Jantar')&&it.dataValor?' '+fmtDiaMes(it.dataValor):''}</span>`).join(' · ')}</div>
+      </div>`;
+    });
+    h+='</div>';
+  }
+
+  el.innerHTML=h;
+}
+
+/* ── Adicionar artigo ── */
+function openShopItemModal(){
+  if(!shopCanWrite()){toast('Sem permissão','bad');return;}
+  document.getElementById('shop-artigo').value='';
+  document.getElementById('shop-qtd').value='';
+  document.getElementById('shop-tipo').value='Gerais';
+  shopTipoChanged();
+  document.getElementById('shop-item-bg').classList.add('show');
+  document.body.classList.add('no-scroll');
+  setTimeout(()=>document.getElementById('shop-artigo').focus(),50);
+}
+function closeShopItemModal(){document.getElementById('shop-item-bg').classList.remove('show');document.body.classList.remove('no-scroll');}
+function shopTipoChanged(){
+  const tipo=document.getElementById('shop-tipo').value;
+  const wrap=document.getElementById('shop-ref-wrap');
+  const isMeal=tipo==='Almoço'||tipo==='Jantar';
+  wrap.style.display=isMeal?'':'none';
+  if(isMeal)document.getElementById('shop-ref').innerHTML=shopMealOptions(tipo,'');
+}
+async function saveShopItem(){
+  if(!DATA._sbId){toast('Sem ligação — recarrega a página','bad');return;}
+  const artigo=(document.getElementById('shop-artigo').value||'').trim();
+  const qtd=(document.getElementById('shop-qtd').value||'').trim();
+  const tipo=document.getElementById('shop-tipo').value;
+  if(!artigo){toast('Indica o artigo','bad');return;}
+  let dataValor=null;
+  if(tipo==='Almoço'||tipo==='Jantar'){
+    dataValor=document.getElementById('shop-ref').value||'';
+    if(!dataValor){toast('Escolhe a refeição (ou define-a em Refeições)','bad');return;}
+  }
+  const criadoPor=myPrimaryName()||(isAdmin()?'Admin':'');
+  const btn=document.getElementById('shop-item-save');btn.disabled=true;
+  setSync('load','a guardar…');
+  try{
+    const ins=await queueWrite(()=>sbReq('POST','shoplist',
+      [{evento_id:DATA._sbId,artigo,quantidade:qtd,tipo,data_valor:dataValor,estado:'pendente',criado_por:criadoPor}],
+      {Prefer:'return=representation'}));
+    shopArr().push({_id:ins&&ins[0]?ins[0].id:null,artigo,quantidade:qtd,tipo,dataValor,estado:'pendente',tratadoPor:null,noCarrinho:false,compraId:null,cfDesc:null,valor:null,criadoPor,criadoEm:new Date().toISOString(),compradoEm:null});
+    syncMirror();marcaGuardado();
+    btn.disabled=false;closeShopItemModal();renderCompras();
+    toast('Artigo adicionado ✓','ok');
+  }catch(e){setSync('err','erro ao guardar');btn.disabled=false;toast(permErrorMsg(e),'bad');}
+}
+
+/* ── Marcações (tratar / carrinho / largar / remover) ── */
+async function _shopUpdate(id,patch,local){
+  const it=shopArr().find(x=>x._id===id);if(!it)return;
+  setSync('load','a guardar…');
+  try{
+    await queueWrite(()=>sbReq('PATCH',`shoplist?id=eq.${id}`,patch));
+    Object.assign(it,local);syncMirror();marcaGuardado();renderCompras();
+  }catch(e){setSync('err','erro ao guardar');toast(permErrorMsg(e),'bad');}
+}
+function claimItem(id){const nome=myPrimaryName()||(isAdmin()?'Admin':'');_shopUpdate(id,{tratado_por:nome},{tratadoPor:nome});}
+function unclaimItem(id){_shopUpdate(id,{tratado_por:null,no_carrinho:false},{tratadoPor:null,noCarrinho:false});}
+function toggleCart(id){const it=shopArr().find(x=>x._id===id);if(!it)return;const v=!it.noCarrinho;_shopUpdate(id,{no_carrinho:v},{noCarrinho:v});}
+async function deleteShopItem(id){
+  const it=shopArr().find(x=>x._id===id);if(!it)return;
+  if(!confirm(`Remover "${it.artigo}" da lista?`))return;
+  setSync('load','a guardar…');
+  try{
+    await queueWrite(()=>sbReq('DELETE',`shoplist?id=eq.${id}`));
+    DATA.shoplist=shopArr().filter(x=>x._id!==id);syncMirror();marcaGuardado();renderCompras();
+    toast('Artigo removido','ok');
+  }catch(e){setSync('err','erro ao guardar');toast(permErrorMsg(e),'bad');}
+}
+
+/* ── Registar compra: repartir o total pelos grupos e criar as despesas ── */
+let shopBuyGroups=[];       // grupos derivados dos artigos escolhidos
+let shopBuyAlloc={};        // {safeKey: valor} — preserva o que já foi escrito
+function openShopBuyModal(){
+  if(!shopCanWrite()){toast('Sem permissão','bad');return;}
+  if(contasFechadas()){toast('Contas fechadas — só pagamentos de dívidas','bad');return;}
+  const pend=shopArr().filter(x=>x.estado!=='comprado');
+  if(!pend.length){toast('Nada para comprar','bad');return;}
+  shopBuyAlloc={};
+  document.getElementById('shop-buy-who').innerHTML=isAdmin()?memberOptions(myPrimaryName()):myMemberOptions(myPrimaryName());
+  document.getElementById('shop-buy-date').value=new Date().toISOString().slice(0,10);
+  document.getElementById('shop-buy-desc').value='';
+  shopBuyDescCount();
+  // Lista de artigos com checkbox (pré-selecciona os que estão no carrinho) + contentor dos grupos
+  const anyCart=pend.some(x=>x.noCarrinho);
+  let pl='<div class="cmp-pick sf">Artigos comprados</div>';
+  pend.slice().sort((a,b)=>a.artigo.localeCompare(b.artigo,'pt')).forEach(it=>{
+    const on=anyCart?it.noCarrinho:true;
+    pl+=`<label class="cmp-pick-row"><input type="checkbox" class="shop-pick" value="${it._id}" ${on?'checked':''} onchange="shopBuyRecalc()">
+      <span>${it.artigo}${it.quantidade?' <i>('+it.quantidade+')</i>':''}</span>
+      <span class="cmp-badge">${shopTipoIcon(it.tipo)}${(it.tipo==='Almoço'||it.tipo==='Jantar')&&it.dataValor?' '+fmtDiaMes(it.dataValor):' '+it.tipo}</span></label>`;
+  });
+  document.getElementById('shop-buy-groups').innerHTML=pl+'<div id="shop-buy-grouplist" style="margin-top:12px"></div>';
+  shopBuyRecalc();
+  document.getElementById('shop-buy-bg').classList.add('show');
+  document.body.classList.add('no-scroll');
+}
+function closeShopBuyModal(){document.getElementById('shop-buy-bg').classList.remove('show');document.body.classList.remove('no-scroll');}
+function shopBuyDescCount(){const inp=document.getElementById('shop-buy-desc');const c=document.getElementById('shop-buy-desc-count');if(inp&&c){c.textContent=`${inp.value.length}/30`;c.classList.toggle('full',inp.value.length>=30);}}
+function _shopCheckedItems(){
+  const ids=[...document.querySelectorAll('.shop-pick:checked')].map(c=>+c.value);
+  return shopArr().filter(x=>ids.includes(x._id));
+}
+function shopBuyRecalc(){
+  const items=_shopCheckedItems();
+  const gmap={};
+  items.forEach(it=>{const k=shopGroupKey(it);if(!gmap[k])gmap[k]={key:k,safeKey:k.replace(/[^a-z0-9]/gi,'_'),tipo:it.tipo,dataValor:it.dataValor||null,label:shopGroupLabel(it.tipo,it.dataValor),items:[]};gmap[k].items.push(it);});
+  const ord={};SHOP_TIPOS.forEach((t,i)=>ord[t]=i);
+  shopBuyGroups=Object.values(gmap).sort((a,b)=>(ord[a.tipo]-ord[b.tipo])||((a.dataValor||'').localeCompare(b.dataValor||'')));
+  const cont=document.getElementById('shop-buy-grouplist');if(!cont)return;
+  if(!shopBuyGroups.length){cont.innerHTML='<div class="empty sf">Escolhe pelo menos um artigo.</div>';document.getElementById('shop-buy-total').textContent='';return;}
+  let h='';
+  shopBuyGroups.forEach(g=>{
+    const val=shopBuyAlloc[g.safeKey]!=null?shopBuyAlloc[g.safeKey]:'';
+    h+=`<div class="cmp-grp">
+      <div class="cmp-grp-hdr">${g.label}<span class="cmp-grp-n">${g.items.length}</span></div>
+      <div class="cmp-grp-items">${g.items.map(i=>i.artigo).join(', ')}</div>
+      <div class="cmp-grp-val"><span>€</span><input type="number" step="0.01" min="0" inputmode="decimal" placeholder="0,00" value="${val}" data-sk="${g.safeKey}" oninput="shopBuyAllocChanged(this)"></div>
+    </div>`;
+  });
+  cont.innerHTML=h;
+  shopBuyUpdateTotal();
+}
+function shopBuyAllocChanged(inp){const v=parseFloat(inp.value);shopBuyAlloc[inp.dataset.sk]=isNaN(v)?null:v;shopBuyUpdateTotal();}
+function shopBuyUpdateTotal(){
+  let tot=0;shopBuyGroups.forEach(g=>{const v=parseFloat(shopBuyAlloc[g.safeKey]);if(!isNaN(v))tot+=v;});
+  document.getElementById('shop-buy-total').textContent=`Total: ${eur(rnd(tot,2))}`;
+}
+async function saveBuy(){
+  if(!DATA._sbId){toast('Sem ligação — recarrega a página','bad');return;}
+  if(contasFechadas()){toast('Contas fechadas','bad');return;}
+  const who=document.getElementById('shop-buy-who').value;
+  const date=document.getElementById('shop-buy-date').value;
+  const desc=(document.getElementById('shop-buy-desc').value||'').trim().slice(0,30);
+  if(!who){toast('Quem pagou?','bad');return;}
+  if(!date){toast('Indica a data','bad');return;}
+  if(!isAdmin()&&!MY_NAMES.includes(who)){toast('Só podes registar compras tuas ou do cônjuge','bad');return;}
+  const items=_shopCheckedItems();
+  if(!items.length){toast('Escolhe os artigos comprados','bad');return;}
+  shopBuyRecalc();
+  if(!shopBuyGroups.length){toast('Escolhe os artigos comprados','bad');return;}
+  // Cada grupo precisa de valor > 0
+  const rows=[];
+  for(const g of shopBuyGroups){
+    const v=rnd(parseFloat(shopBuyAlloc[g.safeKey]),2);
+    if(!v||v<=0){toast(`Aloca um valor a "${g.label}"`,'bad');return;}
+    rows.push({evento_id:DATA._sbId,quem:who,data_desp:date,data_valor:g.dataValor||null,descricao:desc||'Compras',tipo:g.tipo,valor:v,observacoes:g.items.map(i=>i.artigo+(i.quantidade?' ('+i.quantidade+')':'')).join(', ')});
+  }
+  const btn=document.getElementById('shop-buy-save');btn.disabled=true;
+  setSync('load','a guardar…');
+  try{
+    // 1) criar uma despesa por grupo (tipo/data-valor certos → distribuição correta)
+    const ins=await queueWrite(()=>sbReq('POST','despesas',rows,{Prefer:'return=representation'}));
+    rows.forEach((r,i)=>DATA.despesas.push({_id:ins&&ins[i]?ins[i].id:null,quem:r.quem,dataDesp:r.data_desp,dataValor:r.data_valor,desc:r.descricao,tipo:r.tipo,valor:r.valor,obs:r.observacoes}));
+    // 2) marcar os artigos como comprados e ligá-los a esta compra
+    const compraId='c'+Date.now();
+    const compradoEm=new Date().toISOString();
+    const ids=items.map(i=>i._id).filter(x=>x!=null);
+    if(ids.length){
+      await queueWrite(()=>sbReq('PATCH',`shoplist?id=in.(${ids.join(',')})`,{estado:'comprado',compra_id:compraId,cf_desc:desc||'Compras',comprado_em:compradoEm,no_carrinho:false}));
+      items.forEach(it=>Object.assign(it,{estado:'comprado',compraId,cfDesc:desc||'Compras',compradoEm,noCarrinho:false}));
+    }
+    syncMirror();marcaGuardado();
+    btn.disabled=false;closeShopBuyModal();
+    CALC=calcular(JSON.parse(JSON.stringify(DATA)));renderAll();
+    toast('Compra registada ✓','ok');
+  }catch(e){setSync('err','erro ao guardar');btn.disabled=false;toast(permErrorMsg(e),'bad');}
 }
 
 /* ═══ PRESENÇAS GRID ═══ */
@@ -4104,3 +4383,5 @@ document.getElementById('admin-bg').addEventListener('click',e=>{if(e.target.id=
 document.getElementById('pay-bg').addEventListener('click',e=>{if(e.target.id==='pay-bg')closePayModal();});
 document.getElementById('edit-cf-bg').addEventListener('click',e=>{if(e.target.id==='edit-cf-bg')closeEditCf();});
 document.getElementById('refdef-bg').addEventListener('click',e=>{if(e.target.id==='refdef-bg')closeRefdefModal();});
+document.getElementById('shop-item-bg').addEventListener('click',e=>{if(e.target.id==='shop-item-bg')closeShopItemModal();});
+document.getElementById('shop-buy-bg').addEventListener('click',e=>{if(e.target.id==='shop-buy-bg')closeShopBuyModal();});
