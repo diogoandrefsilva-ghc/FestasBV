@@ -104,8 +104,6 @@ body::before{content:"";position:fixed;top:0;left:0;right:0;height:env(safe-area
 .rs-it.rs-saldo .k{font-weight:700;color:var(--ink)}
 .rs-it.rs-saldo .k small{font-weight:500;color:var(--faint);margin-left:4px}
 .rs-it.rs-saldo .v{font-size:15px}
-.rs-more{margin-top:9px;text-align:center;font-size:12px;font-weight:700;color:var(--gold);cursor:pointer;padding:7px;border:1px solid var(--line);border-radius:9px;background:var(--panel);user-select:none}
-.rs-more:active{opacity:.7}
 .rs-row.rs-grand{border-color:var(--gold);background:rgba(238,182,77,.08)}
 .rs-row.rs-grand .rs-head .amt{color:var(--gold)}
 /* Detalhe do detalhe (refeições/dia · amigos/dia) */

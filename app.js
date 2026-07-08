@@ -770,12 +770,18 @@ function renderAll(){
   // SALDOS — usar cálculo consistente com o ecrã de detalhe
   const pAll=CALC.pagamentos;
   const pNR=pAll.filter(p=>!p.ref||!p.ref.startsWith('Reembolso'));
+  const _mvLi=(d,txt,v)=>({k:(d?fmtDiaMes(d)+' — ':'')+txt,v:rnd(v,2)});
   ms.forEach(m=>{
     const isTes=m.nome===DATA.evento.tesoureiro;
-    const totalPagoDesp=DATA.despesas.filter(x=>x.quem===m.nome).reduce((a,x)=>a+x.valor,0);
-    const reembFeitos=pAll.filter(p=>p.ref&&p.ref.startsWith('Reembolso')&&p.de===m.nome).reduce((a,p)=>a+p.valor,0);
-    const reembRecebidos=pAll.filter(p=>p.ref&&p.ref.startsWith('Reembolso')&&p.para===m.nome).reduce((a,p)=>a+p.valor,0);
-    const receb=pNR.filter(p=>p.para===m.nome).reduce((a,p)=>a+p.valor,0);
+    const despL=DATA.despesas.filter(x=>x.quem===m.nome);
+    const totalPagoDesp=despL.reduce((a,x)=>a+x.valor,0);
+    const rfL=pAll.filter(p=>p.ref&&p.ref.startsWith('Reembolso')&&p.de===m.nome);
+    const reembFeitos=rfL.reduce((a,p)=>a+p.valor,0);
+    const rrL=pAll.filter(p=>p.ref&&p.ref.startsWith('Reembolso')&&p.para===m.nome);
+    const reembRecebidos=rrL.reduce((a,p)=>a+p.valor,0);
+    const rcL=pNR.filter(p=>p.para===m.nome);
+    const receb=rcL.reduce((a,p)=>a+p.valor,0);
+    const mealL=DATA.mealheiros.filter(x=>x.quem===m.nome);
     const mealT=rnd((m.W||0)+(m.X||0),2);
     const contribT=rnd(m.Sown+m.AA,2);
     const quotaE=rnd((m.R||0)+(m.U||0),2);
@@ -786,7 +792,13 @@ function renderAll(){
     const deb=rnd(contribT+quotaE+mealT+receb+reembRecebidos,2);
     const paidBy={};
     if(!isTes)(m._creditedBy||[]).filter(c=>c.payer!==m.nome).forEach(c=>{paidBy[c.payer]=rnd((paidBy[c.payer]||0)+c.amount,2);});
-    m._mv={isTes,pagoDesp:rnd(totalPagoDesp,2),reembFeitos:rnd(reembFeitos,2),reembRecebidos:rnd(reembRecebidos,2),receb:rnd(receb,2),mealT,ownPortion:isTes?0:rnd(m._payerOwnPortion,2),paidBy};
+    m._mv={isTes,
+      pagoDesp:rnd(totalPagoDesp,2),pagoDespL:despL.map(x=>_mvLi(x.dataDesp,x.desc||x.tipo||'despesa',x.valor)),
+      reembFeitos:rnd(reembFeitos,2),reembFeitosL:rfL.map(p=>_mvLi(p.data,'para '+p.para,p.valor)),
+      reembRecebidos:rnd(reembRecebidos,2),reembRecebidosL:rrL.map(p=>_mvLi(p.data,'de '+p.de,p.valor)),
+      receb:rnd(receb,2),recebL:rcL.map(p=>_mvLi(p.data,'de '+p.de,p.valor)),
+      mealT,mealL:mealL.map(x=>_mvLi(x.data,x.desc||x.subtipo||'mealheiro',x.valor)),
+      ownPortion:isTes?0:rnd(m._payerOwnPortion,2),paidBy};
     m._sfEcra=rnd(cred-deb,2);
   });
   // Lista fundida (antigo Resumo + saldo individual): despesa por membro, movimentos e saldo
@@ -1346,7 +1358,7 @@ async function carregar(){
     const N=v=>v==null?0:Number(v);
     ALL_YEARS=rows.map(ev=>({
       _sbId: ev.id,
-      evento:{nome:ev.nome,ano:ev.ano,tesoureiro:ev.tesoureiro,arredondaTotal:!!ev.arredonda_total,missaoPoupanca:N(ev.missao_poupanca),fundoReserva:N(ev.fundo_reserva),fatorModo:ev.fator_modo||'fixo',fatorThreshold:ev.fator_threshold!=null?N(ev.fator_threshold):FATOR_THRESHOLD_DEFAULT,contasFechadas:!!ev.contas_fechadas,contasFechadasEm:ev.contas_fechadas_em||null,contasFechadasPor:ev.contas_fechadas_por||null},
+      evento:{nome:ev.nome,ano:ev.ano,tesoureiro:ev.tesoureiro,arredondaTotal:!!ev.arredonda_total,missaoPoupanca:N(ev.missao_poupanca),fundoReserva:N(ev.fundo_reserva),fatorModo:ev.fator_modo||'fixo',fatorThreshold:ev.fator_threshold!=null?N(ev.fator_threshold):FATOR_THRESHOLD_DEFAULT,dividasPublicas:!!ev.dividas_publicas,dividasPublicasCol:('dividas_publicas' in ev),contasFechadas:!!ev.contas_fechadas,contasFechadasEm:ev.contas_fechadas_em||null,contasFechadasPor:ev.contas_fechadas_por||null},
       membros:(ev.membros||[]).sort((a,b)=>a.nome.localeCompare(b.nome,'pt')).map(m=>({
         _id:m.id,nome:m.nome,fator:N(m.fator),sexo:m.sexo==='F'?'F':'M',
         presencas:(m.presencas||[]).map(p=>({k:`${p.dia}|${p.ref}`,modo:p.modo==='bebe'?'bebe':'come'}))
@@ -1399,6 +1411,8 @@ async function sbGuardarEvento(y,slot){
     setSync('load','a guardar…');
     const ev=y.evento;
     const evRow={nome:ev.nome,ano:ev.ano,tesoureiro:ev.tesoureiro,arredonda_total:!!ev.arredondaTotal,missao_poupanca:ev.missaoPoupanca||0,fundo_reserva:ev.fundoReserva||0,fator_modo:ev.fatorModo==='variavel'?'variavel':'fixo',fator_threshold:ev.fatorThreshold!=null?ev.fatorThreshold:FATOR_THRESHOLD_DEFAULT};
+    // Só grava a flag se a coluna já existir no Supabase (migração: ALTER TABLE eventos ADD dividas_publicas)
+    if(ev.dividasPublicasCol)evRow.dividas_publicas=!!ev.dividasPublicas;
     let eid=y._sbId;
     if(!eid){
       const ins=await sbReq('POST','eventos',evRow,{Prefer:'return=representation'});
@@ -2355,6 +2369,12 @@ function loadParams(){
   const fundo=DATA.evento.fundoReserva||0;
   document.getElementById('adm-arredonda').checked=arredonda;
   updateToggleKnob(arredonda);
+  const dpRow=document.getElementById('adm-divpub-row');
+  if(dpRow){
+    dpRow.style.display=DATA.evento.dividasPublicasCol?'':'none';
+    document.getElementById('adm-divpub').checked=!!DATA.evento.dividasPublicas;
+    _setDivpubKnob(!!DATA.evento.dividasPublicas);
+  }
   document.getElementById('adm-missao').value=missao||'';
   document.getElementById('adm-fundo').value=fundo||'';
   const fmEl=document.getElementById('adm-fator-modo');
@@ -2377,6 +2397,12 @@ function updateToggleKnob(on){
   const track=knob?.previousElementSibling;
   if(knob){knob.style.left=on?'22px':'2px';}
   if(track){track.style.background=on?'var(--gold)':'var(--line)';}
+}
+function _setDivpubKnob(on){
+  const knob=document.getElementById('adm-divpub-knob');
+  const track=knob?.previousElementSibling;
+  if(knob)knob.style.left=on?'22px':'2px';
+  if(track)track.style.background=on?'var(--gold)':'var(--line)';
 }
 /* ── Notificações Telegram (só admin · flag global em festasbv.config) ── */
 function _setNotifKnob(on){
@@ -2409,6 +2435,11 @@ async function saveParams(){
   const arredonda=document.getElementById('adm-arredonda').checked;
   updateToggleKnob(arredonda);
   DATA.evento.arredondaTotal=arredonda;
+  if(DATA.evento.dividasPublicasCol){
+    const dp=document.getElementById('adm-divpub').checked;
+    _setDivpubKnob(dp);
+    DATA.evento.dividasPublicas=dp;
+  }
   DATA.evento.missaoPoupanca=parseFloat(document.getElementById('adm-missao').value)||0;
   DATA.evento.fundoReserva=parseFloat(document.getElementById('adm-fundo').value)||0;
   const fmEl=document.getElementById('adm-fator-modo');
@@ -4186,28 +4217,33 @@ function saldosMembrosHtml(){
       <div class="rs-sub">${li}<div class="rs-formula"><span class="res">= ${eur(g.poup)}</span></div></div>`;
   };
   const _admin=isAdmin();
-  const canSee=n=>_admin||MY_NAMES.includes(n);
+  const canSee=n=>_admin||!!DATA.evento.dividasPublicas||MY_NAMES.includes(n);
   // Movimentos + saldo individual (só para membros cujo saldo o utilizador pode ver)
   const mvHtml=m=>{
     if(!m||!m._mv||m._sfEcra==null||!canSee(m.nome))return'';
     const v=m._mv;
-    const line=(icon,lbl,val,cls)=>val>0.005?`<div class="rs-it"><span class="k">${icon} ${lbl}</span><span class="v ${cls}">${cls==='plus'?'+':'−'} ${eur(val)}</span></div>`:'';
+    const line=(icon,lbl,val,cls,list)=>{
+      if(val<=0.005)return'';
+      const vHtml=`<span class="v ${cls}">${cls==='plus'?'+':'−'} ${eur(val)}</span>`;
+      if(!list||!list.length)return`<div class="rs-it"><span class="k">${icon} ${lbl}</span>${vHtml}</div>`;
+      return`<div class="rs-it rs-exp" onclick="toggleRsSub(this,event)"><span class="k">${icon} ${lbl}<span class="sub-arrow">▼</span></span>${vHtml}</div>
+        <div class="rs-sub">${list.map(it=>`<div class="rs-sub-it"><span class="k">${it.k}</span><span class="v">${eur(it.v)}</span></div>`).join('')}</div>`;
+    };
     let li='';
-    li+=line('🛒','Despesas adiantadas',v.pagoDesp,'plus');
-    if(v.isTes)li+=line('💸','Reembolsos feitos',v.reembFeitos,'plus');
+    li+=line('🛒','Despesas adiantadas',v.pagoDesp,'plus',v.pagoDespL);
+    if(v.isTes)li+=line('💸','Reembolsos feitos',v.reembFeitos,'plus',v.reembFeitosL);
     else{
       li+=line('🤝','Pagou para saldar',v.ownPortion,'plus');
       Object.entries(v.paidBy).forEach(([p,a])=>{li+=line('🤝',`Pago por ${p}`,a,'plus');});
     }
-    li+=line('🥫','Mealheiro recebido',v.mealT,'minus');
-    li+=line('🤝','Pagamentos recebidos',v.receb,'minus');
-    li+=line('💸','Reembolsos recebidos',v.reembRecebidos,'minus');
+    li+=line('🥫','Mealheiro recebido',v.mealT,'minus',v.mealL);
+    li+=line('🤝','Pagamentos recebidos',v.receb,'minus',v.recebL);
+    li+=line('💸','Reembolsos recebidos',v.reembRecebidos,'minus',v.reembRecebidosL);
     const sf=m._sfEcra,zero=Math.abs(sf)<0.005;
     const cls=zero?'zero':(sf>0?'pos':'neg');
     const lblS=zero?'saldado':(sf>0?'a receber':'a pagar');
     return `${li?'<div class="rs-mv-title">Movimentos</div>'+li:''}
-      <div class="rs-it rs-saldo"><span class="k">Saldo <small>${lblS}</small></span><span class="v ${cls}">${eur(zero?0:sf)}</span></div>
-      <div class="rs-more" onclick="event.stopPropagation();openMember('${m.nome.replace(/'/g,"\\'")}')">Ver conta detalhada ›</div>`;
+      <div class="rs-it rs-saldo"><span class="k">Saldo <small>${lblS}</small></span><span class="v ${cls}">${eur(zero?0:sf)}</span></div>`;
   };
   // det(g): para uma pessoa → fórmula individual + movimentos/saldo; para o grupo → contribuição de cada membro
   const det=(g,grupo)=>`<div class="rs-detail"><div class="rs-detail-inner sf">
