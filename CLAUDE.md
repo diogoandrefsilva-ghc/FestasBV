@@ -12,7 +12,7 @@ App pessoal de gestão de despesas das Festas (Barrete Verde e Salinas).
 
 ## Como NÃO gastar tokens à toa (importante)
 - **Não leias o `app.js` inteiro.** Está dividido em secções com comentários `/* ═══ TÍTULO ═══ */`. Para achar algo, faz `grep` pelo título e lê só esse troço. Secções:
-  Sessão/refresh do token · Permissões · Fecho de contas + validação · Fator das quotas · Ícones de refeição · Classificar cash-flow · Histórico (auditoria) · **Cash Flow Modal** · Edit/Delete Cash Flow · Parametrizações · Notificações Telegram · Limpeza · Add New Year · Plantel · **Presenças Grid** · Convidados · Refeições Def (CRUD) · Hero sub-totais · **Relatórios/PDF** · Read-only mode · Resumo (despesa por membro) · FABs arrastáveis · **Auth (Supabase)** · Utilizadores↔Membros
+  Sessão/refresh do token · Permissões · Fecho de contas + validação · Fator das quotas · Ícones de refeição · Classificar cash-flow · Histórico (auditoria) · **Cash Flow Modal** · Edit/Delete Cash Flow · Parametrizações · Notificações Telegram · Limpeza · Add New Year · Plantel · **Presenças Grid** · Convidados · Refeições Def (CRUD) · Hero sub-totais · **Relatórios/PDF** · Read-only mode · Resumo fundido nos Saldos (despesa por membro + movimentos + saldo) · FABs arrastáveis · **Auth (Supabase)** · Utilizadores↔Membros
 - Mudança **só visual** → `style.css`. Mudança de **lógica/dados** → `app.js`. Para localizar um botão/campo: procura o `id` no `index.html` e salta para o handler no `app.js`.
 - Faz **edições cirúrgicas** (diffs pequenos). **Nunca reescrevas o ficheiro inteiro.**
 

@@ -675,8 +675,8 @@ const AVCOL=['#eeb64d','#e0533f','#2f9e77','#7fa8c9','#d98a3d','#43c98a','#c96f8
 function av(nome,i){return`<div class="av" style="background:${AVCOL[i%AVCOL.length]}">${nome.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase()}</div>`;}
 
 function setTab(t){TAB=t;document.querySelectorAll('.tab').forEach(e=>e.classList.toggle('on',e.dataset.tab===t));
-  if(['saldos','resumo','refeicoes','cashflows','compras'].includes(t))lsSet('fbv_tab',t);
-  ['saldos','resumo','refeicoes','cashflows','compras'].forEach(v=>document.getElementById('view-'+v).style.display=v===t?'':'none');
+  if(['saldos','refeicoes','cashflows','compras'].includes(t))lsSet('fbv_tab',t);
+  ['saldos','refeicoes','cashflows','compras'].forEach(v=>document.getElementById('view-'+v).style.display=v===t?'':'none');
   // Hero only visible in saldos tab
   const hero=document.getElementById('hero-card');
   if(hero)hero.style.display=t==='saldos'?'':'none';
@@ -784,57 +784,13 @@ function renderAll(){
     if(!isTes){cred+=rnd(m._payerOwnPortion,2);(m._creditedBy||[]).filter(c=>c.payer!==m.nome).forEach(c=>{cred+=c.amount;});}
     cred=rnd(cred,2);
     const deb=rnd(contribT+quotaE+mealT+receb+reembRecebidos,2);
+    const paidBy={};
+    if(!isTes)(m._creditedBy||[]).filter(c=>c.payer!==m.nome).forEach(c=>{paidBy[c.payer]=rnd((paidBy[c.payer]||0)+c.amount,2);});
+    m._mv={isTes,pagoDesp:rnd(totalPagoDesp,2),reembFeitos:rnd(reembFeitos,2),reembRecebidos:rnd(reembRecebidos,2),receb:rnd(receb,2),mealT,ownPortion:isTes?0:rnd(m._payerOwnPortion,2),paidBy};
     m._sfEcra=rnd(cred-deb,2);
   });
-  const sorted=[...ms].sort((a,b)=>b._sfEcra-a._sfEcra);
-  const _admin=isAdmin();
-  // Não-admin: só vê o próprio saldo e o do cônjuge — próprio primeiro, depois cônjuge
-  let visivel=_admin?sorted:sorted.filter(m=>MY_NAMES.includes(m.nome));
-  if(!_admin){
-    const meu=meuNomePrincipal();
-    visivel=[...visivel].sort((a,b)=>{
-      const ra=a.nome===meu?0:1, rb=b.nome===meu?0:1;
-      if(ra!==rb)return ra-rb;
-      return a.nome.localeCompare(b.nome,'pt');
-    });
-  }
-  const mrowHtml=(m)=>{
-    const sf=m._sfEcra;
-    const tag=m.nome===DATA.evento.tesoureiro?' · tesoureiro':'';
-    const onc=`onclick="openMember('${m.nome.replace(/'/g,"\\'")}')"`;
-    if(Math.abs(sf)<0.005){
-      return `<div class="mrow" ${onc}>
-        ${av(m.nome,ms.indexOf(m))}<div class="nm">${m.nome}<small>sem dívida${tag}</small></div>
-        <div class="amt zero">${eur(0)}</div><div class="chev">›</div></div>`;
-    }
-    const cls=sf>0?'pos':'neg';
-    const sign=sf>0.005?'a receber':'a pagar';
-    return `<div class="mrow" ${onc}>
-      ${av(m.nome,ms.indexOf(m))}<div class="nm">${m.nome}<small>${sign}${tag}</small></div>
-      <div class="amt ${cls}">${eur(sf)}</div><div class="chev">›</div></div>`;
-  };
-  const withDebt=visivel.filter(m=>Math.abs(m._sfEcra)>=0.005);
-  const settled=visivel.filter(m=>Math.abs(m._sfEcra)<0.005);
-  let h='<div class="sec-title sf">'+(_admin?'Quem recebe / quem deve':'O meu saldo')+'</div><div class="mlist">';
-  if(!visivel.length){
-    h+='<div class="empty sf">Liga a tua conta a um membro nas Definições para veres o teu saldo.</div>';
-  } else if(!_admin){
-    // Não-admin: lista simples (próprio + cônjuge), sem separar saldados/não-saldados
-    visivel.forEach(m=>{h+=mrowHtml(m);});
-  } else {
-    if(!withDebt.length&&!settled.length) h+='<div class="empty sf">Sem saldo a mostrar.</div>';
-    else if(!withDebt.length) h+='<div class="empty sf">Todas as contas estão saldadas 🎉</div>';
-    withDebt.forEach(m=>{h+=mrowHtml(m);});
-    if(settled.length){
-      h+=`<div class="collapse-toggle sf" onclick="this.classList.toggle('open');this.nextElementSibling.classList.toggle('open')" style="margin-top:10px">
-        <span class="ct-label">${CHECK_SVG} Saldados (${settled.length})</span>
-        <span><span class="ct-arrow">▼</span></span>
-      </div><div class="collapse-body"><div class="mlist" style="margin-top:8px">`;
-      settled.forEach(m=>{h+=mrowHtml(m);});
-      h+='</div></div>';
-    }
-  }
-  h+='</div>';
+  // Lista fundida (antigo Resumo + saldo individual): despesa por membro, movimentos e saldo
+  let h=saldosMembrosHtml();
 
   // CONTAS — fecho de contas + validação (depois do saldo global)
   h+=secContasHtml();
@@ -860,9 +816,6 @@ function renderAll(){
 
   document.getElementById('view-saldos').innerHTML=h;
   updateContasUI();
-
-  // RESUMO — despesa total por membro
-  renderResumo();
 
   // REFEIÇÕES — sub-tabbed: Calendário + Presenças
   let r='';
@@ -1415,8 +1368,8 @@ async function carregar(){
     const savedMeal=parseInt(lsGet('fbv_refmeal'),10);
     if(Number.isInteger(savedMeal)&&savedMeal>=0)REF_SEL=savedMeal;
     selectYear();
-    const savedTab=lsGet('fbv_tab');
-    if(['saldos','resumo','refeicoes','cashflows','compras'].includes(savedTab))setTab(savedTab);
+    const savedTab=lsGet('fbv_tab')==='resumo'?'saldos':lsGet('fbv_tab');
+    if(['saldos','refeicoes','cashflows','compras'].includes(savedTab))setTab(savedTab);
     setSync('live','sincronizado · '+new Date().toLocaleTimeString('pt-PT',{hour:'2-digit',minute:'2-digit'}));
     updateReadOnlyMode();
   }catch(e){setSync('err','sem ligação');toast('Erro: '+e.message,'bad');}
@@ -4152,15 +4105,15 @@ function updateReadOnlyMode(){
   document.body.classList.toggle('no-write',!isAdmin()&&!MY_NAMES.length);
 }
 
-/* ═══ RESUMO TAB — despesa total por membro ═══ */
+/* ═══ RESUMO (fundido nos SALDOS) — despesa total por membro + movimentos + saldo ═══ */
 function toggleRsSub(el,ev){
   if(ev)ev.stopPropagation();
   const s=el.nextElementSibling;
   if(!s||!s.classList.contains('rs-sub'))return;
   el.classList.toggle('open');s.classList.toggle('open');
 }
-function renderResumo(){
-  if(!CALC)return;
+function saldosMembrosHtml(){
+  if(!CALC)return'';
   const ms=CALC.membros;
   // parâmetros do ano (para fórmulas no detalhe)
   const BN3=rnd(CALC.BN3||0,2), sumF=CALC.sumF||0;
@@ -4187,7 +4140,7 @@ function renderResumo(){
     const refeCome=rnd(refsCome.reduce((a,x)=>a+x.v,0),2);
     const refeBebe=rnd(refsBebe.reduce((a,x)=>a+x.v,0),2);
     const convsList=[...(m._convs||[])].sort((a,b)=>oKey(a)-oKey(b)).map(x=>({k:`${x.nome} — ${x.dia} · ${x.ref}`,v:rnd(x.q,2)}));
-    return{nome:m.nome,i:ms.indexOf(m),refeCome,refeBebe,amigos,poup,quota,fator:(m.fatorEf!=null?m.fatorEf:m.fator)||0,outras:rnd(m.T||0,2),refsCome,refsBebe,convsList,tot:rnd(refeCome+refeBebe+amigos+poup+quota,2)};
+    return{nome:m.nome,i:ms.indexOf(m),_m:m,refeCome,refeBebe,amigos,poup,quota,fator:(m.fatorEf!=null?m.fatorEf:m.fator)||0,outras:rnd(m.T||0,2),refsCome,refsBebe,convsList,tot:rnd(refeCome+refeBebe+amigos+poup+quota,2)};
   });
   // Ordem: próprio → cônjuge → restantes (ordem alfabética)
   const _meuR=meuNomePrincipal();
@@ -4232,13 +4185,38 @@ function renderResumo(){
     return `<div class="rs-it rs-exp" onclick="toggleRsSub(this,event)"><span class="k">🐖 Poupança<span class="sub-arrow">▼</span></span><span class="v">${eur(g.poup)}</span></div>
       <div class="rs-sub">${li}<div class="rs-formula"><span class="res">= ${eur(g.poup)}</span></div></div>`;
   };
-  // det(g): para uma pessoa → fórmula individual; para o grupo → contribuição de cada membro
+  const _admin=isAdmin();
+  const canSee=n=>_admin||MY_NAMES.includes(n);
+  // Movimentos + saldo individual (só para membros cujo saldo o utilizador pode ver)
+  const mvHtml=m=>{
+    if(!m||!m._mv||m._sfEcra==null||!canSee(m.nome))return'';
+    const v=m._mv;
+    const line=(icon,lbl,val,cls)=>val>0.005?`<div class="rs-it"><span class="k">${icon} ${lbl}</span><span class="v ${cls}">${cls==='plus'?'+':'−'} ${eur(val)}</span></div>`:'';
+    let li='';
+    li+=line('🛒','Despesas adiantadas',v.pagoDesp,'plus');
+    if(v.isTes)li+=line('💸','Reembolsos feitos',v.reembFeitos,'plus');
+    else{
+      li+=line('🤝','Pagou para saldar',v.ownPortion,'plus');
+      Object.entries(v.paidBy).forEach(([p,a])=>{li+=line('🤝',`Pago por ${p}`,a,'plus');});
+    }
+    li+=line('🥫','Mealheiro recebido',v.mealT,'minus');
+    li+=line('🤝','Pagamentos recebidos',v.receb,'minus');
+    li+=line('💸','Reembolsos recebidos',v.reembRecebidos,'minus');
+    const sf=m._sfEcra,zero=Math.abs(sf)<0.005;
+    const cls=zero?'zero':(sf>0?'pos':'neg');
+    const lblS=zero?'saldado':(sf>0?'a receber':'a pagar');
+    return `${li?'<div class="rs-mv-title">Movimentos</div>'+li:''}
+      <div class="rs-it rs-saldo"><span class="k">Saldo <small>${lblS}</small></span><span class="v ${cls}">${eur(zero?0:sf)}</span></div>
+      <div class="rs-more" onclick="event.stopPropagation();openMember('${m.nome.replace(/'/g,"\\'")}')">Ver conta detalhada ›</div>`;
+  };
+  // det(g): para uma pessoa → fórmula individual + movimentos/saldo; para o grupo → contribuição de cada membro
   const det=(g,grupo)=>`<div class="rs-detail"><div class="rs-detail-inner sf">
       ${expIt('🍽','Refeições',g.refeCome,g.refsCome)}
       ${g.refeBebe>0.005?expIt('🍺','Só bebida',g.refeBebe,g.refsBebe):''}
       ${expIt('👥','Amigos',g.amigos,g.convsList)}
       ${grupo?expIt('➕','Quota Extra',g.quota,g.quotaList):quotaDet(g)}
       ${grupo?expIt('🐖','Poupança',g.poup,g.poupList):poupDet(g)}
+      ${grupo?'':mvHtml(g._m)}
     </div></div>`;
   let h=`<details class="calc-help sf">
     <summary><span class="ch-ico">ⓘ</span> De onde vêm a Quota Extra e a Poupança? <span class="chev">›</span></summary>
@@ -4258,7 +4236,8 @@ function renderResumo(){
       </ul>
     </div>
   </details>`;
-  h+='<div class="sec-title sf">Despesa por Membro</div><div class="mlist">';
+  h+='<div class="sec-title sf">Despesa e Saldo por Membro</div><div class="mlist">';
+  if(!_admin&&!MY_NAMES.length&&rows.length) h+='<div class="empty sf" style="margin-bottom:10px">Liga a tua conta a um membro nas Definições para veres o teu saldo.</div>';
   if(!rows.length) h+='<div class="empty sf">Sem membros.</div>';
   let _prevRk=null;
   rows.forEach(g=>{
@@ -4266,10 +4245,16 @@ function renderResumo(){
     if(_prevRk!==null&&_prevRk<2&&_rk===2)h+='<div class="rs-divider sf"></div>';
     _prevRk=_rk;
     const tag=g.nome===DATA.evento.tesoureiro?' · tesoureiro':'';
+    let sub='despesa total'+tag,saldoHtml='';
+    if(canSee(g.nome)&&g._m&&g._m._sfEcra!=null){
+      const sf=g._m._sfEcra,zero=Math.abs(sf)<0.005;
+      sub=(zero?'sem dívida':(sf>0?'a receber':'a pagar'))+tag;
+      saldoHtml=`<div class="amt-saldo ${zero?'zero':(sf>0?'pos':'neg')}">${eur(zero?0:sf)}</div>`;
+    }
     h+=`<div class="rs-row">
       <div class="rs-head" onclick="this.parentElement.classList.toggle('open')">
-        ${av(g.nome,g.i)}<div class="nm">${g.nome}<small>despesa total${tag}</small></div>
-        <div class="amt">${eur(g.tot)}</div><span class="rs-arrow">▼</span>
+        ${av(g.nome,g.i)}<div class="nm">${g.nome}<small>${sub}</small></div>
+        <div class="amt-col"><div class="amt">${eur(g.tot)}</div>${saldoHtml}</div><span class="rs-arrow">▼</span>
       </div>${det(g)}</div>`;
   });
   if(rows.length){
@@ -4283,7 +4268,7 @@ function renderResumo(){
       </div>${det({refeCome:rnd(T.refeCome,2),refeBebe:rnd(T.refeBebe,2),amigos:rnd(T.amigos,2),poup:rnd(T.poup,2),quota:rnd(T.quota,2),refsCome:T.refsCome,refsBebe:T.refsBebe,convsList:T.convsList,quotaList,poupList},true)}</div>`;
   }
   h+='</div>';
-  document.getElementById('view-resumo').innerHTML=h;
+  return h;
 }
 
 /* ═══ DRAGGABLE FABs ═══ */
