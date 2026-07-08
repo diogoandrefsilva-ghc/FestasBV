@@ -3,6 +3,9 @@ const SB_URL = 'https://gjweqwfbnkgnibhajldc.supabase.co';
 const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdqd2Vxd2ZibmtnbmliaGFqbGRjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODExMDk4NzUsImV4cCI6MjA5NjY4NTg3NX0.h6st-RayGhQdsqH7E2Ko-rPWk2QZUpTevO6cbjvlSnk';
 const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
+// Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
+// para se confirmar de imediato se o telemóvel já tem a build nova.
+const APP_BUILD = 'v8 · 2026-07-08 · compras agrupadas';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -2348,6 +2351,8 @@ function toggleSettingsBlock(hdr){
 function openAdmin(){
   const em=document.getElementById('adm-conta-email');
   if(em)em.textContent=_sbSession?_sbSession.user.email:'—';
+  const ver=document.getElementById('adm-versao');
+  if(ver)ver.textContent='Versão '+APP_BUILD;
   const adm=document.getElementById('adm-pedidos-wrap');
   if(adm)adm.style.display=isAdmin()?'':'none';
   if(isAdmin()){sbRenderPedidos();sbRenderLigacoes();loadNotif();}
