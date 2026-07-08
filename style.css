@@ -88,12 +88,24 @@ body::before{content:"";position:fixed;top:0;left:0;right:0;height:env(safe-area
 .rs-head .rs-arrow{color:var(--faint);font-size:10px;margin-left:2px;transition:transform .2s}
 .rs-row.open .rs-arrow{transform:rotate(180deg)}
 .rs-detail{max-height:0;overflow:hidden;transition:max-height .25s ease;background:var(--panel2);border-top:0 solid transparent}
-.rs-row.open .rs-detail{max-height:320px;border-top:1px solid var(--line)}
+.rs-row.open .rs-detail{max-height:760px;border-top:1px solid var(--line)}
 .rs-row.open .rs-detail:has(.rs-sub.open){max-height:3200px}
 .rs-detail-inner{padding:9px 15px 12px}
 .rs-it{display:flex;justify-content:space-between;align-items:center;padding:5px 0;font-size:12.5px;border-bottom:1px solid rgba(110,75,25,.10)}
 .rs-it:last-child{border-bottom:none}
 .rs-it .k{color:var(--muted)}.rs-it .v{font-weight:700;font-variant-numeric:tabular-nums;color:var(--ink)}
+.rs-head .amt-col{text-align:right;flex-shrink:0}
+.rs-head .amt-saldo{font-size:12px;font-weight:700;font-variant-numeric:tabular-nums;margin-top:1px}
+.rs-head .amt-saldo.pos{color:var(--green)}.rs-head .amt-saldo.neg{color:var(--red)}.rs-head .amt-saldo.zero{color:var(--muted)}
+.rs-it .v.plus{color:var(--green)}.rs-it .v.minus{color:var(--red)}
+.rs-it .v.pos{color:var(--green)}.rs-it .v.neg{color:var(--red)}.rs-it .v.zero{color:var(--muted)}
+.rs-mv-title{margin:10px 0 2px;font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--faint)}
+.rs-it.rs-saldo{border-top:1px solid var(--line);border-bottom:none;margin-top:4px;padding-top:9px}
+.rs-it.rs-saldo .k{font-weight:700;color:var(--ink)}
+.rs-it.rs-saldo .k small{font-weight:500;color:var(--faint);margin-left:4px}
+.rs-it.rs-saldo .v{font-size:15px}
+.rs-more{margin-top:9px;text-align:center;font-size:12px;font-weight:700;color:var(--gold);cursor:pointer;padding:7px;border:1px solid var(--line);border-radius:9px;background:var(--panel);user-select:none}
+.rs-more:active{opacity:.7}
 .rs-row.rs-grand{border-color:var(--gold);background:rgba(238,182,77,.08)}
 .rs-row.rs-grand .rs-head .amt{color:var(--gold)}
 /* Detalhe do detalhe (refeições/dia · amigos/dia) */
