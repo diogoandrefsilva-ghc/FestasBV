@@ -177,9 +177,15 @@ setTimeout(function(){ if (window.fbvEsconderSplash) window.fbvEsconderSplash();
       <label>Refeição a que se destina</label>
       <select id="shop-ref"></select>
     </div>
+    <div id="shop-claim-wrap" style="display:none">
+      <label>Quem trata (admin)</label>
+      <select id="shop-claim"></select>
+    </div>
+    <div class="note" id="shop-meta" style="display:none;margin-top:10px"></div>
     <div class="mbtns">
       <button class="btn ghost" onclick="closeShopItemModal()">Fechar</button>
-      <button class="btn danger" id="shop-item-del" onclick="deleteShopItemFromModal()" style="display:none">Eliminar</button>
+      <button class="btn ghost" id="shop-item-restore" onclick="restoreShopItemFromModal()" style="display:none">↩︎ Repor</button>
+      <button class="btn danger" id="shop-item-del" onclick="deleteShopItemFromModal()" style="display:none">Remover</button>
       <button class="btn prim" id="shop-item-save" onclick="saveShopItem()">Adicionar</button>
     </div>
     <div class="note">Fica na lista partilhada do grupo.</div>

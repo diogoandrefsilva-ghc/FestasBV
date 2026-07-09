@@ -2736,7 +2736,14 @@ async function toggleSexo(idx){
       "outros gastos" avulsos. Cada linha vira UMA despesa marcada com o mesmo
       compra_id → a distribuição pelas refeições respeita as datas da lista (o motor
       calcular() aloca Almoço/Jantar com data_valor diretamente à refeição) e a compra
-      pode ser reaberta e editada como um todo a partir do cash-flow. */
+      pode ser reaberta e editada como um todo a partir do cash-flow.
+   Regras de posse:
+   - Só o autor (criado_por) ou o admin removem um artigo — e remover é soft-delete
+     (estado='removido'): vai para o histórico "Removidos" e, se alguém o reclamou,
+     mantém-se visível para essa pessoa com alerta até ela o largar/comprar.
+   - Ninguém "rouba" um artigo reclamado: só o próprio larga (o claim tem guarda
+     anti-corrida no servidor); o admin pode reatribuir no detalhe do artigo.
+   - O estado "no carrinho" é privado de quem trata; os outros só veem quem trata. */
 
 const SHOP_TIPOS=['Gerais','Bebidas','Almoço','Jantar','Renda','Cerveja'];
 function shopArr(){if(DATA&&!DATA.shoplist)DATA.shoplist=[];return (DATA&&DATA.shoplist)||[];}
@@ -2744,7 +2751,15 @@ function shopArr(){if(DATA&&!DATA.shoplist)DATA.shoplist=[];return (DATA&&DATA.s
 // compra_id. Se as despesas foram apagadas por outra via (ex.: Limpar cash-flows),
 // o artigo é tratado como pendente — nunca fica órfão/invisível na lista.
 function shopBacked(it){return !!it.compraId&&(DATA.despesas||[]).some(d=>d.compraId===it.compraId);}
-function shopIsPending(it){return it.estado!=='comprado'||!shopBacked(it);}
+// 'removido' = soft-delete: sai da lista ativa mas fica no histórico (e visível,
+// com alerta, para quem estiver a tratar dele). cf_desc guarda quem removeu —
+// a coluna só é usada pelas compras quando estado='comprado', por isso está livre aqui.
+function shopIsRemoved(it){return it.estado==='removido';}
+function shopIsBought(it){return it.estado==='comprado'&&shopBacked(it);}
+function shopIsPending(it){return !shopIsBought(it)&&!shopIsRemoved(it);}
+// "Ativo para mim": estou a tratar dele e ainda não foi comprado (mesmo que
+// entretanto o autor o tenha removido — mantém-se na minha checklist com alerta)
+function shopMineActive(it){return shopMine(it)&&!shopIsBought(it);}
 function shopTipoIcon(t){return{Gerais:'🧾',Bebidas:'🥤',Almoço:'🍳',Jantar:'🌙',Renda:'🏠',Cerveja:'🍺'}[t]||'🛒';}
 function shopIsMeal(t){return t==='Almoço'||t==='Jantar';}
 function shopGroupKey(it){return it.tipo+'|'+(it.dataValor||'');}
@@ -2806,48 +2821,64 @@ function myClaimNames(){const s=new Set(MY_NAMES);const p=myPrimaryName()||(isAd
 function shopMine(it){return !!it.tratadoPor&&myClaimNames().has(it.tratadoPor);}
 function shopCanEditItem(it){return isAdmin()||(it.criadoPor&&myClaimNames().has(it.criadoPor));}
 
-function shopItemCard(it){
+function shopItemCard(it,mineView){
   const meal=shopIsMeal(it.tipo)&&it.dataValor;
   const badge=meal?`<span class="cmp-badge meal">${shopTipoIcon(it.tipo)} ${fmtDiaMes(it.dataValor)}</span>`:`<span class="cmp-badge">${shopTipoIcon(it.tipo)} ${it.tipo}</span>`;
   const qtdTxt=normalizeQty(it.quantidade);
   const qtd=qtdTxt?`<span class="cmp-qtd">${escHtml(qtdTxt)}</span>`:'';
+  const removed=shopIsRemoved(it);
+  const removedNote=removed?`<div class="cmp-removed">⚠️ <b>${escHtml(it.cfDesc||'Alguém')}</b> removeu este artigo da lista${mineView?' — se já não contas com ele, larga-o':''}</div>`:'';
   // Editar/eliminar vivem no detalhe (toca no artigo). No cartão só ações rápidas.
-  let statusRow;
-  if(it.tratadoPor){
-    const mine=shopMine(it);
+  let check='',statusRow;
+  if(mineView){
+    // Checklist de compras: a bolinha marca "já está no carrinho físico".
+    // Este estado é só para orientação de quem trata — os outros não o veem.
+    check=`<button class="cmp-check write-action ${it.noCarrinho?'on':''}" onclick="event.stopPropagation();toggleCart(${it._id})" aria-label="Já no carrinho">✓</button>`;
     statusRow=`<div class="cmp-status">
-      <span class="cmp-trata ${it.noCarrinho?'incart':''}">${it.noCarrinho?'✅ no carrinho':'🧑‍🍳 '+escHtml(it.tratadoPor)}</span>
-      <div class="cmp-acts write-action">${mine?`<button class="cmp-mini ${it.noCarrinho?'on':''}" onclick="event.stopPropagation();toggleCart(${it._id})">${it.noCarrinho?'Tirar do carrinho':'🛒 No carrinho'}</button><button class="cmp-mini" onclick="event.stopPropagation();unclaimItem(${it._id})">Largar</button>`:''}</div>
+      <span class="cmp-trata ${it.noCarrinho?'incart':'free'}">${it.noCarrinho?'✅ já no carrinho':'por apanhar'}</span>
+      <div class="cmp-acts write-action"><button class="cmp-mini" onclick="event.stopPropagation();unclaimItem(${it._id})">Largar</button></div>
+    </div>`;
+  }else if(it.tratadoPor){
+    // Para quem não trata, basta saber QUE está entregue e a QUEM (o estado
+    // do carrinho é detalhe de quem anda nas compras).
+    statusRow=`<div class="cmp-status">
+      <span class="cmp-trata">🧑‍🍳 <b>${escHtml(it.tratadoPor)}</b> está a tratar</span>
     </div>`;
   }else{
     statusRow=`<div class="cmp-status">
-      <span class="cmp-trata free">Por tratar</span>
+      <span class="cmp-trata free">Por tratar${it.criadoPor?` · pedido por <b>${escHtml(it.criadoPor)}</b>`:''}</span>
       <div class="cmp-acts write-action"><button class="cmp-mini prim" onclick="event.stopPropagation();claimItem(${it._id})">✋ Eu trato</button></div>
     </div>`;
   }
-  return `<div class="cmp-item cmp-tap${it.noCarrinho?' incart':''}" onclick="openShopItemModal(${it._id})">
-    <div class="cmp-item-top">
-      <div class="cmp-artigo">${escHtml(it.artigo)}${qtd}</div>
-      <div class="cmp-item-right">${badge}<span class="cmp-chev-r">›</span></div>
-    </div>
-    ${statusRow}
+  return `<div class="cmp-item cmp-tap${mineView&&it.noCarrinho?' incart':''}${removed?' removed':''}" onclick="openShopItemModal(${it._id})">
+    <div class="cmp-row">${check}<div class="cmp-main">
+      <div class="cmp-item-top">
+        <div class="cmp-artigo">${escHtml(it.artigo)}${qtd}</div>
+        <div class="cmp-item-right">${badge}<span class="cmp-chev-r">›</span></div>
+      </div>
+      ${removedNote}
+      ${statusRow}
+    </div></div>
   </div>`;
 }
 
 function renderCompras(){
   const el=document.getElementById('view-compras');if(!el||!DATA)return;
   const items=shopArr();
-  const pend=items.filter(shopIsPending);
+  const act=items.filter(it=>!shopIsBought(it));          // tudo o que não está comprado
   const canW=shopCanWrite();
   const fechadas=contasFechadas();
   const ord={};SHOP_TIPOS.forEach((t,i)=>ord[t]=i);
   const sortF=(a,b)=>(ord[a.tipo]-ord[b.tipo])||((a.dataValor||'').localeCompare(b.dataValor||''))||a.artigo.localeCompare(b.artigo,'pt');
-  const mine=pend.filter(shopMine).sort(sortF);
-  const falta=pend.filter(x=>!shopMine(x)).sort(sortF);
+  const mine=act.filter(shopMine).sort(sortF);                                   // a minha checklist (inclui removidos c/ alerta)
+  const falta=act.filter(x=>!x.tratadoPor&&!shopIsRemoved(x)).sort(sortF);       // livres, por tratar
+  const outros=act.filter(x=>x.tratadoPor&&!shopMine(x)).sort(sortF);            // entregues a outros
+  const removidos=act.filter(x=>shopIsRemoved(x)&&!x.tratadoPor).sort(sortF);    // histórico de removidos
+  const nAtivos=act.filter(x=>!shopIsRemoved(x)).length;
 
   let h='';
   h+=`<div class="cmp-hdr">
-    <div class="cmp-hdr-title sf">🛒 Compras <span class="cmp-count">${pend.length}</span></div>
+    <div class="cmp-hdr-title sf">🛒 Compras <span class="cmp-count">${nAtivos}</span></div>
     <button class="btn prim write-action" onclick="openShopItemModal()" ${canW?'':'disabled'}>＋ Artigo</button>
   </div>`;
 
@@ -2856,7 +2887,8 @@ function renderCompras(){
   if(!mine.length){
     h+='<div class="empty sf">Ainda não estás a tratar de nenhum artigo. Marca <b>Eu trato</b> nos que fores buscar.</div>';
   }else{
-    h+='<div class="cmp-list">'+mine.map(shopItemCard).join('')+'</div>';
+    h+='<div class="note" style="margin-bottom:8px">A tua checklist: toca na bolinha quando o artigo entrar no carrinho.</div>';
+    h+='<div class="cmp-list">'+mine.map(it=>shopItemCard(it,true)).join('')+'</div>';
   }
   if(fechadas){
     h+='<div class="empty sf" style="margin-top:10px">Contas fechadas — não é possível registar compras.</div>';
@@ -2864,15 +2896,44 @@ function renderCompras(){
     h+=`<button class="btn prim write-action" style="width:100%;margin-top:12px" onclick="openCompra(null)" ${canW?'':'disabled'}>💰 Registar compra</button>`;
   }
 
-  // ── Em falta (por tratar ou tratados por outros) ──
+  // ── Em falta (livres, ninguém trata) ──
   h+=`<div class="cmp-sec-hdr sf" style="margin-top:22px">📝 Em falta <span class="cmp-count">${falta.length}</span></div>`;
-  if(!falta.length)h+='<div class="empty sf">Nada em falta 🎉</div>';
-  else h+='<div class="cmp-list">'+falta.map(shopItemCard).join('')+'</div>';
+  if(!falta.length)h+='<div class="empty sf">Nada por tratar 🎉</div>';
+  else h+='<div class="cmp-list">'+falta.map(it=>shopItemCard(it,false)).join('')+'</div>';
+
+  // ── Alguém trata (entregues a outros — sem detalhe do carrinho deles) ──
+  if(outros.length){
+    h+=`<div class="cmp-sec-hdr sf" style="margin-top:22px">🧑‍🍳 Alguém trata <span class="cmp-count">${outros.length}</span></div>`;
+    h+='<div class="cmp-list">'+outros.map(it=>shopItemCard(it,false)).join('')+'</div>';
+  }
 
   // ── Comprados (a partir das despesas ligadas a uma compra) ──
   h+=renderComprados();
 
+  // ── Removidos (soft-delete: histórico visível, com opção de repor) ──
+  h+=renderRemovidos(removidos);
+
   el.innerHTML=h;
+}
+
+function renderRemovidos(removidos){
+  if(!removidos.length)return '';
+  const rows=removidos.map(it=>{
+    const qtdTxt=normalizeQty(it.quantidade);
+    const badge=shopIsMeal(it.tipo)&&it.dataValor?`${shopTipoIcon(it.tipo)} ${fmtDiaMes(it.dataValor)}`:`${shopTipoIcon(it.tipo)} ${it.tipo}`;
+    const acts=`<div class="cmp-rm-acts write-action">
+      <button class="cmp-mini" onclick="restoreShopItem(${it._id})">↩︎ Repor</button>
+      ${isAdmin()?`<button class="cmp-mini" onclick="purgeShopItem(${it._id})">✕</button>`:''}
+    </div>`;
+    return `<div class="cmp-done-card cmp-rm">
+      <div class="cmp-done-top"><b>${escHtml(it.artigo)}${qtdTxt?' <i class="cmp-rm-qtd">'+escHtml(qtdTxt)+'</i>':''}</b><span class="cmp-done-meta">${badge}</span></div>
+      <div class="cmp-rm-meta">pedido por ${escHtml(it.criadoPor||'?')} · removido por ${escHtml(it.cfDesc||'?')}</div>
+      ${acts}
+    </div>`;
+  }).join('');
+  return `<div class="cmp-done-hdr sf" onclick="this.nextElementSibling.classList.toggle('open');this.classList.toggle('open')">
+      <span>🗑️ Removidos <span class="cmp-count">${removidos.length}</span></span><span class="cmp-chev">▾</span></div>
+    <div class="cmp-done-body">${rows}</div>`;
 }
 
 function renderComprados(){
@@ -2917,13 +2978,37 @@ function openShopItemModal(id){
   document.getElementById('shop-tipo').value=it?it.tipo:'Gerais';
   shopTipoChanged();
   if(it&&shopIsMeal(it.tipo))document.getElementById('shop-ref').value=it.dataValor||'';
+  // Meta: quem pediu / quem trata / removido — visível para todos no detalhe
+  const meta=document.getElementById('shop-meta');
+  if(it){
+    const mm=[];
+    if(it.criadoPor)mm.push(`📝 Pedido por <b>${escHtml(it.criadoPor)}</b>${it.criadoEm?' · '+fmtDiaMes(String(it.criadoEm).slice(0,10)):''}`);
+    if(it.tratadoPor)mm.push(`🧑‍🍳 <b>${escHtml(it.tratadoPor)}</b> está a tratar${shopMine(it)&&it.noCarrinho?' · ✅ já no carrinho':''}`);
+    if(shopIsRemoved(it))mm.push(`⚠️ Removido da lista por <b>${escHtml(it.cfDesc||'?')}</b>`);
+    meta.innerHTML=mm.join('<br>');meta.style.display=mm.length?'':'none';
+  }else meta.style.display='none';
+  // Reatribuir "quem trata": só o admin pode puxar/passar um artigo reclamado
+  const claimWrap=document.getElementById('shop-claim-wrap');
+  if(it&&isAdmin()){
+    let opts='<option value="">— ninguém —</option>';
+    const nomes=CALC?CALC.membros.map(m=>m.nome):[];
+    if(it.tratadoPor&&!nomes.includes(it.tratadoPor))opts+=`<option value="${escHtml(it.tratadoPor)}" selected>${escHtml(it.tratadoPor)}</option>`;
+    nomes.forEach(n=>{opts+=`<option value="${escHtml(n)}"${it.tratadoPor===n?' selected':''}>${escHtml(n)}</option>`;});
+    document.getElementById('shop-claim').innerHTML=opts;
+    claimWrap.style.display='';
+  }else claimWrap.style.display='none';
   // Campos editáveis só quem pode; senão, detalhe em leitura
   document.querySelectorAll('#shop-item-modal input,#shop-item-modal select').forEach(el=>{el.disabled=!canEdit;el.style.opacity=canEdit?'':'.75';});
   const saveBtn=document.getElementById('shop-item-save');
   saveBtn.textContent=it?'Guardar':'Adicionar';
   saveBtn.style.display=canEdit?'':'none';
   const delBtn=document.getElementById('shop-item-del');
-  delBtn.style.display=(it&&canEdit)?'':'none';
+  // Remover = soft-delete (autor ou admin); num artigo já removido só o admin apaga de vez
+  const canDel=it&&canEdit&&(!shopIsRemoved(it)||isAdmin());
+  delBtn.style.display=canDel?'':'none';
+  delBtn.textContent=it&&shopIsRemoved(it)?'Apagar de vez':'Remover';
+  const restBtn=document.getElementById('shop-item-restore');
+  restBtn.style.display=(it&&shopIsRemoved(it)&&shopCanWrite())?'':'none';
   document.getElementById('shop-item-bg').classList.add('show');
   document.body.classList.add('no-scroll');
   if(!it)setTimeout(()=>document.getElementById('shop-artigo').focus(),50);
@@ -2952,8 +3037,15 @@ async function saveShopItem(){
   try{
     if(editingItemId!=null){
       const it=shopArr().find(x=>x._id===editingItemId);
-      await queueWrite(()=>sbReq('PATCH',`shoplist?id=eq.${editingItemId}`,{artigo,quantidade:qtd,tipo,data_valor:dataValor}));
-      if(it)Object.assign(it,{artigo,quantidade:qtd,tipo,dataValor});
+      const patch={artigo,quantidade:qtd,tipo,data_valor:dataValor};
+      const local={artigo,quantidade:qtd,tipo,dataValor};
+      // Admin pode reatribuir quem trata (puxar/largar por outrem)
+      if(it&&isAdmin()&&document.getElementById('shop-claim-wrap').style.display!=='none'){
+        const nv=document.getElementById('shop-claim').value||null;
+        if(nv!==(it.tratadoPor||null)){patch.tratado_por=nv;patch.no_carrinho=false;local.tratadoPor=nv;local.noCarrinho=false;}
+      }
+      await queueWrite(()=>sbReq('PATCH',`shoplist?id=eq.${editingItemId}`,patch));
+      if(it)Object.assign(it,local);
       toast('Artigo atualizado ✓','ok');
     }else{
       const criadoPor=myPrimaryName()||(isAdmin()?'Admin':'');
@@ -2977,17 +3069,58 @@ async function _shopUpdate(id,patch,local){
     Object.assign(it,local);syncMirror();marcaGuardado();renderCompras();
   }catch(e){setSync('err','erro ao guardar');toast(permErrorMsg(e),'bad');}
 }
-function claimItem(id){const nome=myPrimaryName()||(isAdmin()?'Admin':'');_shopUpdate(id,{tratado_por:nome},{tratadoPor:nome});}
-function unclaimItem(id){_shopUpdate(id,{tratado_por:null,no_carrinho:false},{tratadoPor:null,noCarrinho:false});}
-function toggleCart(id){const it=shopArr().find(x=>x._id===id);if(!it)return;const v=!it.noCarrinho;_shopUpdate(id,{no_carrinho:v},{noCarrinho:v});}
+async function claimItem(id){
+  const it=shopArr().find(x=>x._id===id);if(!it)return;
+  if(it.tratadoPor&&!shopMine(it)){toast(`Já está a ser tratado por ${it.tratadoPor}`,'bad');return;}
+  const nome=myPrimaryName()||(isAdmin()?'Admin':'');
+  setSync('load','a guardar…');
+  try{
+    // Anti-corrida: só reclama se no servidor ainda estiver livre — ninguém
+    // "rouba" um artigo que outro reclamou entretanto (só o próprio larga).
+    const res=await queueWrite(()=>sbReq('PATCH',`shoplist?id=eq.${id}&tratado_por=is.null`,{tratado_por:nome},{Prefer:'return=representation'}));
+    if(res&&res.length){Object.assign(it,{tratadoPor:nome});}
+    else{
+      const rows=await sbReq('GET',`shoplist?id=eq.${id}&select=tratado_por,no_carrinho,estado`);
+      if(rows&&rows[0])Object.assign(it,{tratadoPor:rows[0].tratado_por||null,noCarrinho:!!rows[0].no_carrinho,estado:rows[0].estado||it.estado});
+      toast(it.tratadoPor?`Entretanto ficou ${it.tratadoPor} a tratar`:'Não foi possível reclamar o artigo','bad');
+    }
+    syncMirror();marcaGuardado();renderCompras();
+  }catch(e){setSync('err','erro ao guardar');toast(permErrorMsg(e),'bad');}
+}
+function unclaimItem(id){
+  const it=shopArr().find(x=>x._id===id);if(!it)return;
+  if(!shopMine(it)&&!isAdmin()){toast('Só quem está a tratar pode largar o artigo','bad');return;}
+  _shopUpdate(id,{tratado_por:null,no_carrinho:false},{tratadoPor:null,noCarrinho:false});
+}
+function toggleCart(id){
+  const it=shopArr().find(x=>x._id===id);if(!it)return;
+  if(!shopMine(it)&&!isAdmin())return;   // o carrinho é pessoal de quem trata
+  const v=!it.noCarrinho;_shopUpdate(id,{no_carrinho:v},{noCarrinho:v});
+}
 async function deleteShopItem(id){
   const it=shopArr().find(x=>x._id===id);if(!it)return;
-  if(!confirm(`Remover "${it.artigo}" da lista?`))return;
+  if(!shopCanEditItem(it)){toast('Só quem pediu o artigo (ou o admin) o pode remover','bad');return;}
+  if(shopIsRemoved(it)){purgeShopItem(id);return;}   // já no histórico → apagar de vez (admin)
+  const aviso=it.tratadoPor&&!shopMine(it)?`\n\nAtenção: ${it.tratadoPor} está a tratar dele — vai continuar a vê-lo com um alerta até o largar.`:'';
+  if(!confirm(`Remover "${it.artigo}" da lista?${aviso}\n\n(Fica no histórico de Removidos, de onde pode ser reposto.)`))return;
+  const quem=myPrimaryName()||(isAdmin()?'Admin':'');
+  _shopUpdate(id,{estado:'removido',cf_desc:quem},{estado:'removido',cfDesc:quem});
+}
+function restoreShopItem(id){
+  const it=shopArr().find(x=>x._id===id);if(!it||!shopIsRemoved(it))return;
+  if(!shopCanWrite()){toast('Sem permissão','bad');return;}
+  _shopUpdate(id,{estado:'pendente',cf_desc:null},{estado:'pendente',cfDesc:null});
+}
+function restoreShopItemFromModal(){if(editingItemId!=null){const id=editingItemId;closeShopItemModal();restoreShopItem(id);}}
+async function purgeShopItem(id){   // apagar definitivamente do histórico (só admin)
+  const it=shopArr().find(x=>x._id===id);if(!it)return;
+  if(!isAdmin()){toast('Só o admin pode apagar definitivamente','bad');return;}
+  if(!confirm(`Apagar definitivamente "${it.artigo}"?`))return;
   setSync('load','a guardar…');
   try{
     await queueWrite(()=>sbReq('DELETE',`shoplist?id=eq.${id}`));
     DATA.shoplist=shopArr().filter(x=>x._id!==id);syncMirror();marcaGuardado();renderCompras();
-    toast('Artigo removido','ok');
+    toast('Artigo apagado','ok');
   }catch(e){setSync('err','erro ao guardar');toast(permErrorMsg(e),'bad');}
 }
 
@@ -3008,7 +3141,7 @@ function openCompra(compraId){
       compraEdit.lines.push({tipo:d.tipo,dataValor:d.dataValor||null,valor:d.valor,obs:d.obs||''});
     });
   }else{
-    const seed=shopArr().filter(x=>shopIsPending(x)&&shopMine(x));
+    const seed=shopArr().filter(shopMineActive);   // inclui removidos que ainda reclamo (podem já estar no carrinho)
     const gmap={};
     seed.forEach(it=>{const k=shopGroupKey(it);(gmap[k]=gmap[k]||{tipo:it.tipo,dataValor:it.dataValor||null,items:[]}).items.push(it);});
     const ord={};SHOP_TIPOS.forEach((t,i)=>ord[t]=i);
@@ -3033,8 +3166,8 @@ function openCompra(compraId){
   document.getElementById('shop-buy-desc').value=desc0;
   shopBuyDescCount();
 
-  // Picker de artigos
-  const pend=shopArr().filter(shopIsPending);
+  // Picker de artigos (pendentes + removidos que eu ainda reclamo)
+  const pend=shopArr().filter(x=>shopIsPending(x)||(shopIsRemoved(x)&&shopMine(x)));
   const pickItems=isEdit?linked.concat(pend.filter(x=>x.compraId!==compraId)):pend;
   let pl='';
   if(pickItems.length){
@@ -3042,7 +3175,7 @@ function openCompra(compraId){
     pickItems.slice().sort((a,b)=>a.artigo.localeCompare(b.artigo,'pt')).forEach(it=>{
       const on=isEdit?it.compraId===compraId:shopMine(it);
       pl+=`<label class="cmp-pick-row"><input type="checkbox" class="shop-pick" value="${it._id}" ${on?'checked':''}>
-        <span>${escHtml(it.artigo)}${it.quantidade?' <i>('+escHtml(it.quantidade)+')</i>':''}</span>
+        <span>${escHtml(it.artigo)}${it.quantidade?' <i>('+escHtml(it.quantidade)+')</i>':''}${shopIsRemoved(it)?' ⚠️':''}</span>
         <span class="cmp-badge">${shopTipoIcon(it.tipo)}${shopIsMeal(it.tipo)&&it.dataValor?' '+fmtDiaMes(it.dataValor):' '+it.tipo}</span></label>`;
     });
     pl+='<div class="note" style="margin-top:6px">Os artigos marcados saem da lista e ficam ligados a esta compra.</div>';
