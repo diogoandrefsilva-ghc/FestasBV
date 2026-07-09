@@ -173,8 +173,13 @@ function amigosSemUtilizador(){
 }
 
 function updateContasUI(){
-  document.body.classList.toggle('contas-fechadas',contasFechadas());
+  const fechadas=contasFechadas();
+  document.body.classList.toggle('contas-fechadas',fechadas);
   document.body.classList.toggle('dividas-saldadas',dividasTodasSaldadas());
+  // Compras não faz sentido em anos fechados — esconde o tab (e sai dele se lá estiver)
+  const comprasTab=document.querySelector('.tab[data-tab="compras"]');
+  if(comprasTab)comprasTab.style.display=fechadas?'none':'';
+  if(fechadas&&TAB==='compras')setTab('saldos');
 }
 
 async function fecharContas(){
@@ -677,7 +682,7 @@ function mealIco(ref,px){
 const AVCOL=['#eeb64d','#e0533f','#2f9e77','#7fa8c9','#d98a3d','#43c98a','#c96f8a','#b98cff'];
 function av(nome,i){return`<div class="av" style="background:${AVCOL[i%AVCOL.length]}">${nome.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase()}</div>`;}
 
-function setTab(t){TAB=t;document.querySelectorAll('.tab').forEach(e=>e.classList.toggle('on',e.dataset.tab===t));
+function setTab(t){if(t==='compras'&&contasFechadas())t='saldos';TAB=t;document.querySelectorAll('.tab').forEach(e=>e.classList.toggle('on',e.dataset.tab===t));
   if(['saldos','refeicoes','cashflows','compras'].includes(t))lsSet('fbv_tab',t);
   ['saldos','refeicoes','cashflows','compras'].forEach(v=>document.getElementById('view-'+v).style.display=v===t?'':'none');
   // Hero only visible in saldos tab
