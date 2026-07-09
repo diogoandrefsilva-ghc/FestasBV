@@ -2827,38 +2827,26 @@ function shopItemCard(it,mineView){
   const qtdTxt=normalizeQty(it.quantidade);
   const qtd=qtdTxt?`<span class="cmp-qtd">${escHtml(qtdTxt)}</span>`:'';
   const removed=shopIsRemoved(it);
-  const removedNote=removed?`<div class="cmp-removed">⚠️ <b>${escHtml(it.cfDesc||'Alguém')}</b> removeu este artigo da lista${mineView?' — se já não contas com ele, larga-o':''}</div>`:'';
-  // Editar/eliminar vivem no detalhe (toca no artigo). No cartão só ações rápidas.
-  let check='',statusRow;
+  // Cartão de UMA linha (escala para dezenas de artigos). Editar/eliminar/largar
+  // vivem no detalhe (toca no artigo); no cartão só a ação principal de cada vista.
+  let check='',right='',sub='';
   if(mineView){
     // Checklist de compras: a bolinha marca "já está no carrinho físico".
     // Este estado é só para orientação de quem trata — os outros não o veem.
     check=`<button class="cmp-check write-action ${it.noCarrinho?'on':''}" onclick="event.stopPropagation();toggleCart(${it._id})" aria-label="Já no carrinho">✓</button>`;
-    statusRow=`<div class="cmp-status">
-      <span class="cmp-trata ${it.noCarrinho?'incart':'free'}">${it.noCarrinho?'✅ já no carrinho':'por apanhar'}</span>
-      <div class="cmp-acts write-action"><button class="cmp-mini" onclick="event.stopPropagation();unclaimItem(${it._id})">Largar</button></div>
-    </div>`;
   }else if(it.tratadoPor){
     // Para quem não trata, basta saber QUE está entregue e a QUEM (o estado
     // do carrinho é detalhe de quem anda nas compras).
-    statusRow=`<div class="cmp-status">
-      <span class="cmp-trata">🧑‍🍳 <b>${escHtml(it.tratadoPor)}</b> está a tratar</span>
-    </div>`;
+    right=`<span class="cmp-chip">🧑‍🍳 ${escHtml(it.tratadoPor)}</span>`;
   }else{
-    statusRow=`<div class="cmp-status">
-      <span class="cmp-trata free">Por tratar${it.criadoPor?` · pedido por <b>${escHtml(it.criadoPor)}</b>`:''}</span>
-      <div class="cmp-acts write-action"><button class="cmp-mini prim" onclick="event.stopPropagation();claimItem(${it._id})">✋ Eu trato</button></div>
-    </div>`;
+    if(it.criadoPor)sub=`<div class="cmp-sub">pedido por ${escHtml(it.criadoPor)}</div>`;
+    right=`<button class="cmp-mini prim write-action" onclick="event.stopPropagation();claimItem(${it._id})">✋ Eu trato</button>`;
   }
-  return `<div class="cmp-item cmp-tap${mineView&&it.noCarrinho?' incart':''}${removed?' removed':''}" onclick="openShopItemModal(${it._id})">
-    <div class="cmp-row">${check}<div class="cmp-main">
-      <div class="cmp-item-top">
-        <div class="cmp-artigo">${escHtml(it.artigo)}${qtd}</div>
-        <div class="cmp-item-right">${badge}<span class="cmp-chev-r">›</span></div>
-      </div>
-      ${removedNote}
-      ${statusRow}
-    </div></div>
+  if(removed)sub=`<div class="cmp-sub alert">⚠️ removido por ${escHtml(it.cfDesc||'?')}${mineView?' — abre para largar':''}</div>`;
+  return `<div class="cmp-item cmp-line cmp-tap${mineView&&it.noCarrinho?' incart':''}${removed?' removed':''}" onclick="openShopItemModal(${it._id})">
+    ${check}
+    <div class="cmp-main"><div class="cmp-artigo">${escHtml(it.artigo)}${qtd}</div>${sub}</div>
+    ${badge}${right}<span class="cmp-chev-r">›</span>
   </div>`;
 }
 
@@ -2887,7 +2875,6 @@ function renderCompras(){
   if(!mine.length){
     h+='<div class="empty sf">Ainda não estás a tratar de nenhum artigo. Marca <b>Eu trato</b> nos que fores buscar.</div>';
   }else{
-    h+='<div class="note" style="margin-bottom:8px">A tua checklist: toca na bolinha quando o artigo entrar no carrinho.</div>';
     h+='<div class="cmp-list">'+mine.map(it=>shopItemCard(it,true)).join('')+'</div>';
   }
   if(fechadas){
@@ -3009,6 +2996,8 @@ function openShopItemModal(id){
   delBtn.textContent=it&&shopIsRemoved(it)?'Apagar de vez':'Remover';
   const restBtn=document.getElementById('shop-item-restore');
   restBtn.style.display=(it&&shopIsRemoved(it)&&shopCanWrite())?'':'none';
+  // Largar (só quem está a tratar) — no cartão só fica a bolinha do carrinho
+  document.getElementById('shop-item-unclaim').style.display=(it&&shopMine(it))?'':'none';
   document.getElementById('shop-item-bg').classList.add('show');
   document.body.classList.add('no-scroll');
   if(!it)setTimeout(()=>document.getElementById('shop-artigo').focus(),50);
@@ -3112,6 +3101,7 @@ function restoreShopItem(id){
   _shopUpdate(id,{estado:'pendente',cf_desc:null},{estado:'pendente',cfDesc:null});
 }
 function restoreShopItemFromModal(){if(editingItemId!=null){const id=editingItemId;closeShopItemModal();restoreShopItem(id);}}
+function unclaimItemFromModal(){if(editingItemId!=null){const id=editingItemId;closeShopItemModal();unclaimItem(id);}}
 async function purgeShopItem(id){   // apagar definitivamente do histórico (só admin)
   const it=shopArr().find(x=>x._id===id);if(!it)return;
   if(!isAdmin()){toast('Só o admin pode apagar definitivamente','bad');return;}
