@@ -756,6 +756,9 @@ function cfIcon(t){
 }
 // Lata vermelha (não há emoji de lata simples — o 🥫 parece polpa de tomate)
 const ICON_LATA='<svg viewBox="0 0 24 24" width="1em" height="1em" style="vertical-align:-.125em" aria-hidden="true"><path d="M5 5v14c0 1.66 3.13 3 7 3s7-1.34 7-3V5z" fill="#e03131"/><path d="M5 10c0 1.66 3.13 3 7 3s7-1.34 7-3" fill="none" stroke="#c92a2a" stroke-width="1.2"/><path d="M5 15c0 1.66 3.13 3 7 3s7-1.34 7-3" fill="none" stroke="#c92a2a" stroke-width="1.2"/><ellipse cx="12" cy="5" rx="7" ry="2.6" fill="#c92a2a"/><ellipse cx="12" cy="5" rx="5.4" ry="1.9" fill="#e03131"/><ellipse cx="12.8" cy="4.8" rx="1.7" ry=".8" fill="#a61e1e"/></svg>';
+// Saco de dinheiro (Sobras Ano Anterior) e moeda (Outros) — mesmo estilo da Lata
+const ICON_SACO='<svg viewBox="0 0 24 24" width="1em" height="1em" style="vertical-align:-.125em" aria-hidden="true"><path d="M9 2.5h6c.5 0 .7.5.4.9L13.8 5.5h-3.6L8.6 3.4c-.3-.4-.1-.9.4-.9z" fill="#8a6410"/><path d="M10.2 5.5h3.6c3.7 1.9 6 5.5 6 9.3 0 4.4-3.2 6.7-7.8 6.7s-7.8-2.3-7.8-6.7c0-3.8 2.3-7.4 6-9.3z" fill="#eeb64d"/><path d="M9.4 6.7c-.4-.5-.1-1.2.6-1.2h4c.7 0 1 .7.6 1.2l-.6.7h-4z" fill="#c8951f"/><text x="12" y="17.4" text-anchor="middle" font-size="9.5" font-weight="800" fill="#7a5a0e" font-family="system-ui,sans-serif">€</text></svg>';
+const ICON_MOEDA='<svg viewBox="0 0 24 24" width="1em" height="1em" style="vertical-align:-.125em" aria-hidden="true"><circle cx="12" cy="12" r="9.5" fill="#c8951f"/><circle cx="12" cy="12" r="7.7" fill="#eeb64d"/><circle cx="12" cy="12" r="6.3" fill="none" stroke="#a87b14" stroke-width=".9" stroke-dasharray="1.7 1.7"/><text x="12" y="15.6" text-anchor="middle" font-size="10" font-weight="800" fill="#7a5a0e" font-family="system-ui,sans-serif">€</text></svg>';
 
 function renderAll(){
   if(!CALC)return;const ms=CALC.membros;
@@ -1024,7 +1027,7 @@ function renderCashFlows(){
   });
 
   (DATA.mealheiros||[]).forEach((m,i)=>{
-    const subIcons={'sobras_ano_anterior':['🏦','Sobras Ano Anterior'],'outros':['🎁','Outros']};
+    const subIcons={'sobras_ano_anterior':[ICON_SACO,'Sobras Ano Anterior'],'outros':[ICON_MOEDA,'Outros']};
     const [mIcon,mLabel]=subIcons[m.subtipo]||[ICON_LATA,'Lata'];
     allCf.push({type:'mealheiro',date:m.data||'',label:mLabel,icon:mIcon,sub:mLabel,
       line1:`${m.quem} recebeu`,line2:m.desc||'',valor:m.valor,
@@ -1154,7 +1157,9 @@ function renderCashFlows(){
       </div>`;
     }
     const sgn=cf.sign==='neg'?'−':cf.sign==='pos'?'+':'';
-    const kind=cf.type==='despesa'?('Despesa'+(cf.sub?' · '+cf.sub:'')+(cf.dia?' · '+cf.dia:'')):cf.label;
+    const kind=cf.type==='despesa'?('Despesa'+(cf.sub?' · '+cf.sub:'')+(cf.dia?' · '+cf.dia:''))
+      :cf.type==='mealheiro'?('Mealheiro · '+(cf.sub||'Lata'))
+      :cf.label;
     const meta=[];
     if(cf.line2)meta.push(truncRef(cf.line2));
     if(cf.fromList)meta.push('🛒 lista');
@@ -1714,8 +1719,8 @@ function updateCfForm(){
       <label>Tipo de mealheiro</label>
       <div class="cf-wheel" id="meal-subtype-wheel" style="margin-bottom:4px">
         <div class="cf-opt on" data-sub="corrente" onclick="setMealSubtype(this,'corrente')"><span class="cf-icon" style="font-size:20px">${ICON_LATA}</span><span class="cf-lbl">Lata</span></div>
-        <div class="cf-opt" data-sub="sobras" onclick="setMealSubtype(this,'sobras')"><span class="cf-icon">🏦</span><span class="cf-lbl">Sobras Ano Ant.</span></div>
-        <div class="cf-opt" data-sub="outros" onclick="setMealSubtype(this,'outros')"><span class="cf-icon">🎁</span><span class="cf-lbl">Outros</span></div>
+        <div class="cf-opt" data-sub="sobras" onclick="setMealSubtype(this,'sobras')"><span class="cf-icon" style="font-size:20px">${ICON_SACO}</span><span class="cf-lbl">Sobras Ano Ant.</span></div>
+        <div class="cf-opt" data-sub="outros" onclick="setMealSubtype(this,'outros')"><span class="cf-icon" style="font-size:20px">${ICON_MOEDA}</span><span class="cf-lbl">Outros</span></div>
       </div>
       <div id="meal-corrente-fields">
         <label>Quem recolheu?</label>
@@ -2134,7 +2139,7 @@ function openCfDetail(source,idx){
   if(!isAdmin()||bloquearPorFecho){
     const f=document.getElementById('edit-cf-form');
     f.querySelectorAll('input,select,textarea').forEach(el=>{el.disabled=true;el.style.opacity='.75';});
-    f.querySelectorAll('.sd-chip').forEach(el=>{el.style.pointerEvents='none';});
+    f.querySelectorAll('.sd-chip,.cf-opt').forEach(el=>{el.style.pointerEvents='none';});
   }
 }
 
@@ -2245,9 +2250,18 @@ function editCfEntry(source,idx){
     setTimeout(()=>{ecfTipoChanged();updDescCount('ecf');},10);
   } else if(editType==='mealheiro'){
     const m=DATA.mealheiros[idx];
+    const st=m.subtipo||'lata';
+    editingCf.mealSubtipo=st;
     f.innerHTML=`
+      <label>Tipo de mealheiro</label>
+      <div class="cf-wheel" id="ecf-meal-wheel" style="margin-bottom:4px">
+        ${[['lata',ICON_LATA,'Lata'],['sobras_ano_anterior',ICON_SACO,'Sobras Ano Ant.'],['outros',ICON_MOEDA,'Outros']].map(([k,ic,lb])=>
+          `<div class="cf-opt${k===st?' on':''}" onclick="setEcfMealSubtype(this,'${k}')"><span class="cf-icon" style="font-size:20px">${ic}</span><span class="cf-lbl">${lb}</span></div>`).join('')}
+      </div>
       <label>Quem recebeu?</label>
       <select id="ecf-who">${memberOptions(m.quem)}</select>
+      <label>Descrição</label>
+      <textarea id="ecf-desc" rows="2" placeholder="Ex: Contagem da lata, patrocínio… (opcional)">${escHtml(m.desc||'')}</textarea>
       <div class="inline-row" style="margin-top:14px">
         <div><label>Valor (€)</label><input type="number" id="ecf-val" step="0.01" value="${m.valor}" inputmode="decimal"></div>
         <div><label>Data</label><input type="date" id="ecf-date" value="${m.data||''}"></div>
@@ -2257,6 +2271,13 @@ function editCfEntry(source,idx){
   applyRoFields(document.getElementById('edit-cf-modal'),!isAdmin());
   document.getElementById('edit-cf-bg').classList.add('show');
   document.body.classList.add('no-scroll');
+}
+
+/* Subtipo do mealheiro no modal de edição */
+function setEcfMealSubtype(el,k){
+  if(!editingCf)return;
+  editingCf.mealSubtipo=k;
+  document.querySelectorAll('#ecf-meal-wheel .cf-opt').forEach(o=>o.classList.toggle('on',o===el));
 }
 
 /* Detalhe de um pagamento: mostra SÓ as dívidas efetivamente pagas (consulta).
@@ -2382,6 +2403,8 @@ async function saveEditCf(){
     m.quem=document.getElementById('ecf-who').value;
     m.valor=parseFloat(document.getElementById('ecf-val').value)||m.valor;
     m.data=document.getElementById('ecf-date').value;
+    m.subtipo=editingCf.mealSubtipo||m.subtipo||'lata';
+    m.desc=(document.getElementById('ecf-desc')?.value||'').trim();
   }
 
   const ok=await pushToGitHub('Editar cash-flow');
