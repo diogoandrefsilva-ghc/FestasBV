@@ -794,30 +794,28 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .cf-compra-line i{font-style:normal;color:var(--faint)}
 .cf-compra-line span:last-child{flex:0 0 auto;font-variant-numeric:tabular-nums;font-weight:600;color:var(--ink)}
 
-/* ═══ CASH-FLOWS — "Cronologia" (alternativa B) ═══ */
-.cfb-hero{background:linear-gradient(155deg,var(--panel),var(--sal));border:1px solid var(--line);border-radius:18px;padding:16px 18px;margin-bottom:14px;box-shadow:var(--shadow);position:relative;overflow:hidden}
-.cfb-hero::before{content:"";position:absolute;inset:0;background:radial-gradient(circle at 85% 0%,rgba(168,123,20,.08),transparent 60%);pointer-events:none}
-.cfb-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
-.cfb-lbl{font-family:var(--display);font-size:13px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);font-weight:600}
-.cfb-big{font-size:34px;font-weight:800;letter-spacing:-.8px;font-variant-numeric:tabular-nums;line-height:1.1;margin-top:2px}
-.cfb-big.pos{color:var(--green)}.cfb-big.neg{color:var(--red)}
-.cfb-mini{display:flex;flex-direction:column;gap:2px;text-align:right;font-size:12.5px;font-weight:700;font-variant-numeric:tabular-nums;margin-top:4px;flex-shrink:0}
-.cfb-mini .pos{color:var(--green)}.cfb-mini .neg{color:var(--red)}
-.cfb-bar{display:flex;height:10px;border-radius:6px;overflow:hidden;margin:12px 0 10px;gap:2px}
-.cfb-seg{border-radius:3px;min-width:6px}
-.sg-despesa{background:var(--red)}.sg-mealheiro{background:var(--green)}.sg-reembolso{background:var(--blue)}.sg-saldar{background:var(--gold)}
-.cfb-legs{display:grid;grid-template-columns:1fr 1fr;gap:5px 8px;position:relative}
-.cfb-leg{display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:6px 10px;border-radius:10px;border:1.5px solid transparent;cursor:pointer;transition:.15s;user-select:none;background:rgba(110,75,25,.05);min-width:0}
-.cfb-leg:active{transform:scale(.97)}
-.cfb-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;display:inline-block;margin-right:5px;vertical-align:1px}
-.cfb-leg-lbl{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
-.cfb-leg-lbl i{font-style:normal;color:var(--faint);margin-left:3px;font-weight:600}
-.cfb-leg b{font-size:13px;font-variant-numeric:tabular-nums}
-.cfb-leg b.neg{color:var(--red)}.cfb-leg b.pos{color:var(--green)}.cfb-leg b.mov{color:var(--blue)}.cfb-leg b.set{color:var(--gold)}
-.cfb-leg.on.b-despesa{border-color:var(--red);background:rgba(179,64,47,.08)}
-.cfb-leg.on.b-mealheiro{border-color:var(--green);background:rgba(30,122,77,.08)}
-.cfb-leg.on.b-reembolso{border-color:var(--blue);background:rgba(46,111,168,.08)}
-.cfb-leg.on.b-saldar{border-color:var(--gold);background:rgba(168,123,20,.1)}
+/* ═══ CASH-FLOWS — "Mista" (versão C: cabeçalho extrato + cronologia) ═══ */
+.cfc-net{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 16px;margin:0 0 10px}
+.cfc-net-lbl{font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--faint);font-weight:700}
+.cfc-net-val{font-size:28px;font-weight:800;letter-spacing:-.5px;font-variant-numeric:tabular-nums;line-height:1.15}
+.cfc-net-val.pos{color:var(--green)}.cfc-net-val.neg{color:var(--red)}
+.cfc-net-cols{display:grid;grid-template-columns:auto auto;gap:4px 9px;align-items:baseline;flex-shrink:0}
+.cfc-net-cols small{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--faint)}
+.cfc-net-cols b{font-size:12.5px;font-weight:700;font-variant-numeric:tabular-nums;text-align:right}
+.cfc-net-cols b.pos{color:var(--green)}.cfc-net-cols b.neg{color:var(--red)}
+.cfc-pills{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:10px}
+.cfc-pill{background:var(--panel);border:1.5px solid var(--line);border-radius:11px;padding:7px 4px 6px;text-align:center;cursor:pointer;transition:.15s;user-select:none;min-width:0;overflow:hidden}
+.cfc-pill:active{transform:scale(.96)}
+.cfc-pill b{display:block;font-size:11.5px;font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap}
+.cfc-pill b.neg{color:var(--red)}.cfc-pill b.pos{color:var(--green)}.cfc-pill b.mov{color:var(--blue)}.cfc-pill b.set{color:var(--gold)}
+.cfc-pill small{display:block;font-size:7.5px;font-weight:700;text-transform:uppercase;letter-spacing:.02em;color:var(--faint);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cfc-pill small i{font-style:normal;color:var(--muted)}
+.cfc-pill.on.b-despesa{border-color:var(--red);background:rgba(179,64,47,.07)}
+.cfc-pill.on.b-mealheiro{border-color:var(--green);background:rgba(30,122,77,.07)}
+.cfc-pill.on.b-reembolso{border-color:var(--blue);background:rgba(46,111,168,.07)}
+.cfc-pill.on.b-saldar{border-color:var(--gold);background:rgba(168,123,20,.08)}
+.cfc-tabs{margin-bottom:10px}
+.cfc-prev-list{display:flex;flex-direction:column;gap:8px}
 .cft-month{font-family:var(--display);font-size:14px;letter-spacing:.14em;text-transform:uppercase;color:var(--campino);font-weight:600;margin:14px 0 8px;display:flex;align-items:center;gap:10px}
 .cft-month::after{content:"";flex:1;height:1px;background:linear-gradient(90deg,var(--line),transparent 70%)}
 .cft-day{display:flex;gap:10px}
@@ -834,12 +832,12 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .cft-card.b-mealheiro{border-left-color:var(--green)}
 .cft-card.b-reembolso{border-left-color:var(--blue)}
 .cft-card.b-saldar{border-left-color:var(--gold)}
-.cft-top{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
-.cft-kind{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.07em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.cft-kind{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.07em;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
 .k-despesa{color:var(--red)}.k-mealheiro{color:var(--green)}.k-reembolso{color:var(--blue)}.k-saldar{color:var(--gold)}
-.cft-v{font-size:16px;font-weight:800;font-variant-numeric:tabular-nums;flex-shrink:0}
+.cft-l1{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-top:2px}
+.cft-title{font-size:14.5px;font-weight:600;letter-spacing:-.1px;min-width:0}
+.cft-v{font-size:15px;font-weight:800;font-variant-numeric:tabular-nums;flex-shrink:0}
 .cft-v.neg{color:var(--red)}.cft-v.pos{color:var(--green)}.cft-v.mov{color:var(--blue)}.cft-v.set{color:var(--gold)}
-.cft-title{font-size:14.5px;font-weight:600;letter-spacing:-.1px;margin-top:2px}
 .cft-meta{font-size:11.5px;color:var(--muted);margin-top:1px}
 .cft-obs{font-size:11.5px;color:var(--faint);font-style:italic;margin-top:3px;line-height:1.4}
 .cft-subs{margin-top:7px;border-top:1px dashed var(--line);padding-top:6px;display:flex;flex-direction:column;gap:2px}
