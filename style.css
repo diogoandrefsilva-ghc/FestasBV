@@ -793,3 +793,58 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .cf-compra-line{display:flex;align-items:baseline;justify-content:space-between;gap:10px;font-size:12px;color:var(--muted);line-height:1.4}
 .cf-compra-line i{font-style:normal;color:var(--faint)}
 .cf-compra-line span:last-child{flex:0 0 auto;font-variant-numeric:tabular-nums;font-weight:600;color:var(--ink)}
+
+/* ═══ CASH-FLOWS — "Cronologia" (alternativa B) ═══ */
+.cfb-hero{background:linear-gradient(155deg,var(--panel),var(--sal));border:1px solid var(--line);border-radius:18px;padding:16px 18px;margin-bottom:14px;box-shadow:var(--shadow);position:relative;overflow:hidden}
+.cfb-hero::before{content:"";position:absolute;inset:0;background:radial-gradient(circle at 85% 0%,rgba(168,123,20,.08),transparent 60%);pointer-events:none}
+.cfb-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.cfb-lbl{font-family:var(--display);font-size:13px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.cfb-big{font-size:34px;font-weight:800;letter-spacing:-.8px;font-variant-numeric:tabular-nums;line-height:1.1;margin-top:2px}
+.cfb-big.pos{color:var(--green)}.cfb-big.neg{color:var(--red)}
+.cfb-mini{display:flex;flex-direction:column;gap:2px;text-align:right;font-size:12.5px;font-weight:700;font-variant-numeric:tabular-nums;margin-top:4px;flex-shrink:0}
+.cfb-mini .pos{color:var(--green)}.cfb-mini .neg{color:var(--red)}
+.cfb-bar{display:flex;height:10px;border-radius:6px;overflow:hidden;margin:12px 0 10px;gap:2px}
+.cfb-seg{border-radius:3px;min-width:6px}
+.sg-despesa{background:var(--red)}.sg-mealheiro{background:var(--green)}.sg-reembolso{background:var(--blue)}.sg-saldar{background:var(--gold)}
+.cfb-legs{display:grid;grid-template-columns:1fr 1fr;gap:5px 8px;position:relative}
+.cfb-leg{display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:6px 10px;border-radius:10px;border:1.5px solid transparent;cursor:pointer;transition:.15s;user-select:none;background:rgba(110,75,25,.05);min-width:0}
+.cfb-leg:active{transform:scale(.97)}
+.cfb-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;display:inline-block;margin-right:5px;vertical-align:1px}
+.cfb-leg-lbl{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.cfb-leg-lbl i{font-style:normal;color:var(--faint);margin-left:3px;font-weight:600}
+.cfb-leg b{font-size:13px;font-variant-numeric:tabular-nums}
+.cfb-leg b.neg{color:var(--red)}.cfb-leg b.pos{color:var(--green)}.cfb-leg b.mov{color:var(--blue)}.cfb-leg b.set{color:var(--gold)}
+.cfb-leg.on.b-despesa{border-color:var(--red);background:rgba(179,64,47,.08)}
+.cfb-leg.on.b-mealheiro{border-color:var(--green);background:rgba(30,122,77,.08)}
+.cfb-leg.on.b-reembolso{border-color:var(--blue);background:rgba(46,111,168,.08)}
+.cfb-leg.on.b-saldar{border-color:var(--gold);background:rgba(168,123,20,.1)}
+.cft-month{font-family:var(--display);font-size:14px;letter-spacing:.14em;text-transform:uppercase;color:var(--campino);font-weight:600;margin:14px 0 8px;display:flex;align-items:center;gap:10px}
+.cft-month::after{content:"";flex:1;height:1px;background:linear-gradient(90deg,var(--line),transparent 70%)}
+.cft-day{display:flex;gap:10px}
+.cft-rail{display:flex;flex-direction:column;align-items:center;width:42px;flex-shrink:0}
+.cft-date{width:42px;background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:5px 0 4px;text-align:center;box-shadow:0 1px 4px rgba(80,55,20,.07)}
+.cft-date b{display:block;font-family:var(--display);font-size:18px;font-weight:700;line-height:1;color:var(--ink)}
+.cft-date span{display:block;font-size:8.5px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--faint);margin-top:2px}
+.cft-line{flex:1;width:2px;background:linear-gradient(var(--line),rgba(216,200,163,.3));margin-top:6px;border-radius:2px}
+.cft-day:last-child .cft-line{background:linear-gradient(var(--line),transparent)}
+.cft-cards{flex:1;min-width:0;display:flex;flex-direction:column;gap:8px;padding-bottom:12px}
+.cft-card{margin-bottom:0;padding:11px 13px;cursor:pointer;transition:.12s;border-left:4px solid var(--line)}
+.cft-card:active{transform:scale(.985);background:var(--panel2)}
+.cft-card.b-despesa{border-left-color:var(--red)}
+.cft-card.b-mealheiro{border-left-color:var(--green)}
+.cft-card.b-reembolso{border-left-color:var(--blue)}
+.cft-card.b-saldar{border-left-color:var(--gold)}
+.cft-top{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+.cft-kind{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.07em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.k-despesa{color:var(--red)}.k-mealheiro{color:var(--green)}.k-reembolso{color:var(--blue)}.k-saldar{color:var(--gold)}
+.cft-v{font-size:16px;font-weight:800;font-variant-numeric:tabular-nums;flex-shrink:0}
+.cft-v.neg{color:var(--red)}.cft-v.pos{color:var(--green)}.cft-v.mov{color:var(--blue)}.cft-v.set{color:var(--gold)}
+.cft-title{font-size:14.5px;font-weight:600;letter-spacing:-.1px;margin-top:2px}
+.cft-meta{font-size:11.5px;color:var(--muted);margin-top:1px}
+.cft-obs{font-size:11.5px;color:var(--faint);font-style:italic;margin-top:3px;line-height:1.4}
+.cft-subs{margin-top:7px;border-top:1px dashed var(--line);padding-top:6px;display:flex;flex-direction:column;gap:2px}
+.cft-sub{display:flex;justify-content:space-between;align-items:baseline;gap:10px;font-size:11.5px;color:var(--muted);line-height:1.4}
+.cft-sub i{font-style:normal;color:var(--faint)}
+.cft-sub span:last-child{flex:0 0 auto;font-variant-numeric:tabular-nums;font-weight:600;color:var(--ink)}
+.cft-prevista{border-left-style:dashed;background:repeating-linear-gradient(135deg,rgba(168,123,20,.04) 0 9px,transparent 9px 18px)}
+.cft-prevista .cft-kind{color:var(--gold)}

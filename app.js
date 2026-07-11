@@ -1049,20 +1049,31 @@ function renderCashFlows(){
   visCf.forEach(cf=>(cf.people||[]).forEach(p=>personSet.add(p)));
   const personList=[...personSet].sort((a,b)=>a.localeCompare(b,'pt'));
 
-  // Resumo: 4 cartões clicáveis que funcionam como filtro de tipo
-  const card=(t,icon,lbl,cls,sgn)=>`
-    <div class="cfs-card b-${t}${cfFilterType===t?' on':''}" onclick="cfFilterType=cfFilterType==='${t}'?'all':'${t}';cfFilterSub='all';renderCashFlows()">
-      <span class="cfs-badge b-${t}">${icon}</span>
-      <div class="cfs-body">
-        <div class="cfs-top sf">${lbl}<span class="cfs-n">${cnt[t]||0}</span></div>
-        <div class="cfs-val ${cls}">${sgn}${eur(tot[t]||0)}</div>
-      </div>
+  // Resumo "cronologia": hero com o líquido do grupo + barra de proporções por tipo;
+  // a legenda é clicável e funciona como filtro de tipo.
+  const liq=rnd((tot.mealheiro||0)-(tot.despesa||0),2);
+  const bar=['despesa','mealheiro','reembolso','saldar'].filter(t=>(tot[t]||0)>0)
+    .map(t=>`<span class="cfb-seg sg-${t}" style="flex:${tot[t]}"></span>`).join('');
+  const leg=(t,lbl,cls,sgn)=>`
+    <div class="cfb-leg b-${t}${cfFilterType===t?' on':''}" onclick="cfFilterType=cfFilterType==='${t}'?'all':'${t}';cfFilterSub='all';renderCashFlows()">
+      <span class="cfb-leg-lbl sf"><span class="cfb-dot sg-${t}"></span>${lbl}<i>${cnt[t]||0}</i></span>
+      <b class="${cls}">${sgn}${eur(tot[t]||0)}</b>
     </div>`;
-  let pp=`<div class="cfs-strip">
-    ${card('despesa','🛒','Despesas','neg','−')}
-    ${card('mealheiro','🐷','Mealheiro','pos','+')}
-    ${card('reembolso','💸','Reembolsos','mov','')}
-    ${card('saldar','🤝','Dívidas Pagas','set','')}
+  let pp=`<div class="cfb-hero">
+    <div class="cfb-top">
+      <div>
+        <div class="cfb-lbl">Movimentos do grupo</div>
+        <div class="cfb-big ${liq<0?'neg':'pos'}">${liq<0?'−':'+'}${eur(Math.abs(liq))}</div>
+      </div>
+      <div class="cfb-mini sf"><span class="pos">+${eur(tot.mealheiro||0)}</span><span class="neg">−${eur(tot.despesa||0)}</span></div>
+    </div>
+    ${bar?`<div class="cfb-bar">${bar}</div>`:''}
+    <div class="cfb-legs sf">
+      ${leg('despesa','Despesas','neg','−')}
+      ${leg('mealheiro','Mealheiro','pos','+')}
+      ${leg('reembolso','Reembolsos','mov','')}
+      ${leg('saldar','Dívidas','set','')}
+    </div>
   </div>`;
 
   // Filtro de pessoa (mantém-se em select — 19+ nomes)
@@ -1116,38 +1127,50 @@ function renderCashFlows(){
   </div>`;
   if(!display.length) pp+='<div class="empty sf">Nenhum movimento encontrado</div>';
 
-  // Agrupar por data, com cabeçalho legível e subtotal do dia
-  const fmtDia=ds=>{
-    if(!ds) return 'Sem data';
-    const dt=new Date(ds+'T12:00:00');
-    if(isNaN(dt)) return ds;
-    return dt.toLocaleDateString('pt-PT',{weekday:'short',day:'numeric',month:'short'}).replace(/\./g,'');
-  };
-  let lastDate=undefined;
+  // Cronologia: calha de datas à esquerda, cartões simplificados à direita,
+  // com separadores de mês. O tipo é dado pela cor + rótulo pequeno (sem chips).
+  const days=[];let cur=null;
   display.forEach(cf=>{
-    if(cf.date!==lastDate){
-      lastDate=cf.date;
-      const dayItems=display.filter(x=>x.date===cf.date);
-      pp+=`<div class="cf-group-hdr sf">${fmtDia(cf.date)}<span class="cfg-sum">${dayItems.length} mov.</span></div>`;
-    }
-    const sgn=cf.sign==='neg'?'−':cf.sign==='pos'?'+':'';
+    if(!cur||cur.date!==cf.date){cur={date:cf.date,items:[]};days.push(cur);}
+    cur.items.push(cf);
+  });
+  const cardHtml=cf=>{
     if(cf.isCompra){
       // Cartão de compra da lista: resumo + linhas por refeição/tipo. Toca → editor da compra.
-      const lines=cf.lines.map(l=>`<div class="cf-compra-line"><span>${shopTipoIcon(l.sub)} ${l.sub}${l.dia?' · '+l.dia:''}${l.obs?' · <i>'+escHtml(l.obs)+'</i>':''}</span><span>−${eur(l.valor)}</span></div>`).join('');
-      pp+=`<div class="card cf-card b-despesa cf-compra" onclick="openCompra('${cf.compraId}')">
-        <div class="cf-badge">🛒</div>
-        <div class="cf-main"><div class="top"><div class="desc">${escHtml(cf.line1)}</div>
-        <div class="v cf-neg">−${eur(cf.valor)}</div></div>
-        <div class="meta"><span class="chip t b-despesa">Compra</span><span class="chip chip-lista">🛒 lista · ${cf.subN} ${cf.subN===1?'linha':'linhas'}</span>${cf.line2?`<span class="chip">${truncRef(cf.line2)}</span>`:''}</div>
-        <div class="cf-compra-lines">${lines}</div></div></div>`;
-      return;
+      const lines=cf.lines.map(l=>`<div class="cft-sub"><span>${shopTipoIcon(l.sub)} ${l.sub}${l.dia?' · '+l.dia:''}${l.obs?' · <i>'+escHtml(l.obs)+'</i>':''}</span><span>−${eur(l.valor)}</span></div>`).join('');
+      return `<div class="card cft-card b-despesa" onclick="openCompra('${cf.compraId}')">
+        <div class="cft-top"><span class="cft-kind k-despesa sf">🛒 Compra · lista</span><span class="cft-v neg">−${eur(cf.valor)}</span></div>
+        <div class="cft-title">${escHtml(cf.line1)}</div>
+        ${cf.line2?`<div class="cft-meta">${truncRef(cf.line2)}</div>`:''}
+        <div class="cft-subs">${lines}</div>
+      </div>`;
     }
-    pp+=`<div class="card cf-card b-${cf.type}${cf.prevista?' cf-prevista':''}" onclick="openCfDetail('${cf.source}',${cf.idx})">
-      <div class="cf-badge">${cf.prevista?'📌':cf.icon}</div>
-      <div class="cf-main"><div class="top"><div class="desc">${cf.line1}</div>
-      <div class="v cf-${cf.sign}">${sgn}${eur(cf.valor)}</div></div>
-      <div class="meta"><span class="chip t b-${cf.type}">${cf.label}</span>${cf.type==='despesa'&&cf.sub?`<span class="chip sub s-${cf.sub.toLowerCase().normalize('NFD').replace(/[^a-z]/g,'')}">${cf.sub}${cf.dia?' · '+cf.dia:''}</span>`:''}${cf.fromList?`<span class="chip chip-lista">🛒 lista</span>`:''}${cf.prevista?`<span class="chip prevista">prevista</span>`:''}${cf.line2?`<span class="chip">${truncRef(cf.line2)}</span>`:''}
-      </div>${cf.obs?`<div class="cf-obs">${escHtml(cf.obs)}</div>`:''}</div></div>`;
+    const sgn=cf.sign==='neg'?'−':cf.sign==='pos'?'+':'';
+    const kind=cf.type==='despesa'?('Despesa'+(cf.sub?' · '+cf.sub:'')+(cf.dia?' · '+cf.dia:'')):cf.label;
+    const meta=[];
+    if(cf.line2)meta.push(truncRef(cf.line2));
+    if(cf.fromList)meta.push('🛒 lista');
+    if(cf.prevista)meta.push('prevista');
+    return `<div class="card cft-card b-${cf.type}${cf.prevista?' cft-prevista':''}" onclick="openCfDetail('${cf.source}',${cf.idx})">
+      <div class="cft-top"><span class="cft-kind k-${cf.type} sf">${cf.prevista?'📌':cf.icon} ${kind}</span><span class="cft-v ${cf.sign}">${sgn}${eur(cf.valor)}</span></div>
+      <div class="cft-title">${cf.line1}</div>
+      ${meta.length?`<div class="cft-meta">${meta.join(' · ')}</div>`:''}
+      ${cf.obs?`<div class="cft-obs">${escHtml(cf.obs)}</div>`:''}
+    </div>`;
+  };
+  let lastM;
+  days.forEach(d=>{
+    const dt=d.date?new Date(d.date+'T12:00:00'):null;
+    const ok=dt&&!isNaN(dt);
+    const mkey=d.date?d.date.slice(0,7):'';
+    if(mkey!==lastM){
+      lastM=mkey;
+      pp+=`<div class="cft-month">${ok?dt.toLocaleDateString('pt-PT',{month:'long',year:'numeric'}):'Sem data'}</div>`;
+    }
+    pp+=`<div class="cft-day">
+      <div class="cft-rail"><div class="cft-date"><b>${ok?dt.getDate():'📌'}</b><span>${ok?dt.toLocaleDateString('pt-PT',{weekday:'short'}).replace(/\./g,''):'—'}</span></div><div class="cft-line"></div></div>
+      <div class="cft-cards">${d.items.map(cardHtml).join('')}</div>
+    </div>`;
   });
   document.getElementById('view-cashflows').innerHTML=pp;
 }
