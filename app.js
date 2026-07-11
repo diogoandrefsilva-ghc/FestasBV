@@ -752,8 +752,10 @@ function cfLabel(t){
   return{reembolso:'Reembolso',despesa:'Despesa',mealheiro:'Mealheiro',saldar:'Pagar Dívida'}[t]||t;
 }
 function cfIcon(t){
-  return{reembolso:'💸',despesa:'🛒',mealheiro:'🥫',saldar:'🤝'}[t]||'💰';
+  return{reembolso:'💸',despesa:'🛒',mealheiro:'🐷',saldar:'🤝'}[t]||'💰';
 }
+// Lata vermelha (não há emoji de lata simples — o 🥫 parece polpa de tomate)
+const ICON_LATA='<svg viewBox="0 0 24 24" width="1em" height="1em" style="vertical-align:-.125em" aria-hidden="true"><path d="M5 5v14c0 1.66 3.13 3 7 3s7-1.34 7-3V5z" fill="#e03131"/><path d="M5 10c0 1.66 3.13 3 7 3s7-1.34 7-3" fill="none" stroke="#c92a2a" stroke-width="1.2"/><path d="M5 15c0 1.66 3.13 3 7 3s7-1.34 7-3" fill="none" stroke="#c92a2a" stroke-width="1.2"/><ellipse cx="12" cy="5" rx="7" ry="2.6" fill="#c92a2a"/><ellipse cx="12" cy="5" rx="5.4" ry="1.9" fill="#e03131"/><ellipse cx="12.8" cy="4.8" rx="1.7" ry=".8" fill="#a61e1e"/></svg>';
 
 function renderAll(){
   if(!CALC)return;const ms=CALC.membros;
@@ -1022,7 +1024,7 @@ function renderCashFlows(){
 
   (DATA.mealheiros||[]).forEach((m,i)=>{
     const subIcons={'sobras_ano_anterior':['🏦','Sobras Ano Anterior'],'outros':['🎁','Outros']};
-    const [mIcon,mLabel]=subIcons[m.subtipo]||['🥫','Lata'];
+    const [mIcon,mLabel]=subIcons[m.subtipo]||[ICON_LATA,'Lata'];
     allCf.push({type:'mealheiro',date:m.data||'',label:mLabel,icon:mIcon,sub:mLabel,
       line1:`${m.quem} recebeu`,line2:m.desc||'',valor:m.valor,
       sign:'pos',source:'mealheiros',idx:i,people:[m.quem]});
@@ -1058,7 +1060,7 @@ function renderCashFlows(){
     </div>`;
   let pp=`<div class="cfs-strip">
     ${card('despesa','🛒','Despesas','neg','−')}
-    ${card('mealheiro','🥫','Mealheiro','pos','+')}
+    ${card('mealheiro','🐷','Mealheiro','pos','+')}
     ${card('reembolso','💸','Reembolsos','mov','')}
     ${card('saldar','🤝','Dívidas Pagas','set','')}
   </div>`;
@@ -1671,7 +1673,7 @@ function updateCfForm(){
     f.innerHTML=`
       <label>Tipo de mealheiro</label>
       <div class="cf-wheel" id="meal-subtype-wheel" style="margin-bottom:4px">
-        <div class="cf-opt on" data-sub="corrente" onclick="setMealSubtype(this,'corrente')"><span class="cf-icon" style="font-size:20px">🥫</span><span class="cf-lbl">Lata</span></div>
+        <div class="cf-opt on" data-sub="corrente" onclick="setMealSubtype(this,'corrente')"><span class="cf-icon" style="font-size:20px">${ICON_LATA}</span><span class="cf-lbl">Lata</span></div>
         <div class="cf-opt" data-sub="sobras" onclick="setMealSubtype(this,'sobras')"><span class="cf-icon">🏦</span><span class="cf-lbl">Sobras Ano Ant.</span></div>
         <div class="cf-opt" data-sub="outros" onclick="setMealSubtype(this,'outros')"><span class="cf-icon">🎁</span><span class="cf-lbl">Outros</span></div>
       </div>
@@ -2130,7 +2132,7 @@ function editCfEntry(source,idx){
   const types=[
     {key:'reembolso',icon:'💸',label:'Reembolso'},
     {key:'despesa',icon:'🛒',label:'Despesa'},
-    {key:'mealheiro',icon:'🥫',label:'Mealheiro'},
+    {key:'mealheiro',icon:'🐷',label:'Mealheiro'},
     {key:'saldar',icon:'🤝',label:'Pagar Dívida'}
   ];
   wheel.innerHTML=types.map(t=>`<div class="cf-opt${t.key===editType?' on':''}" style="pointer-events:none;opacity:${t.key===editType?'1':'.35'}"><span class="cf-icon">${t.icon}</span><span class="cf-lbl">${t.label}</span></div>`).join('');
@@ -4369,7 +4371,7 @@ function saldosMembrosHtml(){
       li+=line('🤝','Pagou para saldar',v.ownPortion,'plus');
       Object.entries(v.paidBy).forEach(([p,a])=>{li+=line('🤝',`Pago por ${p}`,a,'plus');});
     }
-    li+=line('🥫','Mealheiro recebido',v.mealT,'minus',v.mealL);
+    li+=line('🐷','Mealheiro recebido',v.mealT,'minus',v.mealL);
     li+=line('🤝','Pagamentos recebidos',v.receb,'minus',v.recebL);
     li+=line('💸','Reembolsos recebidos',v.reembRecebidos,'minus',v.reembRecebidosL);
     const sf=m._sfEcra,zero=Math.abs(sf)<0.005;
