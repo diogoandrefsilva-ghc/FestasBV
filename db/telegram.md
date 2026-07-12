@@ -39,6 +39,49 @@ o histórico continua a registar; só o envio é que para.
    segundos deves receber algo como: `✋ Barrona marcou presença — Sáb · Jantar`.
    Se não chegar: Edge Functions → notif-festas → Logs.
 
+## Notificações PESSOAIS (por utilizador) — Edge Function `notif-pessoais`
+
+Além do aviso ao admin (acima, intocado), cada utilizador pode ligar o SEU
+Telegram na app (Definições → 🔔 Notificações) e recebe avisos dirigidos:
+
+- **Responsável de refeição** — o admin nomeia no detalhe da refeição
+  (👨‍🍳 cozinha / 🛒 compras). O nomeado recebe a nomeação **com a lista de
+  quem vai e os totais**, e depois é avisado sempre que alguém mexe nas
+  presenças/convidados dessa refeição.
+- **Compras** — quem adiciona um artigo indica se «Eu trato de comprar»;
+  se NÃO ficar a tratar, todos os inscritos (menos o autor) são avisados.
+
+```
+Ação na app → INSERT em festasbv.historico → Webhook → notif-pessoais → Telegram (por pessoa)
+        Ligação da conta: t.me/<bot>?start=<codigo> → webhook do bot → notif-pessoais → notif_prefs.chat_id
+```
+
+O interruptor global (`config.notif_telegram`) manda em tudo; cada pessoa tem
+ainda o seu interruptor em `notif_prefs.ativo`. O admin nunca é avisado pela
+`notif-pessoais` (já recebe tudo pela `notif-festas`), nem ninguém é avisado
+das próprias ações.
+
+### Setup (uma vez)
+
+1. **SQL** — correr `db/notifs.sql` (colunas `resp_cozinha`/`resp_compras`,
+   tabela `notif_prefs`, config `telegram_bot`).
+2. **Bot** — preencher o username do bot (sem @):
+   `UPDATE festasbv.config SET valor='OTeuBot' WHERE chave='telegram_bot';`
+3. **Deploy** — `supabase functions deploy notif-pessoais --no-verify-jwt`
+   (código em `notif-pessoais.ts`; usa o mesmo secret `TELEGRAM_BOT_TOKEN`).
+   O `--no-verify-jwt` é preciso porque o Telegram não manda JWT.
+4. **Webhook do bot** — apontar o bot para a função (e opcionalmente definir
+   o secret `TELEGRAM_WEBHOOK_SECRET` nos Secrets e no `secret_token`):
+   `https://api.telegram.org/bot<TOKEN>/setWebhook?url=https://gjweqwfbnkgnibhajldc.supabase.co/functions/v1/notif-pessoais&secret_token=<SEGREDO>`
+   (⚠️ isto desativa o `getUpdates` manual, que já não é preciso.)
+5. **Database Webhook** — Database → Webhooks → Create: Table
+   `festasbv.historico`, Events só **Insert**, Type **Supabase Edge
+   Functions** → `notif-pessoais` (fica um segundo webhook, ao lado do da
+   `notif-festas`).
+6. **Testar** — na app: Definições → 🔔 Notificações → «Ligar ao Telegram»
+   → Start no bot → «Verificar» deve mostrar ✅. Depois pede a outra conta
+   para te nomear responsável ou adicionar um artigo sem «Eu trato».
+
 ## Notas
 
 - A ti não te chega nada, de propósito (és o ADMIN); mas as tuas ações ficam
