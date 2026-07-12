@@ -754,8 +754,12 @@ function cfLabel(t){
 function cfIcon(t){
   return{reembolso:'💸',despesa:'🛒',mealheiro:'🐷',saldar:'🤝'}[t]||'💰';
 }
-// Lata vermelha (não há emoji de lata simples — o 🥫 parece polpa de tomate)
-const ICON_LATA='<svg viewBox="0 0 24 24" width="1em" height="1em" style="vertical-align:-.125em" aria-hidden="true"><path d="M5 5v14c0 1.66 3.13 3 7 3s7-1.34 7-3V5z" fill="#e03131"/><path d="M5 10c0 1.66 3.13 3 7 3s7-1.34 7-3" fill="none" stroke="#c92a2a" stroke-width="1.2"/><path d="M5 15c0 1.66 3.13 3 7 3s7-1.34 7-3" fill="none" stroke="#c92a2a" stroke-width="1.2"/><ellipse cx="12" cy="5" rx="7" ry="2.6" fill="#c92a2a"/><ellipse cx="12" cy="5" rx="5.4" ry="1.9" fill="#e03131"/><ellipse cx="12.8" cy="4.8" rx="1.7" ry=".8" fill="#a61e1e"/></svg>';
+// Lata de recolha vermelha: tampa metálica com ranhura de moedas + cinta com €
+// (não há emoji de lata simples — o 🥫 parece polpa de tomate)
+const ICON_LATA='<svg viewBox="0 0 24 24" width="1em" height="1em" style="vertical-align:-.125em" aria-hidden="true"><path d="M5 5v14c0 1.66 3.13 3 7 3s7-1.34 7-3V5z" fill="#e03131"/><path d="M5 10.2c0 1.66 3.13 3 7 3s7-1.34 7-3v4.6c0 1.66-3.13 3-7 3s-7-1.34-7-3z" fill="#fbf6e8"/><text x="12" y="17.2" text-anchor="middle" font-size="5" font-weight="800" fill="#c92a2a" font-family="system-ui,sans-serif">€</text><ellipse cx="12" cy="5" rx="7" ry="2.6" fill="#b8b0a1"/><ellipse cx="12" cy="4.8" rx="5.7" ry="2" fill="#ddd5c6"/><rect x="8.7" y="4" width="6.6" height="1.5" rx=".75" fill="#3f362b"/></svg>';
+// Saco de dinheiro (Sobras Ano Anterior) e moeda (Outros) — mesmo estilo da Lata
+const ICON_SACO='<svg viewBox="0 0 24 24" width="1em" height="1em" style="vertical-align:-.125em" aria-hidden="true"><path d="M9 2.5h6c.5 0 .7.5.4.9L13.8 5.5h-3.6L8.6 3.4c-.3-.4-.1-.9.4-.9z" fill="#8a6410"/><path d="M10.2 5.5h3.6c3.7 1.9 6 5.5 6 9.3 0 4.4-3.2 6.7-7.8 6.7s-7.8-2.3-7.8-6.7c0-3.8 2.3-7.4 6-9.3z" fill="#eeb64d"/><path d="M9.4 6.7c-.4-.5-.1-1.2.6-1.2h4c.7 0 1 .7.6 1.2l-.6.7h-4z" fill="#c8951f"/><text x="12" y="17.4" text-anchor="middle" font-size="9.5" font-weight="800" fill="#7a5a0e" font-family="system-ui,sans-serif">€</text></svg>';
+const ICON_MOEDA='<svg viewBox="0 0 24 24" width="1em" height="1em" style="vertical-align:-.125em" aria-hidden="true"><circle cx="12" cy="12" r="9.5" fill="#c8951f"/><circle cx="12" cy="12" r="7.7" fill="#eeb64d"/><circle cx="12" cy="12" r="6.3" fill="none" stroke="#a87b14" stroke-width=".9" stroke-dasharray="1.7 1.7"/><text x="12" y="15.6" text-anchor="middle" font-size="10" font-weight="800" fill="#7a5a0e" font-family="system-ui,sans-serif">€</text></svg>';
 
 function renderAll(){
   if(!CALC)return;const ms=CALC.membros;
@@ -974,6 +978,7 @@ function renderAll(){
 let cfFilterType='all';
 let cfFilterPerson='all';
 let cfFilterSub='all';
+let cfFilterView='mov';   // 'mov' = movimentos datados · 'previstas' = sem data
 
 /* Reembolsos e dívidas pagas: não-admins só veem movimentos seus ou dos cônjuges */
 function cfVisivel(cf){
@@ -1023,7 +1028,7 @@ function renderCashFlows(){
   });
 
   (DATA.mealheiros||[]).forEach((m,i)=>{
-    const subIcons={'sobras_ano_anterior':['🏦','Sobras Ano Anterior'],'outros':['🎁','Outros']};
+    const subIcons={'sobras_ano_anterior':[ICON_SACO,'Sobras Ano Anterior'],'outros':[ICON_MOEDA,'Outros']};
     const [mIcon,mLabel]=subIcons[m.subtipo]||[ICON_LATA,'Lata'];
     allCf.push({type:'mealheiro',date:m.data||'',label:mLabel,icon:mIcon,sub:mLabel,
       line1:`${m.quem} recebeu`,line2:m.desc||'',valor:m.valor,
@@ -1049,20 +1054,29 @@ function renderCashFlows(){
   visCf.forEach(cf=>(cf.people||[]).forEach(p=>personSet.add(p)));
   const personList=[...personSet].sort((a,b)=>a.localeCompare(b,'pt'));
 
-  // Resumo: 4 cartões clicáveis que funcionam como filtro de tipo
-  const card=(t,icon,lbl,cls,sgn)=>`
-    <div class="cfs-card b-${t}${cfFilterType===t?' on':''}" onclick="cfFilterType=cfFilterType==='${t}'?'all':'${t}';cfFilterSub='all';renderCashFlows()">
-      <span class="cfs-badge b-${t}">${icon}</span>
-      <div class="cfs-body">
-        <div class="cfs-top sf">${lbl}<span class="cfs-n">${cnt[t]||0}</span></div>
-        <div class="cfs-val ${cls}">${sgn}${eur(tot[t]||0)}</div>
-      </div>
+  // Resumo: resultado líquido do grupo (entradas − saídas) + 4 pílulas-filtro
+  // numa só fila, sem scroll horizontal.
+  const liq=rnd((tot.mealheiro||0)-(tot.despesa||0),2);
+  const pill=(t,icon,lbl,cls,sgn)=>`
+    <div class="cfc-pill b-${t}${cfFilterType===t?' on':''}" onclick="cfFilterType=cfFilterType==='${t}'?'all':'${t}';cfFilterSub='all';renderCashFlows()">
+      <b class="${cls}">${sgn}${eur(tot[t]||0)}</b>
+      <small class="sf">${icon} ${lbl} <i>${cnt[t]||0}</i></small>
     </div>`;
-  let pp=`<div class="cfs-strip">
-    ${card('despesa','🛒','Despesas','neg','−')}
-    ${card('mealheiro','🐷','Mealheiro','pos','+')}
-    ${card('reembolso','💸','Reembolsos','mov','')}
-    ${card('saldar','🤝','Dívidas Pagas','set','')}
+  let pp=`<div class="card cfc-net">
+    <div>
+      <div class="cfc-net-lbl sf">Resultado do grupo</div>
+      <div class="cfc-net-val ${liq<0?'neg':'pos'}">${liq<0?'−':'+'}${eur(Math.abs(liq))}</div>
+    </div>
+    <div class="cfc-net-cols sf">
+      <small>entradas</small><b class="pos">+${eur(tot.mealheiro||0)}</b>
+      <small>saídas</small><b class="neg">−${eur(tot.despesa||0)}</b>
+    </div>
+  </div>
+  <div class="cfc-pills">
+    ${pill('despesa','🛒','Despesas','neg','−')}
+    ${pill('mealheiro','🐷','Mealheiro','pos','+')}
+    ${pill('reembolso','💸','Reembolsos','mov','')}
+    ${pill('saldar','🤝','Dívidas','set','')}
   </div>`;
 
   // Filtro de pessoa (mantém-se em select — 19+ nomes)
@@ -1108,47 +1122,79 @@ function renderCashFlows(){
   const display=(cfFilterSub==='all')?groupCompraCfs(filtered):filtered;
   const totalCount=(cfFilterSub==='all')?visGrouped.length:visCf.length;
 
-  const filteredTotal=display.reduce((a,cf)=>a+cf.valor,0);
-  const showTotal=(cfFilterType!=='all'||cfFilterPerson!=='all')&&display.length>0;
+  // As despesas sem data (previstas) vivem num 2.º tabulador em vez de
+  // aparecerem no fim da cronologia.
+  const dated=display.filter(cf=>cf.date);
+  const undated=display.filter(cf=>!cf.date);
+  if(!undated.length)cfFilterView='mov';
+  if(undated.length){
+    pp+=`<div class="sub-tabs cfc-tabs">
+      <div class="sub-tab${cfFilterView==='mov'?' on':''}" onclick="cfFilterView='mov';renderCashFlows()">Movimentos</div>
+      <div class="sub-tab${cfFilterView==='previstas'?' on':''}" onclick="cfFilterView='previstas';renderCashFlows()">📌 Previstas · ${undated.length}</div>
+    </div>`;
+  }
+  const shown=cfFilterView==='previstas'?undated:dated;
+
+  const filteredTotal=shown.reduce((a,cf)=>a+cf.valor,0);
+  const showTotal=(cfFilterView==='previstas'||cfFilterType!=='all'||cfFilterPerson!=='all')&&shown.length>0;
   pp+=`<div class="sec-title sf" style="display:flex;justify-content:space-between;align-items:center">
-    <span>Movimentos (${display.length}${display.length!==totalCount?' de '+totalCount:''})</span>
+    <span>${cfFilterView==='previstas'?'Previstas':'Movimentos'} (${shown.length}${cfFilterView==='mov'&&shown.length!==totalCount?' de '+totalCount:''})</span>
     ${showTotal?`<span style="color:var(--gold);font-size:12px;font-weight:700;letter-spacing:0">${eur(filteredTotal)}</span>`:''}
   </div>`;
-  if(!display.length) pp+='<div class="empty sf">Nenhum movimento encontrado</div>';
+  if(!shown.length) pp+='<div class="empty sf">Nenhum movimento encontrado</div>';
 
-  // Agrupar por data, com cabeçalho legível e subtotal do dia
-  const fmtDia=ds=>{
-    if(!ds) return 'Sem data';
-    const dt=new Date(ds+'T12:00:00');
-    if(isNaN(dt)) return ds;
-    return dt.toLocaleDateString('pt-PT',{weekday:'short',day:'numeric',month:'short'}).replace(/\./g,'');
-  };
-  let lastDate=undefined;
-  display.forEach(cf=>{
-    if(cf.date!==lastDate){
-      lastDate=cf.date;
-      const dayItems=display.filter(x=>x.date===cf.date);
-      pp+=`<div class="cf-group-hdr sf">${fmtDia(cf.date)}<span class="cfg-sum">${dayItems.length} mov.</span></div>`;
-    }
-    const sgn=cf.sign==='neg'?'−':cf.sign==='pos'?'+':'';
+  // Cronologia: calha de datas à esquerda, cartões simplificados à direita,
+  // com separadores de mês. O tipo é dado pela cor + rótulo pequeno (sem chips);
+  // o valor fica na linha do título para o rótulo não criar espaçamento extra.
+  const cardHtml=cf=>{
     if(cf.isCompra){
       // Cartão de compra da lista: resumo + linhas por refeição/tipo. Toca → editor da compra.
-      const lines=cf.lines.map(l=>`<div class="cf-compra-line"><span>${shopTipoIcon(l.sub)} ${l.sub}${l.dia?' · '+l.dia:''}${l.obs?' · <i>'+escHtml(l.obs)+'</i>':''}</span><span>−${eur(l.valor)}</span></div>`).join('');
-      pp+=`<div class="card cf-card b-despesa cf-compra" onclick="openCompra('${cf.compraId}')">
-        <div class="cf-badge">🛒</div>
-        <div class="cf-main"><div class="top"><div class="desc">${escHtml(cf.line1)}</div>
-        <div class="v cf-neg">−${eur(cf.valor)}</div></div>
-        <div class="meta"><span class="chip t b-despesa">Compra</span><span class="chip chip-lista">🛒 lista · ${cf.subN} ${cf.subN===1?'linha':'linhas'}</span>${cf.line2?`<span class="chip">${truncRef(cf.line2)}</span>`:''}</div>
-        <div class="cf-compra-lines">${lines}</div></div></div>`;
-      return;
+      const lines=cf.lines.map(l=>`<div class="cft-sub"><span>${shopTipoIcon(l.sub)} ${l.sub}${l.dia?' · '+l.dia:''}${l.obs?' · <i>'+escHtml(l.obs)+'</i>':''}</span><span>−${eur(l.valor)}</span></div>`).join('');
+      return `<div class="card cft-card b-despesa" onclick="openCompra('${cf.compraId}')">
+        <div class="cft-kind k-despesa sf">🛒 Compra · lista</div>
+        <div class="cft-l1"><div class="cft-title">${escHtml(cf.line1)}</div><span class="cft-v neg">−${eur(cf.valor)}</span></div>
+        ${cf.line2?`<div class="cft-meta">${truncRef(cf.line2)}</div>`:''}
+        <div class="cft-subs">${lines}</div>
+      </div>`;
     }
-    pp+=`<div class="card cf-card b-${cf.type}${cf.prevista?' cf-prevista':''}" onclick="openCfDetail('${cf.source}',${cf.idx})">
-      <div class="cf-badge">${cf.prevista?'📌':cf.icon}</div>
-      <div class="cf-main"><div class="top"><div class="desc">${cf.line1}</div>
-      <div class="v cf-${cf.sign}">${sgn}${eur(cf.valor)}</div></div>
-      <div class="meta"><span class="chip t b-${cf.type}">${cf.label}</span>${cf.type==='despesa'&&cf.sub?`<span class="chip sub s-${cf.sub.toLowerCase().normalize('NFD').replace(/[^a-z]/g,'')}">${cf.sub}${cf.dia?' · '+cf.dia:''}</span>`:''}${cf.fromList?`<span class="chip chip-lista">🛒 lista</span>`:''}${cf.prevista?`<span class="chip prevista">prevista</span>`:''}${cf.line2?`<span class="chip">${truncRef(cf.line2)}</span>`:''}
-      </div>${cf.obs?`<div class="cf-obs">${escHtml(cf.obs)}</div>`:''}</div></div>`;
-  });
+    const sgn=cf.sign==='neg'?'−':cf.sign==='pos'?'+':'';
+    const kind=cf.type==='despesa'?('Despesa'+(cf.sub?' · '+cf.sub:'')+(cf.dia?' · '+cf.dia:''))
+      :cf.type==='mealheiro'?('Mealheiro · '+(cf.sub||'Lata'))
+      :cf.label;
+    const meta=[];
+    if(cf.line2)meta.push(truncRef(cf.line2));
+    if(cf.fromList)meta.push('🛒 lista');
+    return `<div class="card cft-card b-${cf.type}${cf.prevista?' cft-prevista':''}" onclick="openCfDetail('${cf.source}',${cf.idx})">
+      <div class="cft-kind k-${cf.type} sf">${cf.prevista?'📌':cf.icon} ${kind}</div>
+      <div class="cft-l1"><div class="cft-title">${cf.line1}</div><span class="cft-v ${cf.sign}">${sgn}${eur(cf.valor)}</span></div>
+      ${meta.length?`<div class="cft-meta">${meta.join(' · ')}</div>`:''}
+      ${cf.obs?`<div class="cft-obs">${escHtml(cf.obs)}</div>`:''}
+    </div>`;
+  };
+  if(cfFilterView==='previstas'){
+    // Previstas: pilha simples, sem calha de datas
+    pp+=`<div class="cfc-prev-list">${shown.map(cardHtml).join('')}</div>`;
+  }else{
+    const days=[];let cur=null;
+    shown.forEach(cf=>{
+      if(!cur||cur.date!==cf.date){cur={date:cf.date,items:[]};days.push(cur);}
+      cur.items.push(cf);
+    });
+    let lastM;
+    days.forEach(d=>{
+      const dt=new Date(d.date+'T12:00:00');
+      const ok=!isNaN(dt);
+      const mkey=d.date.slice(0,7);
+      if(mkey!==lastM){
+        lastM=mkey;
+        pp+=`<div class="cft-month">${ok?dt.toLocaleDateString('pt-PT',{month:'long',year:'numeric'}):d.date}</div>`;
+      }
+      pp+=`<div class="cft-day">
+        <div class="cft-rail"><div class="cft-date"><b>${ok?dt.getDate():'?'}</b><span>${ok?dt.toLocaleDateString('pt-PT',{weekday:'short'}).replace(/\./g,''):'—'}</span></div><div class="cft-line"></div></div>
+        <div class="cft-cards">${d.items.map(cardHtml).join('')}</div>
+      </div>`;
+    });
+  }
   document.getElementById('view-cashflows').innerHTML=pp;
 }
 
@@ -1674,8 +1720,8 @@ function updateCfForm(){
       <label>Tipo de mealheiro</label>
       <div class="cf-wheel" id="meal-subtype-wheel" style="margin-bottom:4px">
         <div class="cf-opt on" data-sub="corrente" onclick="setMealSubtype(this,'corrente')"><span class="cf-icon" style="font-size:20px">${ICON_LATA}</span><span class="cf-lbl">Lata</span></div>
-        <div class="cf-opt" data-sub="sobras" onclick="setMealSubtype(this,'sobras')"><span class="cf-icon">🏦</span><span class="cf-lbl">Sobras Ano Ant.</span></div>
-        <div class="cf-opt" data-sub="outros" onclick="setMealSubtype(this,'outros')"><span class="cf-icon">🎁</span><span class="cf-lbl">Outros</span></div>
+        <div class="cf-opt" data-sub="sobras" onclick="setMealSubtype(this,'sobras')"><span class="cf-icon" style="font-size:20px">${ICON_SACO}</span><span class="cf-lbl">Sobras Ano Ant.</span></div>
+        <div class="cf-opt" data-sub="outros" onclick="setMealSubtype(this,'outros')"><span class="cf-icon" style="font-size:20px">${ICON_MOEDA}</span><span class="cf-lbl">Outros</span></div>
       </div>
       <div id="meal-corrente-fields">
         <label>Quem recolheu?</label>
@@ -2094,7 +2140,7 @@ function openCfDetail(source,idx){
   if(!isAdmin()||bloquearPorFecho){
     const f=document.getElementById('edit-cf-form');
     f.querySelectorAll('input,select,textarea').forEach(el=>{el.disabled=true;el.style.opacity='.75';});
-    f.querySelectorAll('.sd-chip').forEach(el=>{el.style.pointerEvents='none';});
+    f.querySelectorAll('.sd-chip,.cf-opt').forEach(el=>{el.style.pointerEvents='none';});
   }
 }
 
@@ -2205,9 +2251,18 @@ function editCfEntry(source,idx){
     setTimeout(()=>{ecfTipoChanged();updDescCount('ecf');},10);
   } else if(editType==='mealheiro'){
     const m=DATA.mealheiros[idx];
+    const st=m.subtipo||'lata';
+    editingCf.mealSubtipo=st;
     f.innerHTML=`
+      <label>Tipo de mealheiro</label>
+      <div class="cf-wheel" id="ecf-meal-wheel" style="margin-bottom:4px">
+        ${[['lata',ICON_LATA,'Lata'],['sobras_ano_anterior',ICON_SACO,'Sobras Ano Ant.'],['outros',ICON_MOEDA,'Outros']].map(([k,ic,lb])=>
+          `<div class="cf-opt${k===st?' on':''}" onclick="setEcfMealSubtype(this,'${k}')"><span class="cf-icon" style="font-size:20px">${ic}</span><span class="cf-lbl">${lb}</span></div>`).join('')}
+      </div>
       <label>Quem recebeu?</label>
       <select id="ecf-who">${memberOptions(m.quem)}</select>
+      <label>Descrição</label>
+      <textarea id="ecf-desc" rows="2" placeholder="Ex: Contagem da lata, patrocínio… (opcional)">${escHtml(m.desc||'')}</textarea>
       <div class="inline-row" style="margin-top:14px">
         <div><label>Valor (€)</label><input type="number" id="ecf-val" step="0.01" value="${m.valor}" inputmode="decimal"></div>
         <div><label>Data</label><input type="date" id="ecf-date" value="${m.data||''}"></div>
@@ -2217,6 +2272,13 @@ function editCfEntry(source,idx){
   applyRoFields(document.getElementById('edit-cf-modal'),!isAdmin());
   document.getElementById('edit-cf-bg').classList.add('show');
   document.body.classList.add('no-scroll');
+}
+
+/* Subtipo do mealheiro no modal de edição */
+function setEcfMealSubtype(el,k){
+  if(!editingCf)return;
+  editingCf.mealSubtipo=k;
+  document.querySelectorAll('#ecf-meal-wheel .cf-opt').forEach(o=>o.classList.toggle('on',o===el));
 }
 
 /* Detalhe de um pagamento: mostra SÓ as dívidas efetivamente pagas (consulta).
@@ -2342,6 +2404,8 @@ async function saveEditCf(){
     m.quem=document.getElementById('ecf-who').value;
     m.valor=parseFloat(document.getElementById('ecf-val').value)||m.valor;
     m.data=document.getElementById('ecf-date').value;
+    m.subtipo=editingCf.mealSubtipo||m.subtipo||'lata';
+    m.desc=(document.getElementById('ecf-desc')?.value||'').trim();
   }
 
   const ok=await pushToGitHub('Editar cash-flow');
