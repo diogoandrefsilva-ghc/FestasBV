@@ -7,7 +7,8 @@
 --
 -- O que acrescenta:
 --   1) refeicoes_def.resp_cozinha / resp_compras — responsáveis nomeados
---      pelo admin para cada refeição (nomes de membros, como o resto da app).
+--      pelo admin para cada refeição (nomes de membros, como o resto da app)
+--      — e refeicoes_def.menu, detalhe adicional do menu (texto livre).
 --   2) festasbv.notif_prefs — preferências pessoais: cada utilizador liga a
 --      sua conta ao bot do Telegram (chat_id) e liga/desliga os avisos.
 --   3) config 'telegram_bot' — username do bot (sem @), para a app montar o
@@ -18,8 +19,10 @@
 -- =====================================================================
 
 -- 1) Responsáveis por refeição (quem cozinha / quem vai às compras)
+--    + detalhe do menu (texto livre, além do prato principal)
 ALTER TABLE festasbv.refeicoes_def ADD COLUMN IF NOT EXISTS resp_cozinha text;
 ALTER TABLE festasbv.refeicoes_def ADD COLUMN IF NOT EXISTS resp_compras text;
+ALTER TABLE festasbv.refeicoes_def ADD COLUMN IF NOT EXISTS menu text;
 
 -- 2) Preferências pessoais de notificação
 CREATE TABLE IF NOT EXISTS festasbv.notif_prefs (

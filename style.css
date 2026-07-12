@@ -497,6 +497,13 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .refdef-chevron{flex-shrink:0;color:var(--faint);font-size:22px;line-height:1;font-weight:600;padding-left:2px}
 .refdef-prato{font-weight:500;color:var(--gold);font-size:12.5px}
 .refdef-resp{font-size:11.5px;color:var(--faint);margin-top:2px}
+.refdef-menu{font-size:11.5px;color:var(--muted);margin-top:2px;white-space:pre-line;line-height:1.45}
+/* Detalhe "quem vai" por agregado (casal + convidados em tom apagado) */
+.rdc-ppl.casais{flex-direction:column;align-items:stretch;gap:7px}
+.rdc-casal-n{font-size:11.5px;font-weight:700;color:var(--ink)}
+.rdc-casal-n.off{color:var(--faint);font-weight:600;font-style:italic}
+.rdc-casal-conv{font-size:11px;color:var(--faint);margin-top:1px;padding-left:12px}
+.rdc-casal-conv small{font-style:italic}
 .refdef-icon{font-size:18px;flex-shrink:0}
 .meal-ic{flex:none;vertical-align:middle;display:inline-block}
 .mi-almoco{color:var(--gold)}

@@ -739,6 +739,26 @@ function setRefMeal(i){REF_SEL=i;lsSet('fbv_refmeal',String(i));
   document.querySelectorAll('.refmeal').forEach(e=>{e.style.display=(+e.dataset.i===i?'':'none');});}
 function togglePeople(id){const e=document.getElementById(id);if(!e)return;const show=(e.style.display==='none'||!e.style.display);e.style.display=show?'flex':'none';const c=document.querySelector('[data-tgt="'+id+'"]');if(c)c.classList.toggle('open',show);}
 
+/* Detalhe "quem vai" agrupado por agregado (casal): os membros que comem numa
+   linha ("Diogo / Margarida") e os convidados desse agregado por baixo, em tom
+   apagado. Convidados de quem não come aparecem num grupo próprio. */
+function casaisPanelHtml(membrosCome,guests){
+  const key=n=>{const c=conjugeDe(n);return c?[n,c].sort((a,b)=>a.localeCompare(b,'pt')).join('|'):n;};
+  const hh={};
+  const get=k=>hh[k]||(hh[k]={nomes:[],convs:[]});
+  membrosCome.forEach(n=>get(key(n)).nomes.push(n));
+  guests.forEach(g=>get(g.membro?key(g.membro):'?').convs.push(g));
+  return Object.keys(hh).sort((a,b)=>a.localeCompare(b,'pt')).map(k=>{
+    const h=hh[k];
+    h.convs.sort((a,b)=>a.nome.localeCompare(b.nome,'pt'));
+    const head=h.nomes.length
+      ?h.nomes.join(' / ')
+      :'convidados de '+[...new Set(h.convs.map(g=>g.membro||'?'))].join(' / ');
+    const convs=h.convs.length?`<div class="rdc-casal-conv">🎟 ${h.convs.map(g=>escHtml(g.nome)+(g.pagante==='Sim'?'':' <small>(não paga)</small>')).join(', ')}</div>`:'';
+    return `<div class="rdc-casal"><div class="rdc-casal-n${h.nomes.length?'':' off'}">${escHtml(head)}</div>${convs}</div>`;
+  }).join('');
+}
+
 /* ── Classify a cash-flow entry ── */
 function cfType(p){
   if(p._cfType) return p._cfType; // explicitly set
@@ -908,13 +928,15 @@ function renderAll(){
         const membrosCount=Math.max(0,calcRef.D-calcRef.E);
         const rkey=`${rd.dia}|${rd.ref==='Lanche'?'Tarde':rd.ref}`;
         const membrosCome=(DATA.membros||[]).filter(m=>(m.presencas||[]).some(p=>p.k===rkey&&p.modo==='come')).map(m=>m.nome).sort((a,b)=>a.localeCompare(b,'pt'));
-        const guestsPay=(DATA.convidados||[]).filter(g=>g.dia===rd.dia&&g.ref===rd.ref&&g.pagante==='Sim');
+        const guestsAll=(DATA.convidados||[]).filter(g=>g.dia===rd.dia&&g.ref===rd.ref);
+        const guestsPay=guestsAll.filter(g=>g.pagante==='Sim');
         const pid='rdp'+rd._idx;
-        const memPanel=membrosCome.length?`<div class="rdc-ppl" id="${pid}m" style="display:none" onclick="event.stopPropagation()">${membrosCome.map(n=>`<span class="rdc-ppl-it">${escHtml(n)}</span>`).join('')}</div>`:'';
+        const temDetM=membrosCome.length>0||guestsAll.length>0;
+        const memPanel=temDetM?`<div class="rdc-ppl casais" id="${pid}m" style="display:none" onclick="event.stopPropagation()">${casaisPanelHtml(membrosCome,guestsAll)}</div>`:'';
         const guestPanel=guestsPay.length?`<div class="rdc-ppl" id="${pid}g" style="display:none" onclick="event.stopPropagation()">${guestsPay.map(g=>`<span class="rdc-ppl-it">${escHtml(g.nome)}${g.membro?`<small> · ${escHtml(g.membro)}</small>`:''}</span>`).join('')}</div>`:'';
-        const memAttrs=membrosCome.length?`class="rdc-cell rdc-cell-btn" data-tgt="${pid}m" onclick="event.stopPropagation();togglePeople('${pid}m')"`:'class="rdc-cell"';
+        const memAttrs=temDetM?`class="rdc-cell rdc-cell-btn" data-tgt="${pid}m" onclick="event.stopPropagation();togglePeople('${pid}m')"`:'class="rdc-cell"';
         const guestAttrs=guestsPay.length?`class="rdc-cell rdc-cell-btn" data-tgt="${pid}g" onclick="event.stopPropagation();togglePeople('${pid}g')"`:'class="rdc-cell"';
-        const membroCell=`<div ${memAttrs}><div class="rdc-cell-k">Membro${membrosCount?`<span class="rdc-cell-n">${membrosCount}</span>`:''}${membrosCome.length?'<span class="rdc-cell-arrow">›</span>':''}</div><div class="rdc-cell-v rdc-cell-v-gold">${calcRef.D>0?eur(calcRef.P):'<span class="rdc-na">N/A</span>'}</div></div>`;
+        const membroCell=`<div ${memAttrs}><div class="rdc-cell-k">Membro${membrosCount?`<span class="rdc-cell-n">${membrosCount}</span>`:''}${temDetM?'<span class="rdc-cell-arrow">›</span>':''}</div><div class="rdc-cell-v rdc-cell-v-gold">${calcRef.D>0?eur(calcRef.P):'<span class="rdc-na">N/A</span>'}</div></div>`;
         const convCell=`<div ${guestAttrs}><div class="rdc-cell-k">Convidado${calcRef.E?`<span class="rdc-cell-n">${calcRef.E}</span>`:''}${guestsPay.length?'<span class="rdc-cell-arrow">›</span>':''}</div><div class="rdc-cell-v">${calcRef.E?eur(calcRef.Q):'<span class="rdc-na">N/A</span>'}</div></div>`;
         const presNota=calcRef.D>0?'':'<div class="rdc-sempres">Sem presenças marcadas</div>';
         costCards+=`<div class="rdc rdc-hero sf">
@@ -930,6 +952,7 @@ function renderAll(){
           <span class="refdef-icon">${icon}</span>
           <div class="refdef-info">
             <div class="refdef-ref sf">${rd.ref}${rd.prato?`<span class="refdef-prato sf"> · ${escHtml(rd.prato)}</span>`:''}</div>
+            ${rd.menu?`<div class="refdef-menu sf">${escHtml(rd.menu)}</div>`:''}
             ${(rd.respCozinha||rd.respCompras)?`<div class="refdef-resp sf">${[rd.respCozinha?'👨‍🍳 '+escHtml(rd.respCozinha):'',rd.respCompras?'🛒 '+escHtml(rd.respCompras):''].filter(Boolean).join(' · ')}</div>`:''}
           </div>
           ${isAdmin()?'<span class="refdef-chevron sf">›</span>':''}
@@ -1378,7 +1401,7 @@ async function carregar(){
         _id:m.id,nome:m.nome,fator:N(m.fator),sexo:m.sexo==='F'?'F':'M',
         presencas:(m.presencas||[]).map(p=>({k:`${p.dia}|${p.ref}`,modo:p.modo==='bebe'?'bebe':'come'}))
       })),
-      refeicoesDef:(ev.refeicoes_def||[]).map(r=>({data:r.data,dia:r.dia,ref:r.ref,prato:r.prato||'',peso:N(r.peso),minMEO:N(r.min_meo),minConv:N(r.min_conv),extraConv:N(r.extra_conv),respCozinha:r.resp_cozinha||'',respCompras:r.resp_compras||''})),
+      refeicoesDef:(ev.refeicoes_def||[]).map(r=>({data:r.data,dia:r.dia,ref:r.ref,prato:r.prato||'',peso:N(r.peso),minMEO:N(r.min_meo),minConv:N(r.min_conv),extraConv:N(r.extra_conv),respCozinha:r.resp_cozinha||'',respCompras:r.resp_compras||'',menu:r.menu||''})),
       despesas:(ev.despesas||[]).map(d=>({_id:d.id,quem:d.quem,dataDesp:d.data_desp,dataValor:d.data_valor,desc:d.descricao,tipo:d.tipo,valor:N(d.valor),obs:d.observacoes||'',compraId:d.compra_id||null})),
       convidados:(ev.convidados||[]).map(c=>({_id:c.id,membro:c.membro,nome:c.nome,data:c.data,dia:c.dia,ref:c.ref,pagante:c.pagante?'Sim':'Não',preco:N(c.preco)})),
       mealheiros:(ev.mealheiros||[]).map(m=>({quem:m.quem,data:m.data,valor:N(m.valor),subtipo:m.subtipo,desc:m.descricao})),
@@ -1454,7 +1477,7 @@ async function sbGuardarEvento(y,slot){
     if(y.refeicoesDef&&y.refeicoesDef.length)
       await sbReq('POST','refeicoes_def',y.refeicoesDef.map(r=>{
         const row={evento_id:eid,data:r.data,dia:r.dia,ref:r.ref,prato:r.prato||null,peso:r.peso||0,min_meo:r.minMEO||0,min_conv:r.minConv||0,extra_conv:r.extraConv||0};
-        if(REFDEF_RESP_COLS){row.resp_cozinha=r.respCozinha||null;row.resp_compras=r.respCompras||null;}
+        if(REFDEF_RESP_COLS){row.resp_cozinha=r.respCozinha||null;row.resp_compras=r.respCompras||null;row.menu=r.menu||null;}
         return row;
       }));
     if(y.despesas&&y.despesas.length){
@@ -3896,14 +3919,17 @@ function openRefdefModal(editIdx){
   const isEdit=editingRefdef!==null;
   document.getElementById('refdef-title').textContent=isEdit?'Detalhe da Refeição':'Adicionar Refeição';
 
-  // Responsáveis (só com a migração db/notifs.sql corrida)
+  // Responsáveis e menu (só com a migração db/notifs.sql corrida)
   const respWrap=document.getElementById('rd-resp-wrap');
   if(respWrap)respWrap.style.display=REFDEF_RESP_COLS?'':'none';
+  const menuWrap=document.getElementById('rd-menu-wrap');
+  if(menuWrap)menuWrap.style.display=REFDEF_RESP_COLS?'':'none';
 
   if(isEdit){
     const rd=DATA.refeicoesDef[editingRefdef];
     document.getElementById('rd-resp-coz').innerHTML=_respOptions(rd.respCozinha||'');
     document.getElementById('rd-resp-comp').innerHTML=_respOptions(rd.respCompras||'');
+    document.getElementById('rd-menu').value=rd.menu||'';
     document.getElementById('rd-data').value=rd.data||'';
     document.getElementById('rd-ref').value=rd.ref||'Jantar';
     document.getElementById('rd-prato').value=rd.prato||'';
@@ -3914,6 +3940,7 @@ function openRefdefModal(editIdx){
   } else {
     document.getElementById('rd-resp-coz').innerHTML=_respOptions('');
     document.getElementById('rd-resp-comp').innerHTML=_respOptions('');
+    document.getElementById('rd-menu').value='';
     document.getElementById('rd-data').value='';
     document.getElementById('rd-ref').value='Jantar';
     document.getElementById('rd-prato').value='';
@@ -3978,7 +4005,8 @@ async function saveRefdef(){
   const anterior=wasEdit?DATA.refeicoesDef[editingRefdef]:null;
   const respCozinha=REFDEF_RESP_COLS?(document.getElementById('rd-resp-coz').value||''):((anterior&&anterior.respCozinha)||'');
   const respCompras=REFDEF_RESP_COLS?(document.getElementById('rd-resp-comp').value||''):((anterior&&anterior.respCompras)||'');
-  const entry={data,dia,ref,prato:prato||'',peso:ref==='Lanche'?null:peso,minMEO,minConv,extraConv,respCozinha,respCompras};
+  const menu=REFDEF_RESP_COLS?(document.getElementById('rd-menu').value||'').trim():((anterior&&anterior.menu)||'');
+  const entry={data,dia,ref,prato:prato||'',peso:ref==='Lanche'?null:peso,minMEO,minConv,extraConv,respCozinha,respCompras,menu};
 
   document.getElementById('rd-save').disabled=true;
   if(wasEdit){
@@ -4016,9 +4044,11 @@ function resumoRefeicao(rd){
   srt(comem);srt(bebem);
   const conv=(DATA.convidados||[]).filter(g=>g.dia===rd.dia&&g.ref===rd.ref);
   const L=[`👥 ${comem.length} a comer · ${bebem.length} só bebem · ${conv.length} convidados`];
+  if(rd.prato)L.unshift('🍲 '+rd.prato);
   if(comem.length)L.push('🍽 '+comem.join(', '));
   if(bebem.length)L.push('🥤 '+bebem.join(', '));
   if(conv.length)L.push('🎟 '+conv.map(g=>g.nome+(g.membro?' ('+g.membro+')':'')).join(', '));
+  if(rd.menu)L.push('📋 '+rd.menu);
   return L.join('\n');
 }
 function logNomeacoes(antes,depois){
