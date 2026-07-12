@@ -36,6 +36,17 @@ CREATE TABLE IF NOT EXISTS festasbv.notif_prefs (
 -- GRANTs (sem isto: HTTP 403 / 42501)
 GRANT ALL ON TABLE festasbv.notif_prefs TO anon, authenticated;
 
+-- ⚠️ A service_role (usada pelas Edge Functions notif-festas/notif-pessoais)
+-- nunca tinha recebido acesso ao schema — o schema.sql só concede a anon e
+-- authenticated. A RLS ela ignora, mas os GRANTs de schema/tabela não.
+-- Sem isto, qualquer SELECT da Edge Function dá 42501 "permission denied
+-- for schema festasbv".
+GRANT USAGE ON SCHEMA festasbv TO service_role;
+GRANT ALL ON ALL TABLES    IN SCHEMA festasbv TO service_role;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA festasbv TO service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA festasbv GRANT ALL ON TABLES    TO service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA festasbv GRANT ALL ON SEQUENCES TO service_role;
+
 -- RLS: cada um só vê e mexe na SUA linha; admin vê tudo. O chat_id é
 -- escrito pela Edge Function (service_role, ignora RLS).
 ALTER TABLE festasbv.notif_prefs ENABLE ROW LEVEL SECURITY;
