@@ -49,17 +49,26 @@ async function sb(method: string, path: string, body?: unknown) {
     },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
-  if (!r.ok) throw new Error(`sb ${path}: HTTP ${r.status}`);
+  if (!r.ok) {
+    const detail = await r.text().catch(() => "");
+    console.error(`sb ${method} ${path} -> HTTP ${r.status}`, detail.slice(0, 300));
+    throw new Error(`sb ${path}: HTTP ${r.status}`);
+  }
   const tx = await r.text();
   return tx ? JSON.parse(tx) : null;
 }
 
 async function tgSend(chatId: string, text: string) {
-  await fetch(`https://api.telegram.org/bot${TG_TOKEN}/sendMessage`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ chat_id: chatId, text }),
-  }).catch(() => {});
+  try {
+    const r = await fetch(`https://api.telegram.org/bot${TG_TOKEN}/sendMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ chat_id: chatId, text }),
+    });
+    if (!r.ok) console.error("tgSend -> HTTP", r.status, (await r.text().catch(() => "")).slice(0, 200));
+  } catch (e) {
+    console.error("tgSend falhou:", (e as Error).message);
+  }
 }
 
 // Interruptor global (mesma semântica fail-open da notif-festas)
@@ -89,6 +98,7 @@ async function handleTelegram(update: any): Promise<Response> {
   const msg = update.message;
   const chatId = msg?.chat?.id;
   const text: string = msg?.text ?? "";
+  console.log("telegram update:", chatId ? `chat ${chatId}` : "sem chat", "texto:", text.slice(0, 40));
   if (!chatId) return new Response("skip", { status: 200 });
 
   const m = text.match(/^\/start\s+(\S+)/);
@@ -97,6 +107,7 @@ async function handleTelegram(update: any): Promise<Response> {
       "GET",
       `notif_prefs?codigo=eq.${encodeURIComponent(m[1])}&select=user_email`,
     );
+    console.log("/start com código:", m[1], "-> match:", rows?.length ?? 0);
     if (rows && rows[0]) {
       await sb("PATCH", `notif_prefs?codigo=eq.${encodeURIComponent(m[1])}`, {
         chat_id: String(chatId),
@@ -113,6 +124,7 @@ async function handleTelegram(update: any): Promise<Response> {
 
 // ── A) INSERT no histórico: routing por tipo de evento ──
 async function handleHistorico(record: any): Promise<Response> {
+  console.log("historico:", record.tipo, record.accao, "por", record.autor_email);
   if (!(await notifLigadas())) return new Response("skip-off", { status: 200 });
 
   const d = record.detalhe ?? {};
@@ -182,6 +194,7 @@ Deno.serve(async (req) => {
     return new Response("skip", { status: 200 });
   } catch (e) {
     // 200 de propósito: evita loops de re-tentativa dos webhooks
+    console.error("erro não tratado:", (e as Error).message);
     return new Response("err: " + (e as Error).message, { status: 200 });
   }
 });
