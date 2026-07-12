@@ -2593,6 +2593,14 @@ async function ligarTelegram(){
     window.open(`https://t.me/${_tgBot}?start=${enc(p.codigo)}`,'_blank');
   }catch(e){toast(permErrorMsg(e),'bad');}
 }
+function copyStartCmd(){
+  if(!_myNotif||!_myNotif.codigo)return;
+  const cmd='/start '+_myNotif.codigo;
+  const done=()=>toast('Copiado — cola no chat do bot ✓','ok');
+  if(navigator.clipboard&&navigator.clipboard.writeText){
+    navigator.clipboard.writeText(cmd).then(done).catch(()=>toast(cmd,'ok'));
+  }else toast(cmd,'ok');   // sem clipboard API: mostra o comando para copiar à mão
+}
 async function toggleMyNotif(cb){
   const on=cb.checked;
   try{
@@ -2629,6 +2637,15 @@ function renderMyNotif(){
       <button class="btn" onclick="loadMyNotif()">🔄 Verificar</button>
       <button class="btn prim" onclick="ligarTelegram()">📲 Ligar ao Telegram</button>
     </div>`;
+    // Plano B: o deep-link do Telegram nem sempre envia o código (sobretudo em
+    // conversas já abertas com o bot) — mostra o comando pronto a copiar.
+    if(_myNotif&&_myNotif.codigo){
+      h+=`<div class="note" style="margin-top:10px">Se o bot não responder "✅ Ligado!", envia-lhe esta mensagem${_tgBot?` (@${escHtml(_tgBot)})`:''}:</div>
+      <div style="display:flex;gap:8px;align-items:center;margin-top:6px">
+        <code style="flex:1;background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:10px 12px;font-size:13px;user-select:all;overflow-x:auto;white-space:nowrap">/start ${escHtml(_myNotif.codigo)}</code>
+        <button class="btn" style="flex-shrink:0" onclick="copyStartCmd()">📋 Copiar</button>
+      </div>`;
+    }
     if(!_tgBot)h+='<div class="note">⚠️ O bot ainda não está configurado (o admin tem de preencher <b>telegram_bot</b> na config).</div>';
   }else{
     h+='<div class="note" style="margin-top:8px">Recebes avisos quando fores nomeado responsável de uma refeição, quando mudam presenças/convidados de uma refeição tua, e quando alguém põe um artigo nas compras sem ficar a tratar dele.</div>';
