@@ -181,6 +181,17 @@ setTimeout(function(){ if (window.fbvEsconderSplash) window.fbvEsconderSplash();
       <label>Quem trata (admin)</label>
       <select id="shop-claim"></select>
     </div>
+    <div id="shop-eutrato-row" style="display:none;align-items:center;gap:10px;padding:10px 12px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;margin-top:12px">
+      <div style="flex:1">
+        <div style="font-size:13px;font-weight:600">🙋 Eu trato de comprar</div>
+        <div style="font-size:11px;color:var(--faint);line-height:1.4">Desligado: fica «Em falta» e o grupo é avisado no Telegram de que falta quem trate</div>
+      </div>
+      <label style="position:relative;width:44px;height:24px;margin:0;flex-shrink:0">
+        <input type="checkbox" id="shop-eutrato" onchange="_setEutratoKnob(this.checked)" style="opacity:0;width:0;height:0;position:absolute">
+        <span style="position:absolute;inset:0;background:var(--line);border-radius:12px;cursor:pointer;transition:.2s"></span>
+        <span id="shop-eutrato-knob" style="position:absolute;top:2px;left:2px;width:20px;height:20px;background:var(--ink);border-radius:50%;transition:.2s"></span>
+      </label>
+    </div>
     <div class="note" id="shop-meta" style="display:none;margin-top:10px"></div>
     <div class="mbtns">
       <button class="btn ghost" onclick="closeShopItemModal()">Fechar</button>
@@ -252,6 +263,19 @@ setTimeout(function(){ if (window.fbvEsconderSplash) window.fbvEsconderSplash();
       <div style="grid-column:1/-1">
         <label>Prato</label>
         <input type="text" id="rd-prato" maxlength="80" placeholder="ex: Esparguete à bolonhesa">
+      </div>
+      <div id="rd-resp-wrap" style="grid-column:1/-1;display:none">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div>
+            <label>👨‍🍳 Resp. cozinha</label>
+            <select id="rd-resp-coz"></select>
+          </div>
+          <div>
+            <label>🛒 Resp. compras</label>
+            <select id="rd-resp-comp"></select>
+          </div>
+        </div>
+        <div class="note" style="margin-top:6px">Quem for nomeado é avisado no Telegram com a lista de quem vai e os totais (se tiver as notificações ligadas).</div>
       </div>
       <div>
         <label>Peso indireto (%)</label>
@@ -382,8 +406,8 @@ setTimeout(function(){ if (window.fbvEsconderSplash) window.fbvEsconderSplash();
       <div class="settings-block-body">
         <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--panel2);border:1px solid var(--line);border-radius:10px">
           <div style="flex:1">
-            <div style="font-size:13px;font-weight:600">Avisos no Telegram</div>
-            <div style="font-size:11px;color:var(--faint);line-height:1.4">Receber aviso quando outra pessoa altera presenças ou convidados. O histórico fica sempre registado.</div>
+            <div style="font-size:13px;font-weight:600">Avisos no Telegram (interruptor global)</div>
+            <div style="font-size:11px;color:var(--faint);line-height:1.4">Desligado, ninguém recebe avisos — nem o admin nem as notificações pessoais. O histórico fica sempre registado.</div>
           </div>
           <label style="position:relative;width:44px;height:24px;margin:0;flex-shrink:0">
             <input type="checkbox" id="adm-notif" onchange="saveNotif()" style="opacity:0;width:0;height:0;position:absolute">
@@ -481,6 +505,19 @@ setTimeout(function(){ if (window.fbvEsconderSplash) window.fbvEsconderSplash();
         <p style="font-size:12px;color:var(--muted);margin-bottom:10px;line-height:1.5">Quem alterou presenças e convidados, e quando. Últimas 100 alterações deste ano.</p>
         <div class="mbtns" style="margin-bottom:10px"><button class="btn" onclick="openHistorico()">🔄 Atualizar</button></div>
         <div id="hist-list"><div class="note">Abre para carregar…</div></div>
+      </div>
+    </div>
+
+    <!-- 3d. Notificações pessoais (cada utilizador) -->
+    <div class="settings-block">
+      <div class="settings-block-hdr" onclick="toggleSettingsBlock(this)">
+        <span class="sb-icon">🔔</span>
+        <span class="sb-title sf">Notificações</span>
+        <span class="sb-arrow sf">▼</span>
+      </div>
+      <div class="settings-block-body">
+        <p style="font-size:12px;color:var(--muted);margin-bottom:10px;line-height:1.5">Recebe avisos no Telegram: quando fores nomeado responsável de uma refeição, quando alteram presenças/convidados de refeições tuas, e quando fica um artigo por tratar nas compras.</p>
+        <div id="my-notif-body"><div class="note">A carregar…</div></div>
       </div>
     </div>
 

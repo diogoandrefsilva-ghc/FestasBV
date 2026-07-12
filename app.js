@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v10 · 2026-07-08 · resumo fundido nos saldos';
+const APP_BUILD = 'v11 · 2026-07-12 · notificações pessoais Telegram';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -93,6 +93,7 @@ let USER_AMIGOS=[];   // [{email,amigo}]
 let CONJUGES=[];      // [{amigo_a,amigo_b}]
 let VALIDACOES=[];    // [{evento_id,amigo,validado_por_email,validado_em}]
 let MY_NAMES=[];      // nomes que o utilizador atual pode gerir (próprio + cônjuge)
+let REFDEF_RESP_COLS=false;   // BD já tem resp_cozinha/resp_compras? (migração db/notifs.sql)
 const enc=encodeURIComponent;
 
 function isAdmin(){return !!_sbSession&&_sbSession.user.email===ADMIN_EMAIL;}
@@ -929,6 +930,7 @@ function renderAll(){
           <span class="refdef-icon">${icon}</span>
           <div class="refdef-info">
             <div class="refdef-ref sf">${rd.ref}${rd.prato?`<span class="refdef-prato sf"> · ${escHtml(rd.prato)}</span>`:''}</div>
+            ${(rd.respCozinha||rd.respCompras)?`<div class="refdef-resp sf">${[rd.respCozinha?'👨‍🍳 '+escHtml(rd.respCozinha):'',rd.respCompras?'🛒 '+escHtml(rd.respCompras):''].filter(Boolean).join(' · ')}</div>`:''}
           </div>
           ${isAdmin()?'<span class="refdef-chevron sf">›</span>':''}
           ${costCards}
@@ -1363,6 +1365,9 @@ async function carregar(){
     CONJUGES=(cjRes&&cjRes.ok)?await cjRes.json():[];
     VALIDACOES=(vlRes&&vlRes.ok)?await vlRes.json():[];
     const shopRows=(slRes&&slRes.ok)?await slRes.json():[];
+    // Só gravamos os responsáveis se as colunas já existirem no Supabase
+    // (senão o replace das refeições falhava todo — padrão dividas_publicas)
+    REFDEF_RESP_COLS=rows.some(ev=>(ev.refeicoes_def||[]).some(r=>'resp_cozinha' in r));
     const shopByEv={};shopRows.forEach(s=>{(shopByEv[s.evento_id]=shopByEv[s.evento_id]||[]).push(s);});
     computeMyNames();
     const N=v=>v==null?0:Number(v);
@@ -1373,7 +1378,7 @@ async function carregar(){
         _id:m.id,nome:m.nome,fator:N(m.fator),sexo:m.sexo==='F'?'F':'M',
         presencas:(m.presencas||[]).map(p=>({k:`${p.dia}|${p.ref}`,modo:p.modo==='bebe'?'bebe':'come'}))
       })),
-      refeicoesDef:(ev.refeicoes_def||[]).map(r=>({data:r.data,dia:r.dia,ref:r.ref,prato:r.prato||'',peso:N(r.peso),minMEO:N(r.min_meo),minConv:N(r.min_conv),extraConv:N(r.extra_conv)})),
+      refeicoesDef:(ev.refeicoes_def||[]).map(r=>({data:r.data,dia:r.dia,ref:r.ref,prato:r.prato||'',peso:N(r.peso),minMEO:N(r.min_meo),minConv:N(r.min_conv),extraConv:N(r.extra_conv),respCozinha:r.resp_cozinha||'',respCompras:r.resp_compras||''})),
       despesas:(ev.despesas||[]).map(d=>({_id:d.id,quem:d.quem,dataDesp:d.data_desp,dataValor:d.data_valor,desc:d.descricao,tipo:d.tipo,valor:N(d.valor),obs:d.observacoes||'',compraId:d.compra_id||null})),
       convidados:(ev.convidados||[]).map(c=>({_id:c.id,membro:c.membro,nome:c.nome,data:c.data,dia:c.dia,ref:c.ref,pagante:c.pagante?'Sim':'Não',preco:N(c.preco)})),
       mealheiros:(ev.mealheiros||[]).map(m=>({quem:m.quem,data:m.data,valor:N(m.valor),subtipo:m.subtipo,desc:m.descricao})),
@@ -1447,7 +1452,11 @@ async function sbGuardarEvento(y,slot){
       if(pres.length)await sbReq('POST','presencas',pres);
     }
     if(y.refeicoesDef&&y.refeicoesDef.length)
-      await sbReq('POST','refeicoes_def',y.refeicoesDef.map(r=>({evento_id:eid,data:r.data,dia:r.dia,ref:r.ref,prato:r.prato||null,peso:r.peso||0,min_meo:r.minMEO||0,min_conv:r.minConv||0,extra_conv:r.extraConv||0})));
+      await sbReq('POST','refeicoes_def',y.refeicoesDef.map(r=>{
+        const row={evento_id:eid,data:r.data,dia:r.dia,ref:r.ref,prato:r.prato||null,peso:r.peso||0,min_meo:r.minMEO||0,min_conv:r.minConv||0,extra_conv:r.extraConv||0};
+        if(REFDEF_RESP_COLS){row.resp_cozinha=r.respCozinha||null;row.resp_compras=r.respCompras||null;}
+        return row;
+      }));
     if(y.despesas&&y.despesas.length){
       const dres=await sbReq('POST','despesas',y.despesas.map(d=>({evento_id:eid,quem:d.quem,data_desp:d.dataDesp||null,data_valor:d.dataValor||null,descricao:d.desc||'',tipo:d.tipo,valor:d.valor,observacoes:d.obs||null,compra_id:d.compraId||null})),{Prefer:'return=representation'});
       if(Array.isArray(dres))dres.forEach((r,i)=>{if(y.despesas[i])y.despesas[i]._id=r.id;});
@@ -1515,6 +1524,16 @@ function fraseHistorico(tipo,accao,alvo,autor,d){
   const dn=_diaNat(d.dia), rn=_refNat(d.ref);
   const diaStr=`${dn.prep} ${dn.nome}`;       // "na sexta"
   const refDia=`${rn.noun} de ${dn.nome}`;     // "jantar de sexta"
+  if(tipo==='refeicao'){
+    const papel=d.papel==='compras'?'pelas compras':'pela cozinha';
+    if(accao==='retirou')return `${A} retirou ${alvo} de responsável ${papel} do ${refDia}`;
+    return `${A} nomeou ${alvo} responsável ${papel} do ${refDia}`;
+  }
+  if(tipo==='compras'){
+    const q=d.quantidade?` (${d.quantidade})`:'';
+    const dest=d.dataValor?` para o ${refDia}`:'';
+    return `${A} pôs "${alvo}"${q} na lista de compras${dest}${d.tratoEu?` — trata ${A}`:' — falta quem trate'}`;
+  }
   if(tipo==='convidado'){
     const dono=(d.membro&&d.membro!==autor)?` (convidado de ${d.membro})`:'';
     if(accao==='removeu')return `${A} já não vai levar ${alvo} ao ${refDia}${dono}`;
@@ -1575,7 +1594,7 @@ async function openHistorico(){
       const d=r.detalhe||{};
       const quando=new Date(r.ts).toLocaleString('pt-PT',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
       const quem=escHtml(r.autor_amigo||r.autor_email||'?');
-      const icon=r.tipo==='presenca'?'✋':'👥';
+      const icon=r.tipo==='presenca'?'✋':r.tipo==='compras'?'🛒':r.tipo==='refeicao'?'🧑‍🍳':'👥';
       const slot=[d.dia,d.ref].filter(Boolean).join(' · ');
       let txt,sub;
       if(d.frase){
@@ -2363,6 +2382,7 @@ function openAdmin(){
   const adm=document.getElementById('adm-pedidos-wrap');
   if(adm)adm.style.display=isAdmin()?'':'none';
   if(isAdmin()){sbRenderPedidos();sbRenderLigacoes();loadNotif();}
+  loadMyNotif();
   loadParams();
   renderPlantel();
   loadLimpeza();
@@ -2441,6 +2461,92 @@ async function saveNotif(){
     cb.checked=!on;_setNotifKnob(!on);   // reverte o visual se a gravação falhar
     toast('Erro ao guardar: '+e.message,'bad');
   }
+}
+
+/* ── Notificações Telegram PESSOAIS (cada utilizador · festasbv.notif_prefs) ──
+   Fluxo de ligação: a app gera um código, o utilizador toca em
+   t.me/<bot>?start=<codigo> e a Edge Function notif-pessoais (webhook do bot)
+   guarda o chat_id. A partir daí recebe avisos dirigidos a ele (responsável
+   de refeição, artigos de compras por tratar). */
+let _myNotif=null;   // linha própria de notif_prefs (null = ainda sem registo)
+let _tgBot='';       // username do bot (config 'telegram_bot', sem @)
+async function loadMyNotif(){
+  const el=document.getElementById('my-notif-body');if(!el)return;
+  if(!_sbSession){el.innerHTML='<div class="note">Inicia sessão para configurar as notificações.</div>';return;}
+  el.innerHTML='<div class="note">A carregar…</div>';
+  try{
+    const [rows,cfg]=await Promise.all([
+      sbReq('GET',`notif_prefs?user_email=eq.${enc(_sbSession.user.email)}&select=*`),
+      sbReq('GET','config?chave=eq.telegram_bot&select=valor').catch(()=>null)
+    ]);
+    _myNotif=rows&&rows[0]?rows[0]:null;
+    _tgBot=cfg&&cfg[0]?(cfg[0].valor||'').replace(/^@/,''):'';
+    renderMyNotif();
+  }catch(e){
+    el.innerHTML='<div class="note">Notificações pessoais indisponíveis — falta correr a migração <b>db/notifs.sql</b> no Supabase.</div>';
+  }
+}
+function _notifCodigo(){
+  const a='abcdefghijklmnopqrstuvwxyz0123456789';let s='';
+  crypto.getRandomValues(new Uint8Array(10)).forEach(v=>s+=a[v%36]);
+  return s;
+}
+async function ensureMyNotif(){   // cria a linha (com código de ligação) na 1ª utilização
+  if(_myNotif)return _myNotif;
+  const row={user_email:_sbSession.user.email,codigo:_notifCodigo(),ativo:true};
+  const ins=await sbReq('POST','notif_prefs',[row],{Prefer:'return=representation'});
+  _myNotif=ins&&ins[0]?ins[0]:row;
+  return _myNotif;
+}
+async function ligarTelegram(){
+  try{
+    const p=await ensureMyNotif();
+    renderMyNotif();
+    if(!_tgBot){toast('O admin ainda não configurou o bot (config → telegram_bot)','bad');return;}
+    window.open(`https://t.me/${_tgBot}?start=${enc(p.codigo)}`,'_blank');
+  }catch(e){toast(permErrorMsg(e),'bad');}
+}
+async function toggleMyNotif(cb){
+  const on=cb.checked;
+  try{
+    await ensureMyNotif();
+    await sbReq('PATCH',`notif_prefs?user_email=eq.${enc(_sbSession.user.email)}`,{ativo:on,updated_at:new Date().toISOString()});
+    _myNotif.ativo=on;renderMyNotif();
+    toast(on?'Notificações pessoais ligadas ✓':'Notificações pessoais desligadas ✓','ok');
+  }catch(e){cb.checked=!on;renderMyNotif();toast(permErrorMsg(e),'bad');}
+}
+function renderMyNotif(){
+  const el=document.getElementById('my-notif-body');if(!el)return;
+  const ligado=!!(_myNotif&&_myNotif.chat_id);
+  const ativo=_myNotif?!!_myNotif.ativo:true;
+  const status=ligado
+    ?'<span style="color:var(--green,#2f9e63);font-weight:700">✅ Telegram ligado</span>'
+    :(_myNotif?'⏳ Falta concluir a ligação no Telegram':'📴 Telegram ainda não ligado');
+  let h=`<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--panel2);border:1px solid var(--line);border-radius:10px">
+    <div style="flex:1">
+      <div style="font-size:13px;font-weight:600">Receber avisos no Telegram</div>
+      <div style="font-size:11px;color:var(--faint);line-height:1.4">${status}</div>
+    </div>
+    <label style="position:relative;width:44px;height:24px;margin:0;flex-shrink:0">
+      <input type="checkbox" onchange="toggleMyNotif(this)" ${ativo?'checked':''} style="opacity:0;width:0;height:0;position:absolute">
+      <span style="position:absolute;inset:0;background:${ativo?'var(--gold)':'var(--line)'};border-radius:12px;cursor:pointer;transition:.2s"></span>
+      <span style="position:absolute;top:2px;left:${ativo?'22px':'2px'};width:20px;height:20px;background:var(--ink);border-radius:50%;transition:.2s"></span>
+    </label>
+  </div>`;
+  if(!ligado){
+    h+=`<div class="note" style="margin-top:10px;line-height:1.6">Para ligares:<br>
+      1. Toca em <b>Ligar ao Telegram</b> (abre o bot já com o teu código)<br>
+      2. No Telegram, toca em <b>Começar/Start</b><br>
+      3. Volta aqui e toca em <b>Verificar</b> — deve aparecer ✅</div>
+    <div class="mbtns" style="margin-top:10px">
+      <button class="btn" onclick="loadMyNotif()">🔄 Verificar</button>
+      <button class="btn prim" onclick="ligarTelegram()">📲 Ligar ao Telegram</button>
+    </div>`;
+    if(!_tgBot)h+='<div class="note">⚠️ O bot ainda não está configurado (o admin tem de preencher <b>telegram_bot</b> na config).</div>';
+  }else{
+    h+='<div class="note" style="margin-top:8px">Recebes avisos quando fores nomeado responsável de uma refeição, quando mudam presenças/convidados de uma refeição tua, e quando alguém põe um artigo nas compras sem ficar a tratar dele.</div>';
+  }
+  el.innerHTML=h;
 }
 async function saveParams(){
   if(!DATA)return;
@@ -2986,6 +3092,13 @@ function openShopItemModal(id){
     document.getElementById('shop-claim').innerHTML=opts;
     claimWrap.style.display='';
   }else claimWrap.style.display='none';
+  // "Eu trato de comprar" só na criação (na edição a posse gere-se por claim/largar)
+  const euRow=document.getElementById('shop-eutrato-row');
+  if(euRow){
+    euRow.style.display=it?'none':'flex';
+    document.getElementById('shop-eutrato').checked=false;
+    _setEutratoKnob(false);
+  }
   // Campos editáveis só quem pode; senão, detalhe em leitura
   document.querySelectorAll('#shop-item-modal input,#shop-item-modal select').forEach(el=>{el.disabled=!canEdit;el.style.opacity=canEdit?'':'.75';});
   const saveBtn=document.getElementById('shop-item-save');
@@ -3006,6 +3119,12 @@ function openShopItemModal(id){
 }
 function deleteShopItemFromModal(){if(editingItemId!=null){const id=editingItemId;closeShopItemModal();deleteShopItem(id);}}
 function closeShopItemModal(){document.getElementById('shop-item-bg').classList.remove('show');document.body.classList.remove('no-scroll');editingItemId=null;}
+function _setEutratoKnob(on){
+  const knob=document.getElementById('shop-eutrato-knob');
+  const track=knob?.previousElementSibling;
+  if(knob)knob.style.left=on?'22px':'2px';
+  if(track)track.style.background=on?'var(--gold)':'var(--line)';
+}
 function shopTipoChanged(){
   const tipo=document.getElementById('shop-tipo').value;
   const wrap=document.getElementById('shop-ref-wrap');
@@ -3040,10 +3159,14 @@ async function saveShopItem(){
       toast('Artigo atualizado ✓','ok');
     }else{
       const criadoPor=myPrimaryName()||(isAdmin()?'Admin':'');
-      const ins=await queueWrite(()=>sbReq('POST','shoplist',
-        [{evento_id:DATA._sbId,artigo,quantidade:qtd,tipo,data_valor:dataValor,estado:'pendente',criado_por:criadoPor}],
-        {Prefer:'return=representation'}));
-      shopArr().push({_id:ins&&ins[0]?ins[0].id:null,artigo,quantidade:qtd,tipo,dataValor,estado:'pendente',tratadoPor:null,noCarrinho:false,compraId:null,cfDesc:null,valor:null,criadoPor,criadoEm:new Date().toISOString(),compradoEm:null});
+      // "Eu trato": quem adiciona fica logo a tratar; senão fica "Em falta" e
+      // os outros são avisados no Telegram (routing na Edge Function notif-pessoais)
+      const tratoEu=!!document.getElementById('shop-eutrato').checked;
+      const row={evento_id:DATA._sbId,artigo,quantidade:qtd,tipo,data_valor:dataValor,estado:'pendente',criado_por:criadoPor};
+      if(tratoEu)row.tratado_por=criadoPor;
+      const ins=await queueWrite(()=>sbReq('POST','shoplist',[row],{Prefer:'return=representation'}));
+      shopArr().push({_id:ins&&ins[0]?ins[0].id:null,artigo,quantidade:qtd,tipo,dataValor,estado:'pendente',tratadoPor:tratoEu?criadoPor:null,noCarrinho:false,compraId:null,cfDesc:null,valor:null,criadoPor,criadoEm:new Date().toISOString(),compradoEm:null});
+      sbLog('compras','adicionou',artigo,{tratoEu,quantidade:qtd,tipoDesp:tipo,dataValor,dia:dataValor?dataToDia(dataValor):undefined,ref:shopIsMeal(tipo)?tipo:undefined});
       toast('Artigo adicionado ✓','ok');
     }
     syncMirror();marcaGuardado();
@@ -3759,13 +3882,28 @@ function applyRoFields(modalEl,ro){
   });
 }
 
+// Opções dos selects de responsável (membros do ano; mantém valor desconhecido se existir)
+function _respOptions(sel){
+  let h='<option value="">— ninguém —</option>';
+  const nomes=(DATA.membros||[]).map(m=>m.nome).sort((a,b)=>a.localeCompare(b,'pt'));
+  if(sel&&!nomes.includes(sel))h+=`<option value="${escHtml(sel)}" selected>${escHtml(sel)}</option>`;
+  nomes.forEach(n=>{h+=`<option value="${escHtml(n)}"${sel===n?' selected':''}>${escHtml(n)}</option>`;});
+  return h;
+}
+
 function openRefdefModal(editIdx){
   editingRefdef=typeof editIdx==='number'?editIdx:null;
   const isEdit=editingRefdef!==null;
   document.getElementById('refdef-title').textContent=isEdit?'Detalhe da Refeição':'Adicionar Refeição';
 
+  // Responsáveis (só com a migração db/notifs.sql corrida)
+  const respWrap=document.getElementById('rd-resp-wrap');
+  if(respWrap)respWrap.style.display=REFDEF_RESP_COLS?'':'none';
+
   if(isEdit){
     const rd=DATA.refeicoesDef[editingRefdef];
+    document.getElementById('rd-resp-coz').innerHTML=_respOptions(rd.respCozinha||'');
+    document.getElementById('rd-resp-comp').innerHTML=_respOptions(rd.respCompras||'');
     document.getElementById('rd-data').value=rd.data||'';
     document.getElementById('rd-ref').value=rd.ref||'Jantar';
     document.getElementById('rd-prato').value=rd.prato||'';
@@ -3774,6 +3912,8 @@ function openRefdefModal(editIdx){
     document.getElementById('rd-minconv').value=rd.minConv||10;
     document.getElementById('rd-extraconv').value=rd.extraConv||2;
   } else {
+    document.getElementById('rd-resp-coz').innerHTML=_respOptions('');
+    document.getElementById('rd-resp-comp').innerHTML=_respOptions('');
     document.getElementById('rd-data').value='';
     document.getElementById('rd-ref').value='Jantar';
     document.getElementById('rd-prato').value='';
@@ -3835,7 +3975,10 @@ async function saveRefdef(){
   if(dup>=0){toast(`${dia} ${ref} já existe`,'bad');return;}
 
   const wasEdit=editingRefdef!==null;
-  const entry={data,dia,ref,prato:prato||'',peso:ref==='Lanche'?null:peso,minMEO,minConv,extraConv};
+  const anterior=wasEdit?DATA.refeicoesDef[editingRefdef]:null;
+  const respCozinha=REFDEF_RESP_COLS?(document.getElementById('rd-resp-coz').value||''):((anterior&&anterior.respCozinha)||'');
+  const respCompras=REFDEF_RESP_COLS?(document.getElementById('rd-resp-comp').value||''):((anterior&&anterior.respCompras)||'');
+  const entry={data,dia,ref,prato:prato||'',peso:ref==='Lanche'?null:peso,minMEO,minConv,extraConv,respCozinha,respCompras};
 
   document.getElementById('rd-save').disabled=true;
   if(wasEdit){
@@ -3852,11 +3995,39 @@ async function saveRefdef(){
   const ok=await pushToGitHub((wasEdit?'Editar':'Adicionar')+' refeição: '+dia+' '+ref);
   document.getElementById('rd-save').disabled=false;
   if(ok){
+    logNomeacoes(anterior,entry);
     closeRefdefModal();
     CALC=calcular(JSON.parse(JSON.stringify(DATA)));
     renderAll();
     toast((wasEdit?'Refeição editada':'Refeição adicionada')+' ✓','ok');
   }
+}
+
+/* Nomeações de responsáveis: regista no histórico (que alimenta o Telegram —
+   o nomeado recebe a frase + a lista de quem vai e os totais). */
+function resumoRefeicao(rd){
+  const rkey=`${rd.dia}|${rd.ref==='Lanche'?'Tarde':rd.ref}`;
+  const comem=[],bebem=[];
+  (DATA.membros||[]).forEach(m=>{
+    const p=(m.presencas||[]).find(x=>x.k===rkey);
+    if(p)(p.modo==='bebe'?bebem:comem).push(m.nome);
+  });
+  const srt=a=>a.sort((x,y)=>x.localeCompare(y,'pt'));
+  srt(comem);srt(bebem);
+  const conv=(DATA.convidados||[]).filter(g=>g.dia===rd.dia&&g.ref===rd.ref);
+  const L=[`👥 ${comem.length} a comer · ${bebem.length} só bebem · ${conv.length} convidados`];
+  if(comem.length)L.push('🍽 '+comem.join(', '));
+  if(bebem.length)L.push('🥤 '+bebem.join(', '));
+  if(conv.length)L.push('🎟 '+conv.map(g=>g.nome+(g.membro?' ('+g.membro+')':'')).join(', '));
+  return L.join('\n');
+}
+function logNomeacoes(antes,depois){
+  [['respCozinha','cozinha'],['respCompras','compras']].forEach(([k,papel])=>{
+    const de=(antes&&antes[k])||'',para=depois[k]||'';
+    if(de===para)return;
+    if(para)sbLog('refeicao','nomeou',para,{dia:depois.dia,ref:depois.ref,papel,resumo:resumoRefeicao(depois)});
+    if(de)sbLog('refeicao','retirou',de,{dia:depois.dia,ref:depois.ref,papel});
+  });
 }
 
 // Eliminar a partir do detalhe (modal)
