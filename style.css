@@ -635,61 +635,12 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .auth-divider::before,.auth-divider::after{content:"";flex:1;height:1px;background:var(--line)}
 .auth-status{display:none;font-size:12.5px;margin-top:12px;line-height:1.5}
 
-/* ═══ CASH-FLOWS v2 — resumo + cartões com badge circular por tipo ═══ */
-.cfs-strip{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
-.cfs-card{background:var(--panel);border:1.5px solid var(--line);border-radius:12px;padding:10px 12px;cursor:pointer;transition:.15s;user-select:none;position:relative;overflow:hidden;display:flex;align-items:center;gap:10px}
-.cfs-card:active{transform:scale(.97)}
-.cfs-badge{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;border:2px solid transparent}
-.cfs-card .cfs-body{flex:1;min-width:0}
-.cfs-card .cfs-top{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;white-space:nowrap}
-.cfs-card .cfs-n{margin-left:auto;font-size:10px;font-weight:700;color:var(--faint);background:var(--panel2);padding:1px 7px;border-radius:8px}
-.cfs-card .cfs-val{font-size:16px;font-weight:800;margin-top:2px;font-variant-numeric:tabular-nums}
-.cfs-card .cfs-val.neg{color:var(--red)}
-.cfs-card .cfs-val.pos{color:var(--green)}
-.cfs-card .cfs-val.mov{color:var(--blue)}
-.cfs-card .cfs-val.set{color:var(--gold)}
-.cfs-card.on{border-color:var(--ink)}
-.cfs-card.on.b-despesa{border-color:var(--red);background:rgba(179,64,47,.07)}
-.cfs-card.on.b-mealheiro{border-color:var(--green);background:rgba(30,122,77,.07)}
-.cfs-card.on.b-reembolso{border-color:var(--blue);background:rgba(46,111,168,.07)}
-.cfs-card.on.b-saldar{border-color:var(--gold);background:rgba(168,123,20,.08)}
-.cf-group-hdr{font-family:var(--display);font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:var(--campino);font-weight:600;margin:16px 0 6px;display:flex;align-items:center;gap:8px}
-.cf-group-hdr::after{content:"";flex:1;height:1px;background:linear-gradient(90deg,var(--line),transparent 70%)}
-.cf-group-hdr .cfg-sum{font-size:10px;color:var(--faint);letter-spacing:0;text-transform:none;font-weight:600;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
-.card .v.cf-neg{color:var(--red)}
-.card .v.cf-pos{color:var(--green)}
-.card .v.cf-mov{color:var(--blue)}
-.card .v.cf-set{color:var(--gold)}
-
-/* Cartão de movimento com badge circular no canto sup. esquerdo */
-.cf-card{display:flex;align-items:flex-start;gap:11px;padding:12px 13px;cursor:pointer;transition:.12s}
-.cf-card:active{transform:scale(.985);background:var(--panel2)}
+/* ═══ CASH-FLOWS — peças partilhadas (sub-filtros, formulários) ═══ */
 .btn.danger{background:rgba(179,64,47,.1);color:var(--red);border:1px solid rgba(179,64,47,.35)}
-.cf-card .cf-badge{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0;margin-top:1px;box-shadow:0 1px 3px rgba(80,55,20,.15)}
-.cf-card .cf-main{flex:1;min-width:0}
-/* Cores por tipologia (badge + filete esquerdo) */
-.b-despesa .cf-badge,.cfs-badge.b-despesa{background:rgba(179,64,47,.13);border:2px solid var(--red)}
-.b-mealheiro .cf-badge,.cfs-badge.b-mealheiro{background:rgba(30,122,77,.13);border:2px solid var(--green)}
-.b-reembolso .cf-badge,.cfs-badge.b-reembolso{background:rgba(46,111,168,.13);border:2px solid var(--blue)}
-.b-saldar .cf-badge,.cfs-badge.b-saldar{background:rgba(168,123,20,.15);border:2px solid var(--gold)}
-.cf-card.b-despesa{border-left:4px solid var(--red)}
-.cf-card.b-mealheiro{border-left:4px solid var(--green)}
-.cf-card.b-reembolso{border-left:4px solid var(--blue)}
-.cf-card.b-saldar{border-left:4px solid var(--gold)}
-.chip.sub.s-almoco{background:rgba(168,123,20,.14);color:var(--gold)}
-.chip.sub.s-jantar{background:rgba(105,70,160,.12);color:#6946A0}
-.chip.sub.s-gerais{background:rgba(111,92,66,.12);color:var(--muted)}
-.chip.sub.s-bebidas{background:rgba(46,111,168,.12);color:var(--blue)}
-.chip.sub.s-cerveja{background:rgba(196,144,32,.16);color:#9A6E0E}
-.chip.sub.s-renda{background:rgba(120,86,55,.14);color:#7A5637}
 .cf-subchips{display:flex;gap:6px;flex-wrap:wrap;margin:-2px 0 12px}
 .cf-subchip{padding:6px 12px;border-radius:18px;border:1.5px solid var(--line);background:#FFFDF6;font-size:12px;font-weight:700;color:var(--muted);cursor:pointer;transition:.15s;user-select:none}
 .cf-subchip:active{transform:scale(.95)}
 .cf-subchip.on{border-color:var(--barrete);background:rgba(30,122,77,.1);color:var(--barrete)}
-.cf-card .chip.t.b-despesa{background:rgba(179,64,47,.1);color:var(--red)}
-.cf-card .chip.t.b-mealheiro{background:rgba(30,122,77,.1);color:var(--green)}
-.cf-card .chip.t.b-reembolso{background:rgba(46,111,168,.1);color:var(--blue)}
-.cf-card .chip.t.b-saldar{background:rgba(168,123,20,.12);color:var(--gold)}
 /* Despesa prevista (sem data) — segmentado de 2 estados */
 .cf-quando{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:14px;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:4px}
 .cf-quando .cfq{text-align:center;padding:10px 6px;border-radius:9px;font-size:13px;font-weight:700;color:var(--muted);cursor:pointer;user-select:none;transition:.15s;border:1.5px solid transparent;line-height:1.2}
@@ -700,11 +651,6 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .cf-quando-hint{font-size:11px;color:var(--faint);margin-top:6px;line-height:1.4}
 .cf-desc-count{float:right;font-size:10.5px;font-weight:600;color:var(--faint);letter-spacing:.02em}
 .cf-desc-count.full{color:#B5453B}
-.chip.prevista{background:rgba(168,123,20,.16);color:#9A6E0E;font-weight:700}
-.cf-card.cf-prevista{border-left:4px dashed var(--gold);background:repeating-linear-gradient(135deg,rgba(168,123,20,.04) 0 9px,transparent 9px 18px)}
-.cf-card.cf-prevista .cf-badge{background:rgba(168,123,20,.15);border:2px dashed var(--gold);box-shadow:none}
-.cf-obs{margin-top:6px;font-size:12px;color:var(--muted);line-height:1.4;display:flex;gap:5px;align-items:flex-start}
-.cf-obs::before{content:"📝";font-size:11px;flex-shrink:0;opacity:.7}
 
 /* ═══ COMPRAS / SHOPLIST ═══ */
 .cmp-hdr{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:14px 0 8px}
@@ -748,7 +694,6 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 
 /* ═══ COMPRAS v2 — secções, linhas de compra, comprados ═══ */
 .cmp-sec-hdr{font-family:var(--display);font-size:15px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);margin:14px 0 8px;display:flex;align-items:center;gap:8px}
-.chip-lista{background:rgba(30,122,77,.12);border-color:rgba(30,122,77,.35);color:var(--green)}
 /* linhas editáveis no modal de compra */
 .cmp-ln{background:var(--panel2);border:1px solid var(--line);border-radius:11px;padding:9px 10px;margin-bottom:8px}
 .cmp-ln-row1{display:flex;align-items:center;gap:8px}
@@ -786,13 +731,6 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .cmp-rm-meta{font-size:12px;color:var(--muted);margin-top:4px}
 .cmp-rm-acts{display:flex;gap:6px;margin-top:8px}
 .cmp-rm-qtd{font-style:normal;color:var(--muted);font-size:12.5px;font-weight:500}
-
-/* Cash-flows — cartão de compra agrupada */
-.cf-compra{cursor:pointer}
-.cf-compra-lines{margin-top:8px;display:flex;flex-direction:column;gap:3px;border-top:1px dashed var(--line);padding-top:7px}
-.cf-compra-line{display:flex;align-items:baseline;justify-content:space-between;gap:10px;font-size:12px;color:var(--muted);line-height:1.4}
-.cf-compra-line i{font-style:normal;color:var(--faint)}
-.cf-compra-line span:last-child{flex:0 0 auto;font-variant-numeric:tabular-nums;font-weight:600;color:var(--ink)}
 
 /* ═══ CASH-FLOWS — "Mista" (versão C: cabeçalho extrato + cronologia) ═══ */
 .cfc-net{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 16px;margin:0 0 10px}
