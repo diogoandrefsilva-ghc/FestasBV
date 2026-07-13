@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v20 · 2026-07-13 · compra: preço por artigo por defeito · destino Gerais/Bebidas/Cerveja · ordenação por artigo';
+const APP_BUILD = 'v21 · 2026-07-13 · "Só totais" sem formulário de detalhe (fica só a repartição do valor)';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -3861,9 +3861,10 @@ function compraAddLine(){compraEdit.lines.push({tipo:'Gerais',dataValor:null,val
 function compraRemoveLine(i){compraEdit.lines.splice(i,1);if(!compraEdit.lines.length)compraEdit.lines.push({tipo:'Gerais',dataValor:null,valor:'',obs:''});compraRenderLines();}
 function compraUpdateTotal(){
   let tot=0;
-  // Modo "preço por artigo": as linhas de repartição estão escondidas e não contam
+  // Modo "preço por artigo": as linhas de repartição estão escondidas e não contam;
+  // "só totais" numa compra nova: o detalhe está escondido e também não conta
   if(!compraEdit.det)compraEdit.lines.forEach(ln=>{const v=parseFloat(ln.valor);if(!isNaN(v))tot+=v;});
-  (compraEdit.lotes||[]).forEach(l=>{const v=parseFloat(l.valor);if(!isNaN(v))tot+=v;});
+  if(compraEdit.det||compraEdit.id)(compraEdit.lotes||[]).forEach(l=>{const v=parseFloat(l.valor);if(!isNaN(v))tot+=v;});
   const el=document.getElementById('shop-buy-total');if(el)el.textContent=`Total: ${eur(rnd(tot,2))}`;
 }
 
@@ -3917,6 +3918,9 @@ function compraRenderLotes(){
   const cont=document.getElementById('shop-buy-lotes');if(!cont)return;
   const ls=compraEdit.lotes||[];
   const det=!!compraEdit.det;
+  // "Só totais" numa compra NOVA: sem detalhe nenhum — só a repartição do
+  // valor (na edição a secção fica, para se poderem editar lotes já gravados)
+  if(!det&&!compraEdit.id){cont.innerHTML='';compraUpdateTotal();return;}
   if(!ls.length&&!STOCK_TABLE&&!det){cont.innerHTML='';compraUpdateTotal();return;}
   // Destino de um artigo fora da lista: tipo de despesa (defeito Gerais),
   // refeição concreta, ou — em último — stock por alocar (a antiga bolsa comum)
@@ -3960,7 +3964,8 @@ async function saveCompra(){
   // diretas por tipo/refeição (tipoFix e artigos fora da lista com destino tipo)
   const det=!!compraEdit.det;
   const lotes=[];const tipoRows={};   // tipoRows: 'Tipo' ou 'Tipo|data' → artigos
-  for(const l of (compraEdit.lotes||[])){
+  // "Só totais" numa compra nova: o detalhe está escondido → não entra no registo
+  for(const l of ((det||isEdit)?(compraEdit.lotes||[]):[])){
     const artigo=(l.artigo||'').trim();
     const v=rnd(parseFloat(l.valor),2);
     if(!v||v<=0){
