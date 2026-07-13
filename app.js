@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v21 · 2026-07-13 · "Só totais" sem formulário de detalhe (fica só a repartição do valor)';
+const APP_BUILD = 'v22 · 2026-07-14 · "Só totais": repartição gerada de TODOS os artigos marcados, atualiza ao marcar';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -3757,22 +3757,10 @@ function openCompra(compraId){
     // Lotes já gravados desta compra (mantêm qtd/€; as refeições recalculam do
     // picker; um lote sem artigo correspondente na lista é um avulso)
     compraEdit.lotes=stockArr().filter(l=>l.compraId===compraId).map(l=>({_id:l._id,artigo:l.artigo,qtd:fmtQty(l.qtd,l.unidade),valor:l.valor,keys:[],free:!linked.some(x=>shopSameArtigo(x.artigo,l.artigo)),destino:(l.alocacoes&&l.alocacoes[0])?l.alocacoes[0].tipo+'|'+l.alocacoes[0].data:''}));
-  }else{
-    const seed=shopArr().filter(shopMineActive);   // inclui removidos que ainda reclamo (podem já estar no carrinho)
-    // Artigos pedidos para VÁRIAS refeições → lotes de stock (ficam fora das linhas por refeição)
-    const loteIds=new Set();
-    if(STOCK_TABLE){
-      const byArt={};
-      seed.filter(it=>shopIsMeal(it.tipo)&&it.dataValor).forEach(it=>{(byArt[shopArtKey(it.artigo)]=byArt[shopArtKey(it.artigo)]||[]).push(it);});
-      for(const k in byArt)if(new Set(byArt[k].map(i=>i.tipo+'|'+i.dataValor)).size>1)byArt[k].forEach(i=>loteIds.add(i._id));
-    }
-    const gmap={};
-    seed.filter(it=>!loteIds.has(it._id)).forEach(it=>{const k=shopGroupKey(it);(gmap[k]=gmap[k]||{tipo:it.tipo,dataValor:it.dataValor||null,items:[]}).items.push(it);});
-    const ord={};SHOP_TIPOS.forEach((t,i)=>ord[t]=i);
-    Object.values(gmap).sort((a,b)=>(ord[a.tipo]-ord[b.tipo])||((a.dataValor||'').localeCompare(b.dataValor||'')))
-      .forEach(g=>compraEdit.lines.push({tipo:g.tipo,dataValor:g.dataValor,valor:'',obs:g.items.map(i=>{const q=shopQtyLabel(i);return i.artigo+(q?' ('+q+')':'');}).join(', ')}));
   }
-  if(!compraEdit.lines.length)compraEdit.lines.push({tipo:'Gerais',dataValor:null,valor:'',obs:''});
+  // Compra nova: as linhas semeiam-se dos artigos MARCADOS no picker (ver
+  // compraSeedLines, chamada depois de o picker existir no DOM)
+  if(isEdit&&!compraEdit.lines.length)compraEdit.lines.push({tipo:'Gerais',dataValor:null,valor:'',obs:''});
 
   // Cabeçalho
   document.getElementById('shop-buy-title').textContent=isEdit?'Editar Compra':'Registar Compra';
@@ -3799,7 +3787,7 @@ function openCompra(compraId){
     pickItems.slice().sort((a,b)=>a.artigo.localeCompare(b.artigo,'pt')).forEach(it=>{
       const on=isEdit?it.compraId===compraId:shopMine(it);
       const ql=shopQtyLabel(it);
-      pl+=`<label class="cmp-pick-row"><input type="checkbox" class="shop-pick" value="${it._id}" ${on?'checked':''} onchange="compraRefreshLotes()">
+      pl+=`<label class="cmp-pick-row"><input type="checkbox" class="shop-pick" value="${it._id}" ${on?'checked':''} onchange="compraPickChanged()">
         <span>${escHtml(it.artigo)}${ql?' <i>('+escHtml(ql)+')</i>':''}${shopIsRemoved(it)?' ⚠️':''}</span>
         <span class="cmp-badge">${shopTipoIcon(it.tipo)}${shopIsMeal(it.tipo)&&it.dataValor?' '+fmtDiaMes(it.dataValor):' '+it.tipo}</span></label>`;
     });
@@ -3813,6 +3801,7 @@ function openCompra(compraId){
     '<div id="shop-buy-lotes"></div>'+
     '<div id="shop-buy-lines-sec"><div class="cmp-pick sf" style="margin-top:14px">Repartição do valor</div><div id="shop-buy-lines"></div>'+
     (ro?'':'<button class="btn ghost" id="shop-buy-addline" style="width:100%;margin-top:8px" onclick="compraAddLine()">＋ Outro gasto</button>')+'</div>';
+  if(!isEdit)compraSeedLines();
   compraRenderLines();
   compraRefreshLotes();
   compraApplyMode();
@@ -3828,7 +3817,29 @@ function openCompra(compraId){
 function closeShopBuyModal(){document.getElementById('shop-buy-bg').classList.remove('show');document.body.classList.remove('no-scroll');}
 // Alterna "preço por artigo" ↔ "só totais": mostra/esconde as secções e refaz
 // as linhas de detalhe (no modo por artigo entram também os artigos de tipo)
-function compraSetMode(det){compraEdit.det=!!det;compraRefreshLotes();compraApplyMode();}
+function compraSetMode(det){compraEdit.det=!!det;compraRefreshLotes();compraSeedLines();compraApplyMode();}
+function compraPickChanged(){compraRefreshLotes();compraSeedLines();}
+/* Linhas de repartição (compra NOVA): geradas dos artigos marcados no picker —
+   TODOS eles, um grupo por refeição/tipo, artigos nas observações. Regenera a
+   cada marca/desmarca, preservando os € já escritos (por grupo) e as linhas
+   acrescentadas à mão com "＋ Outro gasto". */
+function compraSeedLines(){
+  if(compraEdit.id)return;   // edição: as linhas vêm das despesas gravadas
+  const checked=[...document.querySelectorAll('.shop-pick:checked')].map(c=>+c.value);
+  const its=shopArr().filter(x=>checked.includes(x._id));
+  const gmap={};
+  its.forEach(it=>{const k=shopGroupKey(it);(gmap[k]=gmap[k]||{tipo:it.tipo,dataValor:it.dataValor||null,items:[]}).items.push(it);});
+  const ord={};SHOP_TIPOS.forEach((t,i)=>ord[t]=i);
+  const prev=compraEdit.lines.filter(l=>l._auto);
+  const manual=compraEdit.lines.filter(l=>!l._auto&&((l.valor!==''&&l.valor!=null)||(l.obs||'').trim()));
+  compraEdit.lines=Object.values(gmap).sort((a,b)=>(ord[a.tipo]-ord[b.tipo])||((a.dataValor||'').localeCompare(b.dataValor||'')))
+    .map(g=>{
+      const ex=prev.find(l=>l.tipo===g.tipo&&(l.dataValor||'')===(g.dataValor||''));
+      return {_auto:true,tipo:g.tipo,dataValor:g.dataValor,valor:ex?ex.valor:'',obs:g.items.map(i=>{const q=shopQtyLabel(i);return i.artigo+(q?' ('+q+')':'');}).join(', ')};
+    }).concat(manual);
+  if(!compraEdit.lines.length)compraEdit.lines.push({tipo:'Gerais',dataValor:null,valor:'',obs:''});
+  compraRenderLines();
+}
 function compraApplyMode(){
   const det=!!compraEdit.det;
   const sec=document.getElementById('shop-buy-lines-sec');if(sec)sec.style.display=det?'none':'';
