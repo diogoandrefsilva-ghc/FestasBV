@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v12 · 2026-07-13 · lista por refeição + stock FIFO';
+const APP_BUILD = 'v13 · 2026-07-13 · detalhe por artigo + consumido por refeição';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -3236,36 +3236,50 @@ function mealShopSection(rd){
     });
   });
   alocs.sort((a,b)=>a.l.artigo.localeCompare(b.l.artigo,'pt'));
-  const canAdd=shopCanWrite()&&!contasFechadas();
+  const past=rd.data<hojeISO();   // dia próprio ainda conta como "reservado"
+  const canAdd=shopCanWrite()&&!contasFechadas()&&!past;
   if(!items.length&&!alocs.length&&!canAdd)return '';
   const nDone=items.filter(shopIsBought).length;
   const key=rd.data+'|'+rd.ref;
   const alocLines=alocs.map(x=>`<div class="msl-it stk" onclick="openLoteModal(${x.l._id})">
       <span class="msl-art">${stockEstadoIcon(rd.data)} ${escHtml(x.l.artigo)} <i>${escHtml(fmtQty(x.qtd,x.l.unidade))}</i></span><span class="msl-st ok">${eur(x.val)}</span></div>`).join('');
-  const lines=items.map(it=>{
+  const lineOf=(it,dim)=>{
     const done=shopIsBought(it);
     const qtdTxt=normalizeQty(it.quantidade);
-    let st=done?'<span class="msl-st ok">✓ comprado</span>'
+    const st=done?'<span class="msl-st ok">✓ comprado</span>'
       :it.tratadoPor?`<span class="msl-st">🧑‍🍳 ${escHtml(it.tratadoPor)}</span>`
       :'<span class="msl-st falta">falta quem trate</span>';
     // Dica: antes de comprar, há stock livre deste artigo por alocar
     let hint='';
-    if(!done&&STOCK_TABLE){
+    if(!done&&!past&&STOCK_TABLE){
       const q=qtyParse(it.quantidade);
       if(q){const free=stockFreeFor(it.artigo,q.u);if(free>0)hint=`<div class="msl-hint">🧺 há ${escHtml(fmtQty(free,q.u))} em stock por alocar</div>`;}
     }
-    return `<div class="msl-it${done?' done':''}" onclick="openShopItemModal(${it._id})">
+    return `<div class="msl-it${done?' done':''}${dim?' msl-dim':''}" onclick="openShopItemModal(${it._id})">
       <span class="msl-art">${escHtml(it.artigo)}${qtdTxt?` <i>${escHtml(qtdTxt)}</i>`:''}${hint}</span>${st}</div>`;
-  }).join('');
+  };
+  let body;
+  if(past){
+    // Depois do evento a lista de compras deixa de fazer sentido: primeiro o
+    // que foi CONSUMIDO (lotes c/ € + artigos comprados), depois, discreto,
+    // o que ficou por comprar (útil para o planeamento do ano seguinte).
+    // (um pedido comprado cujo artigo tem lote alocado é redundante — a linha
+    // do lote já mostra a qtd consumida e o €)
+    const bought=items.filter(it=>shopIsBought(it)&&!alocs.some(x=>shopSameArtigo(x.l.artigo,it.artigo))).map(it=>lineOf(it,false)).join('');
+    const pend=items.filter(it=>!shopIsBought(it)).map(it=>lineOf(it,true)).join('');
+    body=`${alocLines||bought?`<div class="msl-hdr sf">✅ Consumido nesta refeição</div>${alocLines}${bought}`:'<div class="msl-empty">Nada registado para esta refeição.</div>'}
+      ${pend?`<div class="msl-hdr sf">📝 Pedidos não comprados</div>${pend}`:''}`;
+  }else{
+    const lines=items.map(it=>lineOf(it,false)).join('');
+    body=`${alocLines?`<div class="msl-hdr sf">🧺 Reservado para esta refeição</div>${alocLines}`:''}
+      ${lines?`${alocLines?'<div class="msl-hdr sf">📝 Pedidos</div>':''}${lines}`:''}
+      ${!lines&&!alocLines?'<div class="msl-empty">Ainda sem ingredientes nesta lista.</div>':''}
+      ${canAdd?`<button class="cmp-mini prim write-action msl-add" onclick="openShopItemModal(null,'${rd.ref}','${rd.data}')">＋ Ingrediente</button>`:''}`;
+  }
   return `<div class="rdc sf msl" onclick="event.stopPropagation()">
     <details class="rdc-det msl-det"${MEAL_SHOP_OPEN[key]?' open':''} ontoggle="MEAL_SHOP_OPEN['${key}']=this.open">
-      <summary><span class="rdc-lbl">🛒 Lista de compras</span>${items.length?`<span class="msl-count">${nDone?nDone+'/':''}${items.length}</span>`:''}<span class="rdc-det-arrow">›</span></summary>
-      <div class="rdc-det-body">
-        ${alocLines?`<div class="msl-hdr sf">🧺 ${rd.data>=hojeISO()?'Reservado para esta refeição':'Consumido nesta refeição'}</div>${alocLines}`:''}
-        ${lines?`${alocLines?'<div class="msl-hdr sf">📝 Pedidos</div>':''}${lines}`:''}
-        ${!lines&&!alocLines?'<div class="msl-empty">Ainda sem ingredientes nesta lista.</div>':''}
-        ${canAdd?`<button class="cmp-mini prim write-action msl-add" onclick="openShopItemModal(null,'${rd.ref}','${rd.data}')">＋ Ingrediente</button>`:''}
-      </div>
+      <summary><span class="rdc-lbl">${past?'✅ Consumido':'🛒 Lista de compras'}</span>${items.length?`<span class="msl-count">${nDone?nDone+'/':''}${items.length}</span>`:''}<span class="rdc-det-arrow">›</span></summary>
+      <div class="rdc-det-body">${body}</div>
     </details>
   </div>`;
 }
@@ -3646,8 +3660,9 @@ function openCompra(compraId){
     (DATA.despesas||[]).filter(d=>d.compraId===compraId&&!(d.tipo==='Gerais'&&(d.obs||'')===STOCK_OBS)).forEach(d=>{
       compraEdit.lines.push({tipo:d.tipo,dataValor:d.dataValor||null,valor:d.valor,obs:d.obs||''});
     });
-    // Lotes já gravados desta compra (mantêm qtd/€; as refeições recalculam do picker)
-    compraEdit.lotes=stockArr().filter(l=>l.compraId===compraId).map(l=>({_id:l._id,artigo:l.artigo,qtd:fmtQty(l.qtd,l.unidade),valor:l.valor,keys:[]}));
+    // Lotes já gravados desta compra (mantêm qtd/€; as refeições recalculam do
+    // picker; um lote sem artigo correspondente na lista é um avulso)
+    compraEdit.lotes=stockArr().filter(l=>l.compraId===compraId).map(l=>({_id:l._id,artigo:l.artigo,qtd:fmtQty(l.qtd,l.unidade),valor:l.valor,keys:[],free:!linked.some(x=>shopSameArtigo(x.artigo,l.artigo)),destino:(l.alocacoes&&l.alocacoes[0])?l.alocacoes[0].tipo+'|'+l.alocacoes[0].data:''}));
   }else{
     const seed=shopArr().filter(shopMineActive);   // inclui removidos que ainda reclamo (podem já estar no carrinho)
     // Artigos pedidos para VÁRIAS refeições → lotes de stock (ficam fora das linhas por refeição)
@@ -3739,46 +3754,58 @@ function compraUpdateTotal(){
   const el=document.getElementById('shop-buy-total');if(el)el.textContent=`Total: ${eur(rnd(tot,2))}`;
 }
 
-/* ── Lotes de stock no registo da compra ──
-   Entre os artigos marcados no picker, os que estão pedidos para MAIS do que
-   uma refeição são propostos como lote: qtd total + € total, e a app reparte
-   (FIFO) pelas refeições. Deixar o € vazio = não gerir em stock. */
+/* ── Detalhe por artigo no registo da compra (opt-in) ──
+   TODOS os artigos de refeição marcados no picker podem ser detalhados com
+   qtd + € — preencher o € torna o artigo um LOTE de stock, alocado por FIFO
+   e reajustável depois (mesmo comprado a pensar numa só refeição: se sobrar,
+   realoca-se). € vazio = artigo normal, coberto pelas linhas por refeição.
+   "＋ Artigo detalhado" cria um lote avulso (comprado sem estar na lista). */
 function compraDetectLotes(){
   const checked=[...document.querySelectorAll('.shop-pick:checked')].map(c=>+c.value);
   const its=shopArr().filter(x=>checked.includes(x._id)&&shopIsMeal(x.tipo)&&x.dataValor);
   const g={};
   its.forEach(it=>{(g[shopArtKey(it.artigo)]=g[shopArtKey(it.artigo)]||{artigo:it.artigo,items:[]}).items.push(it);});
-  return Object.values(g).filter(x=>new Set(x.items.map(i=>i.tipo+'|'+i.dataValor)).size>1);
+  return Object.values(g);
 }
 function compraRefreshLotes(){
   const det=STOCK_TABLE?compraDetectLotes():[];
   const prev=compraEdit.lotes||[];
   compraEdit.lotes=det.map(d=>{
     const keys=[...new Set(d.items.map(i=>i.tipo+'|'+i.dataValor))].sort();
-    const ex=prev.find(l=>shopSameArtigo(l.artigo,d.artigo));
+    const ex=prev.find(l=>!l.free&&shopSameArtigo(l.artigo,d.artigo));
     if(ex)return Object.assign(ex,{keys});
     // qtd sugerida = soma das qtds pedidas (se numéricas e na mesma unidade)
     let tot=0,u=null,ok=true;
     d.items.forEach(i=>{const q=qtyParse(i.quantidade);if(!q){ok=false;return;}if(u==null)u=q.u;if(q.u!==u)ok=false;else tot=rnd(tot+q.n,3);});
     return {artigo:d.artigo,qtd:ok&&tot>0?fmtQty(tot,u):'',valor:'',keys};
-  });
+  }).concat(prev.filter(l=>l.free));   // artigos detalhados avulsos mantêm-se
   compraRenderLotes();
 }
 function compraRenderLotes(){
   const cont=document.getElementById('shop-buy-lotes');if(!cont)return;
   const ls=compraEdit.lotes||[];
-  if(!ls.length){cont.innerHTML='';compraUpdateTotal();return;}
-  cont.innerHTML='<div class="cmp-pick sf" style="margin-top:14px">🧺 Stock — artigos p/ várias refeições</div>'+
+  if(!ls.length&&!STOCK_TABLE){cont.innerHTML='';compraUpdateTotal();return;}
+  const mealOpts=sel=>'<option value="">— bolsa comum —</option>'+(DATA.refeicoesDef||[]).filter(r=>shopIsMeal(r.ref)).map(r=>{const v=r.ref+'|'+r.data;return `<option value="${v}"${sel===v?' selected':''}>${r.ref} ${fmtDiaMes(r.data)}${r.prato?' · '+escHtml(r.prato):''}</option>`;}).join('');
+  cont.innerHTML=(ls.length?'<div class="cmp-pick sf" style="margin-top:14px">🧾 Detalhe por artigo — opcional</div>':'')+
     ls.map((l,i)=>`<div class="cmp-ln cmp-lote">
       <div class="cmp-ln-row1">
-        <span class="cmp-lote-art">${escHtml(l.artigo)}</span>
-        <input class="cmp-lote-qtd" type="text" placeholder="Qtd (ex: 10 pacotes)" value="${escHtml(l.qtd||'')}" oninput="compraEdit.lotes[${i}].qtd=this.value" onblur="this.value=normalizeQty(this.value);compraEdit.lotes[${i}].qtd=this.value">
+        ${l.free?`<input class="cmp-lote-art-in" type="text" maxlength="60" placeholder="Artigo" value="${escHtml(l.artigo||'')}" oninput="compraEdit.lotes[${i}].artigo=this.value">`:`<span class="cmp-lote-art">${escHtml(l.artigo)}</span>`}
+        <input class="cmp-lote-qtd" type="text" placeholder="Qtd" value="${escHtml(l.qtd||'')}" oninput="compraEdit.lotes[${i}].qtd=this.value" onblur="this.value=normalizeQty(this.value);compraEdit.lotes[${i}].qtd=this.value">
         <div class="cmp-ln-val"><span>€</span><input type="number" step="0.01" min="0" inputmode="decimal" placeholder="0,00" value="${l.valor===''||l.valor==null?'':l.valor}" oninput="compraEdit.lotes[${i}].valor=this.value;compraUpdateTotal()"></div>
+        ${l.free?`<button class="cmp-ln-del" title="Remover" onclick="compraDelLote(${i})">✕</button>`:''}
       </div>
+      ${l.free?`<div class="cmp-ln-row2"><select class="cmp-ln-meal" onchange="compraEdit.lotes[${i}].destino=this.value">${mealOpts(l.destino||'')}</select></div>`:''}
     </div>`).join('')+
-    '<div class="note">A app reparte pelas refeições por ordem de data (FIFO); ajustas depois no lote (🧺 Stock). Não incluas estes artigos nas linhas de baixo. € vazio = tratar como artigo normal.</div>';
+    (STOCK_TABLE?'<button class="btn ghost" style="width:100%;margin-top:8px" onclick="compraAddLote()">＋ Artigo detalhado</button>':'')+
+    (ls.length?'<div class="note">Preencher o € torna o artigo um lote de stock: a app aloca-o às refeições (FIFO por data) e reajustas depois em 🧺 Stock — mesmo que sobre para outra refeição. Não contes esses artigos nas linhas de baixo. € vazio = artigo normal.</div>':'');
   compraUpdateTotal();
 }
+function compraAddLote(){
+  compraEdit.lotes=compraEdit.lotes||[];
+  compraEdit.lotes.push({free:true,artigo:'',qtd:'',valor:'',destino:'',keys:[]});
+  compraRenderLotes();
+}
+function compraDelLote(i){const l=compraEdit.lotes[i];if(!l||!l.free)return;compraEdit.lotes.splice(i,1);compraRenderLotes();}
 
 async function saveCompra(){
   if(!DATA._sbId){toast('Sem ligação — recarrega a página','bad');return;}
@@ -3795,9 +3822,12 @@ async function saveCompra(){
   for(const l of (compraEdit.lotes||[])){
     const v=rnd(parseFloat(l.valor),2);
     if(!v||v<=0)continue;
+    const artigo=(l.artigo||'').trim();
+    if(!artigo){toast('Indica o nome do artigo detalhado','bad');return;}
     const q=qtyParse(l.qtd);
-    if(!q||!(q.n>0)){toast(`Indica a quantidade de "${l.artigo}" (ex: 10 pacotes)`,'bad');return;}
-    lotes.push({artigo:l.artigo,qtd:q.n,unidade:q.u,valor:v,keys:l.keys||[]});
+    if(!q||!(q.n>0)){toast(`Indica a quantidade de "${artigo}" (ex: 10 pacotes)`,'bad');return;}
+    // avulsos: o destino escolhido guia o FIFO se a lista não tiver procura
+    lotes.push({artigo,qtd:q.n,unidade:q.u,valor:v,keys:l.free?(l.destino?[l.destino]:[]):(l.keys||[])});
   }
   // Validar linhas (linhas totalmente vazias são ignoradas se houver mais alguma coisa)
   const rows=[];

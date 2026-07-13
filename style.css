@@ -768,7 +768,9 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .stk-chip.livre{background:rgba(196,144,32,.12);border-color:rgba(196,144,32,.4);color:#9A6E0E}
 /* Lotes no registo da compra */
 .cmp-lote-art{flex:1;min-width:0;font-size:13px;font-weight:600;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.cmp-lote-qtd{flex:0 0 122px;font-size:13px}
+.cmp-lote-art-in{flex:1;min-width:0;font-size:13px;margin:0}
+.cmp-lote-qtd{flex:0 0 110px;font-size:13px;margin:0}
+.msl-dim{opacity:.55}
 /* Modal do lote: linhas de alocação */
 .lote-ln{display:flex;align-items:center;gap:7px;margin-top:8px}
 .lote-ln select{flex:1;min-width:0;margin:0}
