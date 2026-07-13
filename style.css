@@ -739,6 +739,26 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .cmp-rm-meta{font-size:12px;color:var(--muted);margin-top:4px}
 .cmp-rm-acts{display:flex;gap:6px;margin-top:8px}
 .cmp-rm-qtd{font-style:normal;color:var(--muted);font-size:12.5px;font-weight:500}
+/* Listas agrupadas por refeição/tipo no separador Compras */
+.cmp-grp-hdr{display:flex;align-items:center;gap:7px;font-size:11.5px;font-weight:700;color:var(--muted);margin:10px 2px 2px}
+.cmp-grp-hdr:first-child{margin-top:2px}
+.cmp-grp-hdr::after{content:'';flex:1;height:1px;background:var(--line)}
+.cmp-grp-hdr .cmp-count{margin-left:0}
+/* Lista de compras dentro do cartão da refeição (tab Refeições) */
+.msl{cursor:default}
+.msl-det{margin-top:0;border-top:none;padding-top:0}
+.msl-det>summary{gap:8px}
+.msl-count{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:1px 7px;font-size:10.5px;font-weight:700;color:var(--muted);margin-left:auto}
+.msl-it{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:5px 0;font-size:12.5px;border-bottom:1px solid rgba(110,75,25,.08);cursor:pointer}
+.msl-it:last-of-type{border-bottom:none}
+.msl-it.done .msl-art{text-decoration:line-through;color:var(--faint)}
+.msl-art{min-width:0;color:var(--ink)}
+.msl-art i{font-style:normal;color:var(--faint);font-size:11px;margin-left:4px}
+.msl-st{font-size:11px;color:var(--muted);white-space:nowrap;flex:0 0 auto}
+.msl-st.ok{color:var(--green)}
+.msl-st.falta{color:#9A6E0E}
+.msl-empty{font-size:12px;color:var(--faint);padding:4px 0}
+.msl-add{width:100%;margin-top:8px;justify-content:center}
 
 /* ═══ CASH-FLOWS — "Mista" (versão C: cabeçalho extrato + cronologia) ═══ */
 .cfc-net{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 16px;margin:0 0 10px}

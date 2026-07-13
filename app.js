@@ -960,7 +960,7 @@ function renderAll(){
             ${(rd.respCozinha||rd.respCompras)?`<div class="refdef-resp sf">${[rd.respCozinha?'👨‍🍳 '+escHtml(rd.respCozinha):'',rd.respCompras?'🛒 '+escHtml(rd.respCompras):''].filter(Boolean).join(' · ')}</div>`:''}
           </div>
           ${isAdmin()?'<span class="refdef-chevron sf">›</span>':''}
-          ${costCards}
+          ${costCards}${mealShopSection(rd)}
         </div>
       </div>`;
     });
@@ -3033,9 +3033,9 @@ function myClaimNames(){const s=new Set(MY_NAMES);const p=myPrimaryName()||(isAd
 function shopMine(it){return !!it.tratadoPor&&myClaimNames().has(it.tratadoPor);}
 function shopCanEditItem(it){return isAdmin()||(it.criadoPor&&myClaimNames().has(it.criadoPor));}
 
-function shopItemCard(it,mineView){
+function shopItemCard(it,mineView,noBadge){
   const meal=shopIsMeal(it.tipo)&&it.dataValor;
-  const badge=meal?`<span class="cmp-badge meal">${shopTipoIcon(it.tipo)} ${fmtDiaMes(it.dataValor)}</span>`:`<span class="cmp-badge">${shopTipoIcon(it.tipo)} ${it.tipo}</span>`;
+  const badge=noBadge?'':(meal?`<span class="cmp-badge meal">${shopTipoIcon(it.tipo)} ${fmtDiaMes(it.dataValor)}</span>`:`<span class="cmp-badge">${shopTipoIcon(it.tipo)} ${it.tipo}</span>`);
   const qtdTxt=normalizeQty(it.quantidade);
   const qtd=qtdTxt?`<span class="cmp-qtd">${escHtml(qtdTxt)}</span>`:'';
   const removed=shopIsRemoved(it);
@@ -3060,6 +3060,60 @@ function shopItemCard(it,mineView){
     <div class="cmp-main"><div class="cmp-artigo">${escHtml(it.artigo)}${qtd}</div>${sub}</div>
     ${badge}${right}<span class="cmp-chev-r">›</span>
   </div>`;
+}
+
+/* Lista agrupada por refeição/tipo: um cabeçalho por grupo (ex.: 🍳 Almoço 8/ago
+   · Cabrito) com contagem — é o sumário da lista por refeição no separador
+   Compras. O badge de cada cartão sai: o cabeçalho do grupo já identifica. */
+function shopGroupedList(list,mineView){
+  const counts={};list.forEach(it=>{const k=shopGroupKey(it);counts[k]=(counts[k]||0)+1;});
+  let h='',last=null;
+  list.forEach(it=>{
+    const k=shopGroupKey(it);
+    if(k!==last){h+=`<div class="cmp-grp-hdr sf">${shopGroupLabel(it.tipo,it.dataValor)} <span class="cmp-count">${counts[k]}</span></div>`;last=k;}
+    h+=shopItemCard(it,mineView,true);
+  });
+  return '<div class="cmp-list">'+h+'</div>';
+}
+
+/* Lista de compras da refeição — mostra no cartão da refeição (tab Refeições)
+   os artigos da shoplist ligados a ela (tipo Almoço/Jantar + data). É a MESMA
+   lista do separador Compras: adicionar aqui ou lá dá exatamente no mesmo. */
+const MEAL_SHOP_OPEN={};   // aberto/fechado por refeição (sobrevive a re-renders)
+function mealShopSection(rd){
+  if(!shopIsMeal(rd.ref))return '';
+  const items=shopArr().filter(it=>it.tipo===rd.ref&&it.dataValor===rd.data&&!shopIsRemoved(it))
+    .sort((a,b)=>a.artigo.localeCompare(b.artigo,'pt'));
+  const canAdd=shopCanWrite()&&!contasFechadas();
+  if(!items.length&&!canAdd)return '';
+  const nDone=items.filter(shopIsBought).length;
+  const key=rd.data+'|'+rd.ref;
+  const lines=items.map(it=>{
+    const done=shopIsBought(it);
+    const qtdTxt=normalizeQty(it.quantidade);
+    const st=done?'<span class="msl-st ok">✓ comprado</span>'
+      :it.tratadoPor?`<span class="msl-st">🧑‍🍳 ${escHtml(it.tratadoPor)}</span>`
+      :'<span class="msl-st falta">falta quem trate</span>';
+    return `<div class="msl-it${done?' done':''}" onclick="openShopItemModal(${it._id})">
+      <span class="msl-art">${escHtml(it.artigo)}${qtdTxt?` <i>${escHtml(qtdTxt)}</i>`:''}</span>${st}</div>`;
+  }).join('');
+  return `<div class="rdc sf msl" onclick="event.stopPropagation()">
+    <details class="rdc-det msl-det"${MEAL_SHOP_OPEN[key]?' open':''} ontoggle="MEAL_SHOP_OPEN['${key}']=this.open">
+      <summary><span class="rdc-lbl">🛒 Lista de compras</span>${items.length?`<span class="msl-count">${nDone?nDone+'/':''}${items.length}</span>`:''}<span class="rdc-det-arrow">›</span></summary>
+      <div class="rdc-det-body">
+        ${lines||'<div class="msl-empty">Ainda sem ingredientes nesta lista.</div>'}
+        ${canAdd?`<button class="cmp-mini prim write-action msl-add" onclick="openShopItemModal(null,'${rd.ref}','${rd.data}')">＋ Ingrediente</button>`:''}
+      </div>
+    </details>
+  </div>`;
+}
+
+/* Depois de mexer na shoplist: refaz o separador Compras E os cartões das
+   refeições (a lista por refeição vive lá). renderAll só refaz Compras quando
+   é o tab ativo, daí o segundo passo. */
+function renderShopViews(){
+  if(CALC)renderAll();
+  if(!CALC||TAB!=='compras')renderCompras();
 }
 
 function renderCompras(){
@@ -3087,7 +3141,7 @@ function renderCompras(){
   if(!mine.length){
     h+='<div class="empty sf">Ainda não estás a tratar de nenhum artigo. Marca <b>Eu trato</b> nos que fores buscar.</div>';
   }else{
-    h+='<div class="cmp-list">'+mine.map(it=>shopItemCard(it,true)).join('')+'</div>';
+    h+=shopGroupedList(mine,true);
   }
   if(fechadas){
     h+='<div class="empty sf" style="margin-top:10px">Contas fechadas — não é possível registar compras.</div>';
@@ -3098,12 +3152,12 @@ function renderCompras(){
   // ── Em falta (livres, ninguém trata) ──
   h+=`<div class="cmp-sec-hdr sf" style="margin-top:22px">📝 Em falta <span class="cmp-count">${falta.length}</span></div>`;
   if(!falta.length)h+='<div class="empty sf">Nada por tratar 🎉</div>';
-  else h+='<div class="cmp-list">'+falta.map(it=>shopItemCard(it,false)).join('')+'</div>';
+  else h+=shopGroupedList(falta,false);
 
   // ── Alguém trata (entregues a outros — sem detalhe do carrinho deles) ──
   if(outros.length){
     h+=`<div class="cmp-sec-hdr sf" style="margin-top:22px">🧑‍🍳 Alguém trata <span class="cmp-count">${outros.length}</span></div>`;
-    h+='<div class="cmp-list">'+outros.map(it=>shopItemCard(it,false)).join('')+'</div>';
+    h+=shopGroupedList(outros,false);
   }
 
   // ── Comprados (a partir das despesas ligadas a uma compra) ──
@@ -3164,7 +3218,9 @@ function renderComprados(){
    Tocar num artigo abre o detalhe (editar/eliminar só aqui, e só para o autor
    ou o admin). O botão "＋ Artigo" abre em modo de criação. */
 let editingItemId=null;
-function openShopItemModal(id){
+// presetTipo/presetData: criação a partir do cartão de uma refeição (tab
+// Refeições) — o artigo nasce logo ligado a esse Almoço/Jantar.
+function openShopItemModal(id,presetTipo,presetData){
   const it=id!=null?shopArr().find(x=>x._id===id):null;
   if(id!=null&&!it){toast('Artigo não encontrado','bad');return;}
   // Criar exige permissão de escrita; abrir o detalhe de um artigo é livre
@@ -3174,9 +3230,10 @@ function openShopItemModal(id){
   document.getElementById('shop-item-title').textContent=it?(canEdit?'Editar Artigo':'Detalhe do Artigo'):'Adicionar Artigo';
   document.getElementById('shop-artigo').value=it?it.artigo:'';
   document.getElementById('shop-qtd').value=it?normalizeQty(it.quantidade):'';
-  document.getElementById('shop-tipo').value=it?it.tipo:'Gerais';
+  document.getElementById('shop-tipo').value=it?it.tipo:(presetTipo||'Gerais');
   shopTipoChanged();
   if(it&&shopIsMeal(it.tipo))document.getElementById('shop-ref').value=it.dataValor||'';
+  else if(!it&&presetTipo&&shopIsMeal(presetTipo))document.getElementById('shop-ref').value=presetData||'';
   // Meta: quem pediu / quem trata / removido — visível para todos no detalhe
   const meta=document.getElementById('shop-meta');
   if(it){
@@ -3274,7 +3331,7 @@ async function saveShopItem(){
       toast('Artigo adicionado ✓','ok');
     }
     syncMirror();marcaGuardado();
-    btn.disabled=false;closeShopItemModal();renderCompras();
+    btn.disabled=false;closeShopItemModal();renderShopViews();
   }catch(e){setSync('err','erro ao guardar');btn.disabled=false;toast(permErrorMsg(e),'bad');}
 }
 
@@ -3284,7 +3341,7 @@ async function _shopUpdate(id,patch,local){
   setSync('load','a guardar…');
   try{
     await queueWrite(()=>sbReq('PATCH',`shoplist?id=eq.${id}`,patch));
-    Object.assign(it,local);syncMirror();marcaGuardado();renderCompras();
+    Object.assign(it,local);syncMirror();marcaGuardado();renderShopViews();
   }catch(e){setSync('err','erro ao guardar');toast(permErrorMsg(e),'bad');}
 }
 async function claimItem(id){
@@ -3302,7 +3359,7 @@ async function claimItem(id){
       if(rows&&rows[0])Object.assign(it,{tratadoPor:rows[0].tratado_por||null,noCarrinho:!!rows[0].no_carrinho,estado:rows[0].estado||it.estado});
       toast(it.tratadoPor?`Entretanto ficou ${it.tratadoPor} a tratar`:'Não foi possível reclamar o artigo','bad');
     }
-    syncMirror();marcaGuardado();renderCompras();
+    syncMirror();marcaGuardado();renderShopViews();
   }catch(e){setSync('err','erro ao guardar');toast(permErrorMsg(e),'bad');}
 }
 function unclaimItem(id){
@@ -3338,7 +3395,7 @@ async function purgeShopItem(id){   // apagar definitivamente do histórico (só
   setSync('load','a guardar…');
   try{
     await queueWrite(()=>sbReq('DELETE',`shoplist?id=eq.${id}`));
-    DATA.shoplist=shopArr().filter(x=>x._id!==id);syncMirror();marcaGuardado();renderCompras();
+    DATA.shoplist=shopArr().filter(x=>x._id!==id);syncMirror();marcaGuardado();renderShopViews();
     toast('Artigo apagado','ok');
   }catch(e){setSync('err','erro ao guardar');toast(permErrorMsg(e),'bad');}
 }
