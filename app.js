@@ -2987,6 +2987,13 @@ function shopMealOptions(ref,selData){
   if(!meals.length)return `<option value="">(sem ${ref.toLowerCase()}s)</option>`;
   return `<option value="">— refeição —</option>`+meals.map(r=>`<option value="${r.data}"${selData===r.data?' selected':''}>${fmtDiaMes(r.data)}${r.prato?' · '+r.prato:''}</option>`).join('');
 }
+// Criação: checkboxes em vez de select — o mesmo artigo pode nascer para
+// várias refeições de uma vez (cria um registo por refeição).
+function shopMealChecks(ref){
+  const meals=(DATA.refeicoesDef||[]).filter(r=>r.ref===ref).slice().sort((a,b)=>(a.data||'').localeCompare(b.data||''));
+  if(!meals.length)return `<div class="note">Sem ${ref.toLowerCase()}s definidos — adiciona a refeição primeiro no separador Refeições.</div>`;
+  return meals.map(r=>`<label class="cmp-pick-row"><input type="checkbox" value="${r.data}"><span>${fmtDiaMes(r.data)}${r.prato?' · '+escHtml(r.prato):''}</span></label>`).join('');
+}
 function shopCanWrite(){return !!_sbSession&&(isAdmin()||MY_NAMES.length>0);}
 // Normaliza quantidades em texto livre (1KG / 3 kilos / 500 gr → 1 kg / 3 kg / 500 g).
 // Converte g≥1000→kg e ml≥1000→L. Se não reconhecer, mantém o texto tal como veio.
@@ -3206,7 +3213,7 @@ function renderComprados(){
     return {cid,date,html:`<div class="cmp-done-card" onclick="openCompra('${cid}')">
       <div class="cmp-done-top"><b>${escHtml(desc)}</b><span class="cmp-done-meta">${date?fmtDiaMes(date):''} · ${eur(total)}</span></div>
       <div class="cmp-done-lines">${lines}</div>
-      <div class="cmp-done-edit sf">editar compra ›</div>
+      <div class="cmp-done-edit sf">editar · reajustar repartição entre refeições ›</div>
     </div>`};
   }).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
   return `<div class="cmp-done-hdr sf" onclick="this.nextElementSibling.classList.toggle('open');this.classList.toggle('open')">
@@ -3233,7 +3240,9 @@ function openShopItemModal(id,presetTipo,presetData){
   document.getElementById('shop-tipo').value=it?it.tipo:(presetTipo||'Gerais');
   shopTipoChanged();
   if(it&&shopIsMeal(it.tipo))document.getElementById('shop-ref').value=it.dataValor||'';
-  else if(!it&&presetTipo&&shopIsMeal(presetTipo))document.getElementById('shop-ref').value=presetData||'';
+  else if(!it&&presetTipo&&shopIsMeal(presetTipo)&&presetData){
+    const cb=document.querySelector(`#shop-ref-multi input[value="${presetData}"]`);if(cb)cb.checked=true;
+  }
   // Meta: quem pediu / quem trata / removido — visível para todos no detalhe
   const meta=document.getElementById('shop-meta');
   if(it){
@@ -3290,7 +3299,16 @@ function shopTipoChanged(){
   const tipo=document.getElementById('shop-tipo').value;
   const wrap=document.getElementById('shop-ref-wrap');
   wrap.style.display=shopIsMeal(tipo)?'':'none';
-  if(shopIsMeal(tipo))document.getElementById('shop-ref').innerHTML=shopMealOptions(tipo,'');
+  if(!shopIsMeal(tipo))return;
+  // Criação → checkboxes (pode marcar várias refeições de uma vez); edição →
+  // select (um artigo pertence a UMA refeição — para outra cria-se outro registo)
+  const creating=editingItemId==null;
+  document.getElementById('shop-ref-lbl').textContent=creating?'Refeições a que se destina (podes marcar várias)':'Refeição a que se destina';
+  document.getElementById('shop-ref').style.display=creating?'none':'';
+  const multi=document.getElementById('shop-ref-multi');
+  multi.style.display=creating?'':'none';
+  if(creating)multi.innerHTML=shopMealChecks(tipo);
+  else document.getElementById('shop-ref').innerHTML=shopMealOptions(tipo,'');
 }
 async function saveShopItem(){
   if(!DATA._sbId){toast('Sem ligação — recarrega a página','bad');return;}
@@ -3298,10 +3316,15 @@ async function saveShopItem(){
   const qtd=normalizeQty(document.getElementById('shop-qtd').value);
   const tipo=document.getElementById('shop-tipo').value;
   if(!artigo){toast('Indica o artigo','bad');return;}
-  let dataValor=null;
+  let dataValor=null,datasMulti=null;
   if(shopIsMeal(tipo)){
-    dataValor=document.getElementById('shop-ref').value||'';
-    if(!dataValor){toast('Escolhe a refeição (ou define-a em Refeições)','bad');return;}
+    if(editingItemId!=null){
+      dataValor=document.getElementById('shop-ref').value||'';
+      if(!dataValor){toast('Escolhe a refeição (ou define-a em Refeições)','bad');return;}
+    }else{
+      datasMulti=[...document.querySelectorAll('#shop-ref-multi input:checked')].map(c=>c.value);
+      if(!datasMulti.length){toast('Marca pelo menos uma refeição (ou define-a em Refeições)','bad');return;}
+    }
   }
   const btn=document.getElementById('shop-item-save');btn.disabled=true;
   setSync('load','a guardar…');
@@ -3323,12 +3346,19 @@ async function saveShopItem(){
       // "Eu trato": quem adiciona fica logo a tratar; senão fica "Em falta" e
       // os outros são avisados no Telegram (routing na Edge Function notif-pessoais)
       const tratoEu=!!document.getElementById('shop-eutrato').checked;
-      const row={evento_id:DATA._sbId,artigo,quantidade:qtd,tipo,data_valor:dataValor,estado:'pendente',criado_por:criadoPor};
-      if(tratoEu)row.tratado_por=criadoPor;
-      const ins=await queueWrite(()=>sbReq('POST','shoplist',[row],{Prefer:'return=representation'}));
-      shopArr().push({_id:ins&&ins[0]?ins[0].id:null,artigo,quantidade:qtd,tipo,dataValor,estado:'pendente',tratadoPor:tratoEu?criadoPor:null,noCarrinho:false,compraId:null,cfDesc:null,valor:null,criadoPor,criadoEm:new Date().toISOString(),compradoEm:null});
-      sbLog('compras','adicionou',artigo,{tratoEu,quantidade:qtd,tipoDesp:tipo,dataValor,dia:dataValor?dataToDia(dataValor):undefined,ref:shopIsMeal(tipo)?tipo:undefined});
-      toast('Artigo adicionado ✓','ok');
+      // Uma refeição = um registo: marcar várias refeições cria um artigo por
+      // refeição (cada uma mantém a sua lista e o custo cai no sítio certo)
+      const rows=(datasMulti||[dataValor]).map(dv=>{
+        const r={evento_id:DATA._sbId,artigo,quantidade:qtd,tipo,data_valor:dv,estado:'pendente',criado_por:criadoPor};
+        if(tratoEu)r.tratado_por=criadoPor;
+        return r;
+      });
+      const ins=await queueWrite(()=>sbReq('POST','shoplist',rows,{Prefer:'return=representation'}));
+      rows.forEach((r,i)=>{
+        shopArr().push({_id:ins&&ins[i]?ins[i].id:null,artigo,quantidade:qtd,tipo,dataValor:r.data_valor,estado:'pendente',tratadoPor:tratoEu?criadoPor:null,noCarrinho:false,compraId:null,cfDesc:null,valor:null,criadoPor,criadoEm:new Date().toISOString(),compradoEm:null});
+        sbLog('compras','adicionou',artigo,{tratoEu,quantidade:qtd,tipoDesp:tipo,dataValor:r.data_valor,dia:r.data_valor?dataToDia(r.data_valor):undefined,ref:shopIsMeal(tipo)?tipo:undefined});
+      });
+      toast(rows.length>1?`Artigo adicionado a ${rows.length} refeições ✓`:'Artigo adicionado ✓','ok');
     }
     syncMirror();marcaGuardado();
     btn.disabled=false;closeShopItemModal();renderShopViews();
@@ -3353,7 +3383,7 @@ async function claimItem(id){
     // Anti-corrida: só reclama se no servidor ainda estiver livre — ninguém
     // "rouba" um artigo que outro reclamou entretanto (só o próprio larga).
     const res=await queueWrite(()=>sbReq('PATCH',`shoplist?id=eq.${id}&tratado_por=is.null`,{tratado_por:nome},{Prefer:'return=representation'}));
-    if(res&&res.length){Object.assign(it,{tratadoPor:nome});}
+    if(res&&res.length){Object.assign(it,{tratadoPor:nome});await claimSameElsewhere(it,nome);}
     else{
       const rows=await sbReq('GET',`shoplist?id=eq.${id}&select=tratado_por,no_carrinho,estado`);
       if(rows&&rows[0])Object.assign(it,{tratadoPor:rows[0].tratado_por||null,noCarrinho:!!rows[0].no_carrinho,estado:rows[0].estado||it.estado});
@@ -3361,6 +3391,23 @@ async function claimItem(id){
     }
     syncMirror();marcaGuardado();renderShopViews();
   }catch(e){setSync('err','erro ao guardar');toast(permErrorMsg(e),'bad');}
+}
+/* "Eu trato" em bloco: se o mesmo artigo (nome igual, sem acentos/maiúsculas)
+   estiver livre noutras refeições/tipos, propõe levar tudo na mesma ida — o
+   caso típico "trago logo as batatas de hoje e de amanhã". Quem quiser manter
+   compradores separados ignora a sugestão; cada registo continua independente. */
+function shopSameArtigo(a,b){const n=s=>(s||'').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');return n(a)===n(b);}
+async function claimSameElsewhere(it,nome){
+  const others=shopArr().filter(x=>x._id!==it._id&&x._id!=null&&!x.tratadoPor&&shopIsPending(x)&&shopGroupKey(x)!==shopGroupKey(it)&&shopSameArtigo(x.artigo,it.artigo));
+  if(!others.length)return;
+  const lst=others.map(o=>`• ${shopGroupLabel(o.tipo,o.dataValor)}${o.quantidade?' — '+normalizeQty(o.quantidade):''}`).join('\n');
+  if(!confirm(`"${it.artigo}" também está em falta em:\n\n${lst}\n\nLevas também?`))return;
+  // Mesma guarda anti-corrida do claim simples: só leva os que ainda estão livres
+  const ids=others.map(o=>o._id);
+  const res=await queueWrite(()=>sbReq('PATCH',`shoplist?id=in.(${ids.join(',')})&tratado_por=is.null`,{tratado_por:nome},{Prefer:'return=representation'}));
+  const got=new Set((res||[]).map(r=>r.id));
+  others.forEach(o=>{if(got.has(o._id))o.tratadoPor=nome;});
+  if(got.size<others.length)toast('Alguns já tinham ficado com outra pessoa','bad');
 }
 function unclaimItem(id){
   const it=shopArr().find(x=>x._id===id);if(!it)return;
