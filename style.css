@@ -692,6 +692,14 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .cmp-pick-row input{width:18px!important;height:18px;flex:0 0 auto;margin:0;padding:0;-webkit-appearance:checkbox;appearance:checkbox;accent-color:var(--barrete)}
 .cmp-pick-row span:nth-of-type(1){flex:1}
 .cmp-pick-row i{color:var(--muted);font-style:normal;font-size:12.5px}
+/* Dentro do modal, .modal label ganharia às .cmp-pick-row (uppercase, faint,
+   margens grandes) — repõe-se o aspeto de linha de lista, num painel arredondado */
+.modal label.cmp-pick-row{display:flex;margin:0;padding:12px 2px;font-size:14px;font-weight:600;letter-spacing:0;text-transform:none;color:var(--ink)}
+#shop-ref-multi{background:#FFFDF6;border:1px solid var(--line);border-radius:9px;padding:2px 12px;max-height:230px;overflow-y:auto}
+#shop-ref-multi .cmp-pick-row:last-child{border-bottom:none}
+/* Refeição de destino trancada (adicionar ingrediente a partir de uma refeição) */
+.shop-ctx-lock{display:flex;align-items:center;gap:9px;margin-top:14px;padding:12px;background:var(--panel2);border:1px dashed var(--line);border-radius:10px;font-size:14px;font-weight:600;color:var(--ink);line-height:1.35}
+.shop-ctx-lock span:last-child{min-width:0}
 .cmp-grp{background:var(--panel2);border:1px solid var(--line);border-radius:11px;padding:10px 12px;margin-bottom:8px}
 .cmp-grp-hdr{font-size:14px;font-weight:700;color:var(--ink);display:flex;align-items:center;gap:8px}
 .cmp-grp-n{background:var(--panel);border:1px solid var(--line);color:var(--muted);font-size:11px;font-weight:700;border-radius:20px;padding:0 8px}

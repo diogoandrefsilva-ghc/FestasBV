@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v17 · 2026-07-13 · reset valida sempre sobras do ano anterior · botões "Reset"';
+const APP_BUILD = 'v18 · 2026-07-13 · pop-up de artigo: refeição trancada no contexto, campo tamanho, visual';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -3103,6 +3103,10 @@ function normalizeQty(raw){
   if(rest)return `${fmt(num)} ${rest}`;   // unidade desconhecida → nº normalizado + texto original
   return fmt(num);                        // só número
 }
+// Qtd + tamanho/embalagem vivem num só campo na BD (quantidade), unidos por
+// " × " (ex.: "4 × lata 250 ml"). Helpers para juntar/separar nos dois inputs.
+function shopJoinQty(qtd,tam){return qtd&&tam?`${qtd} × ${tam}`:(qtd||tam||'');}
+function shopSplitQty(s){const v=normalizeQty(s);const i=v.indexOf(' × ');return i<0?[v,'']:[v.slice(0,i),v.slice(i+3)];}
 // Nomes com que reclamo artigos (próprio + cônjuge; admin sem membro → 'Admin')
 function myClaimNames(){const s=new Set(MY_NAMES);const p=myPrimaryName()||(isAdmin()?'Admin':'');if(p)s.add(p);return s;}
 function shopMine(it){return !!it.tratadoPor&&myClaimNames().has(it.tratadoPor);}
@@ -3479,21 +3483,33 @@ function renderComprados(){
    ou o admin). O botão "＋ Artigo" abre em modo de criação. */
 let editingItemId=null;
 // presetTipo/presetData: criação a partir do cartão de uma refeição (tab
-// Refeições) — o artigo nasce logo ligado a esse Almoço/Jantar.
+// Refeições) — o artigo nasce logo ligado a esse Almoço/Jantar. Nesse contexto
+// o tipo e a refeição ficam trancados: mostra-se só a refeição de destino.
+let shopCtxLock=null;
 function openShopItemModal(id,presetTipo,presetData){
   const it=id!=null?shopArr().find(x=>x._id===id):null;
   if(id!=null&&!it){toast('Artigo não encontrado','bad');return;}
   // Criar exige permissão de escrita; abrir o detalhe de um artigo é livre
   if(!it&&!shopCanWrite()){toast('Sem permissão','bad');return;}
   editingItemId=id||null;
+  shopCtxLock=(!it&&presetTipo&&shopIsMeal(presetTipo)&&presetData)?{tipo:presetTipo,data:presetData}:null;
   const canEdit=it?shopCanEditItem(it):true;   // criação = pode
-  document.getElementById('shop-item-title').textContent=it?(canEdit?'Editar Artigo':'Detalhe do Artigo'):'Adicionar Artigo';
+  document.getElementById('shop-item-title').textContent=it?(canEdit?'Editar Artigo':'Detalhe do Artigo'):(shopCtxLock?'Adicionar Ingrediente':'Adicionar Artigo');
   document.getElementById('shop-artigo').value=it?it.artigo:'';
-  document.getElementById('shop-qtd').value=it?normalizeQty(it.quantidade):'';
+  const [q0,t0]=shopSplitQty(it?it.quantidade:'');
+  document.getElementById('shop-qtd').value=q0;
+  document.getElementById('shop-tam').value=t0;
   document.getElementById('shop-tipo').value=it?it.tipo:(presetTipo||'Gerais');
+  // Contexto de refeição trancado: esconde tipo+refeições e mostra o destino fixo
+  document.getElementById('shop-tipo-wrap').style.display=shopCtxLock?'none':'';
+  const ctxBox=document.getElementById('shop-ctx-lock');
+  if(shopCtxLock){
+    ctxBox.innerHTML=`<span class="scl-ico">🔒</span><span>${escHtml(shopGroupLabel(shopCtxLock.tipo,shopCtxLock.data))}</span>`;
+    ctxBox.style.display='';
+  }else ctxBox.style.display='none';
   shopTipoChanged();
   if(it&&shopIsMeal(it.tipo))document.getElementById('shop-ref').value=it.dataValor||'';
-  else if(!it&&presetTipo&&shopIsMeal(presetTipo)&&presetData){
+  else if(!it&&!shopCtxLock&&presetTipo&&shopIsMeal(presetTipo)&&presetData){
     const cb=document.querySelector(`#shop-ref-multi input[value="${presetData}"]`);if(cb)cb.checked=true;
   }
   // Meta: quem pediu / quem trata / removido — visível para todos no detalhe
@@ -3541,7 +3557,7 @@ function openShopItemModal(id,presetTipo,presetData){
   if(!it)setTimeout(()=>document.getElementById('shop-artigo').focus(),50);
 }
 function deleteShopItemFromModal(){if(editingItemId!=null){const id=editingItemId;closeShopItemModal();deleteShopItem(id);}}
-function closeShopItemModal(){document.getElementById('shop-item-bg').classList.remove('show');document.body.classList.remove('no-scroll');editingItemId=null;}
+function closeShopItemModal(){document.getElementById('shop-item-bg').classList.remove('show');document.body.classList.remove('no-scroll');editingItemId=null;shopCtxLock=null;}
 function _setEutratoKnob(on){
   const knob=document.getElementById('shop-eutrato-knob');
   const track=knob?.previousElementSibling;
@@ -3551,6 +3567,8 @@ function _setEutratoKnob(on){
 function shopTipoChanged(){
   const tipo=document.getElementById('shop-tipo').value;
   const wrap=document.getElementById('shop-ref-wrap');
+  // Refeição trancada pelo contexto → não há nada a escolher aqui
+  if(shopCtxLock){wrap.style.display='none';return;}
   wrap.style.display=shopIsMeal(tipo)?'':'none';
   if(!shopIsMeal(tipo))return;
   // Criação → checkboxes (pode marcar várias refeições de uma vez); edição →
@@ -3566,14 +3584,16 @@ function shopTipoChanged(){
 async function saveShopItem(){
   if(!DATA._sbId){toast('Sem ligação — recarrega a página','bad');return;}
   const artigo=(document.getElementById('shop-artigo').value||'').trim();
-  const qtd=normalizeQty(document.getElementById('shop-qtd').value);
-  const tipo=document.getElementById('shop-tipo').value;
+  const qtd=shopJoinQty(normalizeQty(document.getElementById('shop-qtd').value),normalizeQty(document.getElementById('shop-tam').value));
+  const tipo=shopCtxLock?shopCtxLock.tipo:document.getElementById('shop-tipo').value;
   if(!artigo){toast('Indica o artigo','bad');return;}
   let dataValor=null,datasMulti=null;
   if(shopIsMeal(tipo)){
     if(editingItemId!=null){
       dataValor=document.getElementById('shop-ref').value||'';
       if(!dataValor){toast('Escolhe a refeição (ou define-a em Refeições)','bad');return;}
+    }else if(shopCtxLock){
+      datasMulti=[shopCtxLock.data];
     }else{
       datasMulti=[...document.querySelectorAll('#shop-ref-multi input:checked')].map(c=>c.value);
       if(!datasMulti.length){toast('Marca pelo menos uma refeição (ou define-a em Refeições)','bad');return;}
