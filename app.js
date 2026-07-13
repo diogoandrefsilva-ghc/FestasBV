@@ -94,6 +94,7 @@ let CONJUGES=[];      // [{amigo_a,amigo_b}]
 let VALIDACOES=[];    // [{evento_id,amigo,validado_por_email,validado_em}]
 let MY_NAMES=[];      // nomes que o utilizador atual pode gerir (próprio + cônjuge)
 let REFDEF_RESP_COLS=false;   // BD já tem resp_cozinha/resp_compras? (migração db/notifs.sql)
+let STOCK_TABLE=false;        // BD já tem stock_lotes? (migração SQL do stock por refeição)
 const enc=encodeURIComponent;
 
 function isAdmin(){return !!_sbSession&&_sbSession.user.email===ADMIN_EMAIL;}
@@ -435,6 +436,7 @@ function fatorEfetivo(m,data){
 }
 
 function calcular(data){
+  aplicarStock(data);   // stock por refeição: move o alocado da bolsa comum p/ custos diretos (só na cópia)
   const{evento,membros,despesas,convidados,mealheiros,refeicoesDef,pagamentos}=data;
   const pag=pagamentos||[];
   const slotday={};for(const rd of refeicoesDef)slotday[rd.dia]=rd.data;
@@ -916,7 +918,9 @@ function renderAll(){
           ${pesoHtml}${chipsHtml?`<div class="rdc-chips">${chipsHtml}</div>`:''}
           <div class="rdc-unit"><span>Por pessoa${notaBebe}</span><span class="rdc-unit-v">${eur(indPP)}</span></div>
         </div>`;
-        const dirItems=(DATA.despesas||[]).filter(x=>x.tipo===rd.ref&&x.dataValor===rd.data);
+        const dirItems=(DATA.despesas||[]).filter(x=>x.tipo===rd.ref&&x.dataValor===rd.data).slice();
+        // Alocações de stock a esta refeição contam como custo direto — entram no detalhe
+        stockArr().forEach(l=>{if(!stockBacked(l)||!(l.qtd>0))return;(l.alocacoes||[]).forEach(a=>{if(a.tipo===rd.ref&&a.data===rd.data&&+a.qtd>0)dirItems.push({desc:'🧺 '+l.artigo+' ('+fmtQty(+a.qtd,l.unidade)+')',quem:'',valor:rnd(l.valor/l.qtd*a.qtd,2)});});});
         const dirDetBody=dirItems.length?`<div class="rdc-det-body">${dirItems.map(it=>`<div class="rdc-det-it"><span class="k">${escHtml(it.desc||'(sem descrição)')}${it.quem?`<small> · ${escHtml(it.quem)}</small>`:''}</span><span class="v">${eur(it.valor||0)}</span></div>`).join('')}</div>`:'';
         let dirChipsRow='';
         if(dirTot>0){
@@ -1421,12 +1425,14 @@ async function carregar(){
     const sel='*,membros(*,presencas(*)),refeicoes_def(*),despesas(*),convidados(*),mealheiros(*),pagamentos(*)';
     // shoplist vai numa fetch SEPARADA e tolerante a falha: se a tabela ainda
     // não existir (migração por correr) o resto da app continua a funcionar.
-    const [res,uaRes,cjRes,vlRes,slRes]=await Promise.all([
+    const [res,uaRes,cjRes,vlRes,slRes,stRes]=await Promise.all([
       sbFetch(`${SB_URL}/rest/v1/eventos?select=${encodeURIComponent(sel)}&order=ano.asc`,{headers:sbHeaders(),cache:'no-store'}),
       sbFetch(`${SB_URL}/rest/v1/user_amigos?select=email,amigo`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null),
       sbFetch(`${SB_URL}/rest/v1/conjuges?select=amigo_a,amigo_b`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null),
       sbFetch(`${SB_URL}/rest/v1/validacoes?select=evento_id,amigo,validado_por_email,validado_por_amigo,validado_em`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null),
-      sbFetch(`${SB_URL}/rest/v1/shoplist?select=*`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null)
+      sbFetch(`${SB_URL}/rest/v1/shoplist?select=*`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null),
+      // stock_lotes: fetch tolerante — sem a migração corrida a app funciona sem stock
+      sbFetch(`${SB_URL}/rest/v1/stock_lotes?select=*`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null)
     ]);
     if(!res.ok)throw new Error('HTTP '+res.status);
     const rows=await res.json();
@@ -1434,6 +1440,9 @@ async function carregar(){
     CONJUGES=(cjRes&&cjRes.ok)?await cjRes.json():[];
     VALIDACOES=(vlRes&&vlRes.ok)?await vlRes.json():[];
     const shopRows=(slRes&&slRes.ok)?await slRes.json():[];
+    STOCK_TABLE=!!(stRes&&stRes.ok);
+    const stockRows=STOCK_TABLE?await stRes.json():[];
+    const stockByEv={};stockRows.forEach(s=>{(stockByEv[s.evento_id]=stockByEv[s.evento_id]||[]).push(s);});
     // Só gravamos os responsáveis se as colunas já existirem no Supabase
     // (senão o replace das refeições falhava todo — padrão dividas_publicas)
     REFDEF_RESP_COLS=rows.some(ev=>(ev.refeicoes_def||[]).some(r=>'resp_cozinha' in r));
@@ -1452,7 +1461,8 @@ async function carregar(){
       convidados:(ev.convidados||[]).map(c=>({_id:c.id,membro:c.membro,nome:c.nome,data:c.data,dia:c.dia,ref:c.ref,pagante:c.pagante?'Sim':'Não',preco:N(c.preco)})),
       mealheiros:(ev.mealheiros||[]).map(m=>({quem:m.quem,data:m.data,valor:N(m.valor),subtipo:m.subtipo,desc:m.descricao})),
       pagamentos:(ev.pagamentos||[]).map(p=>({de:p.de,para:p.para,valor:N(p.valor),ref:p.ref,data:p.data,extra:N(p.extra)})),
-      shoplist:(shopByEv[ev.id]||[]).map(s=>({_id:s.id,artigo:s.artigo,quantidade:s.quantidade||'',tipo:s.tipo,dataValor:s.data_valor,estado:s.estado||'pendente',tratadoPor:s.tratado_por||null,noCarrinho:!!s.no_carrinho,compraId:s.compra_id||null,cfDesc:s.cf_desc||null,valor:s.valor!=null?N(s.valor):null,criadoPor:s.criado_por||'',criadoEm:s.criado_em,compradoEm:s.comprado_em}))
+      shoplist:(shopByEv[ev.id]||[]).map(s=>({_id:s.id,artigo:s.artigo,quantidade:s.quantidade||'',tipo:s.tipo,dataValor:s.data_valor,estado:s.estado||'pendente',tratadoPor:s.tratado_por||null,noCarrinho:!!s.no_carrinho,compraId:s.compra_id||null,cfDesc:s.cf_desc||null,valor:s.valor!=null?N(s.valor):null,criadoPor:s.criado_por||'',criadoEm:s.criado_em,compradoEm:s.comprado_em})),
+      stockLotes:(stockByEv[ev.id]||[]).map(l=>({_id:l.id,compraId:l.compra_id,artigo:l.artigo,qtd:N(l.qtd),unidade:l.unidade||'',valor:N(l.valor),alocacoes:Array.isArray(l.alocacoes)?l.alocacoes:[],criadoEm:l.criado_em}))
     }));
     ALL_YEARS.sort((a,b)=>(a.evento.ano||0)-(b.evento.ano||0));
     // Restaurar onde o utilizador estava (ano + separadores), senão ano mais recente
@@ -3040,6 +3050,130 @@ function myClaimNames(){const s=new Set(MY_NAMES);const p=myPrimaryName()||(isAd
 function shopMine(it){return !!it.tratadoPor&&myClaimNames().has(it.tratadoPor);}
 function shopCanEditItem(it){return isAdmin()||(it.criadoPor&&myClaimNames().has(it.criadoPor));}
 
+/* ── STOCK POR REFEIÇÃO ──────────────────────────────────────────────
+   Artigos comprados para VÁRIAS refeições (ex.: 10 pacotes de batatas p/ dois
+   jantares) são registados como LOTES (tabela stock_lotes): quantidade + preço
+   por artigo. O valor do lote entra na compra numa linha "🧺 Stock" (Gerais →
+   bolsa comum) e as ALOCAÇÕES (lote → refeição → qtd) movem-no, no cálculo,
+   para custos diretos das refeições — sem nunca reescrever as despesas reais.
+   Alocação automática: FIFO por ordem de data das refeições, cobrindo a
+   procura da lista de compras; sobra fica na bolsa comum; o admin ajusta tudo
+   no detalhe do lote. Reservado vs consumido é derivado da data da refeição. */
+const STOCK_OBS='🧺 Stock';
+function stockArr(){if(DATA&&!DATA.stockLotes)DATA.stockLotes=[];return (DATA&&DATA.stockLotes)||[];}
+// Lote órfão (compra apagada/limpa): sai das contas e das vistas
+function stockBacked(l){return (DATA.despesas||[]).some(d=>d.compraId===l.compraId);}
+function stockEstadoIcon(data){return data>=hojeISO()?'🧺':'✅';}
+function stockEstadoLbl(data){return data>=hojeISO()?'reservado':'consumido';}
+function hojeISO(){return new Date().toISOString().slice(0,10);}
+
+// Interpreta quantidade em texto ("5 pacotes", "2,5 kg") → {n,u} com unidade
+// canónica (g→kg, ml→L; desconhecida fica o texto). null se não houver número.
+function qtyParse(raw){
+  const s=(raw||'').trim();
+  const m=s.match(/^(\d+(?:[.,]\d+)?)\s*(.*)$/);
+  if(!m)return null;
+  let n=parseFloat(m[1].replace(',','.'));
+  const norm=(m[2]||'').trim().toLowerCase().replace(/\.$/,'').normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  let u='';
+  for(const k in _QTY_UNITS){if(_QTY_UNITS[k].includes(norm)){u=k;break;}}
+  if(!u&&norm)u=norm;
+  if(u==='g'){n=n/1000;u='kg';}
+  if(u==='ml'){n=n/1000;u='l';}
+  return{n,u};
+}
+function fmtQty(n,u){
+  const s=String(Math.round(n*1000)/1000).replace('.',',');
+  const pl={duzia:['dúzia','dúzias'],pacote:['pacote','pacotes'],lata:['lata','latas'],garrafa:['garrafa','garrafas'],caixa:['caixa','caixas'],saco:['saco','sacos'],grade:['grade','grades'],fatia:['fatia','fatias'],molho:['molho','molhos']};
+  const lbl=u==='kg'?'kg':u==='l'?'L':u==='un'?'un':pl[u]?(n===1?pl[u][0]:pl[u][1]):u;
+  return lbl?`${s} ${lbl}`:s;
+}
+
+/* Procura de um artigo por refeição (o que foi pedido na lista, comprado ou
+   não — a procura é o pedido). Só entra o que tiver qtd numérica na mesma
+   unidade do lote. Chave: 'tipo|data'. */
+function stockDemandFor(artigo,u){
+  const dem={};
+  shopArr().forEach(it=>{
+    if(!shopIsMeal(it.tipo)||!it.dataValor||shopIsRemoved(it))return;
+    if(!shopSameArtigo(it.artigo,artigo))return;
+    const q=qtyParse(it.quantidade);
+    if(!q||q.u!==u)return;
+    const k=it.tipo+'|'+it.dataValor;
+    dem[k]=rnd((dem[k]||0)+q.n,3);
+  });
+  return dem;
+}
+/* Já alocado a cada refeição pelos OUTROS lotes do mesmo artigo. */
+function stockAllocatedFor(artigo,u,skipLotId){
+  const alloc={};
+  stockArr().forEach(l=>{
+    if(l._id===skipLotId)return;
+    if(!shopSameArtigo(l.artigo,artigo)||(l.unidade||'')!==u)return;
+    (l.alocacoes||[]).forEach(a=>{const k=a.tipo+'|'+a.data;alloc[k]=rnd((alloc[k]||0)+(+a.qtd||0),3);});
+  });
+  return alloc;
+}
+/* Qtd livre (sem alocação) em stock para um artigo — para a dica "há em stock". */
+function stockFreeFor(artigo,u){
+  let free=0;
+  stockArr().forEach(l=>{
+    if(!stockBacked(l)||!shopSameArtigo(l.artigo,artigo)||(l.unidade||'')!==u)return;
+    const aloc=(l.alocacoes||[]).reduce((a,x)=>a+(+x.qtd||0),0);
+    free=rnd(free+Math.max(0,l.qtd-aloc),3);
+  });
+  return free;
+}
+/* FIFO: reparte a qtd do lote pelas refeições por ordem de data, cobrindo a
+   procura ainda em aberto; sobra fica sem alocação (bolsa comum). Se a procura
+   não for numérica e o lote veio de UMA só refeição (fallbackKeys), vai tudo
+   para essa. */
+function fifoAlocar(artigo,qtd,u,skipLotId,fallbackKeys){
+  const dem=stockDemandFor(artigo,u);
+  const done=stockAllocatedFor(artigo,u,skipLotId);
+  const keys=Object.keys(dem).sort((a,b)=>(a.split('|')[1]).localeCompare(b.split('|')[1])||a.localeCompare(b));
+  let rest=qtd;const out=[];
+  for(const k of keys){
+    if(rest<=0)break;
+    const falta=Math.max(0,rnd(dem[k]-(done[k]||0),3));
+    const take=Math.min(rest,falta);
+    if(take>0){const[tipo,data]=k.split('|');out.push({tipo,data,qtd:rnd(take,3)});rest=rnd(rest-take,3);}
+  }
+  if(!out.length&&fallbackKeys&&fallbackKeys.length===1){
+    const[tipo,data]=fallbackKeys[0].split('|');
+    out.push({tipo,data,qtd:rnd(qtd,3)});
+  }
+  return out;
+}
+
+/* Aplica o stock no motor de cálculo: por compra, abate na linha "🧺 Stock"
+   (Gerais) o valor alocado dos lotes e cria despesas diretas sintéticas
+   (tipo Almoço/Jantar + data_valor) nas refeições. Corre SÓ na cópia que o
+   calcular() recebe — as despesas guardadas (quem pagou o quê) ficam
+   intactas. Alocações a refeições apagadas ficam na bolsa comum. */
+function aplicarStock(data){
+  const lotes=data.stockLotes||[];if(!lotes.length)return;
+  const refOk={};(data.refeicoesDef||[]).forEach(r=>{refOk[r.ref+'|'+r.data]=true;});
+  const byCompra={};lotes.forEach(l=>{(byCompra[l.compraId]=byCompra[l.compraId]||[]).push(l);});
+  for(const cid in byCompra){
+    const linha=(data.despesas||[]).find(d=>d.compraId===cid&&d.tipo==='Gerais'&&(d.obs||'')===STOCK_OBS);
+    if(!linha)continue;   // compra apagada → lotes órfãos não contam
+    let resto=linha.valor;
+    byCompra[cid].forEach(l=>{
+      if(!(+l.qtd>0))return;
+      const unit=l.valor/l.qtd;
+      (l.alocacoes||[]).forEach(a=>{
+        if(!refOk[a.tipo+'|'+a.data])return;
+        const v=Math.min(rnd(unit*(+a.qtd||0),2),resto);
+        if(v<=0)return;
+        data.despesas.push({quem:linha.quem,dataDesp:linha.dataDesp,dataValor:a.data,desc:l.artigo,tipo:a.tipo,valor:v,obs:STOCK_OBS,compraId:null,_stock:true});
+        resto=rnd(resto-v,2);
+      });
+    });
+    linha.valor=Math.max(0,resto);
+  }
+}
+
 function shopItemCard(it,mineView,noBadge){
   const meal=shopIsMeal(it.tipo)&&it.dataValor;
   const badge=noBadge?'':(meal?`<span class="cmp-badge meal">${shopTipoIcon(it.tipo)} ${fmtDiaMes(it.dataValor)}</span>`:`<span class="cmp-badge">${shopTipoIcon(it.tipo)} ${it.tipo}</span>`);
@@ -3091,24 +3225,45 @@ function mealShopSection(rd){
   if(!shopIsMeal(rd.ref))return '';
   const items=shopArr().filter(it=>it.tipo===rd.ref&&it.dataValor===rd.data&&!shopIsRemoved(it))
     .sort((a,b)=>a.artigo.localeCompare(b.artigo,'pt'));
+  // Lotes de stock alocados a ESTA refeição (reservado se ainda não passou a data)
+  const alocs=[];
+  stockArr().forEach(l=>{
+    if(!stockBacked(l))return;
+    (l.alocacoes||[]).forEach(a=>{
+      if(a.tipo!==rd.ref||a.data!==rd.data||!(+a.qtd>0))return;
+      const unit=l.qtd>0?l.valor/l.qtd:0;
+      alocs.push({l,qtd:+a.qtd,val:rnd(unit*a.qtd,2)});
+    });
+  });
+  alocs.sort((a,b)=>a.l.artigo.localeCompare(b.l.artigo,'pt'));
   const canAdd=shopCanWrite()&&!contasFechadas();
-  if(!items.length&&!canAdd)return '';
+  if(!items.length&&!alocs.length&&!canAdd)return '';
   const nDone=items.filter(shopIsBought).length;
   const key=rd.data+'|'+rd.ref;
+  const alocLines=alocs.map(x=>`<div class="msl-it stk" onclick="openLoteModal(${x.l._id})">
+      <span class="msl-art">${stockEstadoIcon(rd.data)} ${escHtml(x.l.artigo)} <i>${escHtml(fmtQty(x.qtd,x.l.unidade))}</i></span><span class="msl-st ok">${eur(x.val)}</span></div>`).join('');
   const lines=items.map(it=>{
     const done=shopIsBought(it);
     const qtdTxt=normalizeQty(it.quantidade);
-    const st=done?'<span class="msl-st ok">✓ comprado</span>'
+    let st=done?'<span class="msl-st ok">✓ comprado</span>'
       :it.tratadoPor?`<span class="msl-st">🧑‍🍳 ${escHtml(it.tratadoPor)}</span>`
       :'<span class="msl-st falta">falta quem trate</span>';
+    // Dica: antes de comprar, há stock livre deste artigo por alocar
+    let hint='';
+    if(!done&&STOCK_TABLE){
+      const q=qtyParse(it.quantidade);
+      if(q){const free=stockFreeFor(it.artigo,q.u);if(free>0)hint=`<div class="msl-hint">🧺 há ${escHtml(fmtQty(free,q.u))} em stock por alocar</div>`;}
+    }
     return `<div class="msl-it${done?' done':''}" onclick="openShopItemModal(${it._id})">
-      <span class="msl-art">${escHtml(it.artigo)}${qtdTxt?` <i>${escHtml(qtdTxt)}</i>`:''}</span>${st}</div>`;
+      <span class="msl-art">${escHtml(it.artigo)}${qtdTxt?` <i>${escHtml(qtdTxt)}</i>`:''}${hint}</span>${st}</div>`;
   }).join('');
   return `<div class="rdc sf msl" onclick="event.stopPropagation()">
     <details class="rdc-det msl-det"${MEAL_SHOP_OPEN[key]?' open':''} ontoggle="MEAL_SHOP_OPEN['${key}']=this.open">
       <summary><span class="rdc-lbl">🛒 Lista de compras</span>${items.length?`<span class="msl-count">${nDone?nDone+'/':''}${items.length}</span>`:''}<span class="rdc-det-arrow">›</span></summary>
       <div class="rdc-det-body">
-        ${lines||'<div class="msl-empty">Ainda sem ingredientes nesta lista.</div>'}
+        ${alocLines?`<div class="msl-hdr sf">🧺 ${rd.data>=hojeISO()?'Reservado para esta refeição':'Consumido nesta refeição'}</div>${alocLines}`:''}
+        ${lines?`${alocLines?'<div class="msl-hdr sf">📝 Pedidos</div>':''}${lines}`:''}
+        ${!lines&&!alocLines?'<div class="msl-empty">Ainda sem ingredientes nesta lista.</div>':''}
         ${canAdd?`<button class="cmp-mini prim write-action msl-add" onclick="openShopItemModal(null,'${rd.ref}','${rd.data}')">＋ Ingrediente</button>`:''}
       </div>
     </details>
@@ -3167,6 +3322,9 @@ function renderCompras(){
     h+=shopGroupedList(outros,false);
   }
 
+  // ── Stock (lotes multi-refeição: alocações + livre na bolsa comum) ──
+  h+=renderStockSec();
+
   // ── Comprados (a partir das despesas ligadas a uma compra) ──
   h+=renderComprados();
 
@@ -3194,6 +3352,29 @@ function renderRemovidos(removidos){
   return `<div class="cmp-done-hdr sf" onclick="this.nextElementSibling.classList.toggle('open');this.classList.toggle('open')">
       <span>🗑️ Removidos <span class="cmp-count">${removidos.length}</span></span><span class="cmp-chev">▾</span></div>
     <div class="cmp-done-body">${rows}</div>`;
+}
+
+/* Secção 🧺 Stock do separador Compras: um cartão por lote, com as alocações
+   por refeição (🧺 reservado / ✅ consumido pela data) e o livre → bolsa comum.
+   Tocar abre o detalhe do lote (o admin ajusta, os outros consultam). */
+function renderStockSec(){
+  if(!STOCK_TABLE)return '';
+  const lots=stockArr().filter(stockBacked).slice()
+    .sort((a,b)=>a.artigo.localeCompare(b.artigo,'pt')||(a.criadoEm||'').localeCompare(b.criadoEm||''));
+  if(!lots.length)return '';
+  const cards=lots.map(l=>{
+    const alocT=(l.alocacoes||[]).reduce((a,x)=>a+(+x.qtd||0),0);
+    const livre=rnd(l.qtd-alocT,3);
+    const chips=(l.alocacoes||[]).filter(a=>+a.qtd>0).map(a=>`<span class="stk-chip">${stockEstadoIcon(a.data)} ${shopTipoIcon(a.tipo)} ${fmtDiaMes(a.data)} · ${escHtml(fmtQty(+a.qtd,l.unidade))}</span>`).join('');
+    return `<div class="cmp-done-card" onclick="openLoteModal(${l._id})">
+      <div class="cmp-done-top"><b>${escHtml(l.artigo)}</b><span class="cmp-done-meta">${escHtml(fmtQty(l.qtd,l.unidade))} · ${eur(l.valor)}</span></div>
+      <div class="stk-chips">${chips}${livre>0?`<span class="stk-chip livre">🧺 ${escHtml(fmtQty(livre,l.unidade))} livre → bolsa comum</span>`:''}</div>
+      <div class="cmp-done-edit sf">${isAdmin()?'ajustar alocação ›':'ver alocação ›'}</div>
+    </div>`;
+  }).join('');
+  return `<div class="cmp-done-hdr sf" onclick="this.nextElementSibling.classList.toggle('open');this.classList.toggle('open')">
+      <span>🧺 Stock <span class="cmp-count">${lots.length}</span></span><span class="cmp-chev">▾</span></div>
+    <div class="cmp-done-body">${cards}</div>`;
 }
 
 function renderComprados(){
@@ -3396,7 +3577,8 @@ async function claimItem(id){
    estiver livre noutras refeições/tipos, propõe levar tudo na mesma ida — o
    caso típico "trago logo as batatas de hoje e de amanhã". Quem quiser manter
    compradores separados ignora a sugestão; cada registo continua independente. */
-function shopSameArtigo(a,b){const n=s=>(s||'').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');return n(a)===n(b);}
+function shopArtKey(s){return (s||'').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');}
+function shopSameArtigo(a,b){return shopArtKey(a)===shopArtKey(b);}
 async function claimSameElsewhere(it,nome){
   const others=shopArr().filter(x=>x._id!==it._id&&x._id!=null&&!x.tratadoPor&&shopIsPending(x)&&shopGroupKey(x)!==shopGroupKey(it)&&shopSameArtigo(x.artigo,it.artigo));
   if(!others.length)return;
@@ -3451,22 +3633,32 @@ async function purgeShopItem(id){   // apagar definitivamente do histórico (só
    Estado: compraEdit = { id, lines:[{tipo,dataValor,valor,obs}] }.
    Os artigos escolhidos (picker) são marcados como comprados e ligados ao
    mesmo compra_id; cada linha vira uma despesa. */
-let compraEdit={id:null,lines:[]};
+let compraEdit={id:null,lines:[],lotes:[]};
 function openCompra(compraId){
   if(!shopCanWrite()){toast('Sem permissão','bad');return;}
   if(contasFechadas()&&!compraId){toast('Contas fechadas — só pagamentos de dívidas','bad');return;}
   const isEdit=!!compraId;
-  compraEdit={id:compraId||null,lines:[]};
+  compraEdit={id:compraId||null,lines:[],lotes:[]};
   const linked=isEdit?shopArr().filter(x=>x.compraId===compraId):[];
   // Linhas: (edição) reconstruídas das despesas da compra; (nova) semeadas dos meus artigos
   if(isEdit){
-    (DATA.despesas||[]).filter(d=>d.compraId===compraId).forEach(d=>{
+    // A linha "🧺 Stock" não é editável à mão — é regenerada a partir dos lotes
+    (DATA.despesas||[]).filter(d=>d.compraId===compraId&&!(d.tipo==='Gerais'&&(d.obs||'')===STOCK_OBS)).forEach(d=>{
       compraEdit.lines.push({tipo:d.tipo,dataValor:d.dataValor||null,valor:d.valor,obs:d.obs||''});
     });
+    // Lotes já gravados desta compra (mantêm qtd/€; as refeições recalculam do picker)
+    compraEdit.lotes=stockArr().filter(l=>l.compraId===compraId).map(l=>({_id:l._id,artigo:l.artigo,qtd:fmtQty(l.qtd,l.unidade),valor:l.valor,keys:[]}));
   }else{
     const seed=shopArr().filter(shopMineActive);   // inclui removidos que ainda reclamo (podem já estar no carrinho)
+    // Artigos pedidos para VÁRIAS refeições → lotes de stock (ficam fora das linhas por refeição)
+    const loteIds=new Set();
+    if(STOCK_TABLE){
+      const byArt={};
+      seed.filter(it=>shopIsMeal(it.tipo)&&it.dataValor).forEach(it=>{(byArt[shopArtKey(it.artigo)]=byArt[shopArtKey(it.artigo)]||[]).push(it);});
+      for(const k in byArt)if(new Set(byArt[k].map(i=>i.tipo+'|'+i.dataValor)).size>1)byArt[k].forEach(i=>loteIds.add(i._id));
+    }
     const gmap={};
-    seed.forEach(it=>{const k=shopGroupKey(it);(gmap[k]=gmap[k]||{tipo:it.tipo,dataValor:it.dataValor||null,items:[]}).items.push(it);});
+    seed.filter(it=>!loteIds.has(it._id)).forEach(it=>{const k=shopGroupKey(it);(gmap[k]=gmap[k]||{tipo:it.tipo,dataValor:it.dataValor||null,items:[]}).items.push(it);});
     const ord={};SHOP_TIPOS.forEach((t,i)=>ord[t]=i);
     Object.values(gmap).sort((a,b)=>(ord[a.tipo]-ord[b.tipo])||((a.dataValor||'').localeCompare(b.dataValor||'')))
       .forEach(g=>compraEdit.lines.push({tipo:g.tipo,dataValor:g.dataValor,valor:'',obs:g.items.map(i=>i.artigo+(i.quantidade?' ('+i.quantidade+')':'')).join(', ')}));
@@ -3497,16 +3689,18 @@ function openCompra(compraId){
     pl='<div class="cmp-pick sf">Artigos da lista</div>';
     pickItems.slice().sort((a,b)=>a.artigo.localeCompare(b.artigo,'pt')).forEach(it=>{
       const on=isEdit?it.compraId===compraId:shopMine(it);
-      pl+=`<label class="cmp-pick-row"><input type="checkbox" class="shop-pick" value="${it._id}" ${on?'checked':''}>
+      pl+=`<label class="cmp-pick-row"><input type="checkbox" class="shop-pick" value="${it._id}" ${on?'checked':''} onchange="compraRefreshLotes()">
         <span>${escHtml(it.artigo)}${it.quantidade?' <i>('+escHtml(it.quantidade)+')</i>':''}${shopIsRemoved(it)?' ⚠️':''}</span>
         <span class="cmp-badge">${shopTipoIcon(it.tipo)}${shopIsMeal(it.tipo)&&it.dataValor?' '+fmtDiaMes(it.dataValor):' '+it.tipo}</span></label>`;
     });
     pl+='<div class="note" style="margin-top:6px">Os artigos marcados saem da lista e ficam ligados a esta compra.</div>';
   }
   document.getElementById('shop-buy-body').innerHTML=(ro?'<div class="note" style="margin-bottom:10px">🔒 Só o administrador pode editar uma compra já registada.</div>':'')+pl+
+    '<div id="shop-buy-lotes"></div>'+
     '<div class="cmp-pick sf" style="margin-top:14px">Repartição do valor</div><div id="shop-buy-lines"></div>'+
     (ro?'':'<button class="btn ghost" id="shop-buy-addline" style="width:100%;margin-top:8px" onclick="compraAddLine()">＋ Outro gasto</button>');
   compraRenderLines();
+  compraRefreshLotes();
 
   // Modo leitura (membro a ver uma compra já registada): desativa todos os campos
   const modal=document.getElementById('shop-buy-modal');
@@ -3541,7 +3735,49 @@ function compraAddLine(){compraEdit.lines.push({tipo:'Gerais',dataValor:null,val
 function compraRemoveLine(i){compraEdit.lines.splice(i,1);if(!compraEdit.lines.length)compraEdit.lines.push({tipo:'Gerais',dataValor:null,valor:'',obs:''});compraRenderLines();}
 function compraUpdateTotal(){
   let tot=0;compraEdit.lines.forEach(ln=>{const v=parseFloat(ln.valor);if(!isNaN(v))tot+=v;});
+  (compraEdit.lotes||[]).forEach(l=>{const v=parseFloat(l.valor);if(!isNaN(v))tot+=v;});
   const el=document.getElementById('shop-buy-total');if(el)el.textContent=`Total: ${eur(rnd(tot,2))}`;
+}
+
+/* ── Lotes de stock no registo da compra ──
+   Entre os artigos marcados no picker, os que estão pedidos para MAIS do que
+   uma refeição são propostos como lote: qtd total + € total, e a app reparte
+   (FIFO) pelas refeições. Deixar o € vazio = não gerir em stock. */
+function compraDetectLotes(){
+  const checked=[...document.querySelectorAll('.shop-pick:checked')].map(c=>+c.value);
+  const its=shopArr().filter(x=>checked.includes(x._id)&&shopIsMeal(x.tipo)&&x.dataValor);
+  const g={};
+  its.forEach(it=>{(g[shopArtKey(it.artigo)]=g[shopArtKey(it.artigo)]||{artigo:it.artigo,items:[]}).items.push(it);});
+  return Object.values(g).filter(x=>new Set(x.items.map(i=>i.tipo+'|'+i.dataValor)).size>1);
+}
+function compraRefreshLotes(){
+  const det=STOCK_TABLE?compraDetectLotes():[];
+  const prev=compraEdit.lotes||[];
+  compraEdit.lotes=det.map(d=>{
+    const keys=[...new Set(d.items.map(i=>i.tipo+'|'+i.dataValor))].sort();
+    const ex=prev.find(l=>shopSameArtigo(l.artigo,d.artigo));
+    if(ex)return Object.assign(ex,{keys});
+    // qtd sugerida = soma das qtds pedidas (se numéricas e na mesma unidade)
+    let tot=0,u=null,ok=true;
+    d.items.forEach(i=>{const q=qtyParse(i.quantidade);if(!q){ok=false;return;}if(u==null)u=q.u;if(q.u!==u)ok=false;else tot=rnd(tot+q.n,3);});
+    return {artigo:d.artigo,qtd:ok&&tot>0?fmtQty(tot,u):'',valor:'',keys};
+  });
+  compraRenderLotes();
+}
+function compraRenderLotes(){
+  const cont=document.getElementById('shop-buy-lotes');if(!cont)return;
+  const ls=compraEdit.lotes||[];
+  if(!ls.length){cont.innerHTML='';compraUpdateTotal();return;}
+  cont.innerHTML='<div class="cmp-pick sf" style="margin-top:14px">🧺 Stock — artigos p/ várias refeições</div>'+
+    ls.map((l,i)=>`<div class="cmp-ln cmp-lote">
+      <div class="cmp-ln-row1">
+        <span class="cmp-lote-art">${escHtml(l.artigo)}</span>
+        <input class="cmp-lote-qtd" type="text" placeholder="Qtd (ex: 10 pacotes)" value="${escHtml(l.qtd||'')}" oninput="compraEdit.lotes[${i}].qtd=this.value" onblur="this.value=normalizeQty(this.value);compraEdit.lotes[${i}].qtd=this.value">
+        <div class="cmp-ln-val"><span>€</span><input type="number" step="0.01" min="0" inputmode="decimal" placeholder="0,00" value="${l.valor===''||l.valor==null?'':l.valor}" oninput="compraEdit.lotes[${i}].valor=this.value;compraUpdateTotal()"></div>
+      </div>
+    </div>`).join('')+
+    '<div class="note">A app reparte pelas refeições por ordem de data (FIFO); ajustas depois no lote (🧺 Stock). Não incluas estes artigos nas linhas de baixo. € vazio = tratar como artigo normal.</div>';
+  compraUpdateTotal();
 }
 
 async function saveCompra(){
@@ -3554,14 +3790,28 @@ async function saveCompra(){
   if(!who){toast('Quem pagou?','bad');return;}
   if(!date){toast('Indica a data','bad');return;}
   if(!isAdmin()&&!MY_NAMES.includes(who)){toast('Só podes registar compras tuas ou do cônjuge','bad');return;}
-  // Validar linhas
+  // Lotes de stock (qtd + € por artigo); € vazio = não gerir em stock
+  const lotes=[];
+  for(const l of (compraEdit.lotes||[])){
+    const v=rnd(parseFloat(l.valor),2);
+    if(!v||v<=0)continue;
+    const q=qtyParse(l.qtd);
+    if(!q||!(q.n>0)){toast(`Indica a quantidade de "${l.artigo}" (ex: 10 pacotes)`,'bad');return;}
+    lotes.push({artigo:l.artigo,qtd:q.n,unidade:q.u,valor:v,keys:l.keys||[]});
+  }
+  // Validar linhas (linhas totalmente vazias são ignoradas se houver mais alguma coisa)
   const rows=[];
   for(const ln of compraEdit.lines){
     const v=rnd(parseFloat(ln.valor),2);
+    const vazia=(!v||v<=0)&&!(ln.obs||'').trim();
+    if(vazia&&(lotes.length||compraEdit.lines.length>1))continue;
     if(!v||v<=0){toast(`Preenche o valor de "${shopGroupLabel(ln.tipo,ln.dataValor)}"`,'bad');return;}
     if(shopIsMeal(ln.tipo)&&!ln.dataValor){toast(`Escolhe a refeição em "${ln.tipo}"`,'bad');return;}
     rows.push({tipo:ln.tipo,data_valor:shopIsMeal(ln.tipo)?ln.dataValor:null,valor:v,obs:(ln.obs||'').trim()});
   }
+  // O valor dos lotes entra numa linha "🧺 Stock" (Gerais → bolsa comum); o
+  // calcular() move depois o alocado para as refeições via stock_lotes
+  if(lotes.length)rows.push({tipo:'Gerais',data_valor:null,valor:rnd(lotes.reduce((a,l)=>a+l.valor,0),2),obs:STOCK_OBS});
   if(!rows.length){toast('Adiciona pelo menos uma linha','bad');return;}
   const checkedIds=[...document.querySelectorAll('.shop-pick:checked')].map(c=>+c.value);
   const compraId=compraEdit.id||('c'+Date.now());
@@ -3578,6 +3828,25 @@ async function saveCompra(){
     const payload=rows.map(r=>({evento_id:DATA._sbId,quem:who,data_desp:date,data_valor:r.data_valor,descricao:desc||'Compras',tipo:r.tipo,valor:r.valor,observacoes:r.obs||null,compra_id:compraId}));
     const ins=await queueWrite(()=>sbReq('POST','despesas',payload,{Prefer:'return=representation'}));
     payload.forEach((r,i)=>DATA.despesas.push({_id:ins&&ins[i]?ins[i].id:null,quem:r.quem,dataDesp:r.data_desp,dataValor:r.data_valor,desc:r.descricao,tipo:r.tipo,valor:r.valor,obs:r.observacoes||'',compraId:compraId}));
+    // Lotes de stock: substitui os da compra e aloca por FIFO (cada lote já vê
+    // as alocações dos anteriores e dos lotes de outras compras)
+    if(STOCK_TABLE){
+      if(isEdit){
+        await queueWrite(()=>sbReq('DELETE',`stock_lotes?compra_id=eq.${enc(compraId)}`));
+        DATA.stockLotes=stockArr().filter(l=>l.compraId!==compraId);
+      }
+      if(lotes.length){
+        for(const l of lotes){
+          l.alocacoes=fifoAlocar(l.artigo,l.qtd,l.unidade,null,l.keys);
+          stockArr().push({_id:null,compraId,artigo:l.artigo,qtd:l.qtd,unidade:l.unidade,valor:l.valor,alocacoes:l.alocacoes,criadoEm:new Date().toISOString()});
+        }
+        const lres=await queueWrite(()=>sbReq('POST','stock_lotes',lotes.map(l=>({evento_id:DATA._sbId,compra_id:compraId,artigo:l.artigo,qtd:l.qtd,unidade:l.unidade,valor:l.valor,alocacoes:l.alocacoes})),{Prefer:'return=representation'}));
+        if(Array.isArray(lres)){
+          const added=stockArr().filter(l=>l.compraId===compraId&&l._id==null);
+          added.forEach((l,i)=>{if(lres[i])l._id=lres[i].id;});
+        }
+      }
+    }
     // Artigos: os marcados ficam comprados; os que estavam ligados e foram desmarcados voltam à lista
     const prevLinked=shopArr().filter(x=>x.compraId===compraId).map(x=>x._id);
     const toBuy=checkedIds;
@@ -3597,6 +3866,90 @@ async function saveCompra(){
   }catch(e){setSync('err','erro ao guardar');btn.disabled=false;toast(permErrorMsg(e),'bad');}
 }
 
+/* ── Detalhe / alocação de um lote (menu de ajustes do admin) ──
+   Mostra o lote (qtd · € · €/un) e as alocações por refeição. O admin edita
+   quantidades, muda refeições, acrescenta/remove linhas ou volta ao FIFO;
+   os outros consultam. O que não estiver alocado fica na bolsa comum. */
+let editingLote=null;   // {id, alocs:[{tipo,data,qtd}]}
+function openLoteModal(id){
+  const l=stockArr().find(x=>x._id===id);
+  if(!l){toast('Lote não encontrado','bad');return;}
+  editingLote={id,alocs:(l.alocacoes||[]).map(a=>({tipo:a.tipo,data:a.data,qtd:+a.qtd||0}))};
+  document.getElementById('lote-title').textContent='🧺 '+l.artigo;
+  const unit=l.qtd>0?l.valor/l.qtd:0;
+  document.getElementById('lote-info').innerHTML=`Lote de <b>${escHtml(fmtQty(l.qtd,l.unidade))}</b> por <b>${eur(l.valor)}</b> · ${eur(rnd(unit,2))}/${escHtml(l.unidade?fmtQty(1,l.unidade).replace(/^1\s*/,''):'un')}`;
+  const canEdit=isAdmin();
+  ['lote-save','lote-fifo','lote-addline'].forEach(i=>{document.getElementById(i).style.display=canEdit?'':'none';});
+  loteRenderAlocs();
+  document.getElementById('lote-bg').classList.add('show');
+  document.body.classList.add('no-scroll');
+}
+function closeLoteModal(){document.getElementById('lote-bg').classList.remove('show');document.body.classList.remove('no-scroll');editingLote=null;}
+function loteMeals(){return (DATA.refeicoesDef||[]).filter(r=>shopIsMeal(r.ref));}
+function loteRenderAlocs(){
+  const l=editingLote?stockArr().find(x=>x._id===editingLote.id):null;if(!l)return;
+  const canEdit=isAdmin();
+  const unit=l.qtd>0?l.valor/l.qtd:0;
+  document.getElementById('lote-alocs').innerHTML=editingLote.alocs.map((a,i)=>{
+    const opts=loteMeals().map(r=>{const v=r.ref+'|'+r.data;return `<option value="${v}"${(a.tipo+'|'+a.data)===v?' selected':''}>${r.ref} ${fmtDiaMes(r.data)}${r.prato?' · '+escHtml(r.prato):''}</option>`;}).join('');
+    return `<div class="lote-ln">
+      <span class="lote-st" title="${stockEstadoLbl(a.data)}">${stockEstadoIcon(a.data)}</span>
+      <select ${canEdit?'':'disabled'} onchange="loteAlocField(${i},'ref',this.value)">${opts}</select>
+      <input type="number" step="any" min="0" inputmode="decimal" ${canEdit?'':'disabled'} value="${a.qtd||''}" placeholder="qtd" onchange="loteAlocField(${i},'qtd',this.value)">
+      <span class="lote-val">${eur(rnd(unit*(+a.qtd||0),2))}</span>
+      ${canEdit?`<button class="cmp-ln-del" title="Remover" onclick="loteDelAloc(${i})">✕</button>`:''}
+    </div>`;
+  }).join('')||'<div class="empty sf" style="margin-top:8px">Sem alocações — está tudo na bolsa comum.</div>';
+  const tot=editingLote.alocs.reduce((s,a)=>s+(+a.qtd||0),0);
+  const livre=rnd(l.qtd-tot,3);
+  document.getElementById('lote-resto').innerHTML=livre>0
+    ?`Alocado ${escHtml(fmtQty(rnd(tot,3),l.unidade))} de ${escHtml(fmtQty(l.qtd,l.unidade))} — <b>${escHtml(fmtQty(livre,l.unidade))}</b> (${eur(rnd(unit*livre,2))}) fica na bolsa comum.`
+    :livre<0?`⚠️ Alocaste ${escHtml(fmtQty(rnd(tot,3),l.unidade))} — mais do que o lote tem (${escHtml(fmtQty(l.qtd,l.unidade))}).`
+    :'Lote totalmente alocado.';
+}
+function loteAlocField(i,f,v){
+  const a=editingLote&&editingLote.alocs[i];if(!a)return;
+  if(f==='qtd')a.qtd=parseFloat(String(v).replace(',','.'))||0;
+  else{const p=v.split('|');a.tipo=p[0];a.data=p[1];}
+  loteRenderAlocs();
+}
+function loteAddAloc(){
+  if(!isAdmin()||!editingLote)return;
+  const meals=loteMeals();if(!meals.length){toast('Sem refeições definidas','bad');return;}
+  const used=new Set(editingLote.alocs.map(a=>a.tipo+'|'+a.data));
+  const m=meals.find(r=>!used.has(r.ref+'|'+r.data))||meals[0];
+  editingLote.alocs.push({tipo:m.ref,data:m.data,qtd:0});
+  loteRenderAlocs();
+}
+function loteDelAloc(i){if(!editingLote)return;editingLote.alocs.splice(i,1);loteRenderAlocs();}
+function loteFifo(){
+  const l=editingLote?stockArr().find(x=>x._id===editingLote.id):null;if(!l)return;
+  editingLote.alocs=fifoAlocar(l.artigo,l.qtd,l.unidade,l._id,null);
+  loteRenderAlocs();
+}
+async function saveLote(){
+  if(!isAdmin()){toast('Só o admin ajusta alocações','bad');return;}
+  const l=editingLote?stockArr().find(x=>x._id===editingLote.id):null;if(!l)return;
+  // junta duplicados da mesma refeição, ignora qtd 0 e valida contra o lote
+  const by={};
+  editingLote.alocs.forEach(a=>{const q=+a.qtd||0;if(q<=0)return;const k=a.tipo+'|'+a.data;by[k]=rnd((by[k]||0)+q,3);});
+  const alocs=Object.keys(by).sort((x,y)=>x.split('|')[1].localeCompare(y.split('|')[1])||x.localeCompare(y)).map(k=>{const p=k.split('|');return{tipo:p[0],data:p[1],qtd:by[k]};});
+  const tot=alocs.reduce((s,a)=>s+a.qtd,0);
+  if(tot-l.qtd>0.0005){toast(`Alocaste ${fmtQty(rnd(tot,3),l.unidade)} — o lote só tem ${fmtQty(l.qtd,l.unidade)}`,'bad');return;}
+  const btn=document.getElementById('lote-save');btn.disabled=true;
+  setSync('load','a guardar…');
+  try{
+    await queueWrite(()=>sbReq('PATCH',`stock_lotes?id=eq.${editingLote.id}`,{alocacoes:alocs}));
+    l.alocacoes=alocs;
+    syncMirror();marcaGuardado();
+    btn.disabled=false;closeLoteModal();
+    CALC=calcular(JSON.parse(JSON.stringify(DATA)));
+    renderAll();
+    if(TAB!=='compras')renderCompras();
+    toast('Alocação atualizada ✓','ok');
+  }catch(e){setSync('err','erro ao guardar');btn.disabled=false;toast(permErrorMsg(e),'bad');}
+}
+
 async function deleteCompra(){
   const compraId=compraEdit.id;if(!compraId)return;
   if(!confirm('Apagar esta compra? As despesas são removidas e os artigos voltam à lista.'))return;
@@ -3605,6 +3958,10 @@ async function deleteCompra(){
   try{
     await queueWrite(()=>sbReq('DELETE',`despesas?compra_id=eq.${enc(compraId)}`));
     DATA.despesas=(DATA.despesas||[]).filter(d=>d.compraId!==compraId);
+    if(STOCK_TABLE){
+      await queueWrite(()=>sbReq('DELETE',`stock_lotes?compra_id=eq.${enc(compraId)}`));
+      DATA.stockLotes=stockArr().filter(l=>l.compraId!==compraId);
+    }
     const linked=shopArr().filter(x=>x.compraId===compraId).map(x=>x._id);
     if(linked.length){
       await queueWrite(()=>sbReq('PATCH',`shoplist?id=in.(${linked.join(',')})`,{estado:'pendente',compra_id:null,cf_desc:null,comprado_em:null}));

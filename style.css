@@ -759,6 +759,22 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .msl-st.falta{color:#9A6E0E}
 .msl-empty{font-size:12px;color:var(--faint);padding:4px 0}
 .msl-add{width:100%;margin-top:8px;justify-content:center}
+.msl-hdr{font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);margin:8px 0 2px}
+.msl-hdr:first-child{margin-top:0}
+.msl-hint{font-size:10.5px;color:#9A6E0E;margin-top:1px}
+/* Stock: chips das alocações nos cartões de lote (separador Compras) */
+.stk-chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:7px}
+.stk-chip{background:var(--panel2);border:1px solid var(--line);color:var(--muted);font-size:11px;font-weight:600;border-radius:8px;padding:3px 7px;white-space:nowrap}
+.stk-chip.livre{background:rgba(196,144,32,.12);border-color:rgba(196,144,32,.4);color:#9A6E0E}
+/* Lotes no registo da compra */
+.cmp-lote-art{flex:1;min-width:0;font-size:13px;font-weight:600;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cmp-lote-qtd{flex:0 0 122px;font-size:13px}
+/* Modal do lote: linhas de alocação */
+.lote-ln{display:flex;align-items:center;gap:7px;margin-top:8px}
+.lote-ln select{flex:1;min-width:0;margin:0}
+.lote-ln input{flex:0 0 74px;margin:0;text-align:right}
+.lote-st{flex:0 0 auto;font-size:14px}
+.lote-val{flex:0 0 auto;font-size:12px;font-weight:700;color:var(--muted);font-variant-numeric:tabular-nums;min-width:52px;text-align:right}
 
 /* ═══ CASH-FLOWS — "Mista" (versão C: cabeçalho extrato + cronologia) ═══ */
 .cfc-net{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 16px;margin:0 0 10px}
