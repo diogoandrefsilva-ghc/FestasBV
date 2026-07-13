@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v14 · 2026-07-13 · limpeza: limpar listas de compras';
+const APP_BUILD = 'v15 · 2026-07-13 · sobras do ano anterior transitam auto p/ ano novo';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -2733,9 +2733,14 @@ async function limparPresencas(){
 async function limparCashflows(){
   const p=_limpezaPermitida();if(!p.ok){toast(p.motivo,'bad');return;}
   const ano=DATA.evento.ano;
-  const nDesp=(DATA.despesas||[]).length,nMeal=(DATA.mealheiros||[]).length,nPag=(DATA.pagamentos||[]).length;
+  // Sobras do ano anterior são transitadas e NÃO se apagam na limpeza.
+  const isSobras=m=>m&&m.subtipo==='sobras_ano_anterior';
+  const mealDel=(DATA.mealheiros||[]).filter(m=>!isSobras(m));
+  const mealKeep=(DATA.mealheiros||[]).filter(isSobras);
+  const nDesp=(DATA.despesas||[]).length,nMeal=mealDel.length,nPag=(DATA.pagamentos||[]).length;
   if(!nDesp&&!nMeal&&!nPag){toast('Não há cash-flows para limpar em '+ano,'ok');return;}
-  if(!confirm('LIMPAR CASH-FLOWS — '+ano+'\n\nVai apagar:\n· '+nDesp+' despesa(s)\n· '+nMeal+' mealheiro(s)\n· '+nPag+' pagamento(s)/reembolso(s)\n\nSó afeta o ano '+ano+'. Esta ação NÃO pode ser desfeita.\n\nConfirmar?'))return;
+  const avisoSobras=mealKeep.length?('\n\n(Mantêm-se '+mealKeep.length+' sobra(s) do ano anterior — transitadas, não se apagam.)'):'';
+  if(!confirm('LIMPAR CASH-FLOWS — '+ano+'\n\nVai apagar:\n· '+nDesp+' despesa(s)\n· '+nMeal+' mealheiro(s)\n· '+nPag+' pagamento(s)/reembolso(s)'+avisoSobras+'\n\nSó afeta o ano '+ano+'. Esta ação NÃO pode ser desfeita.\n\nConfirmar?'))return;
   // Repor na lista os artigos que estavam "comprados" (as despesas vão desaparecer;
   // sem isto ficariam órfãos). A rede de segurança no cliente já os mostraria como
   // pendentes, mas aqui limpa-se também o estado na BD.
@@ -2746,7 +2751,7 @@ async function limparCashflows(){
       DATA.shoplist.forEach(it=>{if(it.estado==='comprado')Object.assign(it,{estado:'pendente',compraId:null,cfDesc:null,compradoEm:null});});
     }catch(e){toast('Aviso: artigos da lista não repostos — '+e.message,'bad');}
   }
-  DATA.despesas=[];DATA.mealheiros=[];DATA.pagamentos=[];
+  DATA.despesas=[];DATA.mealheiros=mealKeep;DATA.pagamentos=[];
   const ok=await pushToGitHub('Limpar cash-flows '+ano);
   if(ok){CALC=calcular(JSON.parse(JSON.stringify(DATA)));renderAll();loadLimpeza();toast('Cash-flows de '+ano+' limpos ✓','ok');}
   else loadLimpeza();
@@ -2840,12 +2845,23 @@ async function addNewYear(){
 
   const membros=NY_MEMBROS.map(m=>({nome:m.nome,fator:m.fator,presencas:[],sexo:m.sexo||'M'}));
 
+  // Sobras do ano anterior → entram automaticamente como mealheiro (sobras_ano_anterior).
+  // Fonte: saldo sobrante (saldoGrupo) do ano imediatamente anterior existente. Só se > 0.
+  const mealheiros=[];
+  const prevYears=ALL_YEARS.filter(y=>(y.evento.ano||0)<yearVal);
+  const prevYear=prevYears.length?prevYears.reduce((a,b)=>((b.evento.ano||0)>(a.evento.ano||0)?b:a)):null;
+  if(prevYear){
+    const prevCalc=calcular(JSON.parse(JSON.stringify(prevYear)));
+    const sobras=rnd(prevCalc.saldoGrupo||0,2);
+    if(sobras>0)mealheiros.push({quem:tesVal,data:yearVal+'-01-01',valor:sobras,subtipo:'sobras_ano_anterior',desc:'Sobras ano anterior ('+prevYear.evento.ano+')'});
+  }
+
   const newYear={
     evento:{nome:'MEO '+yearVal,ano:yearVal,tesoureiro:tesVal,arredondaTotal:false,missaoPoupanca:0,fundoReserva:0,fatorModo:'fixo',fatorThreshold:FATOR_THRESHOLD_DEFAULT},
     membros,
     despesas:[],
     convidados:[],
-    mealheiros:[],
+    mealheiros,
     pagamentos:[],
     refeicoesDef:[]
   };
@@ -2860,7 +2876,8 @@ async function addNewYear(){
 
   const ok=await pushToGitHub('Criar ano '+yearVal);
   if(ok){
-    toast('Ano '+yearVal+' criado ✓','ok');
+    const sobra=mealheiros.find(m=>m.subtipo==='sobras_ano_anterior');
+    toast('Ano '+yearVal+' criado ✓'+(sobra?' · sobras '+eur(sobra.valor)+' transitadas':''),'ok');
     document.getElementById('adm-new-year').value='';
     document.getElementById('adm-new-tes').value='';
     NY_MEMBROS=[];
