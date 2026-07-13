@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v18 · 2026-07-13 · pop-up de artigo: refeição trancada no contexto, campo tamanho, visual';
+const APP_BUILD = 'v19 · 2026-07-13 · tamanho passa a coluna própria na BD (corre o ALTER TABLE!)';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -1461,7 +1461,7 @@ async function carregar(){
       convidados:(ev.convidados||[]).map(c=>({_id:c.id,membro:c.membro,nome:c.nome,data:c.data,dia:c.dia,ref:c.ref,pagante:c.pagante?'Sim':'Não',preco:N(c.preco)})),
       mealheiros:(ev.mealheiros||[]).map(m=>({quem:m.quem,data:m.data,valor:N(m.valor),subtipo:m.subtipo,desc:m.descricao})),
       pagamentos:(ev.pagamentos||[]).map(p=>({de:p.de,para:p.para,valor:N(p.valor),ref:p.ref,data:p.data,extra:N(p.extra)})),
-      shoplist:(shopByEv[ev.id]||[]).map(s=>({_id:s.id,artigo:s.artigo,quantidade:s.quantidade||'',tipo:s.tipo,dataValor:s.data_valor,estado:s.estado||'pendente',tratadoPor:s.tratado_por||null,noCarrinho:!!s.no_carrinho,compraId:s.compra_id||null,cfDesc:s.cf_desc||null,valor:s.valor!=null?N(s.valor):null,criadoPor:s.criado_por||'',criadoEm:s.criado_em,compradoEm:s.comprado_em})),
+      shoplist:(shopByEv[ev.id]||[]).map(s=>({_id:s.id,artigo:s.artigo,quantidade:s.quantidade||'',tamanho:s.tamanho||'',tipo:s.tipo,dataValor:s.data_valor,estado:s.estado||'pendente',tratadoPor:s.tratado_por||null,noCarrinho:!!s.no_carrinho,compraId:s.compra_id||null,cfDesc:s.cf_desc||null,valor:s.valor!=null?N(s.valor):null,criadoPor:s.criado_por||'',criadoEm:s.criado_em,compradoEm:s.comprado_em})),
       stockLotes:(stockByEv[ev.id]||[]).map(l=>({_id:l.id,compraId:l.compra_id,artigo:l.artigo,qtd:N(l.qtd),unidade:l.unidade||'',valor:N(l.valor),alocacoes:Array.isArray(l.alocacoes)?l.alocacoes:[],criadoEm:l.criado_em}))
     }));
     ALL_YEARS.sort((a,b)=>(a.evento.ano||0)-(b.evento.ano||0));
@@ -3103,10 +3103,9 @@ function normalizeQty(raw){
   if(rest)return `${fmt(num)} ${rest}`;   // unidade desconhecida → nº normalizado + texto original
   return fmt(num);                        // só número
 }
-// Qtd + tamanho/embalagem vivem num só campo na BD (quantidade), unidos por
-// " × " (ex.: "4 × lata 250 ml"). Helpers para juntar/separar nos dois inputs.
-function shopJoinQty(qtd,tam){return qtd&&tam?`${qtd} × ${tam}`:(qtd||tam||'');}
-function shopSplitQty(s){const v=normalizeQty(s);const i=v.indexOf(' × ');return i<0?[v,'']:[v.slice(0,i),v.slice(i+3)];}
+// Etiqueta qtd + tamanho/embalagem para mostrar (ex.: "4 × lata 250 ml").
+// Na BD são colunas separadas (quantidade, tamanho) — juntam-se só na UI.
+function shopQtyLabel(it){const q=normalizeQty(it.quantidade),t=(it.tamanho||'').trim();return q&&t?`${q} × ${t}`:(q||t);}
 // Nomes com que reclamo artigos (próprio + cônjuge; admin sem membro → 'Admin')
 function myClaimNames(){const s=new Set(MY_NAMES);const p=myPrimaryName()||(isAdmin()?'Admin':'');if(p)s.add(p);return s;}
 function shopMine(it){return !!it.tratadoPor&&myClaimNames().has(it.tratadoPor);}
@@ -3239,7 +3238,7 @@ function aplicarStock(data){
 function shopItemCard(it,mineView,noBadge){
   const meal=shopIsMeal(it.tipo)&&it.dataValor;
   const badge=noBadge?'':(meal?`<span class="cmp-badge meal">${shopTipoIcon(it.tipo)} ${fmtDiaMes(it.dataValor)}</span>`:`<span class="cmp-badge">${shopTipoIcon(it.tipo)} ${it.tipo}</span>`);
-  const qtdTxt=normalizeQty(it.quantidade);
+  const qtdTxt=shopQtyLabel(it);
   const qtd=qtdTxt?`<span class="cmp-qtd">${escHtml(qtdTxt)}</span>`:'';
   const removed=shopIsRemoved(it);
   // Cartão de UMA linha (escala para dezenas de artigos). Editar/eliminar/largar
@@ -3307,7 +3306,7 @@ function mealShopSection(rd){
       <span class="msl-art">${stockEstadoIcon(rd.data)} ${escHtml(x.l.artigo)} <i>${escHtml(fmtQty(x.qtd,x.l.unidade))}</i></span><span class="msl-st ok">${eur(x.val)}</span></div>`).join('');
   const lineOf=(it,dim)=>{
     const done=shopIsBought(it);
-    const qtdTxt=normalizeQty(it.quantidade);
+    const qtdTxt=shopQtyLabel(it);
     const st=done?'<span class="msl-st ok">✓ comprado</span>'
       :it.tratadoPor?`<span class="msl-st">🧑‍🍳 ${escHtml(it.tratadoPor)}</span>`
       :'<span class="msl-st falta">falta quem trate</span>';
@@ -3413,7 +3412,7 @@ function renderCompras(){
 function renderRemovidos(removidos){
   if(!removidos.length)return '';
   const rows=removidos.map(it=>{
-    const qtdTxt=normalizeQty(it.quantidade);
+    const qtdTxt=shopQtyLabel(it);
     const badge=shopIsMeal(it.tipo)&&it.dataValor?`${shopTipoIcon(it.tipo)} ${fmtDiaMes(it.dataValor)}`:`${shopTipoIcon(it.tipo)} ${it.tipo}`;
     const acts=`<div class="cmp-rm-acts write-action">
       <button class="cmp-mini" onclick="restoreShopItem(${it._id})">↩︎ Repor</button>
@@ -3496,9 +3495,8 @@ function openShopItemModal(id,presetTipo,presetData){
   const canEdit=it?shopCanEditItem(it):true;   // criação = pode
   document.getElementById('shop-item-title').textContent=it?(canEdit?'Editar Artigo':'Detalhe do Artigo'):(shopCtxLock?'Adicionar Ingrediente':'Adicionar Artigo');
   document.getElementById('shop-artigo').value=it?it.artigo:'';
-  const [q0,t0]=shopSplitQty(it?it.quantidade:'');
-  document.getElementById('shop-qtd').value=q0;
-  document.getElementById('shop-tam').value=t0;
+  document.getElementById('shop-qtd').value=it?normalizeQty(it.quantidade):'';
+  document.getElementById('shop-tam').value=it?(it.tamanho||''):'';
   document.getElementById('shop-tipo').value=it?it.tipo:(presetTipo||'Gerais');
   // Contexto de refeição trancado: esconde tipo+refeições e mostra o destino fixo
   document.getElementById('shop-tipo-wrap').style.display=shopCtxLock?'none':'';
@@ -3584,7 +3582,8 @@ function shopTipoChanged(){
 async function saveShopItem(){
   if(!DATA._sbId){toast('Sem ligação — recarrega a página','bad');return;}
   const artigo=(document.getElementById('shop-artigo').value||'').trim();
-  const qtd=shopJoinQty(normalizeQty(document.getElementById('shop-qtd').value),normalizeQty(document.getElementById('shop-tam').value));
+  const qtd=normalizeQty(document.getElementById('shop-qtd').value);
+  const tam=normalizeQty(document.getElementById('shop-tam').value);
   const tipo=shopCtxLock?shopCtxLock.tipo:document.getElementById('shop-tipo').value;
   if(!artigo){toast('Indica o artigo','bad');return;}
   let dataValor=null,datasMulti=null;
@@ -3604,8 +3603,8 @@ async function saveShopItem(){
   try{
     if(editingItemId!=null){
       const it=shopArr().find(x=>x._id===editingItemId);
-      const patch={artigo,quantidade:qtd,tipo,data_valor:dataValor};
-      const local={artigo,quantidade:qtd,tipo,dataValor};
+      const patch={artigo,quantidade:qtd,tamanho:tam||null,tipo,data_valor:dataValor};
+      const local={artigo,quantidade:qtd,tamanho:tam,tipo,dataValor};
       // Admin pode reatribuir quem trata (puxar/largar por outrem)
       if(it&&isAdmin()&&document.getElementById('shop-claim-wrap').style.display!=='none'){
         const nv=document.getElementById('shop-claim').value||null;
@@ -3622,14 +3621,14 @@ async function saveShopItem(){
       // Uma refeição = um registo: marcar várias refeições cria um artigo por
       // refeição (cada uma mantém a sua lista e o custo cai no sítio certo)
       const rows=(datasMulti||[dataValor]).map(dv=>{
-        const r={evento_id:DATA._sbId,artigo,quantidade:qtd,tipo,data_valor:dv,estado:'pendente',criado_por:criadoPor};
+        const r={evento_id:DATA._sbId,artigo,quantidade:qtd,tamanho:tam||null,tipo,data_valor:dv,estado:'pendente',criado_por:criadoPor};
         if(tratoEu)r.tratado_por=criadoPor;
         return r;
       });
       const ins=await queueWrite(()=>sbReq('POST','shoplist',rows,{Prefer:'return=representation'}));
       rows.forEach((r,i)=>{
-        shopArr().push({_id:ins&&ins[i]?ins[i].id:null,artigo,quantidade:qtd,tipo,dataValor:r.data_valor,estado:'pendente',tratadoPor:tratoEu?criadoPor:null,noCarrinho:false,compraId:null,cfDesc:null,valor:null,criadoPor,criadoEm:new Date().toISOString(),compradoEm:null});
-        sbLog('compras','adicionou',artigo,{tratoEu,quantidade:qtd,tipoDesp:tipo,dataValor:r.data_valor,dia:r.data_valor?dataToDia(r.data_valor):undefined,ref:shopIsMeal(tipo)?tipo:undefined});
+        shopArr().push({_id:ins&&ins[i]?ins[i].id:null,artigo,quantidade:qtd,tamanho:tam,tipo,dataValor:r.data_valor,estado:'pendente',tratadoPor:tratoEu?criadoPor:null,noCarrinho:false,compraId:null,cfDesc:null,valor:null,criadoPor,criadoEm:new Date().toISOString(),compradoEm:null});
+        sbLog('compras','adicionou',artigo,{tratoEu,quantidade:shopQtyLabel({quantidade:qtd,tamanho:tam}),tipoDesp:tipo,dataValor:r.data_valor,dia:r.data_valor?dataToDia(r.data_valor):undefined,ref:shopIsMeal(tipo)?tipo:undefined});
       });
       toast(rows.length>1?`Artigo adicionado a ${rows.length} refeições ✓`:'Artigo adicionado ✓','ok');
     }
@@ -3674,7 +3673,7 @@ function shopSameArtigo(a,b){return shopArtKey(a)===shopArtKey(b);}
 async function claimSameElsewhere(it,nome){
   const others=shopArr().filter(x=>x._id!==it._id&&x._id!=null&&!x.tratadoPor&&shopIsPending(x)&&shopGroupKey(x)!==shopGroupKey(it)&&shopSameArtigo(x.artigo,it.artigo));
   if(!others.length)return;
-  const lst=others.map(o=>`• ${shopGroupLabel(o.tipo,o.dataValor)}${o.quantidade?' — '+normalizeQty(o.quantidade):''}`).join('\n');
+  const lst=others.map(o=>{const q=shopQtyLabel(o);return `• ${shopGroupLabel(o.tipo,o.dataValor)}${q?' — '+q:''}`;}).join('\n');
   if(!confirm(`"${it.artigo}" também está em falta em:\n\n${lst}\n\nLevas também?`))return;
   // Mesma guarda anti-corrida do claim simples: só leva os que ainda estão livres
   const ids=others.map(o=>o._id);
@@ -3754,7 +3753,7 @@ function openCompra(compraId){
     seed.filter(it=>!loteIds.has(it._id)).forEach(it=>{const k=shopGroupKey(it);(gmap[k]=gmap[k]||{tipo:it.tipo,dataValor:it.dataValor||null,items:[]}).items.push(it);});
     const ord={};SHOP_TIPOS.forEach((t,i)=>ord[t]=i);
     Object.values(gmap).sort((a,b)=>(ord[a.tipo]-ord[b.tipo])||((a.dataValor||'').localeCompare(b.dataValor||'')))
-      .forEach(g=>compraEdit.lines.push({tipo:g.tipo,dataValor:g.dataValor,valor:'',obs:g.items.map(i=>i.artigo+(i.quantidade?' ('+i.quantidade+')':'')).join(', ')}));
+      .forEach(g=>compraEdit.lines.push({tipo:g.tipo,dataValor:g.dataValor,valor:'',obs:g.items.map(i=>{const q=shopQtyLabel(i);return i.artigo+(q?' ('+q+')':'');}).join(', ')}));
   }
   if(!compraEdit.lines.length)compraEdit.lines.push({tipo:'Gerais',dataValor:null,valor:'',obs:''});
 
@@ -3782,8 +3781,9 @@ function openCompra(compraId){
     pl='<div class="cmp-pick sf">Artigos da lista</div>';
     pickItems.slice().sort((a,b)=>a.artigo.localeCompare(b.artigo,'pt')).forEach(it=>{
       const on=isEdit?it.compraId===compraId:shopMine(it);
+      const ql=shopQtyLabel(it);
       pl+=`<label class="cmp-pick-row"><input type="checkbox" class="shop-pick" value="${it._id}" ${on?'checked':''} onchange="compraRefreshLotes()">
-        <span>${escHtml(it.artigo)}${it.quantidade?' <i>('+escHtml(it.quantidade)+')</i>':''}${shopIsRemoved(it)?' ⚠️':''}</span>
+        <span>${escHtml(it.artigo)}${ql?' <i>('+escHtml(ql)+')</i>':''}${shopIsRemoved(it)?' ⚠️':''}</span>
         <span class="cmp-badge">${shopTipoIcon(it.tipo)}${shopIsMeal(it.tipo)&&it.dataValor?' '+fmtDiaMes(it.dataValor):' '+it.tipo}</span></label>`;
     });
     pl+='<div class="note" style="margin-top:6px">Os artigos marcados saem da lista e ficam ligados a esta compra.</div>';
