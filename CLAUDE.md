@@ -19,6 +19,7 @@ App pessoal de gestão de despesas das Festas (Barrete Verde e Salinas).
 ## Regras técnicas (não partir a app)
 - `app.js` carrega como `<script src>` **normal, NÃO module** — há `onclick="…"` no HTML, logo as funções têm de ser **globais**. Não converter para módulo.
 - **PWA/cache:** se mexeres em `app.js`, `style.css` ou `index.html`, **sobe `CACHE_NAME` no `sw.js`** (ex.: `app-cache-v3` → `v4`). Estes três já são *network-first* (atualizam sozinhos), mas o bump garante que ninguém fica com versão velha.
+- **Versão visível:** em cada deploy relevante sobe também o **`APP_BUILD`** no topo do `app.js` (etiqueta `vNN · data · o que mudou`, mostrada em Definições › Conta) — é assim que o utilizador confirma no telemóvel que já tem a build nova. É independente do `CACHE_NAME`.
 - **Supabase:** schema `festasbv`. A chave no topo do `app.js` é a **`anon` (pública, por design)**, protegida por RLS + login Google. **Não é bug nem risco — não a "corrijas" nem a escondas.** Acesso controlado por funções `is_allowed()`/`is_admin()` no servidor.
 
 ## Deploy
