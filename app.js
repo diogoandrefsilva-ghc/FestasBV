@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v15 · 2026-07-13 · sobras do ano anterior transitam auto p/ ano novo';
+const APP_BUILD = 'v16 · 2026-07-13 · limpeza garante trânsito das sobras do ano anterior';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -2730,16 +2730,31 @@ async function limparPresencas(){
   }
   else loadLimpeza();
 }
+/* Sobras do ano anterior → entrada de mealheiro 'sobras_ano_anterior' para o ano dado.
+   Fonte: saldo sobrante (saldoGrupo) do ano imediatamente anterior existente. Devolve null se
+   não houver ano anterior ou se o saldo não for positivo. Reutilizado por addNewYear e
+   limparCashflows (que a regenera caso já não exista). */
+function _sobrasAnoAnterior(ano,tesoureiro){
+  const prev=ALL_YEARS.filter(y=>(y.evento.ano||0)<ano).sort((a,b)=>(a.evento.ano||0)-(b.evento.ano||0)).pop();
+  if(!prev)return null;
+  const sobras=rnd(calcular(JSON.parse(JSON.stringify(prev))).saldoGrupo||0,2);
+  if(sobras<=0)return null;
+  return{quem:tesoureiro,data:ano+'-01-01',valor:sobras,subtipo:'sobras_ano_anterior',desc:'Sobras ano anterior ('+prev.evento.ano+')'};
+}
 async function limparCashflows(){
   const p=_limpezaPermitida();if(!p.ok){toast(p.motivo,'bad');return;}
   const ano=DATA.evento.ano;
   // Sobras do ano anterior são transitadas e NÃO se apagam na limpeza.
   const isSobras=m=>m&&m.subtipo==='sobras_ano_anterior';
   const mealDel=(DATA.mealheiros||[]).filter(m=>!isSobras(m));
-  const mealKeep=(DATA.mealheiros||[]).filter(isSobras);
+  let mealKeep=(DATA.mealheiros||[]).filter(isSobras);
+  // Garantir o trânsito das sobras mesmo que já não existam (ex.: apagadas por uma
+  // limpeza feita antes desta automação). Só regenera se não houver nenhuma registada.
+  const tinhaSobras=mealKeep.length>0;
+  if(!tinhaSobras){const s=_sobrasAnoAnterior(ano,DATA.evento.tesoureiro);if(s)mealKeep=[s];}
   const nDesp=(DATA.despesas||[]).length,nMeal=mealDel.length,nPag=(DATA.pagamentos||[]).length;
   if(!nDesp&&!nMeal&&!nPag){toast('Não há cash-flows para limpar em '+ano,'ok');return;}
-  const avisoSobras=mealKeep.length?('\n\n(Mantêm-se '+mealKeep.length+' sobra(s) do ano anterior — transitadas, não se apagam.)'):'';
+  const avisoSobras=mealKeep.length?('\n\n('+(tinhaSobras?'Mantêm-se':'Transitam-se')+' '+mealKeep.length+' sobra(s) do ano anterior — não se apagam.)'):'';
   if(!confirm('LIMPAR CASH-FLOWS — '+ano+'\n\nVai apagar:\n· '+nDesp+' despesa(s)\n· '+nMeal+' mealheiro(s)\n· '+nPag+' pagamento(s)/reembolso(s)'+avisoSobras+'\n\nSó afeta o ano '+ano+'. Esta ação NÃO pode ser desfeita.\n\nConfirmar?'))return;
   // Repor na lista os artigos que estavam "comprados" (as despesas vão desaparecer;
   // sem isto ficariam órfãos). A rede de segurança no cliente já os mostraria como
@@ -2846,15 +2861,9 @@ async function addNewYear(){
   const membros=NY_MEMBROS.map(m=>({nome:m.nome,fator:m.fator,presencas:[],sexo:m.sexo||'M'}));
 
   // Sobras do ano anterior → entram automaticamente como mealheiro (sobras_ano_anterior).
-  // Fonte: saldo sobrante (saldoGrupo) do ano imediatamente anterior existente. Só se > 0.
   const mealheiros=[];
-  const prevYears=ALL_YEARS.filter(y=>(y.evento.ano||0)<yearVal);
-  const prevYear=prevYears.length?prevYears.reduce((a,b)=>((b.evento.ano||0)>(a.evento.ano||0)?b:a)):null;
-  if(prevYear){
-    const prevCalc=calcular(JSON.parse(JSON.stringify(prevYear)));
-    const sobras=rnd(prevCalc.saldoGrupo||0,2);
-    if(sobras>0)mealheiros.push({quem:tesVal,data:yearVal+'-01-01',valor:sobras,subtipo:'sobras_ano_anterior',desc:'Sobras ano anterior ('+prevYear.evento.ano+')'});
-  }
+  const sobra=_sobrasAnoAnterior(yearVal,tesVal);
+  if(sobra)mealheiros.push(sobra);
 
   const newYear={
     evento:{nome:'MEO '+yearVal,ano:yearVal,tesoureiro:tesVal,arredondaTotal:false,missaoPoupanca:0,fundoReserva:0,fatorModo:'fixo',fatorThreshold:FATOR_THRESHOLD_DEFAULT},
