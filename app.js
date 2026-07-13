@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v13 · 2026-07-13 · detalhe por artigo + consumido por refeição';
+const APP_BUILD = 'v14 · 2026-07-13 · limpeza: limpar listas de compras';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -2704,7 +2704,7 @@ function loadLimpeza(){
   if(!DATA)return;
   const yEl=document.getElementById('adm-limpeza-year');if(yEl)yEl.textContent=DATA.evento.ano||'';
   const p=_limpezaPermitida();
-  ['btn-limpar-presencas','btn-limpar-cashflows'].forEach(id=>{
+  ['btn-limpar-presencas','btn-limpar-cashflows','btn-limpar-compras'].forEach(id=>{
     const b=document.getElementById(id);if(!b)return;
     b.disabled=!p.ok;b.style.opacity=p.ok?'':'.4';b.style.cursor=p.ok?'pointer':'not-allowed';
   });
@@ -2750,6 +2750,25 @@ async function limparCashflows(){
   const ok=await pushToGitHub('Limpar cash-flows '+ano);
   if(ok){CALC=calcular(JSON.parse(JSON.stringify(DATA)));renderAll();loadLimpeza();toast('Cash-flows de '+ano+' limpos ✓','ok');}
   else loadLimpeza();
+}
+async function limparCompras(){
+  const p=_limpezaPermitida();if(!p.ok){toast(p.motivo,'bad');return;}
+  const ano=DATA.evento.ano;
+  const items=(DATA.shoplist||[]);
+  const n=items.length;
+  if(!n){toast('Não há artigos na lista de compras para limpar em '+ano,'ok');return;}
+  const nComp=items.filter(x=>x.estado==='comprado').length;
+  // shoplist vive só no Supabase (não vai no JSON do GitHub) — apaga por evento.
+  // Artigos já comprados têm despesas associadas que se mantêm: essas limpam-se
+  // em "Limpar cash-flows". Aqui só se esvazia a lista de compras.
+  const aviso=nComp?('\n· '+nComp+' já comprado(s) — as despesas associadas mantêm-se (usa "Limpar cash-flows" para essas).'):'';
+  if(!confirm('LIMPAR LISTAS DE COMPRAS — '+ano+'\n\nVai apagar '+n+' artigo(s) da lista de compras.'+aviso+'\n\nSó afeta o ano '+ano+'. Esta ação NÃO pode ser desfeita.\n\nConfirmar?'))return;
+  setSync('load','a guardar…');
+  try{
+    await queueWrite(()=>sbReq('DELETE',`shoplist?evento_id=eq.${DATA._sbId}`));
+    DATA.shoplist=[];syncMirror();marcaGuardado();renderAll();loadLimpeza();
+    toast('Lista de compras de '+ano+' limpa ✓','ok');
+  }catch(e){setSync('err','erro ao guardar');toast(permErrorMsg(e),'bad');loadLimpeza();}
 }
 
 /* ── Add New Year ── */
