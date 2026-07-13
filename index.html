@@ -228,6 +228,26 @@ setTimeout(function(){ if (window.fbvEsconderSplash) window.fbvEsconderSplash();
   </div>
 </div>
 
+<!-- Detalhe / alocação de um lote de stock (artigos comprados p/ várias refeições) -->
+<div class="modal-bg" id="lote-bg">
+  <div class="modal" id="lote-modal">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <h3 style="margin-bottom:0" id="lote-title">Lote</h3>
+      <button onclick="closeLoteModal()" style="background:var(--panel2);border:1px solid var(--line);color:var(--muted);border-radius:9px;width:32px;height:32px;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0">✕</button>
+    </div>
+    <div class="note" id="lote-info" style="margin-top:0"></div>
+    <div id="lote-alocs"></div>
+    <button class="btn ghost write-action" id="lote-addline" style="width:100%;margin-top:8px" onclick="loteAddAloc()">＋ Alocar a refeição</button>
+    <div class="note" id="lote-resto" style="margin-top:10px"></div>
+    <div class="mbtns">
+      <button class="btn ghost" onclick="closeLoteModal()">Fechar</button>
+      <button class="btn ghost write-action" id="lote-fifo" onclick="loteFifo()" title="Repor a alocação automática">↺ FIFO</button>
+      <button class="btn prim write-action" id="lote-save" onclick="saveLote()">Guardar</button>
+    </div>
+    <div class="note">🧺 reservado (refeição ainda não passou) · ✅ consumido. O que não estiver alocado fica na bolsa comum, repartida pelos pesos.</div>
+  </div>
+</div>
+
 <!-- Validação de Contas modal -->
 <div class="modal-bg" id="val-bg">
   <div class="modal" id="val-modal">
