@@ -404,7 +404,7 @@ setTimeout(function(){ if (window.fbvEsconderSplash) window.fbvEsconderSplash();
     <div class="settings-block admin-only">
       <div class="settings-block-hdr" onclick="toggleSettingsBlock(this)">
         <span class="sb-icon">🧹</span>
-        <span class="sb-title sf">Limpeza <span id="adm-limpeza-year" style="color:var(--ink)"></span></span>
+        <span class="sb-title sf">Reset <span id="adm-limpeza-year" style="color:var(--ink)"></span></span>
         <span class="sb-arrow sf">▼</span>
       </div>
       <div class="settings-block-body">
@@ -413,11 +413,11 @@ setTimeout(function(){ if (window.fbvEsconderSplash) window.fbvEsconderSplash();
         </div>
         <div id="adm-limpeza-aviso" style="display:none;font-size:12px;color:var(--muted);background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 12px;margin-bottom:10px"></div>
         <div style="display:flex;flex-direction:column;gap:8px">
-          <button class="btn danger sf" id="btn-limpar-presencas" onclick="limparPresencas()" style="width:100%">🗑 Limpar presenças</button>
+          <button class="btn danger sf" id="btn-limpar-presencas" onclick="limparPresencas()" style="width:100%">🗑 Reset presenças</button>
           <p class="sf" style="font-size:11px;color:var(--faint);margin:-2px 0 4px">Apaga presenças e convidados deste ano. Mantém membros, fator e sexo.</p>
-          <button class="btn danger sf" id="btn-limpar-cashflows" onclick="limparCashflows()" style="width:100%">🗑 Limpar cash-flows</button>
-          <p class="sf" style="font-size:11px;color:var(--faint);margin:-2px 0 4px">Apaga despesas, mealheiros, reembolsos e pagamentos de dívida deste ano. Mantém as sobras do ano anterior (transitadas).</p>
-          <button class="btn danger sf" id="btn-limpar-compras" onclick="limparCompras()" style="width:100%">🗑 Limpar listas de compras</button>
+          <button class="btn danger sf" id="btn-limpar-cashflows" onclick="limparCashflows()" style="width:100%">🗑 Reset cash-flows</button>
+          <p class="sf" style="font-size:11px;color:var(--faint);margin:-2px 0 4px">Apaga despesas, mealheiros, reembolsos e pagamentos de dívida deste ano. Garante sempre a entrada de sobras do ano anterior (transitadas, nunca se apagam).</p>
+          <button class="btn danger sf" id="btn-limpar-compras" onclick="limparCompras()" style="width:100%">🗑 Reset listas de compras</button>
           <p class="sf" style="font-size:11px;color:var(--faint);margin:-2px 0 0">Esvazia a lista de compras deste ano. As despesas de artigos já comprados mantêm-se.</p>
         </div>
       </div>

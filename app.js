@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v16 · 2026-07-13 · limpeza garante trânsito das sobras do ano anterior';
+const APP_BUILD = 'v17 · 2026-07-13 · reset valida sempre sobras do ano anterior · botões "Reset"';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -2691,12 +2691,12 @@ async function saveParams(){
 function _hojeISO(){const d=new Date();const z=n=>String(n).padStart(2,'0');return d.getFullYear()+'-'+z(d.getMonth()+1)+'-'+z(d.getDate());}
 function _limpezaPermitida(){
   if(!DATA||!DATA.evento)return{ok:false,motivo:'Sem dados carregados.'};
-  if(!isAdmin())return{ok:false,motivo:'Apenas o tesoureiro/admin pode limpar.'};
+  if(!isAdmin())return{ok:false,motivo:'Apenas o tesoureiro/admin pode fazer reset.'};
   if(DATA.evento.contasFechadas)return{ok:false,motivo:'As contas deste ano estão fechadas.'};
   const datas=(DATA.refeicoesDef||[]).map(r=>r.data).filter(Boolean).sort();
   if(datas.length){
     const first=datas[0];
-    if(_hojeISO()>first)return{ok:false,motivo:'Já passou a 1ª refeição ('+first+') — limpeza bloqueada.'};
+    if(_hojeISO()>first)return{ok:false,motivo:'Já passou a 1ª refeição ('+first+') — reset bloqueado.'};
   }
   return{ok:true,motivo:''};
 }
@@ -2719,14 +2719,14 @@ async function limparPresencas(){
   // contar linhas de histórico do ano (para o aviso e para saber se há algo a limpar)
   let nHist=0;
   try{const hr=await sbReq('GET',`historico?evento_id=eq.${DATA._sbId}&select=ts`);nHist=Array.isArray(hr)?hr.length:0;}catch(_){}
-  if(!nPres&&!nConv&&!nHist){toast('Não há presenças, convidados nem histórico para limpar em '+ano,'ok');return;}
-  if(!confirm('LIMPAR PRESENÇAS — '+ano+'\n\nVai apagar '+nPres+' presença(s), '+nConv+' convidado(s) e '+nHist+' registo(s) de histórico.\nMembros, fator e sexo mantêm-se.\n\nSó afeta o ano '+ano+'. Esta ação NÃO pode ser desfeita.\n\nConfirmar?'))return;
+  if(!nPres&&!nConv&&!nHist){toast('Não há presenças, convidados nem histórico para reset em '+ano,'ok');return;}
+  if(!confirm('RESET PRESENÇAS — '+ano+'\n\nVai apagar '+nPres+' presença(s), '+nConv+' convidado(s) e '+nHist+' registo(s) de histórico.\nMembros, fator e sexo mantêm-se.\n\nSó afeta o ano '+ano+'. Esta ação NÃO pode ser desfeita.\n\nConfirmar?'))return;
   (DATA.membros||[]).forEach(m=>{m.presencas=[];});
   DATA.convidados=[];
-  const ok=await pushToGitHub('Limpar presenças e convidados '+ano);
+  const ok=await pushToGitHub('Reset presenças e convidados '+ano);
   if(ok){
     try{await sbReq('DELETE',`historico?evento_id=eq.${DATA._sbId}`);}catch(_){}   // limpa também o histórico do ano
-    CALC=calcular(JSON.parse(JSON.stringify(DATA)));renderAll();loadLimpeza();toast('Presenças e histórico de '+ano+' limpos ✓','ok');
+    CALC=calcular(JSON.parse(JSON.stringify(DATA)));renderAll();loadLimpeza();toast('Presenças e histórico de '+ano+' repostos ✓','ok');
   }
   else loadLimpeza();
 }
@@ -2744,18 +2744,31 @@ function _sobrasAnoAnterior(ano,tesoureiro){
 async function limparCashflows(){
   const p=_limpezaPermitida();if(!p.ok){toast(p.motivo,'bad');return;}
   const ano=DATA.evento.ano;
-  // Sobras do ano anterior são transitadas e NÃO se apagam na limpeza.
+  // Sobras do ano anterior são transitadas e NÃO se apagam no reset.
   const isSobras=m=>m&&m.subtipo==='sobras_ano_anterior';
   const mealDel=(DATA.mealheiros||[]).filter(m=>!isSobras(m));
   let mealKeep=(DATA.mealheiros||[]).filter(isSobras);
-  // Garantir o trânsito das sobras mesmo que já não existam (ex.: apagadas por uma
-  // limpeza feita antes desta automação). Só regenera se não houver nenhuma registada.
+  // Validar sempre o trânsito das sobras do ano anterior. Se não houver nenhuma registada
+  // (ex.: apagada por um reset feito antes desta automação), regenera-a do saldo do ano anterior.
   const tinhaSobras=mealKeep.length>0;
   if(!tinhaSobras){const s=_sobrasAnoAnterior(ano,DATA.evento.tesoureiro);if(s)mealKeep=[s];}
+  const regenerou=!tinhaSobras&&mealKeep.length>0;
   const nDesp=(DATA.despesas||[]).length,nMeal=mealDel.length,nPag=(DATA.pagamentos||[]).length;
-  if(!nDesp&&!nMeal&&!nPag){toast('Não há cash-flows para limpar em '+ano,'ok');return;}
+  const temParaLimpar=nDesp||nMeal||nPag;
+
+  // Sem cash-flows para apagar: mesmo assim garante-se a entrada de sobras do ano anterior.
+  if(!temParaLimpar){
+    if(!regenerou){toast('Não há cash-flows para reset em '+ano,'ok');return;}
+    if(!confirm('SOBRAS DO ANO ANTERIOR — '+ano+'\n\nNão há cash-flows para reset, mas falta a entrada de sobras do ano anterior ('+eur(mealKeep[0].valor)+'). Repor?'))return;
+    DATA.mealheiros=mealKeep;
+    const okS=await pushToGitHub('Repor sobras do ano anterior '+ano);
+    if(okS){CALC=calcular(JSON.parse(JSON.stringify(DATA)));renderAll();loadLimpeza();toast('Sobras do ano anterior repostas ✓','ok');}
+    else loadLimpeza();
+    return;
+  }
+
   const avisoSobras=mealKeep.length?('\n\n('+(tinhaSobras?'Mantêm-se':'Transitam-se')+' '+mealKeep.length+' sobra(s) do ano anterior — não se apagam.)'):'';
-  if(!confirm('LIMPAR CASH-FLOWS — '+ano+'\n\nVai apagar:\n· '+nDesp+' despesa(s)\n· '+nMeal+' mealheiro(s)\n· '+nPag+' pagamento(s)/reembolso(s)'+avisoSobras+'\n\nSó afeta o ano '+ano+'. Esta ação NÃO pode ser desfeita.\n\nConfirmar?'))return;
+  if(!confirm('RESET CASH-FLOWS — '+ano+'\n\nVai apagar:\n· '+nDesp+' despesa(s)\n· '+nMeal+' mealheiro(s)\n· '+nPag+' pagamento(s)/reembolso(s)'+avisoSobras+'\n\nSó afeta o ano '+ano+'. Esta ação NÃO pode ser desfeita.\n\nConfirmar?'))return;
   // Repor na lista os artigos que estavam "comprados" (as despesas vão desaparecer;
   // sem isto ficariam órfãos). A rede de segurança no cliente já os mostraria como
   // pendentes, mas aqui limpa-se também o estado na BD.
@@ -2767,8 +2780,8 @@ async function limparCashflows(){
     }catch(e){toast('Aviso: artigos da lista não repostos — '+e.message,'bad');}
   }
   DATA.despesas=[];DATA.mealheiros=mealKeep;DATA.pagamentos=[];
-  const ok=await pushToGitHub('Limpar cash-flows '+ano);
-  if(ok){CALC=calcular(JSON.parse(JSON.stringify(DATA)));renderAll();loadLimpeza();toast('Cash-flows de '+ano+' limpos ✓','ok');}
+  const ok=await pushToGitHub('Reset cash-flows '+ano);
+  if(ok){CALC=calcular(JSON.parse(JSON.stringify(DATA)));renderAll();loadLimpeza();toast('Cash-flows de '+ano+' repostos ✓','ok');}
   else loadLimpeza();
 }
 async function limparCompras(){
@@ -2776,18 +2789,18 @@ async function limparCompras(){
   const ano=DATA.evento.ano;
   const items=(DATA.shoplist||[]);
   const n=items.length;
-  if(!n){toast('Não há artigos na lista de compras para limpar em '+ano,'ok');return;}
+  if(!n){toast('Não há artigos na lista de compras para reset em '+ano,'ok');return;}
   const nComp=items.filter(x=>x.estado==='comprado').length;
   // shoplist vive só no Supabase (não vai no JSON do GitHub) — apaga por evento.
   // Artigos já comprados têm despesas associadas que se mantêm: essas limpam-se
-  // em "Limpar cash-flows". Aqui só se esvazia a lista de compras.
-  const aviso=nComp?('\n· '+nComp+' já comprado(s) — as despesas associadas mantêm-se (usa "Limpar cash-flows" para essas).'):'';
-  if(!confirm('LIMPAR LISTAS DE COMPRAS — '+ano+'\n\nVai apagar '+n+' artigo(s) da lista de compras.'+aviso+'\n\nSó afeta o ano '+ano+'. Esta ação NÃO pode ser desfeita.\n\nConfirmar?'))return;
+  // em "Reset cash-flows". Aqui só se esvazia a lista de compras.
+  const aviso=nComp?('\n· '+nComp+' já comprado(s) — as despesas associadas mantêm-se (usa "Reset cash-flows" para essas).'):'';
+  if(!confirm('RESET LISTAS DE COMPRAS — '+ano+'\n\nVai apagar '+n+' artigo(s) da lista de compras.'+aviso+'\n\nSó afeta o ano '+ano+'. Esta ação NÃO pode ser desfeita.\n\nConfirmar?'))return;
   setSync('load','a guardar…');
   try{
     await queueWrite(()=>sbReq('DELETE',`shoplist?evento_id=eq.${DATA._sbId}`));
     DATA.shoplist=[];syncMirror();marcaGuardado();renderAll();loadLimpeza();
-    toast('Lista de compras de '+ano+' limpa ✓','ok');
+    toast('Lista de compras de '+ano+' reposta ✓','ok');
   }catch(e){setSync('err','erro ao guardar');toast(permErrorMsg(e),'bad');loadLimpeza();}
 }
 
@@ -3015,7 +3028,7 @@ async function toggleSexo(idx){
 const SHOP_TIPOS=['Gerais','Bebidas','Almoço','Jantar','Renda','Cerveja'];
 function shopArr(){if(DATA&&!DATA.shoplist)DATA.shoplist=[];return (DATA&&DATA.shoplist)||[];}
 // Um artigo só está mesmo "comprado" se ainda existir alguma despesa com o seu
-// compra_id. Se as despesas foram apagadas por outra via (ex.: Limpar cash-flows),
+// compra_id. Se as despesas foram apagadas por outra via (ex.: Reset cash-flows),
 // o artigo é tratado como pendente — nunca fica órfão/invisível na lista.
 function shopBacked(it){return !!it.compraId&&(DATA.despesas||[]).some(d=>d.compraId===it.compraId);}
 // 'removido' = soft-delete: sai da lista ativa mas fica no histórico (e visível,
