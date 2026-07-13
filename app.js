@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v22 · 2026-07-14 · "Só totais": repartição gerada de TODOS os artigos marcados, atualiza ao marcar';
+const APP_BUILD = 'v23 · 2026-07-13 · 📷 Importar fatura no Registar Compra (pré-preenche artigos via foto)';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -3777,6 +3777,9 @@ function openCompra(compraId){
   const desc0=isEdit?((DATA.despesas.find(d=>d.compraId===compraId&&d.desc&&d.desc!=='Compras')||{}).desc||''):'';
   document.getElementById('shop-buy-desc').value=desc0;
   shopBuyDescCount();
+  // Importar fatura: só em compras novas (na edição não há pré-preenchimento)
+  const ocr=document.getElementById('shop-buy-ocr');
+  if(ocr)ocr.style.display=isEdit?'none':'';
 
   // Picker de artigos (pendentes + removidos que eu ainda reclamo)
   const pend=shopArr().filter(x=>shopIsPending(x)||(shopIsRemoved(x)&&shopMine(x)));
@@ -3960,6 +3963,101 @@ function compraAddLote(){
   compraRenderLotes();
 }
 function compraDelLote(i){const l=compraEdit.lotes[i];if(!l||!l.free)return;compraEdit.lotes.splice(i,1);compraRenderLotes();}
+
+/* ═══ IMPORTAR FATURA (foto → Gemini via Edge Function fatura-ocr) ═══
+   Só em compras NOVAS: tira-se/escolhe-se a foto do talão, a Edge Function
+   devolve {loja, data, total, linhas:[{artigo,qtd,preco}]} e a app pré-preenche
+   o modo "preço por artigo" — matching difuso com os artigos marcados; linhas
+   sem correspondência entram como artigos fora da lista. O utilizador revê
+   sempre antes de registar. */
+function faturaPick(){const i=document.getElementById('fatura-file');if(i)i.click();}
+async function faturaChosen(inp){
+  const f=inp.files&&inp.files[0];inp.value='';
+  if(!f)return;
+  const btn=document.getElementById('shop-buy-ocr-btn');
+  const label=btn.textContent;
+  btn.disabled=true;btn.textContent='⏳ A ler a fatura…';
+  try{
+    const {b64,mime}=await faturaComprime(f);
+    const r=await sbFetch(`${SB_URL}/functions/v1/fatura-ocr`,{
+      method:'POST',
+      headers:{'Content-Type':'application/json','apikey':SB_KEY},
+      body:JSON.stringify({image:b64,mime})
+    });
+    if(!r.ok){const e=await r.json().catch(()=>({}));throw new Error(e.error||('HTTP '+r.status));}
+    faturaAplicar(await r.json());
+  }catch(e){
+    toast('Não consegui ler a fatura: '+(e.message||e),'bad');
+  }finally{
+    btn.disabled=false;btn.textContent=label;
+  }
+}
+// Reduz a foto (máx 1600px no lado maior, JPEG q0.85): chega de sobra para o
+// modelo ler o talão e mantém o upload leve mesmo em rede móvel
+function faturaComprime(file){
+  return new Promise((resolve,reject)=>{
+    const img=new Image();
+    img.onload=()=>{
+      const MAX=1600;
+      const s=Math.min(1,MAX/Math.max(img.naturalWidth,img.naturalHeight));
+      const w=Math.round(img.naturalWidth*s),h=Math.round(img.naturalHeight*s);
+      const cv=document.createElement('canvas');cv.width=w;cv.height=h;
+      cv.getContext('2d').drawImage(img,0,0,w,h);
+      URL.revokeObjectURL(img.src);
+      const dataUrl=cv.toDataURL('image/jpeg',0.85);
+      resolve({b64:dataUrl.split(',')[1],mime:'image/jpeg'});
+    };
+    img.onerror=()=>{URL.revokeObjectURL(img.src);reject(new Error('imagem inválida'));};
+    img.src=URL.createObjectURL(file);
+  });
+}
+// Tokens do nome do artigo (sem acentos, minúsculas, mín. 3 letras)
+function faturaTokens(s){return shopArtKey(s).replace(/[^a-z0-9\s]/g,' ').split(/\s+/).filter(t=>t.length>=3);}
+// Score 0..1 — fração dos tokens do artigo da lista presentes na linha do talão
+// (match por prefixo nos dois sentidos: "batata" encontra "batatas" e vice-versa)
+function faturaScore(artLista,artTalao){
+  const a=faturaTokens(artLista),b=faturaTokens(artTalao);
+  if(!a.length||!b.length)return 0;
+  let hit=0;
+  a.forEach(t=>{if(b.some(x=>x.startsWith(t)||t.startsWith(x)))hit++;});
+  return hit/a.length;
+}
+function faturaAplicar(d){
+  if(!d||!Array.isArray(d.linhas)||!d.linhas.length){toast('Não encontrei artigos legíveis na fatura','bad');return;}
+  // O pré-preenchimento é por artigo → garante o modo "preço por artigo"
+  if(!compraEdit.det)compraSetMode(true);
+  // Cabeçalho: só preenche o que está vazio (não pisa o que o utilizador escreveu)
+  const desc=document.getElementById('shop-buy-desc');
+  if(desc&&!desc.value.trim()&&d.loja){desc.value=String(d.loja).slice(0,30);shopBuyDescCount();}
+  const date=document.getElementById('shop-buy-date');
+  if(date&&typeof d.data==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(d.data))date.value=d.data;
+  // Matching guloso por melhor score: cada linha do talão serve no máximo um artigo
+  const linhas=d.linhas.filter(l=>l&&l.artigo&&typeof l.preco==='number'&&l.preco>=0);
+  const lotes=compraEdit.lotes||[];
+  const pares=[];
+  lotes.forEach((l,i)=>{if(l.free)return;linhas.forEach((ln,j)=>{const s=faturaScore(l.artigo,ln.artigo);if(s>=0.5)pares.push({i,j,s});});});
+  pares.sort((a,b)=>b.s-a.s);
+  const loteUsado=new Set(),linhaUsada=new Set();
+  let preenchidos=0;
+  pares.forEach(p=>{
+    if(loteUsado.has(p.i)||linhaUsada.has(p.j))return;
+    loteUsado.add(p.i);linhaUsada.add(p.j);
+    const l=lotes[p.i],ln=linhas[p.j];
+    if(l.valor===''||l.valor==null)l.valor=rnd(ln.preco,2);
+    if(!l.qtd&&ln.qtd)l.qtd=normalizeQty(String(ln.qtd));
+    preenchidos++;
+  });
+  // Linhas sem correspondência → artigos fora da lista (o utilizador apaga o que não interessar)
+  let avulsos=0;
+  linhas.forEach((ln,j)=>{
+    if(linhaUsada.has(j))return;
+    lotes.push({free:true,artigo:String(ln.artigo).slice(0,60),qtd:ln.qtd?normalizeQty(String(ln.qtd)):'',valor:rnd(ln.preco,2),destino:'Gerais',keys:[]});
+    avulsos++;
+  });
+  compraEdit.lotes=lotes;
+  compraRenderLotes();
+  toast(`Fatura lida: ${preenchidos} da lista preenchido(s)${avulsos?`, ${avulsos} extra(s) — revê antes de registar`:' — revê antes de registar'}`,'ok');
+}
 
 async function saveCompra(){
   if(!DATA._sbId){toast('Sem ligação — recarrega a página','bad');return;}
