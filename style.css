@@ -695,6 +695,10 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 /* Dentro do modal, .modal label ganharia às .cmp-pick-row (uppercase, faint,
    margens grandes) — repõe-se o aspeto de linha de lista, num painel arredondado */
 .modal label.cmp-pick-row{display:flex;margin:0;padding:12px 2px;font-size:14px;font-weight:600;letter-spacing:0;text-transform:none;color:var(--ink)}
+/* Itemização: os <label> .fld e .lote-sug não devem herdar o aspeto de rótulo
+   do modal (maiúsculas, margens grandes) — só o micro-rótulo .fld>span é caps */
+.modal label.fld{display:flex;flex-direction:column;gap:5px;margin:0;font-weight:400;letter-spacing:0;text-transform:none;color:var(--ink)}
+.modal label.lote-sug{margin:0;font-weight:400;letter-spacing:0;text-transform:none;color:var(--ink)}
 /* Picker do Registar Compra: mais compacto (a lista pode ter dezenas de artigos) */
 #shop-buy-body .cmp-pick-row{padding:6px 2px;gap:8px}
 #shop-buy-body .cmp-pick-row .cmp-badge{font-size:10.5px;padding:2px 6px}
@@ -791,15 +795,50 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .lote-st{flex:0 0 auto;font-size:14px}
 .lote-val{flex:0 0 auto;font-size:12px;font-weight:700;color:var(--muted);font-variant-numeric:tabular-nums;min-width:52px;text-align:right}
 
-/* Destino / split por item no registo da compra (itemização da fatura) */
-.cmp-dest-row{display:flex;align-items:center;gap:7px;margin-top:6px}
-.cmp-dest-row select{flex:1;min-width:0;margin:0}
-.cmp-split-btn,.cmp-split-add{flex:0 0 auto}
-.cmp-split{margin-top:6px;padding:8px;border:1px dashed var(--line);border-radius:10px;background:var(--panel2)}
-.cmp-split-row{display:flex;align-items:center;gap:7px;margin-bottom:6px}
-.cmp-split-row select{flex:1;min-width:0;margin:0}
-.cmp-split-qtd{flex:0 0 68px;margin:0;text-align:right}
-.cmp-split-note{font-size:11px;color:var(--muted);margin-top:2px}
+/* ── Itemização da fatura: cartão por artigo (registo da compra) ── */
+.lote-card{background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:11px 12px 12px;margin-bottom:9px;box-shadow:0 1px 3px rgba(80,55,20,.05)}
+.lote-card.is-miss{border-color:rgba(168,123,20,.55);background:linear-gradient(0deg,rgba(168,123,20,.07),rgba(168,123,20,.07)),var(--panel)}
+.lote-card.is-warn{border-color:rgba(168,123,20,.42)}
+.lote-card.is-ok{border-color:rgba(30,122,77,.32)}
+.lote-head{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.lote-name{flex:1;min-width:0;font-size:14.5px;font-weight:700;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lote-name-in{flex:1;min-width:0;margin:0;font-size:14px;font-weight:600}
+.lote-tag{flex:0 0 auto;font-size:10.5px;font-weight:700;letter-spacing:.01em;border-radius:20px;padding:3px 9px;white-space:nowrap}
+.lote-tag.ok{background:rgba(30,122,77,.13);color:var(--green)}
+.lote-tag.miss,.lote-tag.warn{background:rgba(168,123,20,.17);color:var(--gold)}
+.lote-x{background:transparent;border:none;color:var(--faint);font-size:15px;cursor:pointer;padding:3px 5px;line-height:1;border-radius:6px;flex:0 0 auto}
+.lote-x:active{color:var(--red);background:rgba(179,64,47,.1)}
+.lote-fields{display:flex;gap:10px}
+.fld{display:flex;flex-direction:column;gap:5px;margin:0}
+.fld>span{font-size:9.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--faint)}
+.fld-qty{flex:0 0 36%}
+.fld-price{flex:1}
+.fld input{margin:0;width:100%}
+.price-in{position:relative;display:flex}
+.price-in input{width:100%;padding-right:26px;text-align:right}
+.price-in i{position:absolute;right:11px;top:50%;transform:translateY(-50%);font-style:normal;font-size:14px;color:var(--muted);font-weight:600;pointer-events:none}
+.lote-dest{display:flex;align-items:center;gap:8px;margin-top:10px}
+.lote-dest select{flex:1;min-width:0;margin:0}
+.lote-split-btn{flex:0 0 auto;background:transparent;border:none;color:var(--green);font-size:12px;font-weight:700;cursor:pointer;padding:6px 2px;white-space:nowrap}
+.lote-splits{margin-top:10px;padding:10px;border:1px dashed var(--line);border-radius:11px;background:var(--panel2)}
+.split-row{display:flex;align-items:center;gap:7px;margin-bottom:7px}
+.split-row select{flex:1;min-width:0;margin:0}
+.split-qty{flex:0 0 62px;margin:0;text-align:right}
+.split-add{margin-top:1px}
+.split-note{font-size:11px;color:var(--muted);margin-top:5px;line-height:1.35}
+.lote-sug{display:flex;align-items:center;gap:11px;margin-top:10px;padding:9px 11px;background:rgba(46,111,168,.07);border:1px solid rgba(46,111,168,.25);border-radius:11px;cursor:pointer}
+.lote-sug.alt{background:rgba(168,123,20,.07);border-color:rgba(168,123,20,.25)}
+.lote-sug input{width:19px!important;height:19px;flex:0 0 auto;margin:0;padding:0;-webkit-appearance:checkbox;appearance:checkbox;accent-color:var(--barrete)}
+.sug-txt{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+.sug-txt b{font-size:11px;font-weight:700;color:var(--blue)}
+.lote-sug.alt .sug-txt b{color:var(--gold)}
+.sug-txt span{font-size:12.5px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sug-price{flex:0 0 auto;font-size:13px;font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums}
+/* Aviso: artigos do carrinho não vistos na fatura (ficam por tratar) */
+.lote-miss-warn{margin-top:12px;padding:11px 12px;background:rgba(168,123,20,.1);border:1px solid rgba(168,123,20,.4);border-radius:11px;font-size:12.5px;color:var(--ink);line-height:1.45}
+.lote-miss-warn b{color:var(--gold)}
+.lote-miss-warn ul{margin:6px 0 0;padding-left:18px}
+.lote-miss-warn li{margin:2px 0}
 
 /* Separador Stock — cartões por artigo */
 .stk-card{background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:12px 13px;margin-bottom:10px}

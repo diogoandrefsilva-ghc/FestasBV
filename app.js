@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v30 · 2026-07-14 · Stock unificado: itemização por linha da fatura (destino + split), fatura nas despesas de cash-flow, e novo separador Stock p/ mover artigos entre refeições/tipos';
+const APP_BUILD = 'v31 · 2026-07-14 · Itemização da fatura: cartões redesenhados + aviso claro de artigos do carrinho não detetados (ficam por tratar, não comprados)';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -4049,41 +4049,47 @@ function compraSplitNote(l){
   return 'Repartido a 100%.';
 }
 function compraLoteHtml(l,i){
-  const artCell=l.free
-    ?`<input class="cmp-lote-art-in" type="text" maxlength="60" placeholder="Artigo" value="${escHtml(l.artigo||'')}" oninput="compraEdit.lotes[${i}].artigo=this.value">`
-    :`<span class="cmp-lote-art">${l.tipoFix?shopTipoIcon(l.tipoFix)+' ':''}${escHtml(l.artigo)}${l._fat==='ok'?' <span title="Encontrado na fatura" style="color:#3a8f4a">✓</span>':l._fat==='miss'?' <span title="Não encontrado na fatura — confirma o preço à mão">⚠️</span>':l._fat==='warn'?' <span title="Quantidades diferentes do pedido — confere">⚠️</span>':''}</span>`;
-  const row1=`<div class="cmp-ln-row1">
-      ${artCell}
-      <input class="cmp-lote-qtd" type="text" placeholder="Qtd" value="${escHtml(l.qtd||'')}" oninput="compraEdit.lotes[${i}].qtd=this.value" onblur="this.value=normalizeQty(this.value);compraEdit.lotes[${i}].qtd=this.value;compraSplitNoteUpd(${i})">
-      <div class="cmp-ln-val"><span>€</span><input type="number" step="0.01" min="0" inputmode="decimal" placeholder="0,00" value="${l.valor===''||l.valor==null?'':l.valor}" oninput="compraEdit.lotes[${i}].valor=this.value;compraUpdateTotal()"></div>
-      ${l.free?`<button class="cmp-ln-del" title="Remover" onclick="compraDelLote(${i})">✕</button>`:''}
+  // Estado do matching com a fatura (só nos artigos do carrinho)
+  const tag=l._fat==='ok'?`<span class="lote-tag ok">✓ na fatura</span>`
+    :l._fat==='miss'?`<span class="lote-tag miss">⚠ não encontrado</span>`
+    :l._fat==='warn'?`<span class="lote-tag warn">⚠ qtd difere</span>`:'';
+  const name=l.free
+    ?`<input class="lote-name-in" type="text" maxlength="60" placeholder="Nome do artigo" value="${escHtml(l.artigo||'')}" oninput="compraEdit.lotes[${i}].artigo=this.value">`
+    :`<span class="lote-name">${l.tipoFix?shopTipoIcon(l.tipoFix)+' ':''}${escHtml(l.artigo)}</span>`;
+  const head=`<div class="lote-head">${name}${tag}${l.free?`<button class="lote-x" title="Remover" onclick="compraDelLote(${i})">✕</button>`:''}</div>`;
+  const fields=`<div class="lote-fields">
+      <label class="fld fld-qty"><span>Qtd</span>
+        <input type="text" placeholder="—" value="${escHtml(l.qtd||'')}" oninput="compraEdit.lotes[${i}].qtd=this.value" onblur="this.value=normalizeQty(this.value);compraEdit.lotes[${i}].qtd=this.value;compraSplitNoteUpd(${i})"></label>
+      <label class="fld fld-price"><span>Preço</span>
+        <div class="price-in"><input type="number" step="0.01" min="0" inputmode="decimal" placeholder="0,00" value="${l.valor===''||l.valor==null?'':l.valor}" oninput="compraEdit.lotes[${i}].valor=this.value;compraUpdateTotal()"><i>€</i></div></label>
     </div>`;
   // Destino / split (só faz sentido com tabela de stock — lotes movíveis)
   let destBlock='';
   if(STOCK_TABLE){
     if(l.splits&&l.splits.length){
-      const rows=l.splits.map((s,j)=>`<div class="cmp-split-row">
-          <select class="cmp-ln-meal" onchange="compraEdit.lotes[${i}].splits[${j}].destino=this.value">${destOptsAll(s.destino)}</select>
-          <input class="cmp-split-qtd" type="text" inputmode="decimal" placeholder="qtd" value="${escHtml(s.qtd==null?'':String(s.qtd))}" oninput="compraLoteSplitQty(${i},${j},this.value)">
-          <button class="cmp-ln-del" title="Remover destino" onclick="compraLoteDelSplit(${i},${j})">✕</button>
+      const rows=l.splits.map((s,j)=>`<div class="split-row">
+          <select onchange="compraEdit.lotes[${i}].splits[${j}].destino=this.value">${destOptsAll(s.destino)}</select>
+          <input class="split-qty" type="text" inputmode="decimal" placeholder="qtd" value="${escHtml(s.qtd==null?'':String(s.qtd))}" oninput="compraLoteSplitQty(${i},${j},this.value)">
+          <button class="lote-x" title="Remover destino" onclick="compraLoteDelSplit(${i},${j})">✕</button>
         </div>`).join('');
-      destBlock=`<div class="cmp-split">${rows}
-        <button class="cmp-mini cmp-split-add" onclick="compraLoteAddSplit(${i})">＋ destino</button>
-        <div class="cmp-split-note" id="split-note-${i}">${compraSplitNote(l)}</div></div>`;
+      destBlock=`<div class="lote-splits">${rows}
+        <button class="cmp-mini split-add" onclick="compraLoteAddSplit(${i})">＋ destino</button>
+        <div class="split-note" id="split-note-${i}">${compraSplitNote(l)}</div></div>`;
     }else{
-      destBlock=`<div class="cmp-ln-row2 cmp-dest-row">
-          <select class="cmp-ln-meal" onchange="compraEdit.lotes[${i}].destino=this.value">${destOptsAll(l.destino)}</select>
-          <button class="cmp-mini cmp-split-btn" title="Dividir por vários destinos" onclick="compraLoteAddSplit(${i})">⇄ dividir</button>
+      destBlock=`<div class="lote-dest">
+          <select onchange="compraEdit.lotes[${i}].destino=this.value">${destOptsAll(l.destino)}</select>
+          <button class="lote-split-btn" title="Dividir por vários destinos" onclick="compraLoteAddSplit(${i})">⇄ dividir</button>
         </div>`;
     }
   }
-  const fat=(!l.free&&l._sug?`<label class="cmp-pick-row"><input type="checkbox" onchange="faturaSugToggle(${i})">
-        <span>da fatura? <i>${escHtml(l._sug.artigo)}${l._sug.qtd?' ('+escHtml(l._sug.qtd)+')':''}</i></span>
-        <span class="cmp-badge">${eur(l._sug.valor)}</span></label>`:'')+
-    (!l.free&&l._subs?l._subs.map((s,j)=>`<label class="cmp-pick-row"><input type="checkbox" onchange="faturaSubToggle(${i},${j})">
-        <span>＋ também? <i>${escHtml(s.artigo)}${s.qtd?' ('+escHtml(s.qtd)+')':''}</i></span>
-        <span class="cmp-badge">${eur(s.valor)}</span></label>`).join(''):'');
-  return `<div class="cmp-ln cmp-lote">${row1}${destBlock}${fat}</div>`;
+  const fat=(!l.free&&l._sug?`<label class="lote-sug"><input type="checkbox" onchange="faturaSugToggle(${i})">
+        <div class="sug-txt"><b>Corresponde a esta linha da fatura?</b><span>${escHtml(l._sug.artigo)}${l._sug.qtd?' · '+escHtml(l._sug.qtd):''}</span></div>
+        <span class="sug-price">${eur(l._sug.valor)}</span></label>`:'')+
+    (!l.free&&l._subs?l._subs.map((s,j)=>`<label class="lote-sug alt"><input type="checkbox" onchange="faturaSubToggle(${i},${j})">
+        <div class="sug-txt"><b>＋ Outra marca do mesmo?</b><span>${escHtml(s.artigo)}${s.qtd?' · '+escHtml(s.qtd):''}</span></div>
+        <span class="sug-price">${eur(s.valor)}</span></label>`).join(''):'');
+  const cls='lote-card'+(l._fat==='miss'?' is-miss':l._fat==='warn'?' is-warn':l._fat==='ok'?' is-ok':'');
+  return `<div class="${cls}">${head}${fields}${destBlock}${fat}</div>`;
 }
 function compraRenderLotes(){
   const cont=document.getElementById('shop-buy-lotes');if(!cont)return;
@@ -4093,8 +4099,13 @@ function compraRenderLotes(){
   // valor (na edição a secção fica, para se poderem editar lotes já gravados)
   if(!det&&!compraEdit.id){cont.innerHTML='';compraUpdateTotal();return;}
   if(!ls.length&&!STOCK_TABLE&&!det){cont.innerHTML='';compraUpdateTotal();return;}
+  // Aviso: artigos do carrinho que a fatura não detetou (ficam por tratar se o
+  // preço ficar em branco). Fica visível na revisão, antes de registar.
+  const miss=ls.filter(l=>!l.free&&l._fat==='miss');
+  const missWarn=miss.length?`<div class="lote-miss-warn">⚠️ <b>${miss.length} artigo(s) do carrinho não apareceram na fatura.</b> Se deixares o preço em branco, ficam na lista <b>por tratar</b> (não são dados como comprados):<ul>${miss.map(l=>'<li>'+escHtml(l.artigo)+(l.qtd?' <i style="color:var(--muted);font-style:normal">('+escHtml(l.qtd)+')</i>':'')+'</li>').join('')}</ul></div>`:'';
   cont.innerHTML=((ls.length||det)?`<div class="cmp-pick sf" style="margin-top:14px">${det?'💶 Preço por artigo':'🧾 Detalhe por artigo — opcional'}</div>`:'')+
     ls.map((l,i)=>compraLoteHtml(l,i)).join('')+
+    missWarn+
     ((det||STOCK_TABLE)?`<button class="btn ghost" style="width:100%;margin-top:8px" onclick="compraAddLote()">${det?'＋ Artigo fora da lista':'＋ Artigo detalhado'}</button>`:'')+
     (det
       ?'<div class="note">Cada artigo cai no destino escolhido — refeição ou tipo (Gerais/Bebidas/…). Podes dividir um artigo por vários destinos com ⇄. Reajustas tudo depois no separador 🧺 Stock.</div>'
@@ -4344,15 +4355,15 @@ async function saveCompra(){
   // Detalhe por artigo: lotes de stock (qtd+€, alocados por FIFO) e despesas
   // diretas por tipo/refeição (tipoFix e artigos fora da lista com destino tipo)
   const det=!!compraEdit.det;
-  const lotes=[];const tipoRows={};   // tipoRows: 'Tipo' ou 'Tipo|data' → artigos
+  const lotes=[];const tipoRows={};const naoDetetados=[];   // tipoRows: 'Tipo'|'Tipo|data' → artigos; naoDetetados: artigos do carrinho sem preço
   // "Só totais" numa compra nova: o detalhe está escondido → não entra no registo
   for(const l of ((det||isEdit)?(compraEdit.lotes||[]):[])){
     const artigo=(l.artigo||'').trim();
     const v=rnd(parseFloat(l.valor),2);
     if(!v||v<=0){
-      // No modo por artigo o € é obrigatório (é a única fonte de valor);
-      // no modo por totais, € vazio = artigo normal coberto pelas linhas
-      if(det&&artigo){toast(`Preenche o € de "${artigo}"`,'bad');return;}
+      // Artigo do carrinho sem preço (ex.: não veio na fatura) → NÃO é comprado:
+      // fica na lista por tratar e avisa-se abaixo. Avulso em branco é ignorado.
+      if(det&&artigo&&!l.free)naoDetetados.push({artigo,qtd:l.qtd||''});
       continue;
     }
     if(!artigo){toast('Indica o nome do artigo detalhado','bad');return;}
@@ -4396,6 +4407,13 @@ async function saveCompra(){
   if(lotes.length)rows.push({tipo:'Gerais',data_valor:null,valor:rnd(lotes.reduce((a,l)=>a+l.valor,0),2),obs:STOCK_OBS});
   if(!rows.length){toast(det?'Preenche o € dos artigos (ou marca artigos da lista)':'Adiciona pelo menos uma linha','bad');return;}
   const checkedIds=[...document.querySelectorAll('.shop-pick:checked')].map(c=>+c.value);
+  // Artigos marcados no carrinho mas não detetados na fatura (sem preço): ficam
+  // por tratar (não comprados). Avisa e confirma antes de registar.
+  const missIds=new Set(shopArr().filter(x=>checkedIds.includes(x._id)&&naoDetetados.some(n=>shopSameArtigo(n.artigo,x.artigo))).map(x=>x._id));
+  if(naoDetetados.length){
+    const lst=naoDetetados.map(n=>'• '+n.artigo+(n.qtd?' ('+n.qtd+')':'')).join('\n');
+    if(!confirm(`⚠️ Estes artigos do carrinho não foram detetados na fatura e vão ficar na lista POR TRATAR (não são dados como comprados):\n\n${lst}\n\nRegistar a compra assim mesmo?`))return;
+  }
   const compraId=compraEdit.id||('c'+Date.now());
   const compradoEm=new Date().toISOString();
   const btn=document.getElementById('shop-buy-save');btn.disabled=true;
@@ -4433,8 +4451,9 @@ async function saveCompra(){
     }
     // Artigos: os marcados ficam comprados; os que estavam ligados e foram desmarcados voltam à lista
     const prevLinked=shopArr().filter(x=>x.compraId===compraId).map(x=>x._id);
-    const toBuy=checkedIds;
-    const toRelease=prevLinked.filter(id=>!checkedIds.includes(id));
+    // Os não detetados (sem preço) saem do "comprar" → ficam pendentes na lista
+    const toBuy=checkedIds.filter(id=>!missIds.has(id));
+    const toRelease=prevLinked.filter(id=>!toBuy.includes(id));
     if(toBuy.length){
       await queueWrite(()=>sbReq('PATCH',`shoplist?id=in.(${toBuy.join(',')})`,{estado:'comprado',compra_id:compraId,cf_desc:desc||'Compras',comprado_em:compradoEm,no_carrinho:false}));
       shopArr().forEach(it=>{if(toBuy.includes(it._id))Object.assign(it,{estado:'comprado',compraId,cfDesc:desc||'Compras',compradoEm,noCarrinho:false});});
