@@ -199,6 +199,9 @@ Deno.serve(async (req) => {
     // modelo seguinte. Assim uma sobrecarga pontual num modelo não estraga a
     // leitura quando há outro flash livre.
     const candidatos = await candidatosModelo();
+    // Marcador de versão + lista de candidatos: se este log não aparecer, é a
+    // versão ANTIGA que está a correr (o deploy não pegou).
+    console.log("FATURA-OCR build=flash-first-v1 candidatos:", candidatos.join(", "));
     let model = candidatos[0] ?? "gemini-flash-latest";
     let g: Response | null = null;
 
@@ -206,6 +209,7 @@ Deno.serve(async (req) => {
       model = candidatos[ci];
       for (let tent = 0; tent < 2 && !ctrl.signal.aborted; tent++) {
         g = await chamarGemini(model);
+        console.log("FATURA-OCR tentativa:", model, "->", g.status);
         // Modelo não aceita o campo thinkingConfig (400)? Repete já sem ele.
         if (g.status === 400) {
           const d = await g.clone().text();
