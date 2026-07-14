@@ -26,30 +26,27 @@ const TIMEOUT_MS = 50_000;
 /* ── Escolha do modelo ──
    Os nomes dos modelos Gemini mudam com o tempo (foi assim que apanhámos um
    404). Em vez de fixar um nome, pergunta-se à API que modelos a chave tem
-   (ListModels) e escolhe-se o melhor "flash". Cache em memória enquanto a
-   instância viver. Override manual: secret GEMINI_MODEL (opcional). */
-let _model: string | null = null;
-function rankFlash(names: string[]): string | null {
-  const ok = names.filter((n) =>
+   (ListModels) e ordenam-se os "flash" do melhor para o pior. Devolve-se a
+   LISTA (não só o topo) para se poder cair para o modelo seguinte quando o
+   preferido está sobrecarregado (503). Cache em memória enquanto a instância
+   viver. Override manual: secret GEMINI_MODEL (opcional). */
+let _models: string[] | null = null;
+function rankFlash(names: string[]): string[] {
+  const ok = [...new Set(names.filter((n) =>
     n.includes("flash") &&
     !/(lite|8b|image|tts|live|audio|embed|exp|preview|thinking)/.test(n)
-  );
-  if (!ok.length) return null;
-  if (ok.includes("gemini-flash-latest")) return "gemini-flash-latest";
-  const exact = ok
-    .map((n) => {
-      const m = n.match(/^gemini-(\d+(?:\.\d+)?)-flash$/);
-      return m ? { n, v: parseFloat(m[1]) } : null;
-    })
-    .filter((x): x is { n: string; v: number } => !!x)
-    .sort((a, b) => b.v - a.v);
-  if (exact.length) return exact[0].n;
-  return ok.sort().reverse()[0];
+  ))];
+  const score = (n: string): number => {
+    if (n === "gemini-flash-latest") return 100; // apontador sempre atualizado
+    const m = n.match(/^gemini-(\d+(?:\.\d+)?)-flash$/);
+    return m ? parseFloat(m[1]) : 0; // versão exata; genéricos ao fundo
+  };
+  return ok.sort((a, b) => score(b) - score(a) || a.localeCompare(b));
 }
-async function escolherModelo(): Promise<string> {
+async function candidatosModelo(): Promise<string[]> {
   const pinned = Deno.env.get("GEMINI_MODEL");
-  if (pinned) return pinned;
-  if (_model) return _model;
+  if (pinned) return [pinned];
+  if (_models) return _models;
   try {
     const names: string[] = [];
     let page = "";
@@ -67,9 +64,10 @@ async function escolherModelo(): Promise<string> {
       page = d.nextPageToken ?? "";
       if (!page) break;
     }
-    _model = rankFlash(names);
+    const ranked = rankFlash(names);
+    if (ranked.length) _models = ranked;
   } catch (_) { /* fica o fallback */ }
-  return _model ?? "gemini-flash-latest";
+  return _models ?? ["gemini-flash-latest"];
 }
 
 // A app corre no GitHub Pages (origem diferente) → CORS obrigatório
@@ -173,29 +171,52 @@ Deno.serve(async (req) => {
       });
     };
 
-    let model = await escolherModelo();
-    let g = await chamarGemini(model);
-    // Modelo desapareceu do catálogo (404)? Redescobre e tenta uma vez mais.
-    if (g.status === 404) {
-      _model = null;
-      const m2 = await escolherModelo();
-      if (m2 !== model) {
-        model = m2;
+    // 429/500/503 = sobrecarga temporária do lado do Google ("high demand").
+    const transitorio = (s: number) => s === 429 || s === 500 || s === 503;
+    const sleep = (ms: number) => new Promise((res) => setTimeout(res, ms));
+
+    // Percorre os modelos flash disponíveis. Para cada um tolera uma repetição
+    // em erros transitórios (com pequeno backoff); se persistir, cai para o
+    // modelo seguinte. Assim uma sobrecarga pontual num modelo não estraga a
+    // leitura quando há outro flash livre.
+    const candidatos = await candidatosModelo();
+    let model = candidatos[0] ?? "gemini-flash-latest";
+    let g: Response | null = null;
+
+    for (let ci = 0; ci < candidatos.length && !ctrl.signal.aborted; ci++) {
+      model = candidatos[ci];
+      for (let tent = 0; tent < 2 && !ctrl.signal.aborted; tent++) {
         g = await chamarGemini(model);
+        // Modelo não aceita o campo thinkingConfig (400)? Repete já sem ele.
+        if (g.status === 400) {
+          const d = await g.clone().text();
+          if (/think/i.test(d)) g = await chamarGemini(model, false);
+        }
+        // Nome saiu do catálogo (404) → força redescoberta e salta de modelo.
+        if (g.status === 404) { _models = null; break; }
+        // Sobrecarga temporária → espera e repete o MESMO modelo.
+        if (transitorio(g.status)) { await sleep(700 * (tent + 1)); continue; }
+        break; // resposta definitiva (ok ou erro não recuperável)
       }
-    }
-    // Modelo não aceita o campo thinkingConfig (400)? Repete sem ele.
-    if (g.status === 400) {
-      const d = await g.clone().text();
-      if (/think/i.test(d)) g = await chamarGemini(model, false);
+      if (g && g.ok) break;                                  // sucesso
+      if (g && !transitorio(g.status) && g.status !== 404) break; // erro real
+      // caso contrário (503 persistente ou 404) → tenta o próximo candidato
     }
     clearTimeout(timer);
-    if (!g.ok) {
-      const detail = await g.text();
-      console.error("gemini", model, g.status, detail.slice(0, 500));
+
+    if (!g || !g.ok) {
+      const status = g?.status ?? 502;
+      const detail = g ? await g.text() : "";
+      console.error("gemini", model, status, detail.slice(0, 500));
+      // Sobrecarga esgotou todos os modelos → mensagem amiga (não o texto cru).
+      if (transitorio(status)) {
+        return json({
+          error: "o serviço de leitura de faturas está com muita procura agora — espera um minuto e tenta outra vez",
+        }, 503);
+      }
       let msg = "";
       try { msg = JSON.parse(detail)?.error?.message ?? ""; } catch (_) { /**/ }
-      return json({ error: `gemini ${g.status} (${model})${msg ? ": " + msg.slice(0, 180) : ""}` }, 502);
+      return json({ error: `gemini ${status} (${model})${msg ? ": " + msg.slice(0, 180) : ""}` }, 502);
     }
     const gd = await g.json();
     const text = gd?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
