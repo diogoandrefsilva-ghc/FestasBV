@@ -224,7 +224,7 @@ setTimeout(function(){ if (window.fbvEsconderSplash) window.fbvEsconderSplash();
     <label>Descritivo <span class="cf-desc-count" id="shop-buy-desc-count">0/30</span></label>
     <input type="text" id="shop-buy-desc" maxlength="30" placeholder="Ex: Continente" oninput="shopBuyDescCount()">
     <div id="shop-buy-ocr" style="display:none;margin-top:10px">
-      <button class="btn ghost" id="shop-buy-ocr-btn" style="width:100%" onclick="faturaPick()">📷 Importar fatura (foto ou PDF) — pré-preenche os artigos</button>
+      <button class="btn ghost" id="shop-buy-ocr-btn" style="width:100%" onclick="faturaPick()">📷 Importar fatura (foto ou PDF)<span style="display:block;font-size:11px;font-weight:400;color:var(--muted);margin-top:2px;text-transform:none;letter-spacing:0">pré-preenche os artigos</span></button>
       <input type="file" id="fatura-file" accept="image/*,application/pdf" style="display:none" onchange="faturaChosen(this)">
     </div>
     <div id="shop-buy-body"></div>

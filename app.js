@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v24 · 2026-07-14 · 📷 Importar fatura (foto ou PDF) no Registar Compra';
+const APP_BUILD = 'v25 · 2026-07-14 · Botão Importar fatura em duas linhas (subtítulo pequeno)';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -3975,7 +3975,7 @@ async function faturaChosen(inp){
   const f=inp.files&&inp.files[0];inp.value='';
   if(!f)return;
   const btn=document.getElementById('shop-buy-ocr-btn');
-  const label=btn.textContent;
+  const label=btn.innerHTML;   // duas linhas (título + subtítulo) → repor em HTML
   btn.disabled=true;btn.textContent='⏳ A ler a fatura…';
   try{
     // PDF vai tal e qual (o Gemini lê PDFs nativamente); imagem é comprimida em canvas
@@ -3992,7 +3992,7 @@ async function faturaChosen(inp){
   }catch(e){
     toast('Não consegui ler a fatura: '+(e.message||e),'bad');
   }finally{
-    btn.disabled=false;btn.textContent=label;
+    btn.disabled=false;btn.innerHTML=label;
   }
 }
 // Lê um PDF em base64, sem transformação (o modelo aceita PDFs diretamente)
