@@ -28,8 +28,11 @@ const TIMEOUT_MS = 50_000;
    404). Em vez de fixar um nome, pergunta-se à API que modelos a chave tem
    (ListModels) e ordenam-se os "flash" do melhor para o pior. Devolve-se a
    LISTA (não só o topo) para se poder cair para o modelo seguinte quando o
-   preferido está sobrecarregado (503). Cache em memória enquanto a instância
-   viver. Override manual: secret GEMINI_MODEL (opcional). */
+   preferido falha (404 se o modelo foi reformado, 503 se está sobrecarregado).
+   O secret GEMINI_MODEL (opcional) é apenas uma PREFERÊNCIA: entra em primeiro
+   lugar mas, se estiver morto, a lista de descoberta apanha o pedido a seguir —
+   assim um pin desatualizado nunca deixa a app sem leitura. Cache em memória
+   enquanto a instância viver. */
 let _models: string[] | null = null;
 function rankFlash(names: string[]): string[] {
   const ok = [...new Set(names.filter((n) =>
@@ -43,9 +46,8 @@ function rankFlash(names: string[]): string[] {
   };
   return ok.sort((a, b) => score(b) - score(a) || a.localeCompare(b));
 }
-async function candidatosModelo(): Promise<string[]> {
-  const pinned = Deno.env.get("GEMINI_MODEL");
-  if (pinned) return [pinned];
+// Pergunta à API que modelos flash vivos a chave tem (com cache em memória).
+async function descobrirFlash(): Promise<string[]> {
   if (_models) return _models;
   try {
     const names: string[] = [];
@@ -67,7 +69,17 @@ async function candidatosModelo(): Promise<string[]> {
     const ranked = rankFlash(names);
     if (ranked.length) _models = ranked;
   } catch (_) { /* fica o fallback */ }
-  return _models ?? ["gemini-flash-latest"];
+  return _models ?? [];
+}
+async function candidatosModelo(): Promise<string[]> {
+  const pinned = Deno.env.get("GEMINI_MODEL");
+  const descobertos = await descobrirFlash();
+  // pin (se existir) primeiro, depois os vivos descobertos; sem duplicados.
+  // Se a descoberta falhar e não houver pin, resta o apontador estável.
+  const vistos = new Set<string>();
+  const lista = [...(pinned ? [pinned] : []), ...descobertos]
+    .filter((m) => (vistos.has(m) ? false : vistos.add(m)));
+  return lista.length ? lista : ["gemini-flash-latest"];
 }
 
 // A app corre no GitHub Pages (origem diferente) → CORS obrigatório
