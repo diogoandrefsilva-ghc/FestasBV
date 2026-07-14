@@ -25,7 +25,8 @@ const CORS = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const PROMPT = `Isto é a fotografia de um talão ou fatura de compras (Portugal).
+const PROMPT = `Isto é um talão ou fatura de compras (Portugal) — fotografia ou
+PDF (pode ter várias páginas; considera todas).
 Extrai APENAS um objeto JSON com esta forma exata:
 {"loja": string|null, "data": "YYYY-MM-DD"|null, "total": number|null,
  "linhas": [{"artigo": string, "qtd": string|null, "preco": number}]}

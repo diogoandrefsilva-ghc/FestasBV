@@ -3978,7 +3978,10 @@ async function faturaChosen(inp){
   const label=btn.textContent;
   btn.disabled=true;btn.textContent='⏳ A ler a fatura…';
   try{
-    const {b64,mime}=await faturaComprime(f);
+    // PDF vai tal e qual (o Gemini lê PDFs nativamente); imagem é comprimida em canvas
+    const isPdf=f.type==='application/pdf'||/\.pdf$/i.test(f.name||'');
+    if(isPdf&&f.size>4*1024*1024)throw new Error('PDF demasiado grande (máx. 4 MB)');
+    const {b64,mime}=isPdf?await faturaLerPdf(f):await faturaComprime(f);
     const r=await sbFetch(`${SB_URL}/functions/v1/fatura-ocr`,{
       method:'POST',
       headers:{'Content-Type':'application/json','apikey':SB_KEY},
@@ -3991,6 +3994,15 @@ async function faturaChosen(inp){
   }finally{
     btn.disabled=false;btn.textContent=label;
   }
+}
+// Lê um PDF em base64, sem transformação (o modelo aceita PDFs diretamente)
+function faturaLerPdf(file){
+  return new Promise((resolve,reject)=>{
+    const rd=new FileReader();
+    rd.onload=()=>resolve({b64:String(rd.result).split(',')[1],mime:'application/pdf'});
+    rd.onerror=()=>reject(new Error('não consegui ler o PDF'));
+    rd.readAsDataURL(file);
+  });
 }
 // Reduz a foto (máx 1600px no lado maior, JPEG q0.85): chega de sobra para o
 // modelo ler o talão e mantém o upload leve mesmo em rede móvel
