@@ -9,6 +9,8 @@
 //
 // Secrets necessários (Edge Functions -> Secrets):
 //   GEMINI_API_KEY       chave do Google AI Studio (free tier chega)
+//   GEMINI_MODEL         (opcional) fixa um modelo concreto; sem ele a função
+//                        descobre sozinha o melhor "flash" disponível na chave
 // (SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY são injetados automaticamente.)
 //
 // Deploy: supabase functions deploy fatura-ocr
@@ -16,7 +18,56 @@
 const GEMINI_KEY = Deno.env.get("GEMINI_API_KEY")!;
 const SB_URL = Deno.env.get("SUPABASE_URL")!;
 const SB_SRV = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const MODEL = "gemini-2.5-flash";
+const GAPI = "https://generativelanguage.googleapis.com/v1beta";
+
+/* ── Escolha do modelo ──
+   Os nomes dos modelos Gemini mudam com o tempo (foi assim que apanhámos um
+   404). Em vez de fixar um nome, pergunta-se à API que modelos a chave tem
+   (ListModels) e escolhe-se o melhor "flash". Cache em memória enquanto a
+   instância viver. Override manual: secret GEMINI_MODEL (opcional). */
+let _model: string | null = null;
+function rankFlash(names: string[]): string | null {
+  const ok = names.filter((n) =>
+    n.includes("flash") &&
+    !/(lite|8b|image|tts|live|audio|embed|exp|preview|thinking)/.test(n)
+  );
+  if (!ok.length) return null;
+  if (ok.includes("gemini-flash-latest")) return "gemini-flash-latest";
+  const exact = ok
+    .map((n) => {
+      const m = n.match(/^gemini-(\d+(?:\.\d+)?)-flash$/);
+      return m ? { n, v: parseFloat(m[1]) } : null;
+    })
+    .filter((x): x is { n: string; v: number } => !!x)
+    .sort((a, b) => b.v - a.v);
+  if (exact.length) return exact[0].n;
+  return ok.sort().reverse()[0];
+}
+async function escolherModelo(): Promise<string> {
+  const pinned = Deno.env.get("GEMINI_MODEL");
+  if (pinned) return pinned;
+  if (_model) return _model;
+  try {
+    const names: string[] = [];
+    let page = "";
+    for (let i = 0; i < 3; i++) {
+      const r = await fetch(
+        `${GAPI}/models?pageSize=200${page ? `&pageToken=${page}` : ""}&key=${GEMINI_KEY}`,
+      );
+      if (!r.ok) break;
+      const d = await r.json();
+      (d.models ?? []).forEach((m: any) => {
+        if ((m.supportedGenerationMethods ?? []).includes("generateContent")) {
+          names.push(String(m.name).replace(/^models\//, ""));
+        }
+      });
+      page = d.nextPageToken ?? "";
+      if (!page) break;
+    }
+    _model = rankFlash(names);
+  } catch (_) { /* fica o fallback */ }
+  return _model ?? "gemini-flash-latest";
+}
 
 // A app corre no GitHub Pages (origem diferente) → CORS obrigatório
 const CORS = {
@@ -87,9 +138,8 @@ Deno.serve(async (req) => {
       return json({ error: "imagem em falta ou demasiado grande" }, 400);
     }
 
-    const g = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${GEMINI_KEY}`,
-      {
+    const chamarGemini = (model: string) =>
+      fetch(`${GAPI}/models/${model}:generateContent?key=${GEMINI_KEY}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -101,12 +151,25 @@ Deno.serve(async (req) => {
           }],
           generationConfig: { response_mime_type: "application/json", temperature: 0 },
         }),
-      },
-    );
+      });
+
+    let model = await escolherModelo();
+    let g = await chamarGemini(model);
+    // Modelo desapareceu do catálogo (404)? Redescobre e tenta uma vez mais.
+    if (g.status === 404) {
+      _model = null;
+      const m2 = await escolherModelo();
+      if (m2 !== model) {
+        model = m2;
+        g = await chamarGemini(model);
+      }
+    }
     if (!g.ok) {
       const detail = await g.text();
-      console.error("gemini", g.status, detail.slice(0, 500));
-      return json({ error: `gemini ${g.status}` }, 502);
+      console.error("gemini", model, g.status, detail.slice(0, 500));
+      let msg = "";
+      try { msg = JSON.parse(detail)?.error?.message ?? ""; } catch (_) { /**/ }
+      return json({ error: `gemini ${g.status} (${model})${msg ? ": " + msg.slice(0, 180) : ""}` }, 502);
     }
     const gd = await g.json();
     const text = gd?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
