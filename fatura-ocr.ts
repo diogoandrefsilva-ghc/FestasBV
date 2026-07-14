@@ -71,13 +71,20 @@ async function descobrirFlash(): Promise<string[]> {
   } catch (_) { /* fica o fallback */ }
   return _models ?? [];
 }
+// Aliases estáveis do Gemini, por ordem de preferência. São apontadores que a
+// Google mantém a apontar para o modelo flash atual — ao contrário dos nomes
+// datados (ex.: gemini-2.0-flash-001), que são reformados e passam a dar 404.
+// A descoberta automática por vezes escolhe um desses nomes datados já morto;
+// tentar primeiro estes aliases evita isso. gemini-flash-latest já respondeu
+// (com 503) à nossa chave, logo é válido.
+const ESTAVEIS = ["gemini-flash-latest", "gemini-2.5-flash", "gemini-2.0-flash"];
 async function candidatosModelo(): Promise<string[]> {
   const pinned = Deno.env.get("GEMINI_MODEL");
   const descobertos = await descobrirFlash();
-  // pin (se existir) primeiro, depois os vivos descobertos; sem duplicados.
-  // Se a descoberta falhar e não houver pin, resta o apontador estável.
+  // Ordem: pin manual (se existir) → aliases estáveis → descoberta ao vivo.
+  // O handler salta 404s, por isso um alias morto passa ao seguinte sozinho.
   const vistos = new Set<string>();
-  const lista = [...(pinned ? [pinned] : []), ...descobertos]
+  const lista = [...(pinned ? [pinned] : []), ...ESTAVEIS, ...descobertos]
     .filter((m) => (vistos.has(m) ? false : vistos.add(m)));
   return lista.length ? lista : ["gemini-flash-latest"];
 }
