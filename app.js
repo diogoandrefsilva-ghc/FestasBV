@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v26 · 2026-07-14 · Fatura: extras opt-in por checkbox; ⚠️ em artigos sem correspondência';
+const APP_BUILD = 'v27 · 2026-07-14 · Fatura: só matches 100% entram por defeito; sugestões e multi-marca por checkbox; aviso de qtds';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -3944,12 +3944,18 @@ function compraRenderLotes(){
   cont.innerHTML=((ls.length||det)?`<div class="cmp-pick sf" style="margin-top:14px">${det?'💶 Preço por artigo':'🧾 Detalhe por artigo — opcional'}</div>`:'')+
     ls.map((l,i)=>`<div class="cmp-ln cmp-lote">
       <div class="cmp-ln-row1">
-        ${l.free?`<input class="cmp-lote-art-in" type="text" maxlength="60" placeholder="Artigo" value="${escHtml(l.artigo||'')}" oninput="compraEdit.lotes[${i}].artigo=this.value">`:`<span class="cmp-lote-art">${l.tipoFix?shopTipoIcon(l.tipoFix)+' ':''}${escHtml(l.artigo)}${l._fat==='ok'?' <span title="Encontrado na fatura" style="color:#3a8f4a">✓</span>':l._fat==='miss'?' <span title="Não encontrado na fatura — confirma o preço à mão">⚠️</span>':''}</span>`}
+        ${l.free?`<input class="cmp-lote-art-in" type="text" maxlength="60" placeholder="Artigo" value="${escHtml(l.artigo||'')}" oninput="compraEdit.lotes[${i}].artigo=this.value">`:`<span class="cmp-lote-art">${l.tipoFix?shopTipoIcon(l.tipoFix)+' ':''}${escHtml(l.artigo)}${l._fat==='ok'?' <span title="Encontrado na fatura" style="color:#3a8f4a">✓</span>':l._fat==='miss'?' <span title="Não encontrado na fatura — confirma o preço à mão">⚠️</span>':l._fat==='warn'?' <span title="Quantidades diferentes do pedido — confere, e aloca às refeições em 🧺 Stock">⚠️</span>':''}</span>`}
         <input class="cmp-lote-qtd" type="text" placeholder="Qtd" value="${escHtml(l.qtd||'')}" oninput="compraEdit.lotes[${i}].qtd=this.value" onblur="this.value=normalizeQty(this.value);compraEdit.lotes[${i}].qtd=this.value">
         <div class="cmp-ln-val"><span>€</span><input type="number" step="0.01" min="0" inputmode="decimal" placeholder="0,00" value="${l.valor===''||l.valor==null?'':l.valor}" oninput="compraEdit.lotes[${i}].valor=this.value;compraUpdateTotal()"></div>
         ${l.free?`<button class="cmp-ln-del" title="Remover" onclick="compraDelLote(${i})">✕</button>`:''}
       </div>
       ${l.free?`<div class="cmp-ln-row2"><select class="cmp-ln-meal" onchange="compraEdit.lotes[${i}].destino=this.value">${destOpts(l.destino==null?'Gerais':l.destino)}</select></div>`:''}
+      ${!l.free&&l._sug?`<label class="cmp-pick-row"><input type="checkbox" onchange="faturaSugToggle(${i})">
+        <span>da fatura? <i>${escHtml(l._sug.artigo)}${l._sug.qtd?' ('+escHtml(l._sug.qtd)+')':''}</i></span>
+        <span class="cmp-badge">${eur(l._sug.valor)}</span></label>`:''}
+      ${!l.free&&l._subs?l._subs.map((s,j)=>`<label class="cmp-pick-row"><input type="checkbox" onchange="faturaSubToggle(${i},${j})">
+        <span>＋ também? <i>${escHtml(s.artigo)}${s.qtd?' ('+escHtml(s.qtd)+')':''}</i></span>
+        <span class="cmp-badge">${eur(s.valor)}</span></label>`).join(''):''}
     </div>`).join('')+
     ((det||STOCK_TABLE)?`<button class="btn ghost" style="width:100%;margin-top:8px" onclick="compraAddLote()">${det?'＋ Artigo fora da lista':'＋ Artigo detalhado'}</button>`:'')+
     (det
@@ -4044,35 +4050,91 @@ function faturaAplicar(d){
   if(desc&&!desc.value.trim()&&d.loja){desc.value=String(d.loja).slice(0,30);shopBuyDescCount();}
   const date=document.getElementById('shop-buy-date');
   if(date&&typeof d.data==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(d.data))date.value=d.data;
-  // Matching guloso por melhor score: cada linha do talão serve no máximo um artigo
-  const linhas=d.linhas.filter(l=>l&&l.artigo&&typeof l.preco==='number'&&l.preco>=0);
+  // Matching por níveis de confiança:
+  //   score 1.0 (todas as palavras do artigo na linha) → preenche por defeito ✓
+  //   0.5–1.0 → SUGESTÃO com checkbox desmarcada (o utilizador confirma)
+  //   2.ª linha a 1.0 no MESMO artigo (várias marcas, ex. Lays+Ruffles)
+  //     → sub-artigo por confirmar, que herda o destino do genérico
+  const linhas=d.linhas.filter(l=>l&&l.artigo&&typeof l.preco==='number'&&l.preco>=0)
+    .map(ln=>({artigo:String(ln.artigo).slice(0,60),qtd:ln.qtd?normalizeQty(String(ln.qtd)):'',valor:rnd(ln.preco,2)}));
   const lotes=compraEdit.lotes||[];
-  lotes.forEach(l=>{delete l._fat;});   // re-importação: limpa marcas anteriores
+  lotes.forEach(l=>{delete l._fat;delete l._sug;delete l._subs;delete l._impQtds;delete l._qtdPedida;});
   const pares=[];
-  lotes.forEach((l,i)=>{if(l.free)return;linhas.forEach((ln,j)=>{const s=faturaScore(l.artigo,ln.artigo);if(s>=0.5)pares.push({i,j,s});});});
+  lotes.forEach((l,i)=>{if(l.free)return;l._qtdPedida=l.qtd||'';linhas.forEach((ln,j)=>{const s=faturaScore(l.artigo,ln.artigo);if(s>=0.5)pares.push({i,j,s});});});
   pares.sort((a,b)=>b.s-a.s);
   const loteUsado=new Set(),linhaUsada=new Set();
-  let preenchidos=0;
+  let preenchidos=0,sugestoes=0;
   pares.forEach(p=>{
     if(loteUsado.has(p.i)||linhaUsada.has(p.j))return;
-    loteUsado.add(p.i);linhaUsada.add(p.j);
     const l=lotes[p.i],ln=linhas[p.j];
-    if(l.valor===''||l.valor==null)l.valor=rnd(ln.preco,2);
-    if(!l.qtd&&ln.qtd)l.qtd=normalizeQty(String(ln.qtd));
-    l._fat='ok';   // ✓ encontrado na fatura
-    preenchidos++;
+    if(p.s===1){                              // certeza → entra por defeito
+      loteUsado.add(p.i);linhaUsada.add(p.j);
+      if(l.valor===''||l.valor==null)l.valor=ln.valor;
+      if(!l.qtd&&ln.qtd)l.qtd=ln.qtd;
+      l._fat='ok';l._impQtds=[ln.qtd];
+      faturaQtdRecheck(l);
+      preenchidos++;
+    }else{                                    // parcial → só com o teu OK
+      loteUsado.add(p.i);linhaUsada.add(p.j);
+      l._sug=ln;
+      sugestoes++;
+    }
+  });
+  // 2.ª passagem: linhas restantes que batem a 100% num artigo JÁ preenchido
+  // (genérico → várias marcas) ficam como sub-artigos por confirmar
+  let subs=0;
+  linhas.forEach((ln,j)=>{
+    if(linhaUsada.has(j))return;
+    lotes.forEach((l,i)=>{
+      if(linhaUsada.has(j)||l.free||l._fat!=='ok')return;
+      if(faturaScore(l.artigo,ln.artigo)===1){linhaUsada.add(j);(l._subs=l._subs||[]).push(ln);subs++;}
+    });
   });
   // Artigos do carrinho SEM correspondência na fatura → alerta ⚠️ (fica € vazio)
   let semMatch=0;
   lotes.forEach((l,i)=>{if(!l.free&&!loteUsado.has(i)){l._fat='miss';semMatch++;}});
-  // Linhas da fatura sem correspondência → lista de EXTRAS, desmarcados por
-  // defeito: só entram na compra se o utilizador os marcar (faturaExtraToggle)
-  compraEdit.faturaExtras=linhas.filter((ln,j)=>!linhaUsada.has(j))
-    .map(ln=>({artigo:String(ln.artigo).slice(0,60),qtd:ln.qtd?normalizeQty(String(ln.qtd)):'',valor:rnd(ln.preco,2)}));
+  // Linhas da fatura sem correspondência → EXTRAS, desmarcados por defeito
+  compraEdit.faturaExtras=linhas.filter((ln,j)=>!linhaUsada.has(j));
   const extras=compraEdit.faturaExtras.length;
   compraEdit.lotes=lotes;
   compraRenderLotes();
-  toast(`Fatura lida: ${preenchidos} preenchido(s) ✓${semMatch?`, ${semMatch} da lista sem correspondência ⚠️`:''}${extras?`, ${extras} extra(s) por confirmar`:''}`,'ok');
+  const porConfirmar=sugestoes+subs+extras;
+  toast(`Fatura lida: ${preenchidos} preenchido(s) ✓${porConfirmar?`, ${porConfirmar} por confirmar ☐`:''}${semMatch?`, ${semMatch} sem correspondência ⚠️`:''}`,'ok');
+}
+// Aviso "quantidades não batem": compara o pedido da lista com a soma do que
+// veio da fatura para esse artigo (só quando ambos são numéricos, mesma unidade)
+function faturaQtdRecheck(l){
+  if(l._fat!=='ok'&&l._fat!=='warn')return;
+  const ped=qtyParse(l._qtdPedida||'');
+  if(!ped||!(l._impQtds||[]).length)return;
+  let tot=0;
+  for(const q of l._impQtds){const p=qtyParse(q||'');if(!p||p.u!==ped.u)return;tot=rnd(tot+p.n,3);}
+  l._fat=Math.abs(tot-ped.n)<0.001?'ok':'warn';
+}
+// Confirmar a sugestão de match parcial: aplica € e qtd ao artigo
+function faturaSugToggle(i){
+  const l=(compraEdit.lotes||[])[i];if(!l||!l._sug)return;
+  const ln=l._sug;delete l._sug;
+  if(l.valor===''||l.valor==null)l.valor=ln.valor;
+  if(!l.qtd&&ln.qtd)l.qtd=ln.qtd;
+  l._fat='ok';l._impQtds=[ln.qtd];
+  faturaQtdRecheck(l);
+  compraRenderLotes();
+}
+// Confirmar um sub-artigo (outra marca do mesmo genérico): vira artigo fora da
+// lista com o destino herdado — refeição única → essa; pedido p/ várias
+// refeições → 🧺 Stock por alocar (alocação manual); tipo (Gerais/…) → o tipo
+function faturaSubToggle(i,j){
+  const l=(compraEdit.lotes||[])[i];if(!l||!l._subs||!l._subs[j])return;
+  const ln=l._subs.splice(j,1)[0];
+  if(!l._subs.length)delete l._subs;
+  const multi=(l.keys||[]).length>1;
+  const destino=l.tipoFix?l.tipoFix:((l.keys||[]).length===1?l.keys[0]:(STOCK_TABLE?'':'Gerais'));
+  (compraEdit.lotes=compraEdit.lotes||[]).push({free:true,artigo:ln.artigo,qtd:ln.qtd,valor:ln.valor,destino,keys:[],_fat:'ok'});
+  (l._impQtds=l._impQtds||[]).push(ln.qtd);
+  faturaQtdRecheck(l);
+  compraRenderLotes();
+  if(multi&&STOCK_TABLE)toast('Fica em 🧺 Stock por alocar — depois de registares, aloca às refeições no separador Compras › 🧺 Stock','ok');
 }
 /* Extras da fatura (linhas que não estavam no carrinho): checkbox desmarcada
    por defeito; marcar converte em "artigo fora da lista" editável (o ✕ do
