@@ -19,6 +19,9 @@ const GEMINI_KEY = Deno.env.get("GEMINI_API_KEY")!;
 const SB_URL = Deno.env.get("SUPABASE_URL")!;
 const SB_SRV = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const GAPI = "https://generativelanguage.googleapis.com/v1beta";
+// Limite próprio para a chamada ao Gemini. Abaixo dos ~60s a que o Safari/iOS
+// mata o pedido, para conseguirmos devolver um erro claro em vez de "Load failed".
+const TIMEOUT_MS = 50_000;
 
 /* ── Escolha do modelo ──
    Os nomes dos modelos Gemini mudam com o tempo (foi assim que apanhámos um
@@ -138,10 +141,26 @@ Deno.serve(async (req) => {
       return json({ error: "imagem em falta ou demasiado grande" }, 400);
     }
 
-    const chamarGemini = (model: string) =>
-      fetch(`${GAPI}/models/${model}:generateContent?key=${GEMINI_KEY}`, {
+    // O Safari/iOS corta pedidos que passem dos ~60s ("Load failed", sem
+    // detalhe). Impomos um limite próprio mais curto para conseguir devolver
+    // um erro legível ANTES de o browser rebentar às cegas.
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
+
+    const chamarGemini = (model: string, desligarThinking = true) => {
+      const generationConfig: Record<string, unknown> = {
+        response_mime_type: "application/json",
+        temperature: 0,
+      };
+      // Os modelos 2.5 "pensam" por defeito e isso pode custar dezenas de
+      // segundos — o suficiente para estoirar o limite do Safari. Com
+      // thinkingBudget:0 desligamos o thinking (resposta muito mais rápida).
+      // Se o modelo não suportar o campo devolve 400 → repetimos sem ele.
+      if (desligarThinking) generationConfig.thinkingConfig = { thinkingBudget: 0 };
+      return fetch(`${GAPI}/models/${model}:generateContent?key=${GEMINI_KEY}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        signal: ctrl.signal,
         body: JSON.stringify({
           contents: [{
             parts: [
@@ -149,9 +168,10 @@ Deno.serve(async (req) => {
               { text: PROMPT },
             ],
           }],
-          generationConfig: { response_mime_type: "application/json", temperature: 0 },
+          generationConfig,
         }),
       });
+    };
 
     let model = await escolherModelo();
     let g = await chamarGemini(model);
@@ -164,6 +184,12 @@ Deno.serve(async (req) => {
         g = await chamarGemini(model);
       }
     }
+    // Modelo não aceita o campo thinkingConfig (400)? Repete sem ele.
+    if (g.status === 400) {
+      const d = await g.clone().text();
+      if (/think/i.test(d)) g = await chamarGemini(model, false);
+    }
+    clearTimeout(timer);
     if (!g.ok) {
       const detail = await g.text();
       console.error("gemini", model, g.status, detail.slice(0, 500));
@@ -181,6 +207,13 @@ Deno.serve(async (req) => {
     }
     return json(parsed);
   } catch (e) {
-    return json({ error: (e as Error).message }, 500);
+    const err = e as Error;
+    // Estoirou o nosso timeout antes de o modelo responder.
+    if (err.name === "AbortError") {
+      return json({
+        error: "o modelo demorou demasiado a ler a fatura — tenta uma foto mais nítida ou um PDF com menos páginas",
+      }, 504);
+    }
+    return json({ error: err.message }, 500);
   }
 });
