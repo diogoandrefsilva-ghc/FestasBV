@@ -18,6 +18,10 @@ Numa BD limpa, correr por esta ordem (há dependências entre eles):
 1. `schema.sql` — schema, tabelas, constraints, GRANTs e `ENABLE ROW LEVEL SECURITY`
 2. `functions.sql` — funções de acesso + triggers (dependem das tabelas)
 3. `policies.sql` — RLS policies (dependem das funções)
+4. `shoplist.sql` — lista de compras partilhada (`shoplist` + `despesas.compra_id`)
+5. `stock.sql` — stock por refeição (`stock_lotes`); só necessário para a gestão de stock
+
+Os passos 4–5 são migrações add-on idempotentes: correr uma vez cada.
 
 ## Conteúdo
 
