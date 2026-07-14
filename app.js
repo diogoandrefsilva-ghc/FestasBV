@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v23 · 2026-07-13 · 📷 Importar fatura no Registar Compra (pré-preenche artigos via foto)';
+const APP_BUILD = 'v24 · 2026-07-14 · 📷 Importar fatura (foto ou PDF) no Registar Compra';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -961,7 +961,7 @@ function renderAll(){
           <div class="refdef-info">
             <div class="refdef-ref sf">${rd.ref}${rd.prato?`<span class="refdef-prato sf"> · ${escHtml(rd.prato)}</span>`:''}</div>
             ${rd.menu?`<div class="refdef-menu sf">${escHtml(rd.menu)}</div>`:''}
-            ${(rd.respCozinha||rd.respCompras)?`<div class="refdef-resp sf">${[rd.respCozinha?'👨‍🍳 '+escHtml(rd.respCozinha):'',rd.respCompras?'🛒 '+escHtml(rd.respCompras):''].filter(Boolean).join(' · ')}</div>`:''}
+            ${rd.respCozinha?`<div class="refdef-resp sf">👨‍🍳 ${escHtml(rd.respCozinha)}</div>`:''}
           </div>
           ${isAdmin()?'<span class="refdef-chevron sf">›</span>':''}
           ${costCards}${mealShopSection(rd)}
@@ -1456,7 +1456,7 @@ async function carregar(){
         _id:m.id,nome:m.nome,fator:N(m.fator),sexo:m.sexo==='F'?'F':'M',
         presencas:(m.presencas||[]).map(p=>({k:`${p.dia}|${p.ref}`,modo:p.modo==='bebe'?'bebe':'come'}))
       })),
-      refeicoesDef:(ev.refeicoes_def||[]).map(r=>({data:r.data,dia:r.dia,ref:r.ref,prato:r.prato||'',peso:N(r.peso),minMEO:N(r.min_meo),minConv:N(r.min_conv),extraConv:N(r.extra_conv),respCozinha:r.resp_cozinha||'',respCompras:r.resp_compras||'',menu:r.menu||''})),
+      refeicoesDef:(ev.refeicoes_def||[]).map(r=>({data:r.data,dia:r.dia,ref:r.ref,prato:r.prato||'',peso:N(r.peso),minMEO:N(r.min_meo),minConv:N(r.min_conv),extraConv:N(r.extra_conv),respCozinha:r.resp_cozinha||'',menu:r.menu||''})),
       despesas:(ev.despesas||[]).map(d=>({_id:d.id,quem:d.quem,dataDesp:d.data_desp,dataValor:d.data_valor,desc:d.descricao,tipo:d.tipo,valor:N(d.valor),obs:d.observacoes||'',compraId:d.compra_id||null})),
       convidados:(ev.convidados||[]).map(c=>({_id:c.id,membro:c.membro,nome:c.nome,data:c.data,dia:c.dia,ref:c.ref,pagante:c.pagante?'Sim':'Não',preco:N(c.preco)})),
       mealheiros:(ev.mealheiros||[]).map(m=>({quem:m.quem,data:m.data,valor:N(m.valor),subtipo:m.subtipo,desc:m.descricao})),
@@ -1533,7 +1533,7 @@ async function sbGuardarEvento(y,slot){
     if(y.refeicoesDef&&y.refeicoesDef.length)
       await sbReq('POST','refeicoes_def',y.refeicoesDef.map(r=>{
         const row={evento_id:eid,data:r.data,dia:r.dia,ref:r.ref,prato:r.prato||null,peso:r.peso||0,min_meo:r.minMEO||0,min_conv:r.minConv||0,extra_conv:r.extraConv||0};
-        if(REFDEF_RESP_COLS){row.resp_cozinha=r.respCozinha||null;row.resp_compras=r.respCompras||null;row.menu=r.menu||null;}
+        if(REFDEF_RESP_COLS){row.resp_cozinha=r.respCozinha||null;row.menu=r.menu||null;}
         return row;
       }));
     if(y.despesas&&y.despesas.length){
@@ -4771,7 +4771,6 @@ function openRefdefModal(editIdx){
   if(isEdit){
     const rd=DATA.refeicoesDef[editingRefdef];
     document.getElementById('rd-resp-coz').innerHTML=_respOptions(rd.respCozinha||'');
-    document.getElementById('rd-resp-comp').innerHTML=_respOptions(rd.respCompras||'');
     document.getElementById('rd-menu').value=rd.menu||'';
     document.getElementById('rd-data').value=rd.data||'';
     document.getElementById('rd-ref').value=rd.ref||'Jantar';
@@ -4782,7 +4781,6 @@ function openRefdefModal(editIdx){
     document.getElementById('rd-extraconv').value=rd.extraConv||2;
   } else {
     document.getElementById('rd-resp-coz').innerHTML=_respOptions('');
-    document.getElementById('rd-resp-comp').innerHTML=_respOptions('');
     document.getElementById('rd-menu').value='';
     document.getElementById('rd-data').value='';
     document.getElementById('rd-ref').value='Jantar';
@@ -4847,9 +4845,8 @@ async function saveRefdef(){
   const wasEdit=editingRefdef!==null;
   const anterior=wasEdit?DATA.refeicoesDef[editingRefdef]:null;
   const respCozinha=REFDEF_RESP_COLS?(document.getElementById('rd-resp-coz').value||''):((anterior&&anterior.respCozinha)||'');
-  const respCompras=REFDEF_RESP_COLS?(document.getElementById('rd-resp-comp').value||''):((anterior&&anterior.respCompras)||'');
   const menu=REFDEF_RESP_COLS?(document.getElementById('rd-menu').value||'').trim():((anterior&&anterior.menu)||'');
-  const entry={data,dia,ref,prato:prato||'',peso:ref==='Lanche'?null:peso,minMEO,minConv,extraConv,respCozinha,respCompras,menu};
+  const entry={data,dia,ref,prato:prato||'',peso:ref==='Lanche'?null:peso,minMEO,minConv,extraConv,respCozinha,menu};
 
   document.getElementById('rd-save').disabled=true;
   if(wasEdit){
@@ -4895,7 +4892,7 @@ function resumoRefeicao(rd){
   return L.join('\n');
 }
 function logNomeacoes(antes,depois){
-  [['respCozinha','cozinha'],['respCompras','compras']].forEach(([k,papel])=>{
+  [['respCozinha','cozinha']].forEach(([k,papel])=>{
     const de=(antes&&antes[k])||'',para=depois[k]||'';
     if(de===para)return;
     if(para)sbLog('refeicao','nomeou',para,{dia:depois.dia,ref:depois.ref,papel,resumo:resumoRefeicao(depois)});
