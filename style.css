@@ -836,6 +836,29 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .lote-sug.alt .sug-txt b{color:var(--gold)}
 .sug-txt span{font-size:12.5px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .sug-price{flex:0 0 auto;font-size:13px;font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums}
+/* Botão-seletor de destino (substitui o <select> nativo, feio no iOS) */
+.dest-btn{flex:1;min-width:0;display:flex;align-items:center;gap:8px;background:#FFFDF6;border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:13.5px;font-weight:600;color:var(--ink);cursor:pointer;text-align:left;transition:.12s}
+.dest-btn:active{background:var(--panel2);transform:scale(.99)}
+.dest-btn.dis{opacity:.65;cursor:default}
+.dest-ic{flex:0 0 auto;font-size:15px}
+.dest-lbl{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dest-chev{flex:0 0 auto;color:var(--faint);font-size:11px}
+.lote-ln .dest-btn{padding:9px 11px;font-size:13px}
+/* Bottom-sheet do seletor de destino */
+.dsheet-bg{position:fixed;inset:0;background:rgba(40,25,10,.45);z-index:100060;display:none;align-items:flex-end;justify-content:center}
+.dsheet-bg.show{display:flex}
+.dsheet{background:var(--panel);width:100%;max-width:520px;max-height:82vh;border-radius:20px 20px 0 0;box-shadow:0 -10px 34px rgba(40,25,10,.28);display:flex;flex-direction:column;padding-bottom:max(16px,env(safe-area-inset-bottom));animation:dsheetup .22s cubic-bezier(.22,1,.36,1)}
+@keyframes dsheetup{from{transform:translateY(101%)}to{transform:translateY(0)}}
+.dsheet-handle{width:40px;height:4px;border-radius:3px;background:var(--line);margin:9px auto 3px}
+.dsheet-title{font-family:var(--display);font-size:13px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);font-weight:600;text-align:center;padding:6px 16px 8px}
+.dsheet-list{overflow-y:auto;padding:2px 10px 6px;-webkit-overflow-scrolling:touch}
+.dsheet-grp{font-size:10px;letter-spacing:.09em;text-transform:uppercase;color:var(--faint);font-weight:700;padding:12px 8px 5px}
+.dsheet-opt{display:flex;align-items:center;gap:12px;width:100%;background:transparent;border:none;border-radius:12px;padding:13px 12px;font-size:15px;color:var(--ink);cursor:pointer;text-align:left;font-weight:500}
+.dsheet-opt:active{background:var(--panel2)}
+.dsheet-opt.on{background:rgba(30,122,77,.1)}
+.dsheet-ic{flex:0 0 auto;font-size:19px}
+.dsheet-lbl{flex:1;min-width:0}
+.dsheet-chk{flex:0 0 auto;color:var(--green);font-weight:800;font-size:16px}
 /* Aviso: artigos do carrinho não vistos na fatura (ficam por tratar) */
 .lote-miss-warn{margin-top:12px;padding:11px 12px;background:rgba(168,123,20,.1);border:1px solid rgba(168,123,20,.4);border-radius:11px;font-size:12.5px;color:var(--ink);line-height:1.45}
 .lote-miss-warn b{color:var(--gold)}

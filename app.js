@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v32 · 2026-07-14 · Fatura: a quantidade real do talão manda no stock (o pedido do carrinho é só guia); aviso quando diferem';
+const APP_BUILD = 'v33 · 2026-07-14 · Alocação: seletor de destino próprio (bottom-sheet bonito) e a app PROPÕE a distribuição (sem "FIFO" na lista); é só confirmar/mudar';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -4017,26 +4017,70 @@ function compraRefreshLotes(){
     d.items.forEach(i=>{const q=qtyParse(i.quantidade);if(!q){ok=false;return;}if(u==null)u=q.u;if(q.u!==u)ok=false;else tot=rnd(tot+q.n,3);});
     let qtd=ok&&tot>0?fmtQty(tot,u):'';
     if(!qtd&&d.tipoFix&&d.items.length===1)qtd=shopQtyLabel(d.items[0]);
-    // Destino por defeito: itens de refeição múltipla → '' (FIFO); itens de tipo
-    // (Bebidas/Gerais/…) → esse tipo; refeição fixa (sem tabela) → 'Ref|data'.
+    // Destino: itens de tipo (Bebidas/Gerais/…) → esse tipo; refeição fixa (sem
+    // tabela) → 'Ref|data'; itens de refeição → proposta concreta (FIFO) já feita.
     const destino=d.tipoFix?(d.dataFix?d.tipoFix+'|'+d.dataFix:d.tipoFix):'';
-    return {artigo:d.artigo,qtd,valor:'',keys,tipoFix:d.tipoFix||null,dataFix:d.dataFix||null,destino,splits:null};
+    const lote={artigo:d.artigo,qtd,valor:'',keys,tipoFix:d.tipoFix||null,dataFix:d.dataFix||null,destino,splits:null};
+    if(!d.tipoFix)compraProporDestino(lote);   // propõe alocação concreta às refeições
+    return lote;
   }).concat(prev.filter(l=>l.free));   // artigos fora da lista mantêm-se
   compraRenderLotes();
 }
 /* Opções de destino de um item detalhado: "por alocar" (FIFO), tipos puros
    (Gerais/Bebidas/Cerveja) e cada refeição. Chave: '' | 'Tipo' | 'Ref|data'. */
-// Tipos puros + refeições (sem o "por alocar"). Usado no modal do lote/stock,
-// onde cada linha aponta a um destino concreto (o livre é o resto do lote).
-function destOptsTypesMeals(sel){
-  sel=sel==null?'':sel;
-  let o=['Gerais','Bebidas','Cerveja'].map(t=>`<option value="${t}"${sel===t?' selected':''}>${shopTipoIcon(t)} ${t}</option>`).join('');
-  o+=(DATA.refeicoesDef||[]).filter(r=>shopIsMeal(r.ref)).map(r=>{const v=r.ref+'|'+r.data;return `<option value="${v}"${sel===v?' selected':''}>${shopTipoIcon(r.ref)} ${r.ref} ${fmtDiaMes(r.data)}${r.prato?' · '+escHtml(r.prato):''}</option>`;}).join('');
-  return o;
+/* ── Seletor de destino (bottom-sheet próprio, no tema da app) ──
+   Substitui o <select> nativo. A lista tem só destinos concretos — tipos de
+   despesa e refeições. A distribuição automática (FIFO) é PROPOSTA pela app
+   (compraProporDestino / loteFifo), nunca uma opção que o utilizador escolhe. */
+function destPickList(){
+  const out=[];
+  ['Gerais','Bebidas','Cerveja'].forEach(t=>out.push({value:t,icon:shopTipoIcon(t),label:t,group:'Tipo'}));
+  (DATA.refeicoesDef||[]).filter(r=>shopIsMeal(r.ref)).forEach(r=>out.push({value:r.ref+'|'+r.data,icon:shopTipoIcon(r.ref),label:`${r.ref} ${fmtDiaMes(r.data)}${r.prato?' · '+r.prato:''}`,group:'Refeição'}));
+  return out;
 }
-function destOptsAll(sel){
-  sel=sel==null?'':sel;
-  return `<option value=""${sel===''?' selected':''}>🧺 Por alocar (FIFO)</option>`+destOptsTypesMeals(sel);
+// Rótulo (ícone + texto) de um valor de destino, para o botão do seletor
+function destLabel(value){
+  const it=value?destPickList().find(x=>x.value===value):null;
+  if(it)return{icon:it.icon,label:it.label};
+  const a=value?destinoAloc(value,0):null;
+  if(a)return{icon:shopTipoIcon(a.tipo),label:alocIsMeal(a)?`${a.tipo} ${fmtDiaMes(a.data)}`:a.tipo};
+  return{icon:'🧺',label:'Escolher destino'};
+}
+// Botão que abre o seletor (parece um campo, mas é bonito e controlável)
+function destBtnHtml(value,onclick,dis){
+  const d=destLabel(value);
+  return `<button type="button" class="dest-btn${dis?' dis':''}" ${dis?'disabled':`onclick="${onclick}"`}>
+    <span class="dest-ic">${d.icon}</span><span class="dest-lbl">${escHtml(d.label)}</span>${dis?'':'<span class="dest-chev">▾</span>'}</button>`;
+}
+let _dpick=null;   // {items, cb}
+function openDestPicker(current,cb,title){
+  const items=destPickList();
+  _dpick={items,cb};
+  document.getElementById('dpick-title').textContent=title||'Alocar a…';
+  let last=null,h='';
+  items.forEach((it,idx)=>{
+    if(it.group!==last){h+=`<div class="dsheet-grp">${it.group==='Tipo'?'Tipos de despesa':'Refeições'}</div>`;last=it.group;}
+    h+=`<button type="button" class="dsheet-opt${it.value===current?' on':''}" onclick="pickDest(${idx})">
+      <span class="dsheet-ic">${it.icon}</span><span class="dsheet-lbl">${escHtml(it.label)}</span>${it.value===current?'<span class="dsheet-chk">✓</span>':''}</button>`;
+  });
+  document.getElementById('dpick-list').innerHTML=h;
+  document.getElementById('dpick-bg').classList.add('show');
+}
+function pickDest(idx){const d=_dpick;closeDestPicker();if(d&&d.cb)d.cb(d.items[idx].value);}
+function closeDestPicker(e){if(e&&e.target&&e.target.id!=='dpick-bg')return;document.getElementById('dpick-bg').classList.remove('show');_dpick=null;}
+/* Propõe uma alocação CONCRETA para um lote de refeição (FIFO nos bastidores):
+   1 destino → destino simples; vários → split; sem procura → refeição pedida
+   (se só uma) ou Gerais. Só para lotes de refeição — os de tipo mantêm o tipo. */
+function compraProporDestino(l){
+  const q=qtyParse(l.qtd);
+  if(q&&q.n>0){
+    const al=fifoAlocar(l.artigo,q.n,q.u,null,(l.keys&&l.keys.length)?l.keys:null);
+    if(al.length>=2){l.splits=al.map(a=>({destino:alocToDestino(a),qtd:a.qtd}));l.destino='';return;}
+    if(al.length===1){l.destino=alocToDestino(al[0]);l.splits=null;return;}
+  }
+  l.splits=null;
+  if(l.keys&&l.keys.length===1)l.destino=l.keys[0];
+  else if(!l.destino)l.destino='Gerais';
 }
 // Nota do split: quanto falta/sobra repartir face à qtd do lote
 function compraSplitNote(l){
@@ -4044,7 +4088,7 @@ function compraSplitNote(l){
   const tot=(l.splits||[]).reduce((a,s)=>a+(parseFloat(String(s.qtd).replace(',','.'))||0),0);
   if(!q)return 'Reparte a quantidade pelos destinos (o resto fica por alocar).';
   const livre=rnd(q.n-tot,3);
-  if(livre>0.0005)return `Falta repartir ${fmtQty(livre,u)} → fica por alocar (FIFO).`;
+  if(livre>0.0005)return `Falta repartir ${fmtQty(livre,u)} → fica na bolsa comum.`;
   if(livre<-0.0005)return `⚠️ Repartiste ${fmtQty(rnd(tot,3),u)} — mais do que ${fmtQty(q.n,u)}.`;
   return 'Repartido a 100%.';
 }
@@ -4068,7 +4112,7 @@ function compraLoteHtml(l,i){
   if(STOCK_TABLE){
     if(l.splits&&l.splits.length){
       const rows=l.splits.map((s,j)=>`<div class="split-row">
-          <select onchange="compraEdit.lotes[${i}].splits[${j}].destino=this.value">${destOptsAll(s.destino)}</select>
+          ${destBtnHtml(s.destino,`compraSplitDestPick(${i},${j})`)}
           <input class="split-qty" type="text" inputmode="decimal" placeholder="qtd" value="${escHtml(s.qtd==null?'':String(s.qtd))}" oninput="compraLoteSplitQty(${i},${j},this.value)">
           <button class="lote-x" title="Remover destino" onclick="compraLoteDelSplit(${i},${j})">✕</button>
         </div>`).join('');
@@ -4077,7 +4121,7 @@ function compraLoteHtml(l,i){
         <div class="split-note" id="split-note-${i}">${compraSplitNote(l)}</div></div>`;
     }else{
       destBlock=`<div class="lote-dest">
-          <select onchange="compraEdit.lotes[${i}].destino=this.value">${destOptsAll(l.destino)}</select>
+          ${destBtnHtml(l.destino,`compraDestPick(${i})`)}
           <button class="lote-split-btn" title="Dividir por vários destinos" onclick="compraLoteAddSplit(${i})">⇄ dividir</button>
         </div>`;
     }
@@ -4111,8 +4155,8 @@ function compraRenderLotes(){
     missWarn+
     ((det||STOCK_TABLE)?`<button class="btn ghost" style="width:100%;margin-top:8px" onclick="compraAddLote()">${det?'＋ Artigo fora da lista':'＋ Artigo detalhado'}</button>`:'')+
     (det
-      ?'<div class="note">Cada artigo cai no destino escolhido — refeição ou tipo (Gerais/Bebidas/…). Podes dividir um artigo por vários destinos com ⇄. Reajustas tudo depois no separador 🧺 Stock.</div>'
-      :(ls.length?'<div class="note">Preencher o € torna o artigo um lote de stock, alocado ao destino escolhido (ou repartido por FIFO se ficar "por alocar"). Reajustas depois em 🧺 Stock. € vazio = artigo normal, coberto pelas linhas de baixo.</div>':''))+
+      ?'<div class="note">A app propõe o destino de cada artigo (refeição ou tipo) — confirma ou muda. Podes dividir um artigo por vários destinos com ⇄. Reajustas tudo depois no separador 🧺 Stock.</div>'
+      :(ls.length?'<div class="note">Preencher o € torna o artigo um lote de stock, com o destino que a app propõe (podes mudar). Reajustas depois em 🧺 Stock. € vazio = artigo normal, coberto pelas linhas de baixo.</div>':''))+
     faturaExtrasHtml();
   compraUpdateTotal();
 }
@@ -4132,6 +4176,8 @@ function compraLoteDelSplit(i,j){
   if(l.splits.length<=1){l.destino=l.splits.length?(l.splits[0].destino||''):(l.destino||'');l.splits=null;}
   compraRenderLotes();
 }
+function compraDestPick(i){const l=(compraEdit.lotes||[])[i];if(!l)return;openDestPicker(l.destino,v=>{l.destino=v;l.splits=null;compraRenderLotes();},'Alocar '+(l.artigo||'artigo'));}
+function compraSplitDestPick(i,j){const l=(compraEdit.lotes||[])[i];if(!l||!l.splits||!l.splits[j])return;openDestPicker(l.splits[j].destino,v=>{l.splits[j].destino=v;compraRenderLotes();},'Destino');}
 function compraAddLote(){
   compraEdit.lotes=compraEdit.lotes||[];
   compraEdit.lotes.push({free:true,artigo:'',qtd:'',valor:'',destino:'Gerais',keys:[]});
@@ -4265,6 +4311,7 @@ function faturaAplicar(d){
       if(ln.qtd)l.qtd=ln.qtd;
       l._fat='ok';l._impQtds=[ln.qtd];
       faturaQtdRecheck(l);
+      if(!l.tipoFix)compraProporDestino(l);   // re-propõe com a qtd real do talão
       preenchidos++;
     }else{                                    // parcial → só com o teu OK
       loteUsado.add(p.i);linhaUsada.add(p.j);
@@ -4311,6 +4358,7 @@ function faturaSugToggle(i){
   if(ln.qtd)l.qtd=ln.qtd;   // qtd real do talão (o pedido do carrinho é só guia)
   l._fat='ok';l._impQtds=[ln.qtd];
   faturaQtdRecheck(l);
+  if(!l.tipoFix)compraProporDestino(l);
   compraRenderLotes();
 }
 // Confirmar um sub-artigo (outra marca do mesmo genérico): vira artigo fora da
@@ -4500,10 +4548,9 @@ function loteRenderAlocs(){
   const unit=l.qtd>0?l.valor/l.qtd:0;
   document.getElementById('lote-alocs').innerHTML=editingLote.alocs.map((a,i)=>{
     const meal=alocIsMeal(a);
-    const opts=destOptsTypesMeals(alocToDestino(a));
     return `<div class="lote-ln">
       <span class="lote-st" title="${meal?stockEstadoLbl(a.data):a.tipo}">${meal?stockEstadoIcon(a.data):shopTipoIcon(a.tipo)}</span>
-      <select ${canEdit?'':'disabled'} onchange="loteAlocField(${i},'ref',this.value)">${opts}</select>
+      ${destBtnHtml(alocToDestino(a),`loteDestPick(${i})`,!canEdit)}
       <input type="number" step="any" min="0" inputmode="decimal" ${canEdit?'':'disabled'} value="${a.qtd||''}" placeholder="qtd" onchange="loteAlocField(${i},'qtd',this.value)">
       <span class="lote-val">${eur(rnd(unit*(+a.qtd||0),2))}</span>
       ${canEdit?`<button class="cmp-ln-del" title="Remover" onclick="loteDelAloc(${i})">✕</button>`:''}
@@ -4521,6 +4568,11 @@ function loteAlocField(i,f,v){
   if(f==='qtd')a.qtd=parseFloat(String(v).replace(',','.'))||0;
   else{const d=destinoAloc(v,0);a.tipo=d?d.tipo:v;a.data=d?d.data:null;}
   loteRenderAlocs();
+}
+function loteDestPick(i){
+  if(!isAdmin())return;
+  const a=editingLote&&editingLote.alocs[i];if(!a)return;
+  openDestPicker(alocToDestino(a),v=>loteAlocField(i,'ref',v),'Alocar a');
 }
 function loteAddAloc(){
   if(!isAdmin()||!editingLote)return;
