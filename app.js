@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v29 · 2026-07-14 · Stock unificado: itemização por linha da fatura (destino + split), fatura nas despesas de cash-flow, e novo separador 🧺 Stock p/ mover artigos entre refeições/tipos';
+const APP_BUILD = 'v30 · 2026-07-14 · Stock unificado: itemização por linha da fatura (destino + split), fatura nas despesas de cash-flow, e novo separador Stock p/ mover artigos entre refeições/tipos';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
