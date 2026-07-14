@@ -817,6 +817,8 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .price-in{position:relative;display:flex}
 .price-in input{width:100%;padding-right:26px;text-align:right}
 .price-in i{position:absolute;right:11px;top:50%;transform:translateY(-50%);font-style:normal;font-size:14px;color:var(--muted);font-weight:600;pointer-events:none}
+.lote-hint{margin-top:8px;font-size:11.5px;line-height:1.4;color:var(--gold)}
+.lote-hint b{color:var(--ink);font-weight:700}
 .lote-dest{display:flex;align-items:center;gap:8px;margin-top:10px}
 .lote-dest select{flex:1;min-width:0;margin:0}
 .lote-split-btn{flex:0 0 auto;background:transparent;border:none;color:var(--green);font-size:12px;font-weight:700;cursor:pointer;padding:6px 2px;white-space:nowrap}

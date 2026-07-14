@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v31 · 2026-07-14 · Itemização da fatura: cartões redesenhados + aviso claro de artigos do carrinho não detetados (ficam por tratar, não comprados)';
+const APP_BUILD = 'v32 · 2026-07-14 · Fatura: a quantidade real do talão manda no stock (o pedido do carrinho é só guia); aviso quando diferem';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -4088,8 +4088,11 @@ function compraLoteHtml(l,i){
     (!l.free&&l._subs?l._subs.map((s,j)=>`<label class="lote-sug alt"><input type="checkbox" onchange="faturaSubToggle(${i},${j})">
         <div class="sug-txt"><b>＋ Outra marca do mesmo?</b><span>${escHtml(s.artigo)}${s.qtd?' · '+escHtml(s.qtd):''}</span></div>
         <span class="sug-price">${eur(s.valor)}</span></label>`).join(''):'');
+  // Pediste X no carrinho mas o talão traz Y → o talão manda no stock
+  const qtyHint=(!l.free&&l._fat==='warn'&&l._qtdPedida)
+    ?`<div class="lote-hint">📝 Pediste <b>${escHtml(String(l._qtdPedida))}</b> no carrinho; o talão tem <b>${escHtml(l.qtd||'—')}</b> — é esta que entra em stock.</div>`:'';
   const cls='lote-card'+(l._fat==='miss'?' is-miss':l._fat==='warn'?' is-warn':l._fat==='ok'?' is-ok':'');
-  return `<div class="${cls}">${head}${fields}${destBlock}${fat}</div>`;
+  return `<div class="${cls}">${head}${fields}${qtyHint}${destBlock}${fat}</div>`;
 }
 function compraRenderLotes(){
   const cont=document.getElementById('shop-buy-lotes');if(!cont)return;
@@ -4257,7 +4260,9 @@ function faturaAplicar(d){
     if(p.s===1){                              // certeza → entra por defeito
       loteUsado.add(p.i);linhaUsada.add(p.j);
       if(l.valor===''||l.valor==null)l.valor=ln.valor;
-      if(!l.qtd&&ln.qtd)l.qtd=ln.qtd;
+      // O talão manda na quantidade real (o pedido do carrinho é só guia): se a
+      // fatura traz qtd, é essa que entra em stock — não o que se pediu.
+      if(ln.qtd)l.qtd=ln.qtd;
       l._fat='ok';l._impQtds=[ln.qtd];
       faturaQtdRecheck(l);
       preenchidos++;
@@ -4303,7 +4308,7 @@ function faturaSugToggle(i){
   const l=(compraEdit.lotes||[])[i];if(!l||!l._sug)return;
   const ln=l._sug;delete l._sug;
   if(l.valor===''||l.valor==null)l.valor=ln.valor;
-  if(!l.qtd&&ln.qtd)l.qtd=ln.qtd;
+  if(ln.qtd)l.qtd=ln.qtd;   // qtd real do talão (o pedido do carrinho é só guia)
   l._fat='ok';l._impQtds=[ln.qtd];
   faturaQtdRecheck(l);
   compraRenderLotes();
