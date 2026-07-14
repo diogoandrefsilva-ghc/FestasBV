@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v25 · 2026-07-14 · Botão Importar fatura em duas linhas (subtítulo pequeno)';
+const APP_BUILD = 'v26 · 2026-07-14 · Fatura: extras opt-in por checkbox; ⚠️ em artigos sem correspondência';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -3944,7 +3944,7 @@ function compraRenderLotes(){
   cont.innerHTML=((ls.length||det)?`<div class="cmp-pick sf" style="margin-top:14px">${det?'💶 Preço por artigo':'🧾 Detalhe por artigo — opcional'}</div>`:'')+
     ls.map((l,i)=>`<div class="cmp-ln cmp-lote">
       <div class="cmp-ln-row1">
-        ${l.free?`<input class="cmp-lote-art-in" type="text" maxlength="60" placeholder="Artigo" value="${escHtml(l.artigo||'')}" oninput="compraEdit.lotes[${i}].artigo=this.value">`:`<span class="cmp-lote-art">${l.tipoFix?shopTipoIcon(l.tipoFix)+' ':''}${escHtml(l.artigo)}</span>`}
+        ${l.free?`<input class="cmp-lote-art-in" type="text" maxlength="60" placeholder="Artigo" value="${escHtml(l.artigo||'')}" oninput="compraEdit.lotes[${i}].artigo=this.value">`:`<span class="cmp-lote-art">${l.tipoFix?shopTipoIcon(l.tipoFix)+' ':''}${escHtml(l.artigo)}${l._fat==='ok'?' <span title="Encontrado na fatura" style="color:#3a8f4a">✓</span>':l._fat==='miss'?' <span title="Não encontrado na fatura — confirma o preço à mão">⚠️</span>':''}</span>`}
         <input class="cmp-lote-qtd" type="text" placeholder="Qtd" value="${escHtml(l.qtd||'')}" oninput="compraEdit.lotes[${i}].qtd=this.value" onblur="this.value=normalizeQty(this.value);compraEdit.lotes[${i}].qtd=this.value">
         <div class="cmp-ln-val"><span>€</span><input type="number" step="0.01" min="0" inputmode="decimal" placeholder="0,00" value="${l.valor===''||l.valor==null?'':l.valor}" oninput="compraEdit.lotes[${i}].valor=this.value;compraUpdateTotal()"></div>
         ${l.free?`<button class="cmp-ln-del" title="Remover" onclick="compraDelLote(${i})">✕</button>`:''}
@@ -3954,7 +3954,8 @@ function compraRenderLotes(){
     ((det||STOCK_TABLE)?`<button class="btn ghost" style="width:100%;margin-top:8px" onclick="compraAddLote()">${det?'＋ Artigo fora da lista':'＋ Artigo detalhado'}</button>`:'')+
     (det
       ?'<div class="note">O € de cada artigo cai na refeição ou no tipo respetivo. Artigos pedidos para várias refeições ficam em 🧺 Stock e a app reparte-os pelas refeições (podes ajustar depois).</div>'
-      :(ls.length?'<div class="note">Preencher o € torna o artigo um lote de stock: a app aloca-o às refeições (FIFO por data) e reajustas depois em 🧺 Stock — mesmo que sobre para outra refeição. Não contes esses artigos nas linhas de baixo. € vazio = artigo normal.</div>':''));
+      :(ls.length?'<div class="note">Preencher o € torna o artigo um lote de stock: a app aloca-o às refeições (FIFO por data) e reajustas depois em 🧺 Stock — mesmo que sobre para outra refeição. Não contes esses artigos nas linhas de baixo. € vazio = artigo normal.</div>':''))+
+    faturaExtrasHtml();
   compraUpdateTotal();
 }
 function compraAddLote(){
@@ -4046,6 +4047,7 @@ function faturaAplicar(d){
   // Matching guloso por melhor score: cada linha do talão serve no máximo um artigo
   const linhas=d.linhas.filter(l=>l&&l.artigo&&typeof l.preco==='number'&&l.preco>=0);
   const lotes=compraEdit.lotes||[];
+  lotes.forEach(l=>{delete l._fat;});   // re-importação: limpa marcas anteriores
   const pares=[];
   lotes.forEach((l,i)=>{if(l.free)return;linhas.forEach((ln,j)=>{const s=faturaScore(l.artigo,ln.artigo);if(s>=0.5)pares.push({i,j,s});});});
   pares.sort((a,b)=>b.s-a.s);
@@ -4057,18 +4059,38 @@ function faturaAplicar(d){
     const l=lotes[p.i],ln=linhas[p.j];
     if(l.valor===''||l.valor==null)l.valor=rnd(ln.preco,2);
     if(!l.qtd&&ln.qtd)l.qtd=normalizeQty(String(ln.qtd));
+    l._fat='ok';   // ✓ encontrado na fatura
     preenchidos++;
   });
-  // Linhas sem correspondência → artigos fora da lista (o utilizador apaga o que não interessar)
-  let avulsos=0;
-  linhas.forEach((ln,j)=>{
-    if(linhaUsada.has(j))return;
-    lotes.push({free:true,artigo:String(ln.artigo).slice(0,60),qtd:ln.qtd?normalizeQty(String(ln.qtd)):'',valor:rnd(ln.preco,2),destino:'Gerais',keys:[]});
-    avulsos++;
-  });
+  // Artigos do carrinho SEM correspondência na fatura → alerta ⚠️ (fica € vazio)
+  let semMatch=0;
+  lotes.forEach((l,i)=>{if(!l.free&&!loteUsado.has(i)){l._fat='miss';semMatch++;}});
+  // Linhas da fatura sem correspondência → lista de EXTRAS, desmarcados por
+  // defeito: só entram na compra se o utilizador os marcar (faturaExtraToggle)
+  compraEdit.faturaExtras=linhas.filter((ln,j)=>!linhaUsada.has(j))
+    .map(ln=>({artigo:String(ln.artigo).slice(0,60),qtd:ln.qtd?normalizeQty(String(ln.qtd)):'',valor:rnd(ln.preco,2)}));
+  const extras=compraEdit.faturaExtras.length;
   compraEdit.lotes=lotes;
   compraRenderLotes();
-  toast(`Fatura lida: ${preenchidos} da lista preenchido(s)${avulsos?`, ${avulsos} extra(s) — revê antes de registar`:' — revê antes de registar'}`,'ok');
+  toast(`Fatura lida: ${preenchidos} preenchido(s) ✓${semMatch?`, ${semMatch} da lista sem correspondência ⚠️`:''}${extras?`, ${extras} extra(s) por confirmar`:''}`,'ok');
+}
+/* Extras da fatura (linhas que não estavam no carrinho): checkbox desmarcada
+   por defeito; marcar converte em "artigo fora da lista" editável (o ✕ do
+   lote serve de desfazer). Os que ficarem desmarcados não entram no registo. */
+function faturaExtrasHtml(){
+  const ex=compraEdit.faturaExtras||[];
+  if(!ex.length)return '';
+  return `<div class="cmp-pick sf" style="margin-top:14px">🧾 Extras da fatura — não estavam na lista</div>`+
+    ex.map((e,i)=>`<label class="cmp-pick-row"><input type="checkbox" onchange="faturaExtraToggle(${i})">
+      <span>${escHtml(e.artigo)}${e.qtd?' <i>('+escHtml(e.qtd)+')</i>':''}</span>
+      <span class="cmp-badge">${eur(e.valor)}</span></label>`).join('')+
+    '<div class="note" style="margin-top:6px">Estão na fatura mas não estavam no carrinho. Marca os que são das Festas; os restantes ficam de fora.</div>';
+}
+function faturaExtraToggle(i){
+  const e=(compraEdit.faturaExtras||[])[i];if(!e)return;
+  compraEdit.faturaExtras.splice(i,1);
+  (compraEdit.lotes=compraEdit.lotes||[]).push({free:true,artigo:e.artigo,qtd:e.qtd,valor:e.valor,destino:'Gerais',keys:[]});
+  compraRenderLotes();
 }
 
 async function saveCompra(){
