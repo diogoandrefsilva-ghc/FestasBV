@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v27 · 2026-07-14 · Fatura: só matches 100% entram por defeito; sugestões e multi-marca por checkbox; aviso de qtds';
+const APP_BUILD = 'v28 · 2026-07-14 · Fatura: thinking do modelo desligado + timeout na função (corrige "load failed"); mensagens de erro mais claras';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -3997,7 +3997,13 @@ async function faturaChosen(inp){
     if(!r.ok){const e=await r.json().catch(()=>({}));throw new Error(e.error||('HTTP '+r.status));}
     faturaAplicar(await r.json());
   }catch(e){
-    toast('Não consegui ler a fatura: '+(e.message||e),'bad');
+    // "Load failed"/"Failed to fetch" é o erro genérico do browser quando o
+    // pedido é cortado por timeout (~60s no iOS) ou a ligação cai a meio.
+    const m=String(e&&e.message||e);
+    const rede=/load failed|failed to fetch|networkerror|timed? ?out/i.test(m);
+    toast(rede
+      ?'A leitura demorou demasiado ou falhou a ligação. Tenta uma foto mais nítida, um PDF mais pequeno, ou volta a tentar.'
+      :'Não consegui ler a fatura: '+m,'bad');
   }finally{
     btn.disabled=false;btn.innerHTML=label;
   }
