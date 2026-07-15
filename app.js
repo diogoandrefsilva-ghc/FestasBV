@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v42 · 2026-07-15 · Stock com containers por categoria';
+const APP_BUILD = 'v43 · 2026-07-15 · Stock condensado; dia da semana; Outros no fim';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -3557,6 +3557,8 @@ function shopGroupedList(list,mineView){
    cartão — o cabeçalho diz o produto, não o destino. Sem categoria no fim. */
 function shopCatGroupedList(list,mineView){
   const keyOf=it=>{const c=artCat(it.artigo);return c?'c'+c.id:'none';};
+  // Sem categoria ("Outros") sempre no fim, independentemente do sort de quem chama
+  list=list.filter(it=>keyOf(it)!=='none').concat(list.filter(it=>keyOf(it)==='none'));
   const counts={};list.forEach(it=>{const k=keyOf(it);counts[k]=(counts[k]||0)+1;});
   let h='',last=null;
   list.forEach(it=>{
@@ -3759,11 +3761,13 @@ function stockAggAlocs(lotes){
   });
   return {dest,freeQ,freeV,totQ,totV,u};
 }
+// Dia da semana abreviado a 3 letras (Sáb, Dom, Sex, …) para rótulos compactos
+function diaAbrev(ds){const s=diaCurto(ds);return s?s.slice(0,3):'';}
 function stockDestChip(k,qtd,u){
   const a=destinoAloc(k,qtd);if(!a)return '';
   const meal=alocIsMeal(a);
   const ic=shopTipoIcon(a.tipo);
-  const lbl=meal?fmtDiaMes(a.data):a.tipo;
+  const lbl=meal?`${diaAbrev(a.data)} ${fmtDiaMes(a.data)}`:a.tipo;
   return `<span class="stk-chip">${ic} ${escHtml(lbl)} · ${escHtml(fmtQty(qtd,u))}</span>`;
 }
 // Cartão minimal: nome + chips (refeições por ordem do calendário, com a qtd
@@ -3806,7 +3810,7 @@ function renderStock(){
   const aiBtn=(CATS_TABLE&&canEdit&&catNamesPorCategorizar().length)
     ?`<button class="btn write-action" id="stk-catsug-btn" onclick="catSugerir()">✨ Categorias</button>`:'';
   let h=`<div class="cmp-hdr"><div class="cmp-hdr-title sf">🧺 Gestão de Stock</div>${aiBtn}</div>`;
-  h+=`<div class="note" style="margin-top:2px;margin-bottom:12px">${canEdit?'Toca num artigo para o alocar às refeições e categorias — as contas recalculam sozinhas.':'Toca num artigo para ver como está alocado às refeições e categorias.'}</div>`;
+  h+=`<div class="note" style="margin-top:2px;margin-bottom:8px">${canEdit?'Toca num artigo para o alocar às refeições e categorias — as contas recalculam sozinhas.':'Toca num artigo para ver como está alocado às refeições e categorias.'}</div>`;
   if(!arr.length){el.innerHTML=h+'<div class="empty sf">Ainda não há stock. Regista uma compra itemizada ou importa uma fatura.</div>';return;}
   // Chips de filtro: ícones abreviados, só as tipologias com artigos
   const FILTROS=[['Gerais','🧾'],['Bebidas','🥤'],['Cerveja','🍺'],['Almoço','☀️'],['Jantar','🌙']].filter(([t])=>arr.some(g=>g.tipos.has(t)));
@@ -3832,6 +3836,9 @@ function renderStock(){
       if(!secs[k]){secs[k]={cat:c,groups:[]};order.push(k);}
       secs[k].groups.push(g);
     });
+    // Garantia explícita: "Outros" fecha sempre a lista, aconteça o que
+    // acontecer ao sort acima
+    if(secs.none&&order[order.length-1]!=='none'){order.splice(order.indexOf('none'),1);order.push('none');}
     h+=order.map(k=>{
       const s=secs[k];
       const nome=s.cat?s.cat.nome:'Outros';

@@ -782,7 +782,7 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 /* Stock: chips das alocações nos cartões de lote (separador Compras) */
 /* Chips de filtro por tipologia no topo do Stock — ícone + legenda pequenina,
    para caberem todos sem scroll horizontal */
-.stk-filter{flex-wrap:wrap;gap:4px;margin-bottom:12px}
+.stk-filter{flex-wrap:wrap;gap:4px;margin-bottom:8px}
 .stk-filter .sd-chip{flex-direction:column;gap:1px;padding:4px 6px 5px;line-height:1;min-height:35px;justify-content:center}
 .stk-filter .sd-chip i{font-style:normal;font-size:13.5px;line-height:1.2}
 .stk-filter .sd-chip small{font-size:7.5px;font-weight:700;letter-spacing:0;text-transform:uppercase;color:inherit}
@@ -955,20 +955,23 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 
 /* ── Categorias de artigos (agrupadores: Sumos, Talho, …) ── */
 /* Stock: um container colapsável por categoria; "Outros" (sem categoria) no fim */
-.stk-cat{border:1px solid var(--line);border-radius:15px;background:var(--panel);margin-bottom:10px;overflow:hidden;box-shadow:0 1px 5px rgba(80,55,20,.06)}
-.stk-cat-sum{display:flex;align-items:center;gap:9px;padding:11px 13px;cursor:pointer;user-select:none;list-style:none;transition:background .12s}
+.stk-cat{border:1px solid var(--line);border-radius:13px;background:var(--panel);margin-bottom:7px;overflow:hidden;box-shadow:0 1px 5px rgba(80,55,20,.06)}
+.stk-cat-sum{display:flex;align-items:center;gap:8px;padding:8px 11px;cursor:pointer;user-select:none;list-style:none;transition:background .12s}
 .stk-cat-sum::-webkit-details-marker{display:none}
 .stk-cat-sum:active{background:var(--panel2)}
-.stk-cat-ico{width:30px;height:30px;border-radius:9px;background:var(--panel2);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0}
-.stk-cat-nome{flex:1;min-width:0;font-size:13.5px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.stk-cat-n{font-size:11px;font-weight:800;background:var(--panel2);border:1px solid var(--line);color:var(--muted);border-radius:10px;padding:1px 7px;flex-shrink:0}
-.stk-cat-val{font-size:12.5px;font-weight:800;color:var(--campino-escuro);font-variant-numeric:tabular-nums;flex-shrink:0}
-.stk-cat-arrow{color:var(--faint);font-size:11px;line-height:1;transition:transform .18s;flex-shrink:0}
+.stk-cat-ico{width:24px;height:24px;border-radius:7px;background:var(--panel2);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0}
+.stk-cat-nome{flex:1;min-width:0;font-size:12.5px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.stk-cat-n{font-size:10px;font-weight:800;background:var(--panel2);border:1px solid var(--line);color:var(--muted);border-radius:10px;padding:0 6px;flex-shrink:0}
+.stk-cat-val{font-size:12px;font-weight:800;color:var(--campino-escuro);font-variant-numeric:tabular-nums;flex-shrink:0}
+.stk-cat-arrow{color:var(--faint);font-size:10px;line-height:1;transition:transform .18s;flex-shrink:0}
 .stk-cat[open] .stk-cat-arrow{transform:rotate(180deg)}
 .stk-cat[open] .stk-cat-sum{border-bottom:1px dashed var(--line)}
-.stk-cat-body{padding:8px 10px 10px;background:linear-gradient(180deg,rgba(216,200,163,.12),transparent 45%)}
-.stk-cat-body .stk-card{border-radius:11px;margin-bottom:6px}
+.stk-cat-body{padding:6px 8px 8px;background:linear-gradient(180deg,rgba(216,200,163,.12),transparent 45%)}
+.stk-cat-body .stk-card{border-radius:10px;margin-bottom:5px;padding:7px 10px}
 .stk-cat-body .stk-card:last-child{margin-bottom:0}
+.stk-cat-body .stk-card-top b{font-size:13px}
+.stk-cat-body .stk-chips{margin-top:4px;gap:4px}
+.stk-cat-body .stk-chip{font-size:10.5px;padding:2px 6px}
 .stk-cat-outros .stk-cat-ico{opacity:.75}
 .stk-cat-outros .stk-cat-nome{color:var(--muted)}
 .adm-cat-row{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;margin-top:6px;cursor:pointer}
