@@ -695,9 +695,8 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 /* Dentro do modal, .modal label ganharia às .cmp-pick-row (uppercase, faint,
    margens grandes) — repõe-se o aspeto de linha de lista, num painel arredondado */
 .modal label.cmp-pick-row{display:flex;margin:0;padding:12px 2px;font-size:14px;font-weight:600;letter-spacing:0;text-transform:none;color:var(--ink)}
-/* Itemização: os <label> .fld e .lote-sug não devem herdar o aspeto de rótulo
-   do modal (maiúsculas, margens grandes) — só o micro-rótulo .fld>span é caps */
-.modal label.fld{display:flex;flex-direction:column;gap:5px;margin:0;font-weight:400;letter-spacing:0;text-transform:none;color:var(--ink)}
+/* Itemização: os <label> .lote-sug não devem herdar o aspeto de rótulo
+   do modal (maiúsculas, margens grandes) */
 .modal label.lote-sug{margin:0;font-weight:400;letter-spacing:0;text-transform:none;color:var(--ink)}
 /* Picker do Registar Compra: mais compacto (a lista pode ter dezenas de artigos) */
 #shop-buy-body .cmp-pick-row{padding:6px 2px;gap:8px}
@@ -796,32 +795,37 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .lote-val{flex:0 0 auto;font-size:12px;font-weight:700;color:var(--muted);font-variant-numeric:tabular-nums;min-width:52px;text-align:right}
 
 /* ── Itemização da fatura: cartão por artigo (registo da compra) ── */
-.lote-card{background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:11px 12px 12px;margin-bottom:9px;box-shadow:0 1px 3px rgba(80,55,20,.05)}
+.lote-card{background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:9px 11px 10px;margin-bottom:7px;box-shadow:0 1px 3px rgba(80,55,20,.05)}
 .lote-card.is-miss{border-color:rgba(168,123,20,.55);background:linear-gradient(0deg,rgba(168,123,20,.07),rgba(168,123,20,.07)),var(--panel)}
 .lote-card.is-warn{border-color:rgba(168,123,20,.42)}
 .lote-card.is-ok{border-color:rgba(30,122,77,.32)}
-.lote-head{display:flex;align-items:center;gap:8px;margin-bottom:10px}
-.lote-name{flex:1;min-width:0;font-size:14.5px;font-weight:700;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lote-head{display:flex;align-items:center;gap:8px;margin-bottom:7px}
+.lote-name{flex:1;min-width:0;font-size:14px;font-weight:700;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lote-list-art{display:block;font-size:10.5px;font-weight:500;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .lote-name-in{flex:1;min-width:0;margin:0;font-size:14px;font-weight:600}
 .lote-tag{flex:0 0 auto;font-size:10.5px;font-weight:700;letter-spacing:.01em;border-radius:20px;padding:3px 9px;white-space:nowrap}
 .lote-tag.ok{background:rgba(30,122,77,.13);color:var(--green)}
 .lote-tag.miss,.lote-tag.warn{background:rgba(168,123,20,.17);color:var(--gold)}
 .lote-x{background:transparent;border:none;color:var(--faint);font-size:15px;cursor:pointer;padding:3px 5px;line-height:1;border-radius:6px;flex:0 0 auto}
 .lote-x:active{color:var(--red);background:rgba(179,64,47,.1)}
-.lote-fields{display:flex;gap:10px}
-.fld{display:flex;flex-direction:column;gap:5px;margin:0}
-.fld>span{font-size:9.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--faint)}
-.fld-qty{flex:0 0 36%}
-.fld-price{flex:1}
-.fld input{margin:0;width:100%}
+/* Uma só linha por artigo: qtd + € + destino (+ ⇄ dividir) */
+.lote-row{display:flex;align-items:center;gap:7px}
+.lote-row .lote-qty{flex:0 0 66px;min-width:0;margin:0;text-align:center;padding-left:6px;padding-right:6px}
+.lote-row .price-in{flex:0 0 88px;min-width:0}
+.lote-row .price-in input{margin:0}
+.lote-row .dest-btn{padding:9px 8px;font-size:12.5px;gap:5px}
 .price-in{position:relative;display:flex}
 .price-in input{width:100%;padding-right:26px;text-align:right}
 .price-in i{position:absolute;right:11px;top:50%;transform:translateY(-50%);font-style:normal;font-size:14px;color:var(--muted);font-weight:600;pointer-events:none}
 .lote-hint{margin-top:8px;font-size:11.5px;line-height:1.4;color:var(--gold)}
 .lote-hint b{color:var(--ink);font-weight:700}
-.lote-dest{display:flex;align-items:center;gap:8px;margin-top:10px}
-.lote-dest select{flex:1;min-width:0;margin:0}
-.lote-split-btn{flex:0 0 auto;background:transparent;border:none;color:var(--green);font-size:12px;font-weight:700;cursor:pointer;padding:6px 2px;white-space:nowrap}
+/* Bloco recolhível "🛒 Artigos da lista" no registo da compra */
+.pick-det{margin-top:12px;border:1px solid var(--line);border-radius:12px;background:var(--panel);padding:0 12px}
+.pick-det>summary{display:flex;align-items:center;gap:8px;list-style:none;cursor:pointer;padding:11px 0;font-size:13.5px;font-weight:700;color:var(--ink)}
+.pick-det>summary::-webkit-details-marker{display:none}
+.pick-det .pick-chev{margin-left:auto;color:var(--faint);font-size:14px;transition:transform .15s}
+.pick-det[open] .pick-chev{transform:rotate(90deg)}
+.lote-split-btn{flex:0 0 auto;background:transparent;border:none;color:var(--green);font-size:15px;font-weight:700;cursor:pointer;padding:6px 3px;white-space:nowrap;line-height:1}
 .lote-splits{margin-top:10px;padding:10px;border:1px dashed var(--line);border-radius:11px;background:var(--panel2)}
 .split-row{display:flex;align-items:center;gap:7px;margin-bottom:7px}
 .split-row select{flex:1;min-width:0;margin:0}
@@ -847,7 +851,11 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 /* Bottom-sheet do seletor de destino */
 .dsheet-bg{position:fixed;inset:0;background:rgba(40,25,10,.45);z-index:100060;display:none;align-items:flex-end;justify-content:center}
 .dsheet-bg.show{display:flex}
-.dsheet{background:var(--panel);width:100%;max-width:520px;max-height:82vh;border-radius:20px 20px 0 0;box-shadow:0 -10px 34px rgba(40,25,10,.28);display:flex;flex-direction:column;padding-bottom:max(16px,env(safe-area-inset-bottom));animation:dsheetup .22s cubic-bezier(.22,1,.36,1)}
+.dsheet{position:relative;background:var(--panel);width:100%;max-width:520px;max-height:82vh;border-radius:20px 20px 0 0;box-shadow:0 -10px 34px rgba(40,25,10,.28);display:flex;flex-direction:column;padding-bottom:max(16px,env(safe-area-inset-bottom));animation:dsheetup .22s cubic-bezier(.22,1,.36,1)}
+.dsheet-close{position:absolute;top:8px;right:8px;background:transparent;border:none;color:var(--faint);font-size:16px;line-height:1;padding:9px;cursor:pointer;border-radius:8px}
+.dsheet-close:active{color:var(--red);background:rgba(179,64,47,.08)}
+.dsheet-cancel{flex:0 0 auto;margin:8px 14px 0;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--panel2);font-size:14px;font-weight:700;color:var(--ink);cursor:pointer}
+.dsheet-cancel:active{background:var(--line)}
 @keyframes dsheetup{from{transform:translateY(101%)}to{transform:translateY(0)}}
 .dsheet-handle{width:40px;height:4px;border-radius:3px;background:var(--line);margin:9px auto 3px}
 .dsheet-title{font-family:var(--display);font-size:13px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);font-weight:600;text-align:center;padding:6px 16px 8px}
