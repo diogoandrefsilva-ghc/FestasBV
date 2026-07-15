@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v43 · 2026-07-15 · Stock condensado; dia da semana; Outros no fim';
+const APP_BUILD = 'v44 · 2026-07-15 · Shop List com sub-separadores (Em falta · Carrinho · Histórico)';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -3644,10 +3644,15 @@ function renderShopViews(){
   if(!CALC||TAB!=='compras')renderCompras();
 }
 
-// Ordenação do separador Compras: 'ref' = agrupado por refeição/tipo (defeito);
+// Ordenação do separador Shop List: 'ref' = agrupado por refeição/tipo (defeito);
 // 'art' = lista plana por ordem alfabética de artigo. Fica memorizada no aparelho.
 let SHOP_ORDER=(function(){try{return localStorage.getItem('festasbv_shop_order')||'ref';}catch(e){return 'ref';}})();
 function setShopOrder(o){SHOP_ORDER=o;try{localStorage.setItem('festasbv_shop_order',o);}catch(e){}renderCompras();}
+
+// Sub-separador ativo do Shop List: 'falta' | 'carrinho' | 'hist'. Memorizado
+// no aparelho — quem anda nas compras volta a cair direto no carrinho.
+let SHOP_TAB=(function(){try{const t=localStorage.getItem('festasbv_shop_tab');return['falta','carrinho','hist'].includes(t)?t:'falta';}catch(e){return 'falta';}})();
+function setShopTab(t){SHOP_TAB=t;try{localStorage.setItem('festasbv_shop_tab',t);}catch(e){}renderCompras();}
 
 function renderCompras(){
   const el=document.getElementById('view-compras');if(!el||!DATA)return;
@@ -3680,49 +3685,61 @@ function renderCompras(){
 
   let h='';
   h+=`<div class="cmp-hdr">
-    <div class="cmp-hdr-title sf">🛒 Compras</div>
+    <div class="cmp-hdr-title sf">🛒 Shop List</div>
     <button class="btn prim write-action" onclick="openShopItemModal()" ${canW?'':'disabled'}>＋ Artigo</button>
   </div>`;
-  h+=`<div class="cmp-sort">
-    <span class="sd-chip${(byArt||byCat)?'':' on'}" onclick="setShopOrder('ref')">📅 Por refeição</span>
-    <span class="sd-chip${byArt?' on':''}" onclick="setShopOrder('art')">🔤 Por artigo</span>
-    ${CATS_TABLE?`<span class="sd-chip${byCat?' on':''}" onclick="setShopOrder('cat')">🏷️ Por categoria</span>`:''}
+
+  // ── Sub-separadores: Em falta · O Meu Carrinho · Histórico ──
+  const nCompras=new Set((DATA.despesas||[]).filter(d=>d.compraId).map(d=>d.compraId)).size;
+  const nHist=nCompras+removidos.length;
+  const tabBtn=(id,ico,lbl,n)=>`<button class="cmp-tab${SHOP_TAB===id?' on':''}" onclick="setShopTab('${id}')"><span class="cmp-tab-ico">${ico}</span><span class="cmp-tab-lbl">${lbl}</span>${n?`<span class="cmp-tab-n">${n}</span>`:''}</button>`;
+  h+=`<div class="cmp-tabs sf">
+    ${tabBtn('falta','📝','Em falta',falta.length)}
+    ${tabBtn('carrinho','🛒','Carrinho',mine.length)}
+    ${tabBtn('hist','🕘','Histórico',nHist)}
   </div>`;
 
-  // ── O meu carrinho (artigos que disse que tratava) ──
-  h+=`<div class="cmp-sec-hdr sf">🛒 O meu carrinho <span class="cmp-count">${mine.length}</span></div>`;
-  if(!mine.length){
-    h+='<div class="empty sf">Ainda não estás a tratar de nenhum artigo. Marca <b>Eu trato</b> nos que fores buscar.</div>';
+  // Ordenação só faz sentido nas listas ativas (no histórico manda a data)
+  if(SHOP_TAB!=='hist'){
+    h+=`<div class="cmp-sort">
+      <span class="sd-chip${(byArt||byCat)?'':' on'}" onclick="setShopOrder('ref')">📅 Por refeição</span>
+      <span class="sd-chip${byArt?' on':''}" onclick="setShopOrder('art')">🔤 Por artigo</span>
+      ${CATS_TABLE?`<span class="sd-chip${byCat?' on':''}" onclick="setShopOrder('cat')">🏷️ Por categoria</span>`:''}
+    </div>`;
+  }
+
+  if(SHOP_TAB==='falta'){
+    // ── Em falta (livres, ninguém trata) ──
+    if(!falta.length)h+='<div class="cmp-empty sf"><span class="cmp-empty-ico">🎉</span>Nada por tratar — está tudo entregue!</div>';
+    else h+=listOf(falta,false);
+    // ── Alguém trata (entregues a outros — sem detalhe do carrinho deles) ──
+    if(outros.length){
+      h+=`<div class="cmp-sec-hdr sf" style="margin-top:22px">🧑‍🍳 Alguém trata <span class="cmp-count">${outros.length}</span></div>`;
+      h+=listOf(outros,false);
+    }
+  }else if(SHOP_TAB==='carrinho'){
+    // ── O meu carrinho (artigos que disse que tratava) ──
+    if(!mine.length){
+      h+='<div class="cmp-empty sf"><span class="cmp-empty-ico">🛒</span>O teu carrinho está vazio.<br>Passa por <b>📝 Em falta</b> e marca <b>✋ Eu trato</b> nos artigos que fores buscar.</div>';
+    }else{
+      h+=listOf(mine,true);
+    }
+    if(fechadas){
+      h+='<div class="empty sf" style="margin-top:10px">Contas fechadas — não é possível registar compras.</div>';
+    }else{
+      h+=`<button class="btn prim write-action" style="width:100%;margin-top:12px" onclick="openCompra(null)" ${canW?'':'disabled'}>💰 Registar compra</button>`;
+    }
   }else{
-    h+=listOf(mine,true);
+    // ── Histórico: compras registadas + artigos removidos ──
+    if(!nHist)h+='<div class="cmp-empty sf"><span class="cmp-empty-ico">🕘</span>Ainda sem histórico.<br>As compras registadas e os artigos removidos aparecem aqui.</div>';
+    h+=renderComprados(true);
+    h+=renderRemovidos(removidos,true);
   }
-  if(fechadas){
-    h+='<div class="empty sf" style="margin-top:10px">Contas fechadas — não é possível registar compras.</div>';
-  }else{
-    h+=`<button class="btn prim write-action" style="width:100%;margin-top:12px" onclick="openCompra(null)" ${canW?'':'disabled'}>💰 Registar compra</button>`;
-  }
-
-  // ── Em falta (livres, ninguém trata) ──
-  h+=`<div class="cmp-sec-hdr sf" style="margin-top:22px">📝 Em falta <span class="cmp-count">${falta.length}</span></div>`;
-  if(!falta.length)h+='<div class="empty sf">Nada por tratar 🎉</div>';
-  else h+=listOf(falta,false);
-
-  // ── Alguém trata (entregues a outros — sem detalhe do carrinho deles) ──
-  if(outros.length){
-    h+=`<div class="cmp-sec-hdr sf" style="margin-top:22px">🧑‍🍳 Alguém trata <span class="cmp-count">${outros.length}</span></div>`;
-    h+=listOf(outros,false);
-  }
-
-  // ── Comprados (a partir das despesas ligadas a uma compra) ──
-  h+=renderComprados();
-
-  // ── Removidos (soft-delete: histórico visível, com opção de repor) ──
-  h+=renderRemovidos(removidos);
 
   el.innerHTML=h;
 }
 
-function renderRemovidos(removidos){
+function renderRemovidos(removidos,open){
   if(!removidos.length)return '';
   const rows=removidos.map(it=>{
     const qtdTxt=shopQtyLabel(it);
@@ -3737,9 +3754,9 @@ function renderRemovidos(removidos){
       ${acts}
     </div>`;
   }).join('');
-  return `<div class="cmp-done-hdr sf" onclick="this.nextElementSibling.classList.toggle('open');this.classList.toggle('open')">
+  return `<div class="cmp-done-hdr sf${open?' open':''}" onclick="this.nextElementSibling.classList.toggle('open');this.classList.toggle('open')">
       <span>🗑️ Removidos <span class="cmp-count">${removidos.length}</span></span><span class="cmp-chev">▾</span></div>
-    <div class="cmp-done-body">${rows}</div>`;
+    <div class="cmp-done-body${open?' open':''}">${rows}</div>`;
 }
 
 /* ═══ SEPARADOR STOCK — gestão global (mover artigos entre refeições/tipos) ═══
@@ -3859,7 +3876,7 @@ function renderStock(){
   el.innerHTML=h;
 }
 
-function renderComprados(){
+function renderComprados(open){
   const withC=(DATA.despesas||[]).filter(d=>d.compraId);
   if(!withC.length)return '';
   const groups={};
@@ -3878,9 +3895,9 @@ function renderComprados(){
       <div class="cmp-done-lines">${lines}</div>
     </div>`};
   }).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
-  return `<div class="cmp-done-hdr sf" onclick="this.nextElementSibling.classList.toggle('open');this.classList.toggle('open')">
+  return `<div class="cmp-done-hdr sf${open?' open':''}" onclick="this.nextElementSibling.classList.toggle('open');this.classList.toggle('open')">
       <span>✅ Comprados <span class="cmp-count">${cards.length}</span></span><span class="cmp-chev">▾</span></div>
-    <div class="cmp-done-body">${cards.map(c=>c.html).join('')}</div>`;
+    <div class="cmp-done-body${open?' open':''}">${cards.map(c=>c.html).join('')}</div>`;
 }
 
 /* ── Detalhe / Adicionar / Editar artigo ──
@@ -4743,7 +4760,7 @@ function faturaSubToggle(i,j){
   (l._impQtds=l._impQtds||[]).push(ln.qtd);
   faturaQtdRecheck(l);
   compraRenderLotes();
-  if(multi&&STOCK_TABLE)toast('Fica em 🧺 Stock por alocar — depois de registares, aloca às refeições no separador Compras › 🧺 Stock','ok');
+  if(multi&&STOCK_TABLE)toast('Fica em 🧺 Stock por alocar — depois de registares, aloca às refeições no separador Stock','ok');
 }
 /* Extras da fatura (linhas que não estavam no carrinho): checkbox desmarcada
    por defeito; marcar converte em "artigo fora da lista" editável (o ✕ do
