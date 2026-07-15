@@ -9,6 +9,9 @@
   --shadow:0 6px 22px rgba(80,55,20,.14);
 }
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+/* iOS Safari "text autosizing" inflava labels soltas (ex.: Descritivo no
+   registo da compra) — bloqueia-se o ajuste automático de tamanho de texto */
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
 body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--ink);padding:0 0 90px;line-height:1.5;min-height:100vh;touch-action:manipulation}
 .sf{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
 
@@ -763,6 +766,8 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 /* Lista de compras dentro do cartão da refeição (tab Refeições) */
 .msl{cursor:default}
 .msl-det{margin-top:0;border-top:none;padding-top:0}
+/* Dois blocos no mesmo cartão (Lista de compras + Comprado): separador entre eles */
+.msl-det+.msl-det{margin-top:8px;border-top:1px solid rgba(110,75,25,.14);padding-top:8px}
 .msl-det>summary{gap:8px}
 .msl-count{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:1px 7px;font-size:10.5px;font-weight:700;color:var(--muted);margin-left:auto}
 .msl-it{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:5px 0;font-size:12.5px;border-bottom:1px solid rgba(110,75,25,.08);cursor:pointer}
@@ -775,8 +780,6 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .msl-st.falta{color:#9A6E0E}
 .msl-empty{font-size:12px;color:var(--faint);padding:4px 0}
 .msl-add{width:100%;margin-top:8px;justify-content:center}
-.msl-hdr{font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);margin:8px 0 2px}
-.msl-hdr:first-child{margin-top:0}
 .msl-hint{font-size:10.5px;color:#9A6E0E;margin-top:1px}
 /* Stock: chips das alocações nos cartões de lote (separador Compras) */
 .stk-chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:7px}
@@ -791,7 +794,6 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .lote-ln{display:flex;align-items:center;gap:7px;margin-top:8px}
 .lote-ln select{flex:1;min-width:0;margin:0}
 .lote-ln input{flex:0 0 74px;margin:0;text-align:right}
-.lote-st{flex:0 0 auto;font-size:14px}
 .lote-val{flex:0 0 auto;font-size:12px;font-weight:700;color:var(--muted);font-variant-numeric:tabular-nums;min-width:52px;text-align:right}
 
 /* ── Itemização da fatura: cartão por artigo (registo da compra) ── */
@@ -808,12 +810,19 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .lote-tag.miss,.lote-tag.warn{background:rgba(168,123,20,.17);color:var(--gold)}
 .lote-x{background:transparent;border:none;color:var(--faint);font-size:15px;cursor:pointer;padding:3px 5px;line-height:1;border-radius:6px;flex:0 0 auto}
 .lote-x:active{color:var(--red);background:rgba(179,64,47,.1)}
-/* Uma só linha por artigo: qtd + € + destino (+ ⇄ dividir) */
+/* Uma só linha por artigo: qtd + € + destino (+ ⇄ dividir) — tudo à mesma
+   altura (40px) e com letra mais pequena para "1,124 kg" não ficar cortado */
 .lote-row{display:flex;align-items:center;gap:7px}
-.lote-row .lote-qty{flex:0 0 66px;min-width:0;margin:0;text-align:center;padding-left:6px;padding-right:6px}
-.lote-row .price-in{flex:0 0 88px;min-width:0}
-.lote-row .price-in input{margin:0}
-.lote-row .dest-btn{padding:9px 8px;font-size:12.5px;gap:5px}
+.lote-row .lote-qty{flex:0 0 72px;min-width:0;margin:0;text-align:center;padding:0 5px;height:40px;font-size:13px}
+.lote-row .price-in{flex:0 0 86px;min-width:0}
+.lote-row .price-in input{margin:0;height:40px;padding-top:0;padding-bottom:0;font-size:13px}
+.lote-row .price-in i{font-size:12.5px}
+.lote-row .dest-btn{padding:0 8px;height:40px;font-size:12.5px;gap:5px}
+.lote-row .lote-split-btn{height:40px}
+/* Mesma altura nas linhas de split e no detalhe do lote (qtd vs seletor) */
+.split-row .split-qty{height:40px;padding-top:0;padding-bottom:0;font-size:13px}
+.split-row .dest-btn,.lote-ln .dest-btn{height:40px;padding-top:0;padding-bottom:0}
+.lote-ln input{height:40px;padding-top:0;padding-bottom:0;font-size:13px}
 .price-in{position:relative;display:flex}
 .price-in input{width:100%;padding-right:26px;text-align:right}
 .price-in i{position:absolute;right:11px;top:50%;transform:translateY(-50%);font-style:normal;font-size:14px;color:var(--muted);font-weight:600;pointer-events:none}
@@ -866,6 +875,7 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .dsheet-opt.on{background:rgba(30,122,77,.1)}
 .dsheet-ic{flex:0 0 auto;font-size:19px}
 .dsheet-lbl{flex:1;min-width:0}
+.dsheet-sub{display:block;font-size:11.5px;color:var(--muted);font-weight:400;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .dsheet-chk{flex:0 0 auto;color:var(--green);font-weight:800;font-size:16px}
 /* Aviso: artigos do carrinho não vistos na fatura (ficam por tratar) */
 .lote-miss-warn{margin-top:12px;padding:11px 12px;background:rgba(168,123,20,.1);border:1px solid rgba(168,123,20,.4);border-radius:11px;font-size:12.5px;color:var(--ink);line-height:1.45}
