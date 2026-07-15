@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v40 · 2026-07-15 · Títulos de Compras e Stock sem contadores';
+const APP_BUILD = 'v41 · 2026-07-15 · Categorias de artigos (Stock/Compras + AI)';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -1431,14 +1431,18 @@ async function carregar(){
     const sel='*,membros(*,presencas(*)),refeicoes_def(*),despesas(*),convidados(*),mealheiros(*),pagamentos(*)';
     // shoplist vai numa fetch SEPARADA e tolerante a falha: se a tabela ainda
     // não existir (migração por correr) o resto da app continua a funcionar.
-    const [res,uaRes,cjRes,vlRes,slRes,stRes]=await Promise.all([
+    const [res,uaRes,cjRes,vlRes,slRes,stRes,ctRes,acRes]=await Promise.all([
       sbFetch(`${SB_URL}/rest/v1/eventos?select=${encodeURIComponent(sel)}&order=ano.asc`,{headers:sbHeaders(),cache:'no-store'}),
       sbFetch(`${SB_URL}/rest/v1/user_amigos?select=email,amigo`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null),
       sbFetch(`${SB_URL}/rest/v1/conjuges?select=amigo_a,amigo_b`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null),
       sbFetch(`${SB_URL}/rest/v1/validacoes?select=evento_id,amigo,validado_por_email,validado_por_amigo,validado_em`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null),
       sbFetch(`${SB_URL}/rest/v1/shoplist?select=*`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null),
       // stock_lotes: fetch tolerante — sem a migração corrida a app funciona sem stock
-      sbFetch(`${SB_URL}/rest/v1/stock_lotes?select=*`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null)
+      sbFetch(`${SB_URL}/rest/v1/stock_lotes?select=*`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null),
+      // categorias de artigos (db/categorias.sql): também tolerantes — sem a
+      // migração, CATS_TABLE=false e tudo o que é categorias fica escondido
+      sbFetch(`${SB_URL}/rest/v1/categorias?select=*`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null),
+      sbFetch(`${SB_URL}/rest/v1/artigo_categorias?select=*`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null)
     ]);
     if(!res.ok)throw new Error('HTTP '+res.status);
     const rows=await res.json();
@@ -1448,6 +1452,10 @@ async function carregar(){
     const shopRows=(slRes&&slRes.ok)?await slRes.json():[];
     STOCK_TABLE=!!(stRes&&stRes.ok);
     const stockRows=STOCK_TABLE?await stRes.json():[];
+    CATS_TABLE=!!(ctRes&&ctRes.ok&&acRes&&acRes.ok);
+    CATEGORIAS=CATS_TABLE?(await ctRes.json()).sort((a,b)=>a.nome.localeCompare(b.nome,'pt')):[];
+    ART_CATS={};
+    if(CATS_TABLE)(await acRes.json()).forEach(r=>{ART_CATS[r.artigo_key]={catId:r.categoria_id,origem:r.origem||'manual'};});
     const stockByEv={};stockRows.forEach(s=>{(stockByEv[s.evento_id]=stockByEv[s.evento_id]||[]).push(s);});
     // Só gravamos os responsáveis se as colunas já existirem no Supabase
     // (senão o replace das refeições falhava todo — padrão dividas_publicas)
@@ -2485,7 +2493,7 @@ function openAdmin(){
   if(ver)ver.textContent='Versão '+APP_BUILD;
   const adm=document.getElementById('adm-pedidos-wrap');
   if(adm)adm.style.display=isAdmin()?'':'none';
-  if(isAdmin()){sbRenderPedidos();sbRenderLigacoes();loadNotif();}
+  if(isAdmin()){sbRenderPedidos();sbRenderLigacoes();loadNotif();admCatCancel();renderAdmCats();}
   loadMyNotif();
   loadParams();
   renderPlantel();
@@ -3014,6 +3022,210 @@ async function toggleSexo(idx){
   }
 }
 
+/* ═══ CATEGORIAS DE ARTIGOS ═══
+   Agrupadores de produto ("Sumos", "Talho", …) — migração db/categorias.sql.
+   Duas peças: o dicionário (CATEGORIAS, gerido pelo admin em Definições) e a
+   memória artigo→categoria (ART_CATS, chave = shopArtKey do nome). Quem
+   preenche a memória: a AI na importação de fatura e no botão ✨ do Stock
+   (origem 'ai', nunca pisa o que existe — ignore-duplicates), ou pessoas
+   (origem 'manual'; mudar uma associação existente é só do admin).
+   Aparecem como agrupadores no separador 🧺 Stock e na ordenação
+   "Por categoria" das Compras. Sem migração corrida, tudo fica escondido. */
+let CATS_TABLE=false;   // BD já tem categorias/artigo_categorias?
+let CATEGORIAS=[];      // [{id,nome,descritivo}] ordenadas por nome
+let ART_CATS={};        // artigo_key → {catId,origem}
+
+function catById(id){return CATEGORIAS.find(c=>c.id===id)||null;}
+function artCat(artigo){const m=ART_CATS[shopArtKey(artigo)];return m?catById(m.catId):null;}
+// Lista nome+descritivo que segue no prompt do Gemini (fatura-ocr) — é por
+// vir daqui que categorias novas ficam logo "conhecidas" pela AI
+function catPromptList(){return CATEGORIAS.map(c=>({nome:c.nome,descritivo:c.descritivo||''}));}
+function catOptionsHtml(cur){
+  return '<option value="">— sem categoria —</option>'+
+    CATEGORIAS.map(c=>`<option value="${c.id}"${c.id===cur?' selected':''}>${escHtml(c.nome)}</option>`).join('');
+}
+/* Definir/alterar a categoria de um artigo a partir da UI. Regras:
+   preencher um buraco pode qualquer membro; mudar/limpar o que já está
+   definido é só do admin (o RLS garante o mesmo no servidor). */
+async function catUserSetMapping(artigo,catId){
+  if(!CATS_TABLE)return false;
+  const key=shopArtKey(artigo);if(!key)return false;
+  const cur=ART_CATS[key]||null;
+  if((cur?cur.catId:null)===(catId||null))return false;
+  if(cur&&!isAdmin())return false;
+  try{
+    if(!catId){
+      await queueWrite(()=>sbReq('DELETE',`artigo_categorias?artigo_key=eq.${enc(key)}`));
+      delete ART_CATS[key];
+    }else{
+      await queueWrite(()=>sbReq('POST','artigo_categorias?on_conflict=artigo_key',
+        [{artigo_key:key,categoria_id:catId,origem:'manual',atualizado_em:new Date().toISOString()}],
+        {Prefer:'resolution=merge-duplicates'}));
+      ART_CATS[key]={catId,origem:'manual'};
+    }
+    if(TAB==='stock')renderStock();
+    return true;
+  }catch(e){toast('Categoria não guardada: '+(e.message||e),'bad');return false;}
+}
+/* Sugestões da AI (fatura ou botão ✨): só INSERE onde não há associação —
+   ignore-duplicates garante que nunca pisa manual nem AI anterior. */
+async function catAIMappings(pairs){
+  if(!CATS_TABLE||!pairs||!pairs.length)return 0;
+  const byNome={};CATEGORIAS.forEach(c=>{byNome[shopArtKey(c.nome)]=c.id;});
+  const rows=[],seen=new Set();
+  pairs.forEach(p=>{
+    const key=shopArtKey(p.artigo);
+    const cid=byNome[shopArtKey(p.categoria||'')];
+    if(!key||!cid||ART_CATS[key]||seen.has(key))return;
+    seen.add(key);
+    rows.push({artigo_key:key,categoria_id:cid,origem:'ai'});
+  });
+  if(!rows.length)return 0;
+  try{
+    await queueWrite(()=>sbReq('POST','artigo_categorias?on_conflict=artigo_key',rows,{Prefer:'resolution=ignore-duplicates'}));
+    rows.forEach(r=>{ART_CATS[r.artigo_key]={catId:r.categoria_id,origem:'ai'};});
+    return rows.length;
+  }catch(_){return 0;}
+}
+
+/* ── Gestão do dicionário (Definições › Categorias de Artigos, só admin) ── */
+let _catEdit;   // undefined=fechado · null=nova · id=em edição
+function renderAdmCats(){
+  const el=document.getElementById('adm-cats-list');if(!el)return;
+  if(!CATS_TABLE){
+    el.innerHTML='<div class="note">Categorias indisponíveis — falta correr a migração <b>db/categorias.sql</b> no Supabase.</div>';
+    document.getElementById('adm-cat-add').style.display='none';
+    return;
+  }
+  const counts={};Object.keys(ART_CATS).forEach(k=>{const id=ART_CATS[k].catId;counts[id]=(counts[id]||0)+1;});
+  el.innerHTML=CATEGORIAS.map(c=>`<div class="adm-cat-row" onclick="admCatEdit(${c.id})">
+      <div class="adm-cat-main"><b>${escHtml(c.nome)}</b>${c.descritivo?`<div class="adm-cat-desc">${escHtml(c.descritivo)}</div>`:''}</div>
+      <span class="cmp-count">${counts[c.id]||0}</span><span class="stk-chev">›</span>
+    </div>`).join('')||'<div class="empty sf">Ainda sem categorias — cria a primeira.</div>';
+}
+function admCatEdit(id){
+  _catEdit=id;
+  const c=id!=null?CATEGORIAS.find(x=>x.id===id):null;
+  document.getElementById('adm-cat-nome').value=c?c.nome:'';
+  document.getElementById('adm-cat-desc').value=c?(c.descritivo||''):'';
+  document.getElementById('adm-cat-del').style.display=c?'':'none';
+  document.getElementById('adm-cat-form').style.display='';
+  document.getElementById('adm-cat-add').style.display='none';
+  if(!c)setTimeout(()=>document.getElementById('adm-cat-nome').focus(),50);
+}
+function admCatCancel(){
+  _catEdit=undefined;
+  document.getElementById('adm-cat-form').style.display='none';
+  document.getElementById('adm-cat-add').style.display='';
+}
+async function admCatSave(){
+  if(_catEdit===undefined)return;
+  const nome=(document.getElementById('adm-cat-nome').value||'').trim();
+  const desc=(document.getElementById('adm-cat-desc').value||'').trim();
+  if(!nome){toast('Indica o nome da categoria','bad');return;}
+  setSync('load','a guardar…');
+  try{
+    if(_catEdit!=null){
+      await queueWrite(()=>sbReq('PATCH',`categorias?id=eq.${_catEdit}`,{nome,descritivo:desc}));
+      const c=CATEGORIAS.find(x=>x.id===_catEdit);if(c){c.nome=nome;c.descritivo=desc;}
+    }else{
+      const ins=await queueWrite(()=>sbReq('POST','categorias',[{nome,descritivo:desc}],{Prefer:'return=representation'}));
+      if(ins&&ins[0])CATEGORIAS.push({id:ins[0].id,nome,descritivo:desc});
+    }
+    CATEGORIAS.sort((a,b)=>a.nome.localeCompare(b.nome,'pt'));
+    marcaGuardado();admCatCancel();renderAdmCats();
+    toast('Categoria guardada ✓ — a AI já a conhece na próxima fatura','ok');
+    if(TAB==='stock')renderStock();
+    if(TAB==='compras')renderCompras();
+  }catch(e){setSync('err','erro ao guardar');toast(permErrorMsg(e),'bad');}
+}
+async function admCatDelete(){
+  if(_catEdit==null)return;
+  const c=CATEGORIAS.find(x=>x.id===_catEdit);if(!c)return;
+  const n=Object.keys(ART_CATS).filter(k=>ART_CATS[k].catId===c.id).length;
+  if(!confirm(`Eliminar a categoria "${c.nome}"?${n?`\n\n${n} artigo(s) ficam sem categoria.`:''}`))return;
+  setSync('load','a guardar…');
+  try{
+    await queueWrite(()=>sbReq('DELETE',`categorias?id=eq.${c.id}`));
+    CATEGORIAS=CATEGORIAS.filter(x=>x.id!==c.id);
+    Object.keys(ART_CATS).forEach(k=>{if(ART_CATS[k].catId===c.id)delete ART_CATS[k];});
+    marcaGuardado();admCatCancel();renderAdmCats();
+    toast('Categoria eliminada ✓','ok');
+    if(TAB==='stock')renderStock();
+    if(TAB==='compras')renderCompras();
+  }catch(e){setSync('err','erro ao guardar');toast(permErrorMsg(e),'bad');}
+}
+
+/* ── ✨ Sugestões AI em lote (botão no Stock, só admin) ──
+   Junta os artigos por categorizar (stock + lista de compras), pede ao
+   fatura-ocr o modo só-texto, e mostra as sugestões num modal para rever
+   antes de gravar — cada linha pode ser corrigida no próprio modal. */
+let _catSug=null;   // [{artigo,key,catId}]
+function catNamesPorCategorizar(){
+  const seen={};
+  const add=n=>{const k=shopArtKey(n);if(!k||seen[k]||ART_CATS[k])return;seen[k]=n;};
+  stockArr().filter(stockBacked).forEach(l=>add(l.artigo));
+  shopArr().filter(x=>!shopIsRemoved(x)).forEach(x=>add(x.artigo));
+  return Object.values(seen);
+}
+async function catSugerir(){
+  if(!CATS_TABLE||!isAdmin())return;
+  if(!CATEGORIAS.length){toast('Cria primeiro categorias em Definições','bad');return;}
+  const nomes=catNamesPorCategorizar();
+  if(!nomes.length){toast('Está tudo categorizado 🎉','ok');return;}
+  const btn=document.getElementById('stk-catsug-btn');
+  if(btn){btn.disabled=true;btn.textContent='⏳ A pensar…';}
+  try{
+    const r=await sbFetch(`${SB_URL}/functions/v1/fatura-ocr`,{
+      method:'POST',
+      headers:{'Content-Type':'application/json','apikey':SB_KEY},
+      body:JSON.stringify({artigos:nomes.slice(0,200),categorias:catPromptList()})
+    });
+    if(!r.ok){const e=await r.json().catch(()=>({}));throw new Error(e.error||('HTTP '+r.status));}
+    const d=await r.json();
+    const sug={};
+    (d&&Array.isArray(d.sugestoes)?d.sugestoes:[]).forEach(s=>{if(s&&s.artigo)sug[shopArtKey(s.artigo)]=s.categoria||null;});
+    const byNome={};CATEGORIAS.forEach(c=>{byNome[shopArtKey(c.nome)]=c.id;});
+    _catSug=nomes.map(n=>{const k=shopArtKey(n);return{artigo:n,key:k,catId:byNome[shopArtKey(sug[k]||'')]||null};})
+      .sort((a,b)=>(a.catId?0:1)-(b.catId?0:1)||a.artigo.localeCompare(b.artigo,'pt'));
+    catSugRender();
+    document.getElementById('catsug-bg').classList.add('show');
+    document.body.classList.add('no-scroll');
+  }catch(e){toast('Sugestões falharam: '+(e.message||e),'bad');}
+  finally{if(btn){btn.disabled=false;btn.textContent='✨ Categorias';}}
+}
+function catSugRender(){
+  const com=_catSug.filter(s=>s.catId).length;
+  document.getElementById('catsug-info').textContent=
+    `${_catSug.length} artigo(s) por categorizar — a AI sugeriu ${com}. Revê, corrige o que for preciso e grava.`;
+  document.getElementById('catsug-list').innerHTML=_catSug.map((s,i)=>`<div class="catsug-row">
+      <span class="catsug-art">${escHtml(s.artigo)}</span>
+      <select onchange="_catSug[${i}].catId=parseInt(this.value)||null">${catOptionsHtml(s.catId)}</select>
+    </div>`).join('');
+}
+function catSugClose(){
+  document.getElementById('catsug-bg').classList.remove('show');
+  document.body.classList.remove('no-scroll');
+  _catSug=null;
+}
+async function catSugApply(){
+  if(!_catSug)return;
+  const rows=_catSug.filter(s=>s.catId).map(s=>({artigo_key:s.key,categoria_id:s.catId,origem:'ai'}));
+  if(!rows.length){catSugClose();return;}
+  const btn=document.getElementById('catsug-save');btn.disabled=true;
+  setSync('load','a guardar…');
+  try{
+    await queueWrite(()=>sbReq('POST','artigo_categorias?on_conflict=artigo_key',rows,{Prefer:'resolution=ignore-duplicates'}));
+    rows.forEach(r=>{ART_CATS[r.artigo_key]={catId:r.categoria_id,origem:'ai'};});
+    marcaGuardado();
+    toast(`${rows.length} artigo(s) categorizados ✓`,'ok');
+    catSugClose();
+    if(TAB==='stock')renderStock();
+    if(TAB==='compras')renderCompras();
+  }catch(e){setSync('err','erro ao guardar');toast(permErrorMsg(e),'bad');}
+  btn.disabled=false;
+}
+
 /* ═══ COMPRAS / SHOPLIST ═══
    Lista partilhada de artigos em falta. Fluxo:
    1) alguém adiciona artigos (artigo, qtd, tipo, e se Almoço/Jantar a refeição alvo)
@@ -3326,6 +3538,25 @@ function shopGroupedList(list,mineView){
   return '<div class="cmp-list">'+h+'</div>';
 }
 
+/* Lista agrupada por CATEGORIA de produto (Sumos, Talho, …): a vista para
+   fazer as compras "por corredor". O badge de refeição/tipo mantém-se em cada
+   cartão — o cabeçalho diz o produto, não o destino. Sem categoria no fim. */
+function shopCatGroupedList(list,mineView){
+  const keyOf=it=>{const c=artCat(it.artigo);return c?'c'+c.id:'none';};
+  const counts={};list.forEach(it=>{const k=keyOf(it);counts[k]=(counts[k]||0)+1;});
+  let h='',last=null;
+  list.forEach(it=>{
+    const k=keyOf(it);
+    if(k!==last){
+      const c=artCat(it.artigo);
+      h+=`<div class="cmp-grp-hdr sf">🏷️ ${c?escHtml(c.nome):'Sem categoria'} <span class="cmp-count">${counts[k]}</span></div>`;
+      last=k;
+    }
+    h+=shopItemCard(it,mineView,false);
+  });
+  return '<div class="cmp-list">'+h+'</div>';
+}
+
 /* Lista de compras da refeição — mostra no cartão da refeição (tab Refeições)
    os artigos da shoplist ligados a ela (tipo Almoço/Jantar + data). É a MESMA
    lista do separador Compras: adicionar aqui ou lá dá exatamente no mesmo. */
@@ -3409,11 +3640,22 @@ function renderCompras(){
   const fechadas=contasFechadas();
   const ord={};SHOP_TIPOS.forEach((t,i)=>ord[t]=i);
   const byArt=SHOP_ORDER==='art';
-  const sortF=byArt
+  const byCat=SHOP_ORDER==='cat'&&CATS_TABLE;
+  // Por categoria: agrupa por categoria de produto (sem categoria no fim) — a
+  // vista "corredor do supermercado"; o badge fica para identificar o destino
+  const catCmp=(a,b)=>{
+    const ca=artCat(a.artigo),cb=artCat(b.artigo);
+    return ((ca?0:1)-(cb?0:1))||(ca&&cb?ca.nome.localeCompare(cb.nome,'pt'):0);
+  };
+  const sortF=byCat
+    ?(a,b)=>catCmp(a,b)||a.artigo.localeCompare(b.artigo,'pt')||(ord[a.tipo]-ord[b.tipo])||((a.dataValor||'').localeCompare(b.dataValor||''))
+    :byArt
     ?(a,b)=>a.artigo.localeCompare(b.artigo,'pt')||(ord[a.tipo]-ord[b.tipo])||((a.dataValor||'').localeCompare(b.dataValor||''))
     :(a,b)=>(ord[a.tipo]-ord[b.tipo])||((a.dataValor||'').localeCompare(b.dataValor||''))||a.artigo.localeCompare(b.artigo,'pt');
   // Por artigo: lista plana com o badge da refeição em cada cartão
-  const listOf=(arr,mineView)=>byArt?'<div class="cmp-list">'+arr.map(it=>shopItemCard(it,mineView,false)).join('')+'</div>':shopGroupedList(arr,mineView);
+  const listOf=(arr,mineView)=>byCat?shopCatGroupedList(arr,mineView)
+    :byArt?'<div class="cmp-list">'+arr.map(it=>shopItemCard(it,mineView,false)).join('')+'</div>'
+    :shopGroupedList(arr,mineView);
   const mine=act.filter(shopMine).sort(sortF);                                   // a minha checklist (inclui removidos c/ alerta)
   const falta=act.filter(x=>!x.tratadoPor&&!shopIsRemoved(x)).sort(sortF);       // livres, por tratar
   const outros=act.filter(x=>x.tratadoPor&&!shopMine(x)).sort(sortF);            // entregues a outros
@@ -3425,8 +3667,9 @@ function renderCompras(){
     <button class="btn prim write-action" onclick="openShopItemModal()" ${canW?'':'disabled'}>＋ Artigo</button>
   </div>`;
   h+=`<div class="cmp-sort">
-    <span class="sd-chip${byArt?'':' on'}" onclick="setShopOrder('ref')">📅 Por refeição</span>
+    <span class="sd-chip${(byArt||byCat)?'':' on'}" onclick="setShopOrder('ref')">📅 Por refeição</span>
     <span class="sd-chip${byArt?' on':''}" onclick="setShopOrder('art')">🔤 Por artigo</span>
+    ${CATS_TABLE?`<span class="sd-chip${byCat?' on':''}" onclick="setShopOrder('cat')">🏷️ Por categoria</span>`:''}
   </div>`;
 
   // ── O meu carrinho (artigos que disse que tratava) ──
@@ -3542,7 +3785,10 @@ function renderStock(){
   const arr=Object.values(groups).sort((a,b)=>a.artigo.localeCompare(b.artigo,'pt'))
     .map(g=>Object.assign(g,{tipos:stockGroupTipos(stockAggAlocs(g.lotes))}));
   const canEdit=isAdmin();
-  let h=`<div class="cmp-hdr"><div class="cmp-hdr-title sf">🧺 Gestão de Stock</div></div>`;
+  // ✨: pedir à AI categorias para o que ainda não tem (só admin, com migração)
+  const aiBtn=(CATS_TABLE&&canEdit&&catNamesPorCategorizar().length)
+    ?`<button class="btn write-action" id="stk-catsug-btn" onclick="catSugerir()">✨ Categorias</button>`:'';
+  let h=`<div class="cmp-hdr"><div class="cmp-hdr-title sf">🧺 Gestão de Stock</div>${aiBtn}</div>`;
   h+=`<div class="note" style="margin-top:2px;margin-bottom:12px">${canEdit?'Toca num artigo para o alocar às refeições e categorias — as contas recalculam sozinhas.':'Toca num artigo para ver como está alocado às refeições e categorias.'}</div>`;
   if(!arr.length){el.innerHTML=h+'<div class="empty sf">Ainda não há stock. Regista uma compra itemizada ou importa uma fatura.</div>';return;}
   // Chips de filtro: ícones abreviados, só as tipologias com artigos
@@ -3553,7 +3799,21 @@ function renderStock(){
     ${FILTROS.map(([t,ic])=>`<span class="sd-chip${STOCK_FILTER===t?' on':''}" onclick="setStockFilter('${t}')"><i>${ic}</i><small>${t}</small></span>`).join('')}
   </div>`;
   const vis=STOCK_FILTER==='all'?arr:arr.filter(g=>g.tipos.has(STOCK_FILTER));
-  h+=vis.length?vis.map(g=>stockArticleCard(g)).join(''):'<div class="empty sf">Sem artigos nesta tipologia.</div>';
+  if(!vis.length)h+='<div class="empty sf">Sem artigos nesta tipologia.</div>';
+  else if(!CATS_TABLE)h+=vis.map(g=>stockArticleCard(g)).join('');
+  else{
+    // Agrupado por categoria de produto (Sumos, Talho, …); sem categoria no fim
+    vis.sort((a,b)=>{
+      const ca=artCat(a.artigo),cb=artCat(b.artigo);
+      return ((ca?0:1)-(cb?0:1))||(ca&&cb?ca.nome.localeCompare(cb.nome,'pt'):0)||a.artigo.localeCompare(b.artigo,'pt');
+    });
+    let last=null;
+    vis.forEach(g=>{
+      const c=artCat(g.artigo);const k=c?'c'+c.id:'none';
+      if(k!==last){last=k;h+=`<div class="cmp-grp-hdr sf stk-cat-hdr">🏷️ ${c?escHtml(c.nome):'Sem categoria'}</div>`;}
+      h+=stockArticleCard(g);
+    });
+  }
   el.innerHTML=h;
 }
 
@@ -3642,6 +3902,7 @@ function openShopItemModal(id,presetTipo,presetData){
   }
   // Campos editáveis só quem pode; senão, detalhe em leitura
   document.querySelectorAll('#shop-item-modal input,#shop-item-modal select').forEach(el=>{el.disabled=!canEdit;el.style.opacity=canEdit?'':'.75';});
+  shopCatSync();   // depois do disable geral: a categoria tem regras próprias
   const saveBtn=document.getElementById('shop-item-save');
   saveBtn.textContent=it?'Guardar':'Adicionar';
   saveBtn.style.display=canEdit?'':'none';
@@ -3682,6 +3943,23 @@ function shopTipoChanged(){
   multi.style.display=creating?'':'none';
   if(creating)multi.innerHTML=shopMealChecks(tipo);
   else document.getElementById('shop-ref').innerHTML=shopMealOptions(tipo,'');
+}
+/* Categoria no detalhe do artigo: mostra a associação do nome escrito e
+   deixa preencher (qualquer membro) ou alterar (só admin). Corre DEPOIS do
+   disable geral do modal — um detalhe em leitura fica em leitura. */
+function shopCatSync(){
+  const wrap=document.getElementById('shop-cat-wrap');if(!wrap)return;
+  if(!CATS_TABLE){wrap.style.display='none';return;}
+  wrap.style.display='';
+  const sel=document.getElementById('shop-cat');
+  const note=document.getElementById('shop-cat-note');
+  const artigo=(document.getElementById('shop-artigo').value||'').trim();
+  const m=ART_CATS[shopArtKey(artigo)];
+  sel.innerHTML=catOptionsHtml(m?m.catId:null);
+  const locked=!!(m&&!isAdmin());
+  if(locked&&!sel.disabled){sel.disabled=true;sel.style.opacity='.75';}
+  note.textContent='Categoria já definida — só o admin a altera.';
+  note.style.display=locked?'':'none';
 }
 async function saveShopItem(){
   if(!DATA._sbId){toast('Sem ligação — recarrega a página','bad');return;}
@@ -3735,6 +4013,12 @@ async function saveShopItem(){
         sbLog('compras','adicionou',artigo,{tratoEu,quantidade:shopQtyLabel({quantidade:qtd,tamanho:tam}),tipoDesp:tipo,dataValor:r.data_valor,dia:r.data_valor?dataToDia(r.data_valor):undefined,ref:shopIsMeal(tipo)?tipo:undefined});
       });
       toast(rows.length>1?`Artigo adicionado a ${rows.length} refeições ✓`:'Artigo adicionado ✓','ok');
+    }
+    // Categoria do artigo (associação global por nome) — em paralelo, não
+    // bloqueia o artigo; catUserSetMapping aplica as regras e trata erros
+    if(CATS_TABLE){
+      const csel=document.getElementById('shop-cat');
+      if(csel&&!csel.disabled)catUserSetMapping(artigo,parseInt(csel.value)||null);
     }
     syncMirror();marcaGuardado();
     btn.disabled=false;closeShopItemModal();renderShopViews();
@@ -4249,10 +4533,14 @@ async function faturaChosen(inp){
     const isPdf=f.type==='application/pdf'||/\.pdf$/i.test(f.name||'');
     if(isPdf&&f.size>4*1024*1024)throw new Error('PDF demasiado grande (máx. 4 MB)');
     const {b64,mime}=isPdf?await faturaLerPdf(f):await faturaComprime(f);
+    // Com a migração das categorias corrida, a lista (nome+descritivo) segue
+    // no pedido — o Gemini devolve também a categoria de cada linha
+    const body={image:b64,mime};
+    if(CATS_TABLE&&CATEGORIAS.length)body.categorias=catPromptList();
     const r=await sbFetch(`${SB_URL}/functions/v1/fatura-ocr`,{
       method:'POST',
       headers:{'Content-Type':'application/json','apikey':SB_KEY},
-      body:JSON.stringify({image:b64,mime})
+      body:JSON.stringify(body)
     });
     if(!r.ok){const e=await r.json().catch(()=>({}));throw new Error(e.error||('HTTP '+r.status));}
     faturaAplicar(await r.json());
@@ -4322,7 +4610,10 @@ function faturaAplicar(d){
   //   2.ª linha a 1.0 no MESMO artigo (várias marcas, ex. Lays+Ruffles)
   //     → sub-artigo por confirmar, que herda o destino do genérico
   const linhas=d.linhas.filter(l=>l&&l.artigo&&typeof l.preco==='number'&&l.preco>=0)
-    .map(ln=>({artigo:String(ln.artigo).slice(0,60),qtd:ln.qtd?normalizeQty(String(ln.qtd)):'',valor:rnd(ln.preco,2)}));
+    .map(ln=>({artigo:String(ln.artigo).slice(0,60),qtd:ln.qtd?normalizeQty(String(ln.qtd)):'',valor:rnd(ln.preco,2),categoria:ln.categoria?String(ln.categoria).slice(0,40):null}));
+  // Categorias sugeridas pela AI: gravam-se já (só onde não havia — a memória
+  // artigo→categoria é global e vale mesmo que a compra não chegue a registar-se)
+  catAIMappings(linhas.filter(l=>l.categoria)).then(n=>{if(n&&TAB==='stock')renderStock();});
   const lotes=compraEdit.lotes||[];
   // Reset (re-importação): volta ao nome da lista para refazer o matching do zero
   lotes.forEach(l=>{delete l._fat;delete l._sug;delete l._subs;delete l._impQtds;delete l._qtdPedida;if(l._listArt){l.artigo=l._listArt;delete l._listArt;}});
@@ -4601,11 +4892,31 @@ function openLoteModal(id){
     `<div class="lote-cmps">${comprasRows}</div>`;
   const canEdit=isAdmin()&&!contasFechadas();
   ['lote-save','lote-addline'].forEach(i=>{document.getElementById(i).style.display=canEdit?'':'none';});
+  loteCatFill();
   loteRenderAlocs();
   document.getElementById('lote-bg').classList.add('show');
   document.body.classList.add('no-scroll');
 }
 function closeLoteModal(){document.getElementById('lote-bg').classList.remove('show');document.body.classList.remove('no-scroll');editingLote=null;}
+/* Categoria do artigo no detalhe do lote — grava logo ao mudar (é uma
+   associação global por nome, independente das alocações deste artigo).
+   Preencher um buraco pode qualquer membro; mudar é só do admin. */
+function loteCatFill(){
+  const wrap=document.getElementById('lote-cat-wrap');if(!wrap)return;
+  if(!CATS_TABLE||!editingLote){wrap.style.display='none';return;}
+  const m=ART_CATS[shopArtKey(editingLote.artigo)];
+  const sel=document.getElementById('lote-cat');
+  sel.innerHTML=catOptionsHtml(m?m.catId:null);
+  sel.disabled=!!(m&&!isAdmin());
+  sel.style.opacity=sel.disabled?'.75':'';
+  wrap.style.display='';
+}
+async function loteCatChanged(v){
+  if(!editingLote)return;
+  const ok=await catUserSetMapping(editingLote.artigo,parseInt(v)||null);
+  if(ok){marcaGuardado();toast('Categoria guardada ✓','ok');}
+  loteCatFill();   // repõe o select se a escrita falhou/foi bloqueada
+}
 function loteMeals(){return (DATA.refeicoesDef||[]).filter(r=>shopIsMeal(r.ref));}
 function loteRenderAlocs(){
   if(!editingLote)return;

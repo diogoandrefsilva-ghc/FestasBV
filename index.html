@@ -163,10 +163,15 @@ setTimeout(function(){ if (window.fbvEsconderSplash) window.fbvEsconderSplash();
       <button onclick="closeShopItemModal()" style="background:var(--panel2);border:1px solid var(--line);color:var(--muted);border-radius:9px;width:32px;height:32px;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0">✕</button>
     </div>
     <label>Artigo</label>
-    <input type="text" id="shop-artigo" maxlength="60" placeholder="Ex: Feijão">
+    <input type="text" id="shop-artigo" maxlength="60" placeholder="Ex: Feijão" onchange="shopCatSync()">
     <div class="inline-row">
       <div style="flex:3"><label>Tamanho / embalagem</label><input type="text" id="shop-tam" maxlength="20" placeholder="Ex: lata 250 ml" onblur="this.value=normalizeQty(this.value)"></div>
       <div style="flex:2"><label>Qtd.</label><input type="text" id="shop-qtd" maxlength="20" placeholder="Ex: 4" onblur="this.value=normalizeQty(this.value)"></div>
+    </div>
+    <div id="shop-cat-wrap" style="display:none">
+      <label>Categoria 🏷️</label>
+      <select id="shop-cat"></select>
+      <div class="note" id="shop-cat-note" style="display:none;margin-top:4px"></div>
     </div>
     <div id="shop-ctx-lock" class="shop-ctx-lock" style="display:none"></div>
     <div id="shop-tipo-wrap">
@@ -247,6 +252,10 @@ setTimeout(function(){ if (window.fbvEsconderSplash) window.fbvEsconderSplash();
       <button onclick="closeLoteModal()" style="background:var(--panel2);border:1px solid var(--line);color:var(--muted);border-radius:9px;width:32px;height:32px;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0">✕</button>
     </div>
     <div class="note" id="lote-info" style="margin-top:0"></div>
+    <div id="lote-cat-wrap" style="display:none">
+      <label>Categoria 🏷️</label>
+      <select id="lote-cat" onchange="loteCatChanged(this.value)"></select>
+    </div>
     <div id="lote-alocs"></div>
     <button class="btn ghost write-action" id="lote-addline" style="width:100%;margin-top:8px" onclick="loteAddAloc()">＋ Alocar a refeição</button>
     <div class="note" id="lote-resto" style="margin-top:10px"></div>
@@ -254,6 +263,23 @@ setTimeout(function(){ if (window.fbvEsconderSplash) window.fbvEsconderSplash();
       <button class="btn ghost" onclick="closeLoteModal()">Fechar</button>
       <button class="btn prim write-action" id="lote-save" onclick="saveLote()">Guardar</button>
     </div>
+  </div>
+</div>
+
+<!-- ✨ Sugestões de categorias da AI (rever antes de gravar) -->
+<div class="modal-bg" id="catsug-bg">
+  <div class="modal" id="catsug-modal">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <h3 style="margin-bottom:0">✨ Sugestões de Categorias</h3>
+      <button onclick="catSugClose()" style="background:var(--panel2);border:1px solid var(--line);color:var(--muted);border-radius:9px;width:32px;height:32px;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0">✕</button>
+    </div>
+    <div class="note" id="catsug-info" style="margin-top:0"></div>
+    <div id="catsug-list"></div>
+    <div class="mbtns">
+      <button class="btn ghost" onclick="catSugClose()">Cancelar</button>
+      <button class="btn prim" id="catsug-save" onclick="catSugApply()">Gravar</button>
+    </div>
+    <div class="note">O que ficar em «— sem categoria —» não é gravado; podes categorizar depois no detalhe do artigo.</div>
   </div>
 </div>
 
@@ -454,6 +480,31 @@ setTimeout(function(){ if (window.fbvEsconderSplash) window.fbvEsconderSplash();
             <span id="adm-notif-knob" style="position:absolute;top:2px;left:2px;width:20px;height:20px;background:var(--ink);border-radius:50%;transition:.2s"></span>
           </label>
         </div>
+      </div>
+    </div>
+
+    <!-- 1d. Categorias de artigos (só admin · agrupadores de produto no Stock/Compras) -->
+    <div class="settings-block admin-only">
+      <div class="settings-block-hdr" onclick="toggleSettingsBlock(this)">
+        <span class="sb-icon">🏷️</span>
+        <span class="sb-title sf">Categorias de Artigos</span>
+        <span class="sb-arrow sf">▼</span>
+      </div>
+      <div class="settings-block-body">
+        <p style="font-size:12px;color:var(--muted);margin-bottom:10px;line-height:1.5">Agrupadores de produto (Sumos, Talho, …) usados no 🧺 Stock e nas Compras. O <b>descritivo</b> vai no prompt da AI ao importar faturas — quanto melhor, melhores as categorizações automáticas. O número é quantos artigos já estão associados.</p>
+        <div id="adm-cats-list"></div>
+        <div id="adm-cat-form" style="display:none;margin-top:10px;padding:10px 12px;background:var(--panel2);border:1px solid var(--line);border-radius:10px">
+          <label>Nome</label>
+          <input type="text" id="adm-cat-nome" maxlength="40" placeholder="Ex: Talho">
+          <label>Descritivo (ajuda a AI a classificar)</label>
+          <input type="text" id="adm-cat-desc" maxlength="160" placeholder="Ex: Carne fresca: acém, picanha, frango">
+          <div class="mbtns">
+            <button class="btn ghost" onclick="admCatCancel()">Cancelar</button>
+            <button class="btn danger" id="adm-cat-del" onclick="admCatDelete()" style="display:none">Eliminar</button>
+            <button class="btn prim" onclick="admCatSave()">Guardar</button>
+          </div>
+        </div>
+        <button class="btn" id="adm-cat-add" style="width:100%;margin-top:8px" onclick="admCatEdit(null)">＋ Categoria</button>
       </div>
     </div>
 
