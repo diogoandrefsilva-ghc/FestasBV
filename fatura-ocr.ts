@@ -1,7 +1,10 @@
 // supabase/functions/fatura-ocr/index.ts
 // FestasBV — Lê uma fotografia de fatura/talão com o Gemini e devolve JSON
 // estruturado (loja, data, total, linhas artigo a artigo) para a app
-// pré-preencher o Registar Compra. Chamada pelo browser com o JWT do
+// pré-preencher o Registar Compra. Se a app mandar `categorias`, cada linha
+// vem também com a categoria de produto sugerida; e há um modo só-texto
+// (`artigos` sem `image`) que classifica artigos existentes em lote.
+// Chamada pelo browser com o JWT do
 // utilizador (verify_jwt fica LIGADO no deploy — é o gateway que valida).
 //
 // Por cima disso confirma-se ainda que o email consta de allowed_users
@@ -96,11 +99,31 @@ const CORS = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const PROMPT = `Isto é um talão ou fatura de compras (Portugal) — fotografia ou
+/* ── Categorias de artigos (opcional) ──
+   A app pode mandar a lista de categorias (nome + descritivo, geridas pelo
+   admin em Definições). Com ela, o OCR devolve também "categoria" por linha
+   e existe um modo só-texto (artigos sem imagem) para classificar em lote.
+   Como a lista vem da BD em cada chamada, categorias novas ficam
+   automaticamente "conhecidas" pela AI — sem redeploy. */
+type Cat = { nome: string; descritivo: string };
+function lerCategorias(raw: unknown): Cat[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter((c) => c && typeof c.nome === "string" && c.nome.trim())
+    .slice(0, 60)
+    .map((c) => ({
+      nome: String(c.nome).replace(/\s+/g, " ").trim().slice(0, 40),
+      descritivo: String(c.descritivo ?? "").replace(/\s+/g, " ").trim().slice(0, 160),
+    }));
+}
+const catsLista = (cats: Cat[]) =>
+  cats.map((c) => `  · ${c.nome}${c.descritivo ? ` — ${c.descritivo}` : ""}`).join("\n");
+
+const promptFatura = (cats: Cat[]) => `Isto é um talão ou fatura de compras (Portugal) — fotografia ou
 PDF (pode ter várias páginas; considera todas).
 Extrai APENAS um objeto JSON com esta forma exata:
 {"loja": string|null, "data": "YYYY-MM-DD"|null, "total": number|null,
- "linhas": [{"artigo": string, "qtd": string|null, "preco": number}]}
+ "linhas": [{"artigo": string, "qtd": string|null, "preco": number${cats.length ? ', "categoria": string|null' : ""}}]}
 
 Regras:
 - "linhas": só produtos comprados. Ignora subtotais, IVA, troco, pontos de
@@ -111,9 +134,30 @@ Regras:
 - "qtd": quantidade legível, ex. "2", "1,5 kg", "6 garrafas". null se não for claro.
 - "artigo": nome legível em português. Expande abreviaturas óbvias
   (ex. "LTE MG UHT" -> "Leite meio-gordo UHT") mas não inventes.
-- "loja": nome da cadeia/loja (ex. "Continente"), sem morada.
+- "loja": nome da cadeia/loja (ex. "Continente"), sem morada.${cats.length ? `
+- "categoria": a categoria que melhor descreve o artigo, EXATAMENTE um destes
+  nomes (copia o nome tal e qual), ou null se nenhum encaixar com confiança:
+${catsLista(cats)}` : ""}
 - Se algo não se ler com confiança, usa null nesse campo em vez de adivinhar.
 Responde só com o JSON.`;
+
+// Modo só-texto: classificar nomes de artigos já existentes (sem imagem)
+const promptClassificar = (artigos: string[], cats: Cat[]) => `Classifica artigos de compras de
+supermercado (Portugal) em categorias.
+
+Categorias disponíveis:
+${catsLista(cats)}
+
+Artigos a classificar:
+${artigos.map((a) => `  - ${a}`).join("\n")}
+
+Responde APENAS com um objeto JSON com esta forma exata:
+{"sugestoes": [{"artigo": string, "categoria": string|null}]}
+
+Regras:
+- Devolve UMA entrada por artigo, com "artigo" exatamente igual ao nome dado.
+- "categoria": EXATAMENTE um dos nomes da lista (copia tal e qual), ou null
+  se nenhum encaixar com confiança. Não inventes categorias novas.`;
 
 async function emailAutorizado(auth: string): Promise<boolean> {
   // 1) quem é o utilizador deste token?
@@ -153,9 +197,30 @@ Deno.serve(async (req) => {
       return json({ error: "não autorizado" }, 403);
     }
 
-    const { image, mime } = await req.json();
-    if (!image || typeof image !== "string" || image.length > 6_000_000) {
-      return json({ error: "imagem em falta ou demasiado grande" }, 400);
+    const { image, mime, categorias, artigos } = await req.json();
+    const cats = lerCategorias(categorias);
+
+    // Duas utilizações: OCR de fatura (image) ou classificação só-texto
+    // (artigos, sem image) — o botão "✨ Categorias" da app.
+    const soTexto = !image && Array.isArray(artigos);
+    let parts: unknown[];
+    if (soTexto) {
+      const nomes = (artigos as unknown[])
+        .filter((a) => typeof a === "string" && a.trim())
+        .slice(0, 200)
+        .map((a) => String(a).replace(/\s+/g, " ").trim().slice(0, 60));
+      if (!nomes.length || !cats.length) {
+        return json({ error: "artigos ou categorias em falta" }, 400);
+      }
+      parts = [{ text: promptClassificar(nomes, cats) }];
+    } else {
+      if (!image || typeof image !== "string" || image.length > 6_000_000) {
+        return json({ error: "imagem em falta ou demasiado grande" }, 400);
+      }
+      parts = [
+        { inline_data: { mime_type: mime || "image/jpeg", data: image } },
+        { text: promptFatura(cats) },
+      ];
     }
 
     // O Safari/iOS corta pedidos que passem dos ~60s ("Load failed", sem
@@ -179,12 +244,7 @@ Deno.serve(async (req) => {
         headers: { "Content-Type": "application/json" },
         signal: ctrl.signal,
         body: JSON.stringify({
-          contents: [{
-            parts: [
-              { inline_data: { mime_type: mime || "image/jpeg", data: image } },
-              { text: PROMPT },
-            ],
-          }],
+          contents: [{ parts }],
           generationConfig,
         }),
       });
@@ -201,7 +261,7 @@ Deno.serve(async (req) => {
     const candidatos = await candidatosModelo();
     // Marcador de versão + lista de candidatos: se este log não aparecer, é a
     // versão ANTIGA que está a correr (o deploy não pegou).
-    console.log("FATURA-OCR build=flash-first-v1 candidatos:", candidatos.join(", "));
+    console.log("FATURA-OCR build=categorias-v1 candidatos:", candidatos.join(", "));
     let model = candidatos[0] ?? "gemini-flash-latest";
     let g: Response | null = null;
 

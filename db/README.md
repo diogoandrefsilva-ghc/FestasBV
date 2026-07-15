@@ -20,8 +20,11 @@ Numa BD limpa, correr por esta ordem (há dependências entre eles):
 3. `policies.sql` — RLS policies (dependem das funções)
 4. `shoplist.sql` — lista de compras partilhada (`shoplist` + `despesas.compra_id`)
 5. `stock.sql` — stock por refeição (`stock_lotes`); só necessário para a gestão de stock
+6. `categorias.sql` — categorias de artigos (`categorias` + `artigo_categorias`,
+   globais/sem evento); alimentam os agrupadores no Stock/Compras e o prompt
+   da AI no `fatura-ocr`
 
-Os passos 4–5 são migrações add-on idempotentes: correr uma vez cada.
+Os passos 4–6 são migrações add-on idempotentes: correr uma vez cada.
 
 ## Conteúdo
 
