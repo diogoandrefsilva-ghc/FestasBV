@@ -781,9 +781,16 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .msl-add{width:100%;margin-top:8px;justify-content:center}
 .msl-hint{font-size:10.5px;color:#9A6E0E;margin-top:1px}
 /* Stock: chips das alocações nos cartões de lote (separador Compras) */
-/* Chips de filtro por tipologia no topo do Stock — cabem sem scroll horizontal */
-.stk-filter{flex-wrap:wrap;margin-bottom:12px}
-.stk-filter .sd-chip{padding:7px 11px}
+/* Chips de filtro por tipologia no topo do Stock — ícone + legenda pequenina,
+   para caberem todos sem scroll horizontal */
+.stk-filter{flex-wrap:wrap;gap:4px;margin-bottom:12px}
+.stk-filter .sd-chip{flex-direction:column;gap:1px;padding:4px 6px 5px;line-height:1;min-height:35px;justify-content:center}
+.stk-filter .sd-chip i{font-style:normal;font-size:13.5px;line-height:1.2}
+.stk-filter .sd-chip small{font-size:7.5px;font-weight:700;letter-spacing:0;text-transform:uppercase;color:inherit}
+.stk-filter .sd-chip.txt{font-size:12px;padding:4px 10px 5px}
+/* Cartão do Stock: toca-se no artigo para alocar (as compras são só info) */
+.stk-card.stk-tap{cursor:pointer}
+.stk-card-go{text-align:right;font-size:11px;font-weight:600;color:var(--barrete);margin-top:2px}
 .stk-chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:7px}
 .stk-chip{background:var(--panel2);border:1px solid var(--line);color:var(--muted);font-size:11px;font-weight:600;border-radius:8px;padding:3px 7px;white-space:nowrap}
 .stk-chip.livre{background:rgba(196,144,32,.12);border-color:rgba(196,144,32,.4);color:#9A6E0E}
@@ -891,10 +898,9 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .stk-card-top b{font-size:14px;font-weight:700;color:var(--ink)}
 .stk-card-meta{font-size:12px;font-weight:700;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
 .stk-lotes{margin-top:9px;border-top:1px solid var(--line);padding-top:7px}
-.stk-lote-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:6px 0;cursor:pointer}
+.stk-lote-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:6px 0}
 .stk-lote-row+.stk-lote-row{border-top:1px solid var(--line)}
 .stk-lote-info{font-size:12.5px;color:var(--ink);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.stk-lote-edit{font-size:11px;font-weight:600;color:var(--barrete);flex:0 0 auto;white-space:nowrap}
 .stk-link{cursor:pointer}
 
 /* ═══ CASH-FLOWS — "Mista" (versão C: cabeçalho extrato + cronologia) ═══ */
