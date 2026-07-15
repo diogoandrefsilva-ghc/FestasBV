@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v39 · 2026-07-15 · Detalhe do artigo em stock sem o botão Propor';
+const APP_BUILD = 'v40 · 2026-07-15 · Títulos de Compras e Stock sem contadores';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -3418,11 +3418,10 @@ function renderCompras(){
   const falta=act.filter(x=>!x.tratadoPor&&!shopIsRemoved(x)).sort(sortF);       // livres, por tratar
   const outros=act.filter(x=>x.tratadoPor&&!shopMine(x)).sort(sortF);            // entregues a outros
   const removidos=act.filter(x=>shopIsRemoved(x)&&!x.tratadoPor).sort(sortF);    // histórico de removidos
-  const nAtivos=act.filter(x=>!shopIsRemoved(x)).length;
 
   let h='';
   h+=`<div class="cmp-hdr">
-    <div class="cmp-hdr-title sf">🛒 Compras <span class="cmp-count">${nAtivos}</span></div>
+    <div class="cmp-hdr-title sf">🛒 Compras</div>
     <button class="btn prim write-action" onclick="openShopItemModal()" ${canW?'':'disabled'}>＋ Artigo</button>
   </div>`;
   h+=`<div class="cmp-sort">
@@ -3543,7 +3542,7 @@ function renderStock(){
   const arr=Object.values(groups).sort((a,b)=>a.artigo.localeCompare(b.artigo,'pt'))
     .map(g=>Object.assign(g,{tipos:stockGroupTipos(stockAggAlocs(g.lotes))}));
   const canEdit=isAdmin();
-  let h=`<div class="cmp-hdr"><div class="cmp-hdr-title sf">🧺 Gestão de Stock <span class="cmp-count">${arr.length}</span></div></div>`;
+  let h=`<div class="cmp-hdr"><div class="cmp-hdr-title sf">🧺 Gestão de Stock</div></div>`;
   h+=`<div class="note" style="margin-top:2px;margin-bottom:12px">${canEdit?'Toca num artigo para o alocar às refeições e categorias — as contas recalculam sozinhas.':'Toca num artigo para ver como está alocado às refeições e categorias.'}</div>`;
   if(!arr.length){el.innerHTML=h+'<div class="empty sf">Ainda não há stock. Regista uma compra itemizada ou importa uma fatura.</div>';return;}
   // Chips de filtro: ícones abreviados, só as tipologias com artigos
