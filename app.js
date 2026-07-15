@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v35 · 2026-07-15 · Sem reservado/consumido; refeição c/ 2 blocos (lista + comprado); campos da compra alinhados; dia da semana no destino; fix label iOS; stock some em anos fechados';
+const APP_BUILD = 'v36 · 2026-07-15 · Refeições sem riscados; Stock com filtro por tipologia e menos repetição de quantidades';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -3344,7 +3344,9 @@ function mealShopSection(rd){
   const lineOf=(it,dim)=>{
     const done=shopIsBought(it);
     const qtdTxt=shopQtyLabel(it);
-    const st=done?'<span class="msl-st ok">✓ comprado</span>'
+    // Sem "riscado": um artigo comprado é uma linha normal do bloco Comprado,
+    // igual às dos lotes — o bloco onde está já diz tudo
+    const st=done?''
       :it.tratadoPor?`<span class="msl-st">🧑‍🍳 ${escHtml(it.tratadoPor)}</span>`
       :'<span class="msl-st falta">falta quem trate</span>';
     // Dica: antes de comprar, há stock livre deste artigo por alocar
@@ -3353,7 +3355,7 @@ function mealShopSection(rd){
       const q=qtyParse(it.quantidade);
       if(q){const free=stockFreeFor(it.artigo,q.u);if(free>0)hint=`<div class="msl-hint">🧺 há ${escHtml(fmtQty(free,q.u))} em stock por alocar</div>`;}
     }
-    return `<div class="msl-it${done?' done':''}${dim?' msl-dim':''}" onclick="openShopItemModal(${it._id})">
+    return `<div class="msl-it${dim?' msl-dim':''}" onclick="openShopItemModal(${it._id})">
       <span class="msl-art">${escHtml(it.artigo)}${qtdTxt?` <i>${escHtml(qtdTxt)}</i>`:''}${hint}</span>${st}</div>`;
   };
   // Dois blocos independentes: 📝 a lista (pendentes) e 🧺 o que já foi comprado
@@ -3508,23 +3510,32 @@ function stockAggAlocs(lotes){
   });
   return {dest,freeQ,freeV,totQ,totV,u};
 }
-function stockDestChip(k,qtd,u){
+function stockDestChip(k,qtd,u,showQty){
   const a=destinoAloc(k,qtd);if(!a)return '';
   const meal=alocIsMeal(a);
   const ic=shopTipoIcon(a.tipo);
   const lbl=meal?fmtDiaMes(a.data):a.tipo;
-  return `<span class="stk-chip">${ic} ${escHtml(lbl)} · ${escHtml(fmtQty(qtd,u))}</span>`;
+  return `<span class="stk-chip">${ic} ${escHtml(lbl)}${showQty?' · '+escHtml(fmtQty(qtd,u)):''}</span>`;
 }
 function stockArticleCard(g){
   const ag=stockAggAlocs(g.lotes);
-  const chips=Object.keys(ag.dest).sort().map(k=>stockDestChip(k,ag.dest[k].qtd,ag.u)).join('')
+  // Menos repetição: com UM só destino a qtd do chip repetia o cabeçalho —
+  // só se mostra quando há vários destinos ou sobra por alocar
+  const dests=Object.keys(ag.dest).sort();
+  const showQty=dests.length>1||ag.freeQ>0;
+  const chips=dests.map(k=>stockDestChip(k,ag.dest[k].qtd,ag.u,showQty)).join('')
     +(ag.freeQ>0?`<span class="stk-chip livre">🧺 ${escHtml(fmtQty(ag.freeQ,ag.u))} por alocar → bolsa comum</span>`:'');
+  // Lote único: qtd e € também já estão no cabeçalho — fica só data · loja
+  const single=g.lotes.length===1;
   const loteRows=g.lotes.slice().sort((a,b)=>(a.criadoEm||'').localeCompare(b.criadoEm||'')).map(l=>{
     const dsp=(DATA.despesas||[]).find(d=>d.compraId===l.compraId);
-    const when=dsp&&dsp.dataDesp?fmtDiaMes(dsp.dataDesp):'';
-    const extra=dsp&&dsp.desc&&dsp.desc!=='Compras'?' · '+escHtml(dsp.desc):'';
+    const parts=[];
+    if(dsp&&dsp.dataDesp)parts.push(fmtDiaMes(dsp.dataDesp));
+    if(!single){parts.push(escHtml(fmtQty(l.qtd,l.unidade)));parts.push(eur(l.valor));}
+    if(dsp&&dsp.desc&&dsp.desc!=='Compras')parts.push(escHtml(dsp.desc));
+    if(!parts.length)parts.push(escHtml(fmtQty(l.qtd,l.unidade)),eur(l.valor));
     return `<div class="stk-lote-row" onclick="openLoteModal(${l._id})">
-      <span class="stk-lote-info">${when?when+' · ':''}${escHtml(fmtQty(l.qtd,l.unidade))} · ${eur(l.valor)}${extra}</span>
+      <span class="stk-lote-info">${parts.join(' · ')}</span>
       <span class="stk-lote-edit">${isAdmin()?'mover ›':'ver ›'}</span>
     </div>`;
   }).join('');
@@ -3534,18 +3545,39 @@ function stockArticleCard(g){
     <div class="stk-lotes">${loteRows}</div>
   </div>`;
 }
+// Filtro do separador Stock por tipologia de destino ('all' | 'Gerais' | …).
+// Só vive na sessão — ao reabrir a app volta a "Tudo".
+let STOCK_FILTER='all';
+function setStockFilter(f){STOCK_FILTER=f;renderStock();}
+// Tipologias em que um artigo toca: destinos das alocações + bolsa comum
+// (o que está por alocar cai no pool Gerais)
+function stockGroupTipos(ag){
+  const s=new Set();
+  Object.keys(ag.dest).forEach(k=>{const a=destinoAloc(k,0);if(a)s.add(a.tipo);});
+  if(ag.freeQ>0)s.add('Gerais');
+  return s;
+}
 function renderStock(){
   const el=document.getElementById('view-stock');if(!el||!DATA)return;
   if(!STOCK_TABLE){el.innerHTML='<div class="empty sf">Stock indisponível.</div>';return;}
   const lots=stockArr().filter(stockBacked);
   const groups={};
   lots.forEach(l=>{const k=shopArtKey(l.artigo);(groups[k]=groups[k]||{artigo:l.artigo,lotes:[]}).lotes.push(l);});
-  const arr=Object.values(groups).sort((a,b)=>a.artigo.localeCompare(b.artigo,'pt'));
+  const arr=Object.values(groups).sort((a,b)=>a.artigo.localeCompare(b.artigo,'pt'))
+    .map(g=>Object.assign(g,{tipos:stockGroupTipos(stockAggAlocs(g.lotes))}));
   const canEdit=isAdmin();
   let h=`<div class="cmp-hdr"><div class="cmp-hdr-title sf">🧺 Gestão de Stock <span class="cmp-count">${arr.length}</span></div></div>`;
-  h+=`<div class="note" style="margin-top:2px;margin-bottom:14px">${canEdit?'Move artigos entre refeições e categorias sem reabrir as faturas — a alocação da compra é atualizada e as contas re-calculam.':'Vê como o stock comprado está alocado às refeições e categorias.'}</div>`;
+  h+=`<div class="note" style="margin-top:2px;margin-bottom:12px">${canEdit?'Move artigos entre refeições e categorias sem reabrir as faturas — a alocação da compra é atualizada e as contas re-calculam.':'Vê como o stock comprado está alocado às refeições e categorias.'}</div>`;
   if(!arr.length){el.innerHTML=h+'<div class="empty sf">Ainda não há stock. Regista uma compra itemizada ou importa uma fatura.</div>';return;}
-  h+=arr.map(g=>stockArticleCard(g)).join('');
+  // Chips de filtro: ícones abreviados, só as tipologias com artigos
+  const FILTROS=[['Gerais','🧾'],['Bebidas','🥤'],['Cerveja','🍺'],['Almoço','☀️'],['Jantar','🌙']].filter(([t])=>arr.some(g=>g.tipos.has(t)));
+  if(STOCK_FILTER!=='all'&&!FILTROS.some(([t])=>t===STOCK_FILTER))STOCK_FILTER='all';
+  if(FILTROS.length>1)h+=`<div class="cmp-sort stk-filter">
+    <span class="sd-chip${STOCK_FILTER==='all'?' on':''}" onclick="setStockFilter('all')">Tudo</span>
+    ${FILTROS.map(([t,ic])=>`<span class="sd-chip${STOCK_FILTER===t?' on':''}" title="${t}" onclick="setStockFilter('${t}')">${ic}</span>`).join('')}
+  </div>`;
+  const vis=STOCK_FILTER==='all'?arr:arr.filter(g=>g.tipos.has(STOCK_FILTER));
+  h+=vis.length?vis.map(g=>stockArticleCard(g)).join(''):'<div class="empty sf">Sem artigos nesta tipologia.</div>';
   el.innerHTML=h;
 }
 

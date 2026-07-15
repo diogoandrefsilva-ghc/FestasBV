@@ -772,7 +772,6 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .msl-count{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:1px 7px;font-size:10.5px;font-weight:700;color:var(--muted);margin-left:auto}
 .msl-it{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:5px 0;font-size:12.5px;border-bottom:1px solid rgba(110,75,25,.08);cursor:pointer}
 .msl-it:last-of-type{border-bottom:none}
-.msl-it.done .msl-art{text-decoration:line-through;color:var(--faint)}
 .msl-art{min-width:0;color:var(--ink)}
 .msl-art i{font-style:normal;color:var(--faint);font-size:11px;margin-left:4px}
 .msl-st{font-size:11px;color:var(--muted);white-space:nowrap;flex:0 0 auto}
@@ -782,6 +781,9 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .msl-add{width:100%;margin-top:8px;justify-content:center}
 .msl-hint{font-size:10.5px;color:#9A6E0E;margin-top:1px}
 /* Stock: chips das alocações nos cartões de lote (separador Compras) */
+/* Chips de filtro por tipologia no topo do Stock — cabem sem scroll horizontal */
+.stk-filter{flex-wrap:wrap;margin-bottom:12px}
+.stk-filter .sd-chip{padding:7px 11px}
 .stk-chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:7px}
 .stk-chip{background:var(--panel2);border:1px solid var(--line);color:var(--muted);font-size:11px;font-weight:600;border-radius:8px;padding:3px 7px;white-space:nowrap}
 .stk-chip.livre{background:rgba(196,144,32,.12);border-color:rgba(196,144,32,.4);color:#9A6E0E}
