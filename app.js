@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v38 · 2026-07-15 · Stock: cartões minimal (qtd por refeição + badge a sobrar, compras no detalhe); Compras sem atalho Stock nem label editar';
+const APP_BUILD = 'v39 · 2026-07-15 · Detalhe do artigo em stock sem o botão Propor';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -4059,7 +4059,7 @@ function compraRefreshLotes(){
 /* ── Seletor de destino (bottom-sheet próprio, no tema da app) ──
    Substitui o <select> nativo. A lista tem só destinos concretos — tipos de
    despesa e refeições. A distribuição automática (FIFO) é PROPOSTA pela app
-   (compraProporDestino / loteFifo), nunca uma opção que o utilizador escolhe. */
+   (compraProporDestino), nunca uma opção que o utilizador escolhe. */
 // Dia da semana sem o "-feira" (Sexta, Sábado, Domingo) — para rótulos curtos
 function diaCurto(ds){const s=diaExtenso(ds);return s?s.replace(/-feira$/i,''):'';}
 function destPickList(){
@@ -4601,7 +4601,7 @@ function openLoteModal(id){
     `Em stock: <b>${escHtml(fmtQty(totQ,editingLote.u))}</b> por <b>${eur(totV)}</b>${lotes.length>1?` · ${lotes.length} compras — a distribuição pelas compras é automática (FIFO)`:''}`+
     `<div class="lote-cmps">${comprasRows}</div>`;
   const canEdit=isAdmin()&&!contasFechadas();
-  ['lote-save','lote-fifo','lote-addline'].forEach(i=>{document.getElementById(i).style.display=canEdit?'':'none';});
+  ['lote-save','lote-addline'].forEach(i=>{document.getElementById(i).style.display=canEdit?'':'none';});
   loteRenderAlocs();
   document.getElementById('lote-bg').classList.add('show');
   document.body.classList.add('no-scroll');
@@ -4647,11 +4647,6 @@ function loteAddAloc(){
   loteRenderAlocs();
 }
 function loteDelAloc(i){if(!editingLote)return;editingLote.alocs.splice(i,1);loteRenderAlocs();}
-function loteFifo(){
-  if(!editingLote)return;
-  editingLote.alocs=fifoAlocar(editingLote.artigo,editingLote.totQ,editingLote.u,editingLote.ids,null);
-  loteRenderAlocs();
-}
 async function saveLote(){
   if(!isAdmin()){toast('Só o admin ajusta alocações','bad');return;}
   if(contasFechadas()){toast('Contas fechadas — o stock já não se mexe','bad');return;}
