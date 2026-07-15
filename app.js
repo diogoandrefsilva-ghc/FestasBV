@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v41 · 2026-07-15 · Categorias de artigos (Stock/Compras + AI)';
+const APP_BUILD = 'v42 · 2026-07-15 · Stock com containers por categoria';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -3044,6 +3044,20 @@ function catOptionsHtml(cur){
   return '<option value="">— sem categoria —</option>'+
     CATEGORIAS.map(c=>`<option value="${c.id}"${c.id===cur?' selected':''}>${escHtml(c.nome)}</option>`).join('');
 }
+/* Ícone da categoria por palavras-chave do nome (sem acentos). Cobre as
+   categorias típicas das Festas; uma categoria nova sem match fica 🏷️ —
+   é só cosmético, nada depende disto. */
+function catEmoji(nome){
+  const s=shopArtKey(nome);
+  const MAP=[[/(sumo|refriger)/,'🥤'],[/agua/,'💧'],[/(batata|snack|aperitivo)/,'🍟'],
+    [/(churrasc|carvao|grelha|acendalha)/,'🔥'],[/(prato|copo|talher|guardanapo|descart|refeicao)/,'🍽️'],
+    [/(talho|carne)/,'🥩'],[/(peix|marisc)/,'🐟'],[/(branca|espirituos|whisky|gin|vodka|licor)/,'🥃'],
+    [/(cerveja|sidra)/,'🍺'],[/vinho/,'🍷'],[/(limpeza|detergente|higiene)/,'🧽'],
+    [/(bricolagem|obra|ferramenta)/,'🛠️'],[/(sobremesa|fruta|doce|gelado)/,'🍉'],
+    [/(entrada|queijo|pate|petisco)/,'🧀'],[/cafe/,'☕'],[/gelo/,'🧊'],[/(pao|padaria)/,'🥖'],[/outro/,'🧩']];
+  for(const [re,e] of MAP)if(re.test(s))return e;
+  return '🏷️';
+}
 /* Definir/alterar a categoria de um artigo a partir da UI. Regras:
    preencher um buraco pode qualquer membro; mudar/limpar o que já está
    definido é só do admin (o RLS garante o mesmo no servidor). */
@@ -3549,7 +3563,8 @@ function shopCatGroupedList(list,mineView){
     const k=keyOf(it);
     if(k!==last){
       const c=artCat(it.artigo);
-      h+=`<div class="cmp-grp-hdr sf">🏷️ ${c?escHtml(c.nome):'Sem categoria'} <span class="cmp-count">${counts[k]}</span></div>`;
+      const nome=c?c.nome:'Outros';
+      h+=`<div class="cmp-grp-hdr sf">${catEmoji(nome)} ${escHtml(nome)} <span class="cmp-count">${counts[k]}</span></div>`;
       last=k;
     }
     h+=shopItemCard(it,mineView,false);
@@ -3767,6 +3782,8 @@ function stockArticleCard(g){
 // Filtro do separador Stock por tipologia de destino ('all' | 'Gerais' | …).
 // Só vive na sessão — ao reabrir a app volta a "Tudo".
 let STOCK_FILTER='all';
+// Containers de categoria abertos/fechados (só na sessão; abertos por defeito)
+const STOCK_CAT_OPEN={};
 function setStockFilter(f){STOCK_FILTER=f;renderStock();}
 // Tipologias em que um artigo toca: destinos das alocações + bolsa comum
 // (o que está por alocar cai no pool Gerais)
@@ -3802,17 +3819,35 @@ function renderStock(){
   if(!vis.length)h+='<div class="empty sf">Sem artigos nesta tipologia.</div>';
   else if(!CATS_TABLE)h+=vis.map(g=>stockArticleCard(g)).join('');
   else{
-    // Agrupado por categoria de produto (Sumos, Talho, …); sem categoria no fim
+    // Containers por categoria de produto (Sumos, Talho, …), colapsáveis; os
+    // sem categoria caem em "Outros", sempre no fim. O cabeçalho resume o
+    // container: ícone + nº de artigos + € total em stock dessa categoria.
     vis.sort((a,b)=>{
       const ca=artCat(a.artigo),cb=artCat(b.artigo);
       return ((ca?0:1)-(cb?0:1))||(ca&&cb?ca.nome.localeCompare(cb.nome,'pt'):0)||a.artigo.localeCompare(b.artigo,'pt');
     });
-    let last=null;
+    const secs={},order=[];
     vis.forEach(g=>{
       const c=artCat(g.artigo);const k=c?'c'+c.id:'none';
-      if(k!==last){last=k;h+=`<div class="cmp-grp-hdr sf stk-cat-hdr">🏷️ ${c?escHtml(c.nome):'Sem categoria'}</div>`;}
-      h+=stockArticleCard(g);
+      if(!secs[k]){secs[k]={cat:c,groups:[]};order.push(k);}
+      secs[k].groups.push(g);
     });
+    h+=order.map(k=>{
+      const s=secs[k];
+      const nome=s.cat?s.cat.nome:'Outros';
+      const totV=rnd(s.groups.reduce((a,g)=>a+stockAggAlocs(g.lotes).totV,0),2);
+      const open=STOCK_CAT_OPEN[k]!==false;   // aberto por defeito; fecho é da sessão
+      return `<details class="stk-cat${s.cat?'':' stk-cat-outros'}"${open?' open':''} ontoggle="STOCK_CAT_OPEN['${k}']=this.open">
+        <summary class="stk-cat-sum">
+          <span class="stk-cat-ico">${catEmoji(nome)}</span>
+          <span class="stk-cat-nome sf">${escHtml(nome)}</span>
+          <span class="stk-cat-n">${s.groups.length}</span>
+          <span class="stk-cat-val">${eur(totV)}</span>
+          <span class="stk-cat-arrow">▾</span>
+        </summary>
+        <div class="stk-cat-body">${s.groups.map(g=>stockArticleCard(g)).join('')}</div>
+      </details>`;
+    }).join('');
   }
   el.innerHTML=h;
 }
