@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v33 · 2026-07-14 · Alocação: seletor de destino próprio (bottom-sheet bonito) e a app PROPÕE a distribuição (sem "FIFO" na lista); é só confirmar/mudar';
+const APP_BUILD = 'v34 · 2026-07-15 · Compra: cartões numa linha, nome do talão manda, artigos da lista mais abaixo, tabs também na edição, voltar no seletor de destino';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -3170,11 +3170,14 @@ function stockDemandFor(artigo,u){
   });
   return dem;
 }
-/* Já alocado a cada refeição pelos OUTROS lotes do mesmo artigo. */
+/* Já alocado a cada refeição pelos OUTROS lotes do mesmo artigo.
+   Lotes órfãos (a compra foi apagada) NÃO contam — senão as alocações de uma
+   compra apagada continuavam a assombrar as propostas da compra seguinte. */
 function stockAllocatedFor(artigo,u,skipLotId){
   const alloc={};
   stockArr().forEach(l=>{
-    if(l._id===skipLotId)return;
+    if(skipLotId!=null&&l._id===skipLotId)return;
+    if(!stockBacked(l))return;
     if(!shopSameArtigo(l.artigo,artigo)||(l.unidade||'')!==u)return;
     (l.alocacoes||[]).forEach(a=>{const k=a.tipo+'|'+a.data;alloc[k]=rnd((alloc[k]||0)+(+a.qtd||0),3);});
   });
@@ -3830,9 +3833,10 @@ function openCompra(compraId){
   if(contasFechadas()&&!compraId){toast('Contas fechadas — só pagamentos de dívidas','bad');return;}
   const isEdit=!!compraId;
   // det = "preço por artigo" (defeito nas compras novas): preenche-se qtd+€ por
-  // artigo e as linhas de despesa geram-se sozinhas. Na edição não dá para
-  // reconstruir o detalhe a partir das despesas → fica o modo por totais.
-  compraEdit={id:compraId||null,lines:[],lotes:[],det:!isEdit};
+  // artigo e as linhas de despesa geram-se sozinhas. Na edição abre no separador
+  // que corresponde ao que a compra tem (lotes → por artigo; senão por totais) —
+  // os dois tabuladores ficam disponíveis e AMBAS as partes são gravadas.
+  compraEdit={id:compraId||null,lines:[],lotes:[],det:!isEdit||stockArr().some(l=>l.compraId===compraId)};
   const linked=isEdit?shopArr().filter(x=>x.compraId===compraId):[];
   // Linhas: (edição) reconstruídas das despesas da compra; (nova) semeadas dos meus artigos
   if(isEdit){
@@ -3844,8 +3848,10 @@ function openCompra(compraId){
     // (1 alocação → destino simples; várias → split; nenhuma → por alocar).
     compraEdit.lotes=stockArr().filter(l=>l.compraId===compraId).map(l=>{
       const al=(l.alocacoes||[]).filter(a=>+a.qtd>0);
-      const free=!linked.some(x=>shopSameArtigo(x.artigo,l.artigo));
-      const base={_id:l._id,artigo:l.artigo,qtd:fmtQty(l.qtd,l.unidade),valor:l.valor,keys:[],free,destino:'',splits:null};
+      // Liga o lote ao artigo da lista: nome igual ou, se a fatura o renomeou
+      // (o talão manda no nome), por semelhança — guarda-se em _listArt
+      const link=linked.find(x=>shopSameArtigo(x.artigo,l.artigo))||linked.find(x=>faturaScore(x.artigo,l.artigo)>=0.5);
+      const base={_id:l._id,artigo:l.artigo,_listArt:link?link.artigo:null,qtd:fmtQty(l.qtd,l.unidade),valor:l.valor,keys:[],free:!link,destino:'',splits:null};
       if(al.length>1)base.splits=al.map(a=>({destino:alocToDestino(a),qtd:a.qtd}));
       else if(al.length===1)base.destino=alocToDestino(al[0]);
       return base;
@@ -3877,24 +3883,31 @@ function openCompra(compraId){
   // Picker de artigos (pendentes + removidos que eu ainda reclamo)
   const pend=shopArr().filter(x=>shopIsPending(x)||(shopIsRemoved(x)&&shopMine(x)));
   const pickItems=isEdit?linked.concat(pend.filter(x=>x.compraId!==compraId)):pend;
+  // O picker vive num bloco recolhível DEPOIS do detalhe por artigo (junto ao
+  // "＋ Artigo fora da lista") — abre sozinho quando ainda nada está marcado.
   let pl='';
   if(pickItems.length){
-    pl='<div class="cmp-pick sf" style="margin-top:16px">Artigos da lista</div>';
+    const nOn=pickItems.filter(it=>isEdit?it.compraId===compraId:shopMine(it)).length;
+    let rows='';
     pickItems.slice().sort((a,b)=>a.artigo.localeCompare(b.artigo,'pt')).forEach(it=>{
       const on=isEdit?it.compraId===compraId:shopMine(it);
       const ql=shopQtyLabel(it);
-      pl+=`<label class="cmp-pick-row"><input type="checkbox" class="shop-pick" value="${it._id}" ${on?'checked':''} onchange="compraPickChanged()">
+      rows+=`<label class="cmp-pick-row"><input type="checkbox" class="shop-pick" value="${it._id}" ${on?'checked':''} onchange="compraPickChanged()">
         <span>${escHtml(it.artigo)}${ql?' <i>('+escHtml(ql)+')</i>':''}${shopIsRemoved(it)?' ⚠️':''}</span>
         <span class="cmp-badge">${shopTipoIcon(it.tipo)}${shopIsMeal(it.tipo)&&it.dataValor?' '+fmtDiaMes(it.dataValor):' '+it.tipo}</span></label>`;
     });
-    pl+='<div class="note" style="margin-top:6px">Os artigos marcados saem da lista e ficam ligados a esta compra.</div>';
+    pl=`<details class="pick-det"${nOn?'':' open'}>
+      <summary>🛒 Artigos da lista <span class="cmp-count" id="shop-pick-count">${nOn}/${pickItems.length}</span><span class="pick-chev">›</span></summary>
+      ${rows}
+      <div class="note" style="margin:6px 0 12px">Os artigos marcados saem da lista e ficam ligados a esta compra.</div>
+    </details>`;
   }
-  document.getElementById('shop-buy-body').innerHTML=(ro?'<div class="note" style="margin-bottom:10px">🔒 Só o administrador pode editar uma compra já registada.</div>':'')+pl+
-    (isEdit?'':`<div class="cmp-sort" style="margin-top:14px">
+  document.getElementById('shop-buy-body').innerHTML=(ro?'<div class="note" style="margin-bottom:10px">🔒 Só o administrador pode editar uma compra já registada.</div>':'')+
+    `<div class="cmp-sort" style="margin-top:14px">
       <span class="sd-chip" id="shop-mode-det" onclick="compraSetMode(true)">💶 Preço por artigo</span>
       <span class="sd-chip" id="shop-mode-tot" onclick="compraSetMode(false)">∑ Só totais</span>
-    </div>`)+
-    '<div id="shop-buy-lotes"></div>'+
+    </div>`+
+    '<div id="shop-buy-lotes"></div>'+pl+
     '<div id="shop-buy-lines-sec"><div class="cmp-pick sf" style="margin-top:14px">Repartição do valor</div><div id="shop-buy-lines"></div>'+
     (ro?'':'<button class="btn ghost" id="shop-buy-addline" style="width:100%;margin-top:8px" onclick="compraAddLine()">＋ Outro gasto</button>')+'</div>';
   if(!isEdit)compraSeedLines();
@@ -3905,7 +3918,10 @@ function openCompra(compraId){
   // Modo leitura (membro a ver uma compra já registada): desativa todos os campos
   const modal=document.getElementById('shop-buy-modal');
   ['shop-buy-who','shop-buy-date','shop-buy-desc'].forEach(id=>{const e=document.getElementById(id);if(e){e.disabled=ro;e.style.opacity=ro?'.7':'';}});
-  if(ro)modal.querySelectorAll('#shop-buy-body input,#shop-buy-body select,#shop-buy-body button').forEach(el=>{el.disabled=true;el.style.opacity='.7';});
+  if(ro){
+    modal.querySelectorAll('#shop-buy-body input,#shop-buy-body select,#shop-buy-body button').forEach(el=>{el.disabled=true;el.style.opacity='.7';});
+    modal.querySelectorAll('#shop-buy-body .sd-chip').forEach(el=>{el.style.pointerEvents='none';el.style.opacity='.6';});
+  }
 
   document.getElementById('shop-buy-bg').classList.add('show');
   document.body.classList.add('no-scroll');
@@ -3914,7 +3930,11 @@ function closeShopBuyModal(){document.getElementById('shop-buy-bg').classList.re
 // Alterna "preço por artigo" ↔ "só totais": mostra/esconde as secções e refaz
 // as linhas de detalhe (no modo por artigo entram também os artigos de tipo)
 function compraSetMode(det){compraEdit.det=!!det;compraRefreshLotes();compraSeedLines();compraApplyMode();}
-function compraPickChanged(){compraRefreshLotes();compraSeedLines();}
+function compraPickChanged(){
+  const c=document.getElementById('shop-pick-count');
+  if(c){const all=[...document.querySelectorAll('.shop-pick')];c.textContent=all.filter(x=>x.checked).length+'/'+all.length;}
+  compraRefreshLotes();compraSeedLines();
+}
 /* Linhas de repartição (compra NOVA): geradas dos artigos marcados no picker —
    TODOS eles, um grupo por refeição/tipo, artigos nas observações. Regenera a
    cada marca/desmarca, preservando os € já escritos (por grupo) e as linhas
@@ -3968,9 +3988,10 @@ function compraAddLine(){compraEdit.lines.push({tipo:'Gerais',dataValor:null,val
 function compraRemoveLine(i){compraEdit.lines.splice(i,1);if(!compraEdit.lines.length)compraEdit.lines.push({tipo:'Gerais',dataValor:null,valor:'',obs:''});compraRenderLines();}
 function compraUpdateTotal(){
   let tot=0;
-  // Modo "preço por artigo": as linhas de repartição estão escondidas e não contam;
-  // "só totais" numa compra nova: o detalhe está escondido e também não conta
-  if(!compraEdit.det)compraEdit.lines.forEach(ln=>{const v=parseFloat(ln.valor);if(!isNaN(v))tot+=v;});
+  // Modo "preço por artigo" numa compra NOVA: as linhas de repartição estão
+  // escondidas e não contam; na EDIÇÃO contam sempre (os tabuladores só mudam
+  // a vista — as duas partes existem e são ambas gravadas)
+  if(!compraEdit.det||compraEdit.id)compraEdit.lines.forEach(ln=>{const v=parseFloat(ln.valor);if(!isNaN(v))tot+=v;});
   if(compraEdit.det||compraEdit.id)(compraEdit.lotes||[]).forEach(l=>{const v=parseFloat(l.valor);if(!isNaN(v))tot+=v;});
   const el=document.getElementById('shop-buy-total');if(el)el.textContent=`Total: ${eur(rnd(tot,2))}`;
 }
@@ -3996,8 +4017,10 @@ function compraDetectLotes(){
     out.push(...Object.values(g));
   }
   // Modo "preço por artigo": os artigos de tipo (Gerais/Bebidas/…) também se
-  // detalham — geram despesas diretas desse tipo, não lotes de stock
-  if(compraEdit.det){
+  // detalham — geram despesas diretas desse tipo, não lotes de stock.
+  // Na edição entram sempre: os lotes gravados desses artigos têm de ter grupo,
+  // senão desapareciam do modal ao alternar de separador.
+  if(compraEdit.det||compraEdit.id){
     const nm=shopArr().filter(x=>checked.includes(x._id)&&!shopIsMeal(x.tipo));
     const g={};
     nm.forEach(it=>{const k=it.tipo+'|'+shopArtKey(it.artigo);(g[k]=g[k]||{artigo:it.artigo,tipoFix:it.tipo,items:[]}).items.push(it);});
@@ -4008,10 +4031,13 @@ function compraDetectLotes(){
 function compraRefreshLotes(){
   const found=(STOCK_TABLE||compraEdit.det)?compraDetectLotes():[];
   const prev=compraEdit.lotes||[];
+  const used=new Set();
   compraEdit.lotes=found.map(d=>{
     const keys=d.tipoFix?[]:[...new Set(d.items.map(i=>i.tipo+'|'+i.dataValor))].sort();
-    const ex=prev.find(l=>!l.free&&shopSameArtigo(l.artigo,d.artigo)&&(l.tipoFix||'')===(d.tipoFix||'')&&(l.dataFix||'')===(d.dataFix||''));
-    if(ex)return Object.assign(ex,{keys});
+    // Match pelo nome da LISTA (_listArt quando a fatura renomeou o artigo);
+    // um lote gravado (edição, _id) vale pelo nome, seja qual for a origem
+    const ex=prev.find(l=>!used.has(l)&&!l.free&&shopSameArtigo(l._listArt||l.artigo,d.artigo)&&(l._id!=null||((l.tipoFix||'')===(d.tipoFix||'')&&(l.dataFix||'')===(d.dataFix||''))));
+    if(ex){used.add(ex);return Object.assign(ex,{keys});}
     // qtd sugerida = soma das qtds pedidas (se numéricas e na mesma unidade)
     let tot=0,u=null,ok=true;
     d.items.forEach(i=>{const q=qtyParse(i.quantidade);if(!q){ok=false;return;}if(u==null)u=q.u;if(q.u!==u)ok=false;else tot=rnd(tot+q.n,3);});
@@ -4023,7 +4049,7 @@ function compraRefreshLotes(){
     const lote={artigo:d.artigo,qtd,valor:'',keys,tipoFix:d.tipoFix||null,dataFix:d.dataFix||null,destino,splits:null};
     if(!d.tipoFix)compraProporDestino(lote);   // propõe alocação concreta às refeições
     return lote;
-  }).concat(prev.filter(l=>l.free));   // artigos fora da lista mantêm-se
+  }).concat(prev.filter(l=>!used.has(l)&&l.free));   // artigos fora da lista mantêm-se
   compraRenderLotes();
 }
 /* Opções de destino de um item detalhado: "por alocar" (FIFO), tipos puros
@@ -4072,9 +4098,12 @@ function closeDestPicker(e){if(e&&e.target&&e.target.id!=='dpick-bg')return;docu
    1 destino → destino simples; vários → split; sem procura → refeição pedida
    (se só uma) ou Gerais. Só para lotes de refeição — os de tipo mantêm o tipo. */
 function compraProporDestino(l){
+  // A procura casa-se pelo nome da LISTA (se a fatura renomeou o artigo, o
+  // pedido continua a chamar-se como na lista); um lote já gravado não se
+  // bloqueia a si próprio (skipLotId)
   const q=qtyParse(l.qtd);
   if(q&&q.n>0){
-    const al=fifoAlocar(l.artigo,q.n,q.u,null,(l.keys&&l.keys.length)?l.keys:null);
+    const al=fifoAlocar(l._listArt||l.artigo,q.n,q.u,l._id!=null?l._id:null,(l.keys&&l.keys.length)?l.keys:null);
     if(al.length>=2){l.splits=al.map(a=>({destino:alocToDestino(a),qtd:a.qtd}));l.destino='';return;}
     if(al.length===1){l.destino=alocToDestino(al[0]);l.splits=null;return;}
   }
@@ -4097,34 +4126,33 @@ function compraLoteHtml(l,i){
   const tag=l._fat==='ok'?`<span class="lote-tag ok">✓ na fatura</span>`
     :l._fat==='miss'?`<span class="lote-tag miss">⚠ não encontrado</span>`
     :l._fat==='warn'?`<span class="lote-tag warn">⚠ qtd difere</span>`:'';
+  // Se a fatura renomeou o artigo, o nome pedido na lista fica como nota
+  const sub=(!l.free&&l._listArt&&!shopSameArtigo(l._listArt,l.artigo))?`<small class="lote-list-art">na lista: ${escHtml(l._listArt)}</small>`:'';
   const name=l.free
     ?`<input class="lote-name-in" type="text" maxlength="60" placeholder="Nome do artigo" value="${escHtml(l.artigo||'')}" oninput="compraEdit.lotes[${i}].artigo=this.value">`
-    :`<span class="lote-name">${l.tipoFix?shopTipoIcon(l.tipoFix)+' ':''}${escHtml(l.artigo)}</span>`;
+    :`<span class="lote-name">${l.tipoFix?shopTipoIcon(l.tipoFix)+' ':''}${escHtml(l.artigo)}${sub}</span>`;
   const head=`<div class="lote-head">${name}${tag}${l.free?`<button class="lote-x" title="Remover" onclick="compraDelLote(${i})">✕</button>`:''}</div>`;
-  const fields=`<div class="lote-fields">
-      <label class="fld fld-qty"><span>Qtd</span>
-        <input type="text" placeholder="—" value="${escHtml(l.qtd||'')}" oninput="compraEdit.lotes[${i}].qtd=this.value" onblur="this.value=normalizeQty(this.value);compraEdit.lotes[${i}].qtd=this.value;compraSplitNoteUpd(${i})"></label>
-      <label class="fld fld-price"><span>Preço</span>
-        <div class="price-in"><input type="number" step="0.01" min="0" inputmode="decimal" placeholder="0,00" value="${l.valor===''||l.valor==null?'':l.valor}" oninput="compraEdit.lotes[${i}].valor=this.value;compraUpdateTotal()"><i>€</i></div></label>
+  // Uma só linha: qtd + preço + destino (o destino desce para o bloco de split
+  // quando o artigo está dividido por vários destinos)
+  const hasSplit=!!(l.splits&&l.splits.length);
+  const destInline=(STOCK_TABLE&&!hasSplit)
+    ?destBtnHtml(l.destino,`compraDestPick(${i})`)+`<button class="lote-split-btn" title="Dividir por vários destinos" onclick="compraLoteAddSplit(${i})">⇄</button>`
+    :'';
+  const fields=`<div class="lote-row">
+      <input class="lote-qty" type="text" placeholder="Qtd" title="Quantidade" value="${escHtml(l.qtd||'')}" oninput="compraEdit.lotes[${i}].qtd=this.value" onblur="this.value=normalizeQty(this.value);compraEdit.lotes[${i}].qtd=this.value;compraSplitNoteUpd(${i})">
+      <div class="price-in lote-price"><input type="number" step="0.01" min="0" inputmode="decimal" placeholder="0,00" title="Preço" value="${l.valor===''||l.valor==null?'':l.valor}" oninput="compraEdit.lotes[${i}].valor=this.value;compraUpdateTotal()"><i>€</i></div>
+      ${destInline}
     </div>`;
-  // Destino / split (só faz sentido com tabela de stock — lotes movíveis)
   let destBlock='';
-  if(STOCK_TABLE){
-    if(l.splits&&l.splits.length){
-      const rows=l.splits.map((s,j)=>`<div class="split-row">
-          ${destBtnHtml(s.destino,`compraSplitDestPick(${i},${j})`)}
-          <input class="split-qty" type="text" inputmode="decimal" placeholder="qtd" value="${escHtml(s.qtd==null?'':String(s.qtd))}" oninput="compraLoteSplitQty(${i},${j},this.value)">
-          <button class="lote-x" title="Remover destino" onclick="compraLoteDelSplit(${i},${j})">✕</button>
-        </div>`).join('');
-      destBlock=`<div class="lote-splits">${rows}
-        <button class="cmp-mini split-add" onclick="compraLoteAddSplit(${i})">＋ destino</button>
-        <div class="split-note" id="split-note-${i}">${compraSplitNote(l)}</div></div>`;
-    }else{
-      destBlock=`<div class="lote-dest">
-          ${destBtnHtml(l.destino,`compraDestPick(${i})`)}
-          <button class="lote-split-btn" title="Dividir por vários destinos" onclick="compraLoteAddSplit(${i})">⇄ dividir</button>
-        </div>`;
-    }
+  if(STOCK_TABLE&&hasSplit){
+    const rows=l.splits.map((s,j)=>`<div class="split-row">
+        ${destBtnHtml(s.destino,`compraSplitDestPick(${i},${j})`)}
+        <input class="split-qty" type="text" inputmode="decimal" placeholder="qtd" value="${escHtml(s.qtd==null?'':String(s.qtd))}" oninput="compraLoteSplitQty(${i},${j},this.value)">
+        <button class="lote-x" title="Remover destino" onclick="compraLoteDelSplit(${i},${j})">✕</button>
+      </div>`).join('');
+    destBlock=`<div class="lote-splits">${rows}
+      <button class="cmp-mini split-add" onclick="compraLoteAddSplit(${i})">＋ destino</button>
+      <div class="split-note" id="split-note-${i}">${compraSplitNote(l)}</div></div>`;
   }
   const fat=(!l.free&&l._sug?`<label class="lote-sug"><input type="checkbox" onchange="faturaSugToggle(${i})">
         <div class="sug-txt"><b>Corresponde a esta linha da fatura?</b><span>${escHtml(l._sug.artigo)}${l._sug.qtd?' · '+escHtml(l._sug.qtd):''}</span></div>
@@ -4142,21 +4170,18 @@ function compraRenderLotes(){
   const cont=document.getElementById('shop-buy-lotes');if(!cont)return;
   const ls=compraEdit.lotes||[];
   const det=!!compraEdit.det;
-  // "Só totais" numa compra NOVA: sem detalhe nenhum — só a repartição do
-  // valor (na edição a secção fica, para se poderem editar lotes já gravados)
-  if(!det&&!compraEdit.id){cont.innerHTML='';compraUpdateTotal();return;}
-  if(!ls.length&&!STOCK_TABLE&&!det){cont.innerHTML='';compraUpdateTotal();return;}
+  // Tabulador "Só totais": o detalhe por artigo fica escondido (na edição os
+  // lotes mantêm-se em memória e continuam a ser gravados — é só a vista)
+  if(!det){cont.innerHTML='';compraUpdateTotal();return;}
   // Aviso: artigos do carrinho que a fatura não detetou (ficam por tratar se o
   // preço ficar em branco). Fica visível na revisão, antes de registar.
   const miss=ls.filter(l=>!l.free&&l._fat==='miss');
   const missWarn=miss.length?`<div class="lote-miss-warn">⚠️ <b>${miss.length} artigo(s) do carrinho não apareceram na fatura.</b> Se deixares o preço em branco, ficam na lista <b>por tratar</b> (não são dados como comprados):<ul>${miss.map(l=>'<li>'+escHtml(l.artigo)+(l.qtd?' <i style="color:var(--muted);font-style:normal">('+escHtml(l.qtd)+')</i>':'')+'</li>').join('')}</ul></div>`:'';
-  cont.innerHTML=((ls.length||det)?`<div class="cmp-pick sf" style="margin-top:14px">${det?'💶 Preço por artigo':'🧾 Detalhe por artigo — opcional'}</div>`:'')+
+  cont.innerHTML=`<div class="cmp-pick sf" style="margin-top:14px">💶 Preço por artigo</div>`+
     ls.map((l,i)=>compraLoteHtml(l,i)).join('')+
     missWarn+
-    ((det||STOCK_TABLE)?`<button class="btn ghost" style="width:100%;margin-top:8px" onclick="compraAddLote()">${det?'＋ Artigo fora da lista':'＋ Artigo detalhado'}</button>`:'')+
-    (det
-      ?'<div class="note">A app propõe o destino de cada artigo (refeição ou tipo) — confirma ou muda. Podes dividir um artigo por vários destinos com ⇄. Reajustas tudo depois no separador 🧺 Stock.</div>'
-      :(ls.length?'<div class="note">Preencher o € torna o artigo um lote de stock, com o destino que a app propõe (podes mudar). Reajustas depois em 🧺 Stock. € vazio = artigo normal, coberto pelas linhas de baixo.</div>':''))+
+    `<button class="btn ghost" style="width:100%;margin-top:8px" onclick="compraAddLote()">＋ Artigo fora da lista</button>`+
+    '<div class="note">A app propõe o destino de cada artigo (refeição ou tipo) — confirma ou muda. Podes dividir um artigo por vários destinos com ⇄. Reajustas tudo depois no separador 🧺 Stock.</div>'+
     faturaExtrasHtml();
   compraUpdateTotal();
 }
@@ -4294,7 +4319,8 @@ function faturaAplicar(d){
   const linhas=d.linhas.filter(l=>l&&l.artigo&&typeof l.preco==='number'&&l.preco>=0)
     .map(ln=>({artigo:String(ln.artigo).slice(0,60),qtd:ln.qtd?normalizeQty(String(ln.qtd)):'',valor:rnd(ln.preco,2)}));
   const lotes=compraEdit.lotes||[];
-  lotes.forEach(l=>{delete l._fat;delete l._sug;delete l._subs;delete l._impQtds;delete l._qtdPedida;});
+  // Reset (re-importação): volta ao nome da lista para refazer o matching do zero
+  lotes.forEach(l=>{delete l._fat;delete l._sug;delete l._subs;delete l._impQtds;delete l._qtdPedida;if(l._listArt){l.artigo=l._listArt;delete l._listArt;}});
   const pares=[];
   lotes.forEach((l,i)=>{if(l.free)return;l._qtdPedida=l.qtd||'';linhas.forEach((ln,j)=>{const s=faturaScore(l.artigo,ln.artigo);if(s>=0.5)pares.push({i,j,s});});});
   pares.sort((a,b)=>b.s-a.s);
@@ -4309,6 +4335,9 @@ function faturaAplicar(d){
       // O talão manda na quantidade real (o pedido do carrinho é só guia): se a
       // fatura traz qtd, é essa que entra em stock — não o que se pediu.
       if(ln.qtd)l.qtd=ln.qtd;
+      // …e manda também no NOME do artigo (a lista é só guia); o nome pedido
+      // fica em _listArt para o match com a procura da lista e como nota na UI
+      if(ln.artigo&&!shopSameArtigo(l.artigo,ln.artigo)){l._listArt=l.artigo;l.artigo=ln.artigo;}
       l._fat='ok';l._impQtds=[ln.qtd];
       faturaQtdRecheck(l);
       if(!l.tipoFix)compraProporDestino(l);   // re-propõe com a qtd real do talão
@@ -4326,7 +4355,7 @@ function faturaAplicar(d){
     if(linhaUsada.has(j))return;
     lotes.forEach((l,i)=>{
       if(linhaUsada.has(j)||l.free||l._fat!=='ok')return;
-      if(faturaScore(l.artigo,ln.artigo)===1){linhaUsada.add(j);(l._subs=l._subs||[]).push(ln);subs++;}
+      if(faturaScore(l._listArt||l.artigo,ln.artigo)===1){linhaUsada.add(j);(l._subs=l._subs||[]).push(ln);subs++;}
     });
   });
   // Artigos do carrinho SEM correspondência na fatura → alerta ⚠️ (fica € vazio)
@@ -4356,6 +4385,8 @@ function faturaSugToggle(i){
   const ln=l._sug;delete l._sug;
   if(l.valor===''||l.valor==null)l.valor=ln.valor;
   if(ln.qtd)l.qtd=ln.qtd;   // qtd real do talão (o pedido do carrinho é só guia)
+  // O nome do talão também manda (a lista fica como nota em _listArt)
+  if(ln.artigo&&!shopSameArtigo(l.artigo,ln.artigo)){l._listArt=l._listArt||l.artigo;l.artigo=ln.artigo;}
   l._fat='ok';l._impQtds=[ln.qtd];
   faturaQtdRecheck(l);
   if(!l.tipoFix)compraProporDestino(l);
@@ -4416,7 +4447,9 @@ async function saveCompra(){
     if(!v||v<=0){
       // Artigo do carrinho sem preço (ex.: não veio na fatura) → NÃO é comprado:
       // fica na lista por tratar e avisa-se abaixo. Avulso em branco é ignorado.
-      if(det&&artigo&&!l.free)naoDetetados.push({artigo,qtd:l.qtd||''});
+      // Só em compras NOVAS: na edição um € vazio não solta artigos (podem
+      // estar cobertos pelas linhas de repartição).
+      if(det&&!isEdit&&artigo&&!l.free)naoDetetados.push({artigo,qtd:l.qtd||''});
       continue;
     }
     if(!artigo){toast('Indica o nome do artigo detalhado','bad');return;}
@@ -4441,8 +4474,10 @@ async function saveCompra(){
     lotes.push({artigo,qtd:q.n,unidade:q.u,valor:v,keys:l.free?(l.destino?[l.destino]:[]):(l.keys||[])});
   }
   const rows=[];
-  // Modo por totais: validar linhas (totalmente vazias são ignoradas se houver mais alguma coisa)
-  if(!det)for(const ln of compraEdit.lines){
+  // Modo por totais: validar linhas (totalmente vazias são ignoradas se houver
+  // mais alguma coisa). Na edição as linhas entram SEMPRE — o tabulador ativo
+  // só muda a vista, não o que se grava.
+  if(!det||isEdit)for(const ln of compraEdit.lines){
     const v=rnd(parseFloat(ln.valor),2);
     const vazia=(!v||v<=0)&&!(ln.obs||'').trim();
     if(vazia&&(lotes.length||Object.keys(tipoRows).length||compraEdit.lines.length>1))continue;

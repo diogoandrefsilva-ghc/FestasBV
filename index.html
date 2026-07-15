@@ -263,8 +263,10 @@ setTimeout(function(){ if (window.fbvEsconderSplash) window.fbvEsconderSplash();
 <div class="dsheet-bg" id="dpick-bg" onclick="closeDestPicker(event)">
   <div class="dsheet" id="dpick">
     <div class="dsheet-handle"></div>
+    <button class="dsheet-close" type="button" aria-label="Fechar" onclick="closeDestPicker()">✕</button>
     <div class="dsheet-title" id="dpick-title">Alocar a…</div>
     <div class="dsheet-list" id="dpick-list"></div>
+    <button class="dsheet-cancel" type="button" onclick="closeDestPicker()">‹ Voltar</button>
   </div>
 </div>
 
