@@ -1004,3 +1004,93 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .catsug-row{display:flex;align-items:center;gap:8px;margin-top:6px}
 .catsug-art{flex:1;font-size:13px;min-width:0;overflow-wrap:anywhere}
 .catsug-row select{flex:0 0 46%;max-width:46%;margin-top:0}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   REDESIGN Compras & Stock — VARIANTE A · "Talão de Mercado"
+   A lista é um talão de mercearia: papel-sal com perfuração, linhas
+   tracejadas, carimbos campino e etiquetas kraft com furo. Tudo confinado
+   a #view-compras / #view-stock — modais e restantes separadores intactos.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* ── Cabeçalho: título maior com sublinhado a pincel dourado ── */
+#view-compras .cmp-hdr,#view-stock .cmp-hdr{margin:16px 0 12px}
+#view-compras .cmp-hdr-title,#view-stock .cmp-hdr-title{font-size:22px;color:var(--campino-escuro);position:relative;padding-bottom:7px}
+#view-compras .cmp-hdr-title::after,#view-stock .cmp-hdr-title::after{content:"";position:absolute;left:2px;right:-8px;bottom:0;height:5px;background:linear-gradient(90deg,var(--gold) 0%,rgba(168,123,20,.55) 55%,rgba(168,123,20,.08) 100%);border-radius:3px;transform:skewX(-18deg)}
+
+/* ── Sub-separadores: senhas de mercado (bilhetes com recorte lateral) ── */
+#view-compras .cmp-tabs{background:transparent;border:none;padding:0;gap:7px;margin-bottom:12px}
+#view-compras .cmp-tab{background:var(--sal);border:1px solid var(--line);border-radius:9px;padding:9px 2px;box-shadow:0 2px 5px rgba(80,55,20,.10);position:relative;overflow:visible}
+#view-compras .cmp-tab::before,#view-compras .cmp-tab::after{content:"";position:absolute;top:50%;width:11px;height:11px;margin-top:-5.5px;border-radius:50%;background:var(--bg);pointer-events:none}
+#view-compras .cmp-tab::before{left:-6px;box-shadow:inset -1px 0 0 var(--line)}
+#view-compras .cmp-tab::after{right:-6px;box-shadow:inset 1px 0 0 var(--line)}
+#view-compras .cmp-tab.on{background:var(--barrete);border-color:var(--barrete);color:#fff;box-shadow:0 3px 9px rgba(30,122,77,.35),inset 0 0 0 1px rgba(255,255,255,.28)}
+#view-compras .cmp-tab.on::before{box-shadow:inset -1px 0 0 var(--barrete)}
+#view-compras .cmp-tab.on::after{box-shadow:inset 1px 0 0 var(--barrete)}
+#view-compras .cmp-tab.on .cmp-tab-ico{filter:none;opacity:1}
+#view-compras .cmp-tab.on .cmp-tab-n{background:var(--gold);color:#fff}
+
+/* ── Chips de ordenação/filtro: etiquetas kraft com furo e cordel ── */
+#view-compras .cmp-sort .sd-chip,#view-stock .stk-filter .sd-chip{background:#F3EAD2;border-radius:5px 14px 14px 5px;position:relative;padding-left:19px}
+#view-compras .cmp-sort .sd-chip::before,#view-stock .stk-filter .sd-chip::before{content:"";position:absolute;left:7px;top:50%;width:5px;height:5px;margin-top:-2.5px;border-radius:50%;background:var(--bg);box-shadow:inset 0 0 0 1.5px rgba(110,75,25,.45)}
+#view-compras .cmp-sort .sd-chip.on,#view-stock .stk-filter .sd-chip.on{background:rgba(30,122,77,.12)}
+#view-stock .stk-filter .sd-chip{padding:6px 10px 7px 10px}
+#view-stock .stk-filter .sd-chip::before{left:50%;top:4px;margin:0 0 0 -2.5px}
+
+/* ── A lista é UM talão: papel contínuo com perfuração no topo ── */
+#view-compras .cmp-list{position:relative;background:var(--sal);border:1px solid var(--line);border-top:none;border-radius:0 0 13px 13px;padding:4px 13px 9px;gap:0;box-shadow:0 10px 24px rgba(80,55,20,.14);margin-top:15px}
+#view-compras .cmp-list::before{content:"";position:absolute;left:-1px;right:-1px;top:-9px;height:9px;background:radial-gradient(circle 5px at 8px 0,transparent 98%,var(--sal) 100%) repeat-x;background-size:16px 9px}
+/* artigos = linhas do talão, separadas a tracejado */
+#view-compras .cmp-item{background:transparent;border:none;border-radius:0;box-shadow:none;padding:10px 2px;border-bottom:1px dashed rgba(110,75,25,.28)}
+#view-compras .cmp-list>.cmp-item:last-child{border-bottom:none}
+#view-compras .cmp-tap:active{background:rgba(110,75,25,.06)}
+#view-compras .cmp-item.incart{background:linear-gradient(90deg,rgba(30,122,77,.08),transparent 70%)}
+#view-compras .cmp-item.removed{border-bottom-color:rgba(179,64,47,.4);background:repeating-linear-gradient(-45deg,rgba(179,64,47,.05) 0 6px,transparent 6px 12px)}
+
+/* ── Cabeçalhos de grupo: secção carimbada a tinta campino ── */
+#view-compras .cmp-grp-hdr{font-family:var(--display);font-size:13.5px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--campino-tinta);margin:13px 0 1px}
+#view-compras .cmp-grp-hdr:first-child{margin-top:4px}
+#view-compras .cmp-grp-hdr::after{height:0;background:none;border-top:1px dashed rgba(133,41,26,.4)}
+#view-compras .cmp-grp-hdr .cmp-count{background:transparent;border:1.5px solid rgba(133,41,26,.55);color:var(--campino-tinta);font-weight:800;transform:rotate(-4deg)}
+#view-compras .cmp-sec-hdr{font-size:16px;color:var(--campino-escuro)}
+
+/* ── Bolinha do carrinho: carimbo verde com estampada ── */
+#view-compras .cmp-check{width:27px;height:27px;border:2px dashed rgba(110,75,25,.4);background:transparent;transition:border-color .15s}
+#view-compras .cmp-check.on{border-style:solid;border-color:var(--barrete);background:var(--barrete);animation:stampA .28s cubic-bezier(.2,1.6,.5,1)}
+@keyframes stampA{0%{transform:scale(1.7) rotate(-15deg);opacity:.3}100%{transform:scale(1) rotate(0)}}
+
+/* ── Badges/chips dos artigos: mini-etiquetas kraft ── */
+#view-compras .cmp-badge,#view-compras .cmp-chip{background:#F3EAD2;border-radius:4px 9px 9px 4px;position:relative;padding-left:16px}
+#view-compras .cmp-badge::before,#view-compras .cmp-chip::before{content:"";position:absolute;left:5px;top:50%;width:4px;height:4px;margin-top:-2px;border-radius:50%;background:var(--sal);box-shadow:inset 0 0 0 1px rgba(110,75,25,.5)}
+#view-compras .cmp-badge.meal{background:rgba(30,122,77,.13)}
+#view-compras .cmp-mini.cart{border-radius:18px}
+
+/* ── Estados vazios: recado pregado com pionés ── */
+#view-compras .cmp-empty{background:var(--sal);border:1px solid var(--line);border-radius:3px 16px 4px 15px;transform:rotate(-.6deg);box-shadow:0 8px 18px rgba(80,55,20,.16);position:relative;margin-top:16px}
+#view-compras .cmp-empty::before{content:"📌";position:absolute;top:-13px;left:50%;transform:translateX(-50%) rotate(10deg);font-size:19px;filter:drop-shadow(0 2px 2px rgba(0,0,0,.25))}
+
+/* ── Histórico: compras como linhas do talão; removidos em kraft ── */
+#view-compras .cmp-done-card{background:transparent;border:none;border-radius:0;padding:10px 2px;border-bottom:1px dashed rgba(110,75,25,.28)}
+#view-compras .cmp-list>.cmp-done-card:last-child{border-bottom:none}
+#view-compras .cmp-done-body .cmp-done-card.cmp-rm{background:#F3EAD2;border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin:0}
+#view-compras .cmp-done-hdr{color:var(--campino-tinta)}
+
+/* ── Registar compra: botão-fita de fecho do talão ── */
+#view-compras>.btn.prim{border-radius:12px;padding:14px;box-shadow:0 5px 14px rgba(30,122,77,.32),inset 0 0 0 1px rgba(255,255,255,.25)}
+#view-compras>.btn.prim:active{transform:scale(.985)}
+
+/* ── STOCK: despensa com prateleiras ── */
+#view-stock .stk-cat{background:var(--sal);border-radius:11px;box-shadow:0 4px 12px rgba(80,55,20,.12);margin-bottom:8px}
+#view-stock .stk-cat-sum{background:linear-gradient(180deg,#EBDDBB,#DFCD9F);padding:9px 12px}
+#view-stock .stk-cat[open] .stk-cat-sum{border-bottom:1px solid var(--line)}
+#view-stock .stk-cat-ico{width:28px;height:28px;border:none;border-radius:50%;background:var(--sal);font-size:14px;box-shadow:0 1px 3px rgba(80,55,20,.25)}
+#view-stock .stk-cat-nome{font-family:var(--display);font-size:14.5px;letter-spacing:.09em}
+#view-stock .stk-cat-n{background:transparent;border:none;color:var(--muted)}
+#view-stock .stk-cat-val{border:1.5px solid rgba(133,41,26,.5);color:var(--campino-tinta);border-radius:13px;padding:1px 8px;font-size:11px;transform:rotate(-3deg)}
+#view-stock .stk-cat-body{background:none;padding:2px 13px 6px}
+/* artigos = linhas de inventário no papel da despensa */
+#view-stock .stk-cat-body .stk-card{background:transparent;border:none;border-radius:0;margin:0;padding:9px 2px;border-bottom:1px dashed rgba(110,75,25,.25)}
+#view-stock .stk-cat-body .stk-card:last-child{border-bottom:none}
+#view-stock>.stk-card{background:var(--sal);box-shadow:0 3px 10px rgba(80,55,20,.1)}
+#view-stock .stk-chip{background:#F3EAD2;border-radius:4px 9px 9px 4px;position:relative;padding-left:16px}
+#view-stock .stk-chip::before{content:"";position:absolute;left:5px;top:50%;width:4px;height:4px;margin-top:-2px;border-radius:50%;background:var(--sal);box-shadow:inset 0 0 0 1px rgba(110,75,25,.5)}
+#view-stock .stk-chip.livre{background:rgba(196,144,32,.18)}
