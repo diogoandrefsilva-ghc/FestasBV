@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v45 · 2026-07-16 · Shop List afinada: Ao carrinho, Já em carrinhos, Histórico limpo; Notificações fundidas';
+const APP_BUILD = 'v46 · 2026-07-16 · Botão Carrinho com ícone visível';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -3274,6 +3274,9 @@ function shopIsPending(it){return !shopIsBought(it)&&!shopIsRemoved(it);}
 // entretanto o autor o tenha removido — mantém-se na minha checklist com alerta)
 function shopMineActive(it){return shopMine(it)&&!shopIsBought(it);}
 function shopTipoIcon(t){return{Gerais:'🧾',Bebidas:'🥤',Almoço:'☀️',Jantar:'🌙',Renda:'🏠',Cerveja:'🍺'}[t]||'🛒';}
+// Carrinho em SVG (herda a cor do texto): o emoji 🛒 é cinzento-escuro e
+// desaparece nos botões verdes — este fica branco em fundo primário.
+const CART_ICO='<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;flex:0 0 auto"><circle cx="9.5" cy="20.3" r="1.7"/><circle cx="18.3" cy="20.3" r="1.7"/><path d="M2.5 3.5h2.2l2.3 11.7a1.8 1.8 0 0 0 1.8 1.4h8.9a1.8 1.8 0 0 0 1.8-1.5l1.5-7.6H6"/></svg>';
 function shopIsMeal(t){return t==='Almoço'||t==='Jantar';}
 function shopGroupKey(it){return it.tipo+'|'+(it.dataValor||'');}
 function shopGroupLabel(tipo,dataValor){
@@ -3528,7 +3531,7 @@ function shopItemCard(it,mineView,noBadge){
     right=`<span class="cmp-chip">🛒 ${escHtml(it.tratadoPor)}</span>`;
   }else{
     if(it.criadoPor)sub=`<div class="cmp-sub">pedido por ${escHtml(it.criadoPor)}</div>`;
-    right=`<button class="cmp-mini prim write-action" onclick="event.stopPropagation();claimItem(${it._id})">🛒 Ao carrinho</button>`;
+    right=`<button class="cmp-mini prim write-action" onclick="event.stopPropagation();claimItem(${it._id})">${CART_ICO} Carrinho</button>`;
   }
   if(removed)sub=`<div class="cmp-sub alert">⚠️ removido por ${escHtml(it.cfDesc||'?')}${mineView?' — abre para largar':''}</div>`;
   return `<div class="cmp-item cmp-line cmp-tap${mineView&&it.noCarrinho?' incart':''}${removed?' removed':''}" onclick="openShopItemModal(${it._id})">
@@ -3723,7 +3726,7 @@ function renderCompras(){
   }else if(SHOP_TAB==='carrinho'){
     // ── O meu carrinho (artigos que disse que tratava) ──
     if(!mine.length){
-      h+='<div class="cmp-empty sf"><span class="cmp-empty-ico">🛒</span>O teu carrinho está vazio.<br>Passa por <b>📝 Em falta</b> e toca em <b>🛒 Ao carrinho</b> nos artigos que fores buscar.</div>';
+      h+='<div class="cmp-empty sf"><span class="cmp-empty-ico">🛒</span>O teu carrinho está vazio.<br>Passa por <b>📝 Em falta</b> e toca em <b>Carrinho</b> nos artigos que fores buscar.</div>';
     }else{
       h+=listOf(mine,true);
     }
