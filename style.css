@@ -1094,3 +1094,15 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 #view-stock .stk-chip{background:#F3EAD2;border-radius:4px 9px 9px 4px;position:relative;padding-left:16px}
 #view-stock .stk-chip::before{content:"";position:absolute;left:5px;top:50%;width:4px;height:4px;margin-top:-2px;border-radius:50%;background:var(--sal);box-shadow:inset 0 0 0 1px rgba(110,75,25,.5)}
 #view-stock .stk-chip.livre{background:rgba(196,144,32,.18)}
+
+/* ── Estado à vista no "Em falta": sem dono vs entregue ──
+   Fita de margem no talão (à moda dos talões antigos): campino = falta quem
+   trate; verde = já está no carrinho de alguém. O bloco entregue leva um
+   lavado verde e a etiqueta "🛒 Nome" fica verde — deixa de se confundir
+   com o botão de ação "🛒 Carrinho" dos artigos livres. */
+#view-compras .cmp-sec-falta{color:var(--campino-tinta)}
+#view-compras .cmp-sec-claim{color:var(--green)}
+#view-compras .cmp-free .cmp-list{border-left:4px solid rgba(156,47,29,.55)}
+#view-compras .cmp-claimed .cmp-list{border-left:4px solid rgba(30,122,77,.55);background:linear-gradient(90deg,rgba(30,122,77,.07),var(--sal) 60%)}
+#view-compras .cmp-claimed .cmp-chip{background:rgba(30,122,77,.13);border-color:rgba(30,122,77,.3);color:var(--green)}
+#view-compras .cmp-claimed .cmp-chip::before{box-shadow:inset 0 0 0 1px rgba(30,122,77,.5)}

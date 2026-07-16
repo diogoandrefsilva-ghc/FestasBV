@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v51A · 2026-07-16 · Redesign Compras+Stock — Variante A "Talão de Mercado"';
+const APP_BUILD = 'v52 · 2026-07-16 · Shop List: "Falta quem trate" vs "Já em carrinhos" com fitas de estado';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -3767,11 +3767,16 @@ function renderCompras(){
       h+=carrinhos.length
         ?'<div class="cmp-empty sf"><span class="cmp-empty-ico">🛒</span>Nada em falta — está tudo no carrinho de alguém 👇</div>'
         :'<div class="cmp-empty sf"><span class="cmp-empty-ico">🎉</span>A lista está vazia.<br>Toca em <b>＋ Artigo</b> para pedir o primeiro.</div>';
-    }else h+=listOf(falta,false);
+    }else{
+      // Cabeçalho de estado + wrapper .cmp-free: distingue à vista o que ainda
+      // não tem dono (fita campino) do que já está entregue (bloco verde abaixo)
+      h+=`<div class="cmp-sec-hdr sf cmp-sec-falta">📣 Falta quem trate <span class="cmp-count">${falta.length}</span></div>`;
+      h+='<div class="cmp-free">'+listOf(falta,false)+'</div>';
+    }
     // ── Já em carrinhos (de qualquer pessoa — todos veem quem leva o quê) ──
     if(carrinhos.length){
-      h+=`<div class="cmp-sec-hdr sf" style="margin-top:22px">🛒 Já em carrinhos <span class="cmp-count">${carrinhos.length}</span></div>`;
-      h+=listOf(carrinhos,false);
+      h+=`<div class="cmp-sec-hdr sf cmp-sec-claim" style="margin-top:22px">🛒 Já em carrinhos <span class="cmp-count">${carrinhos.length}</span></div>`;
+      h+='<div class="cmp-claimed">'+listOf(carrinhos,false)+'</div>';
     }
   }else if(SHOP_TAB==='carrinho'){
     // ── O meu carrinho (artigos que disse que tratava) ──
