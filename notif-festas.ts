@@ -54,6 +54,13 @@ Deno.serve(async (req) => {
       return new Response("skip-admin", { status: 200 });
     }
 
+    // Eventos marcados como silenciosos ficam no histórico (auditoria) mas não
+    // enviam Telegram — ex.: transições de só-bebida. A app põe detalhe.silencioso
+    // na origem (ver _flushPresLog). Remover esta marca reativa o aviso.
+    if (record.detalhe && record.detalhe.silencioso === true) {
+      return new Response("skip-silent", { status: 200 });
+    }
+
     // Switch ON/OFF na app: se desligado, não envia (histórico já está gravado)
     if (!(await notifLigadas())) {
       return new Response("skip-off", { status: 200 });

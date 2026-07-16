@@ -128,6 +128,10 @@ async function handleHistorico(record: any): Promise<Response> {
   if (!(await notifLigadas())) return new Response("skip-off", { status: 200 });
 
   const d = record.detalhe ?? {};
+  // Eventos silenciosos ficam no histórico (auditoria) mas não notificam
+  // ninguém — ex.: transições de só-bebida. A app marca detalhe.silencioso na
+  // origem (ver _flushPresLog). Remover a marca reativa o aviso.
+  if (d.silencioso === true) return new Response("skip-silent", { status: 200 });
   const destinos = new Set<string>();
 
   if (record.tipo === "presenca" || record.tipo === "convidado") {
