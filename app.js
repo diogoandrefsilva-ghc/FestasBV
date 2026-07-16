@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v49 · 2026-07-16 · Notif. presenças: total a comer + sem avisos de só-bebe';
+const APP_BUILD = 'v50 · 2026-07-16 · Presenças: total a comer, só-bebe no histórico sem aviso, filtros no Histórico';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -1683,15 +1683,21 @@ function _flushPresLog(key){
   if(e.timer)clearTimeout(e.timer);
   _presLogPend.delete(key);
   if(e.origem===e.final)return;                       // voltou ao mesmo -> nada a registar
-  // Transições de "só bebe" silenciadas — não geram registo no histórico nem,
-  // por consequência, aviso Telegram: #2 (vazio→só bebe) e #6 (só bebe→vazio).
-  // A presença já foi gravada na BD; só o registo é que é omitido.
-  // Para REATIVAR os avisos destas duas transições, comenta/remove esta linha:
-  if((e.origem===null&&e.final==='bebe')||(e.origem==='bebe'&&e.final===null))return;
   const accao=e.origem===null?'marcou':(e.final===null?'removeu':'mudou');
-  sbLog('presenca',accao,e.alvo,{dia:e.dia,ref:e.ref,de:e.origem,para:e.final,totalCome:totalComeRefeicao(e.dia,e.ref)});
+  const det={dia:e.dia,ref:e.ref,de:e.origem,para:e.final,totalCome:totalComeRefeicao(e.dia,e.ref)};
+  // Transições de só-bebida ficam SEMPRE no histórico (auditoria), mas não
+  // notificam: #2 (vazio→só bebe) e #6 (só bebe→vazio). A marca 'silencioso' é
+  // lida pela Edge (notif-festas), que trava o envio. Para voltar a notificar
+  // estas duas transições, comenta/remove a linha seguinte.
+  if((e.origem===null&&e.final==='bebe')||(e.origem==='bebe'&&e.final===null))det.silencioso=true;
+  sbLog('presenca',accao,e.alvo,det);
 }
 function flushPresLogs(){for(const k of [..._presLogPend.keys()])_flushPresLog(k);}
+
+let _histRows=[];          // últimas linhas carregadas (filtradas em memória)
+let _histFPessoa='all';    // filtro por pessoa (o visado da entrada = alvo)
+let _histFRef='all';       // filtro por refeição (dia · ref)
+function _histRefDe(r){const d=r.detalhe||{};return [d.dia,d.ref].filter(Boolean).join(' · ');}
 
 async function openHistorico(){
   const el=document.getElementById('hist-list');
@@ -1702,8 +1708,37 @@ async function openHistorico(){
   try{
     const rows=await sbReq('GET',`historico?evento_id=eq.${DATA._sbId}&select=ts,autor_email,autor_amigo,tipo,accao,alvo,detalhe&order=ts.desc&limit=100`);
     el.dataset.loaded='1';
-    if(!rows||!rows.length){el.innerHTML='<div class="note">Ainda não há alterações registadas este ano.</div>';return;}
-    el.innerHTML=rows.map(r=>{
+    _histRows=rows||[];
+    renderHistList();
+  }catch(e){
+    el.innerHTML='<div class="note">Erro ao carregar histórico: '+escHtml(e.message||'')+'</div>';
+  }
+}
+
+/* Desenha a lista já carregada (_histRows) aplicando os filtros por pessoa e
+   por refeição. Os filtros correm em memória — não recarregam da BD. */
+function renderHistList(){
+  const el=document.getElementById('hist-list');
+  if(!el)return;
+  if(!_histRows.length){el.innerHTML='<div class="note">Ainda não há alterações registadas este ano.</div>';return;}
+  // Opções dos dois filtros, a partir de todas as linhas carregadas
+  const pessoas=[...new Set(_histRows.map(r=>r.alvo).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'pt'));
+  const refs=[...new Set(_histRows.map(_histRefDe).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'pt'));
+  if(_histFPessoa!=='all'&&!pessoas.includes(_histFPessoa))_histFPessoa='all';
+  if(_histFRef!=='all'&&!refs.includes(_histFRef))_histFRef='all';
+  const filtered=_histRows.filter(r=>
+    (_histFPessoa==='all'||r.alvo===_histFPessoa)&&
+    (_histFRef==='all'||_histRefDe(r)===_histFRef));
+  // Barra de filtros
+  let out='<div class="hist-filter">';
+  out+=`<select onchange="_histFPessoa=this.value;renderHistList()"><option value="all"${_histFPessoa==='all'?' selected':''}>👤 Todas as pessoas</option>`+
+    pessoas.map(p=>`<option value="${escHtml(p)}"${_histFPessoa===p?' selected':''}>${escHtml(p)}</option>`).join('')+'</select>';
+  out+=`<select onchange="_histFRef=this.value;renderHistList()"><option value="all"${_histFRef==='all'?' selected':''}>🍽️ Todas as refeições</option>`+
+    refs.map(p=>`<option value="${escHtml(p)}"${_histFRef===p?' selected':''}>${escHtml(p)}</option>`).join('')+'</select>';
+  if(_histFPessoa!=='all'||_histFRef!=='all')out+=`<button class="hist-clear" onclick="_histFPessoa='all';_histFRef='all';renderHistList()">✕</button>`;
+  out+='</div>';
+  if(!filtered.length){el.innerHTML=out+'<div class="note">Sem alterações para este filtro.</div>';return;}
+  out+=filtered.map(r=>{
       const d=r.detalhe||{};
       const quando=new Date(r.ts).toLocaleString('pt-PT',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
       const quem=escHtml(r.autor_amigo||r.autor_email||'?');
@@ -1734,9 +1769,7 @@ async function openHistorico(){
         </div>
       </div>`;
     }).join('');
-  }catch(e){
-    el.innerHTML='<div class="note">Erro ao carregar histórico: '+escHtml(e.message||'')+'</div>';
-  }
+  el.innerHTML=out;
 }
 
 function abrirHistoricoSeVazio(){
