@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v46 · 2026-07-16 · Botão Carrinho com ícone visível';
+const APP_BUILD = 'v47 · 2026-07-16 · Ícone do Carrinho decente (Feather)';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -3276,7 +3276,8 @@ function shopMineActive(it){return shopMine(it)&&!shopIsBought(it);}
 function shopTipoIcon(t){return{Gerais:'🧾',Bebidas:'🥤',Almoço:'☀️',Jantar:'🌙',Renda:'🏠',Cerveja:'🍺'}[t]||'🛒';}
 // Carrinho em SVG (herda a cor do texto): o emoji 🛒 é cinzento-escuro e
 // desaparece nos botões verdes — este fica branco em fundo primário.
-const CART_ICO='<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;flex:0 0 auto"><circle cx="9.5" cy="20.3" r="1.7"/><circle cx="18.3" cy="20.3" r="1.7"/><path d="M2.5 3.5h2.2l2.3 11.7a1.8 1.8 0 0 0 1.8 1.4h8.9a1.8 1.8 0 0 0 1.8-1.5l1.5-7.6H6"/></svg>';
+// Desenho do Feather Icons (shopping-cart, MIT).
+const CART_ICO='<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2.5px;flex:0 0 auto"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>';
 function shopIsMeal(t){return t==='Almoço'||t==='Jantar';}
 function shopGroupKey(it){return it.tipo+'|'+(it.dataValor||'');}
 function shopGroupLabel(tipo,dataValor){
