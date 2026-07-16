@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v47 · 2026-07-16 · Ícone do Carrinho decente (Feather)';
+const APP_BUILD = 'v48 · 2026-07-16 · Botão Carrinho: emoji de sempre em fundo claro';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -3274,10 +3274,6 @@ function shopIsPending(it){return !shopIsBought(it)&&!shopIsRemoved(it);}
 // entretanto o autor o tenha removido — mantém-se na minha checklist com alerta)
 function shopMineActive(it){return shopMine(it)&&!shopIsBought(it);}
 function shopTipoIcon(t){return{Gerais:'🧾',Bebidas:'🥤',Almoço:'☀️',Jantar:'🌙',Renda:'🏠',Cerveja:'🍺'}[t]||'🛒';}
-// Carrinho em SVG (herda a cor do texto): o emoji 🛒 é cinzento-escuro e
-// desaparece nos botões verdes — este fica branco em fundo primário.
-// Desenho do Feather Icons (shopping-cart, MIT).
-const CART_ICO='<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2.5px;flex:0 0 auto"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>';
 function shopIsMeal(t){return t==='Almoço'||t==='Jantar';}
 function shopGroupKey(it){return it.tipo+'|'+(it.dataValor||'');}
 function shopGroupLabel(tipo,dataValor){
@@ -3532,7 +3528,7 @@ function shopItemCard(it,mineView,noBadge){
     right=`<span class="cmp-chip">🛒 ${escHtml(it.tratadoPor)}</span>`;
   }else{
     if(it.criadoPor)sub=`<div class="cmp-sub">pedido por ${escHtml(it.criadoPor)}</div>`;
-    right=`<button class="cmp-mini prim write-action" onclick="event.stopPropagation();claimItem(${it._id})">${CART_ICO} Carrinho</button>`;
+    right=`<button class="cmp-mini cart write-action" onclick="event.stopPropagation();claimItem(${it._id})">🛒 Carrinho</button>`;
   }
   if(removed)sub=`<div class="cmp-sub alert">⚠️ removido por ${escHtml(it.cfDesc||'?')}${mineView?' — abre para largar':''}</div>`;
   return `<div class="cmp-item cmp-line cmp-tap${mineView&&it.noCarrinho?' incart':''}${removed?' removed':''}" onclick="openShopItemModal(${it._id})">
