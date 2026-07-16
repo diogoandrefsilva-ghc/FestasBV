@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v48 · 2026-07-16 · Botão Carrinho: emoji de sempre em fundo claro';
+const APP_BUILD = 'v49 · 2026-07-16 · Notif. presenças: total a comer + sem avisos de só-bebe';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -1638,14 +1638,19 @@ function fraseHistorico(tipo,accao,alvo,autor,d){
   const para=('para'in d)?d.para:(d.modo!==undefined?d.modo:undefined);
   const self=!!(autor&&alvo&&autor===alvo);
   const alvoTxt=self?'':` de ${alvo}`;
-  if(de==null&&para==='come') return `${A} confirmou presença${alvoTxt} no ${refDia}`;
-  if(de==null&&para==='bebe') return self?`${A} confirmou que vai só beber ${diaStr}`:`${A} confirmou que ${alvo} vai só beber ${diaStr}`;
-  if(de==='come'&&para==='bebe') return self?`${A} afinal só vai beber ${diaStr}`:`${A} mudou ${alvo} para só beber ${diaStr}`;
-  if(de==='bebe'&&para==='come') return self?`${A} afinal vai ${rn.verb} ${diaStr}`:`${A} mudou ${alvo} para ${rn.verb} ${diaStr}`;
-  if(de==='come'&&para==null) return self?`${A} afinal não vai ${rn.verb} ${diaStr}`:`${A} tirou ${alvo} do ${refDia}`;
-  if(de==='bebe'&&para==null) return self?`${A} afinal não vai beber ${diaStr}`:`${A} cancelou a bebida${alvoTxt} ${diaStr}`;
-  if(para==null) return self?`${A} saiu do ${refDia}`:`${A} tirou ${alvo} do ${refDia}`;
-  return self?`${A} atualizou a presença no ${refDia}`:`${A} atualizou a presença de ${alvo} no ${refDia}`;
+  // Sufixo com o total de pessoas a comer nesta refeição (só quem come),
+  // acrescentado a todas as notificações de presença que enviamos.
+  const tot=(d.totalCome!=null)?` — ${d.totalCome} a comer`:'';
+  let f;
+  if(de==null&&para==='come') f=`${A} confirmou presença${alvoTxt} no ${refDia}`;
+  else if(de==null&&para==='bebe') f=self?`${A} confirmou que vai só beber ${diaStr}`:`${A} confirmou que ${alvo} vai só beber ${diaStr}`;
+  else if(de==='come'&&para==='bebe') f=self?`${A} afinal só vai beber ${diaStr}`:`${A} mudou ${alvo} para só beber ${diaStr}`;
+  else if(de==='bebe'&&para==='come') f=self?`${A} afinal vai ${rn.verb} ${diaStr}`:`${A} mudou ${alvo} para ${rn.verb} ${diaStr}`;
+  else if(de==='come'&&para==null) f=self?`${A} afinal não vai ${rn.verb} ${diaStr}`:`${A} tirou ${alvo} do ${refDia}`;
+  else if(de==='bebe'&&para==null) f=self?`${A} afinal não vai beber ${diaStr}`:`${A} cancelou a bebida${alvoTxt} ${diaStr}`;
+  else if(para==null) f=self?`${A} saiu do ${refDia}`:`${A} tirou ${alvo} do ${refDia}`;
+  else f=self?`${A} atualizou a presença no ${refDia}`:`${A} atualizou a presença de ${alvo} no ${refDia}`;
+  return f+tot;
 }
 
 /* Log de presenças com debounce por célula: persiste-se cada toque na BD,
@@ -1662,14 +1667,29 @@ function scheduleLogPresenca(m,dia,ref,origemTap,finalTap){
   if(e.timer)clearTimeout(e.timer);
   e.timer=setTimeout(()=>_flushPresLog(key),2500);
 }
+/* Total de pessoas a comer numa refeição: membros com modo 'come' + convidados
+   (que comem sempre). Reproduz o mapeamento Tarde→Lanche do rodapé da grelha,
+   porque os convidados guardam a refeição do lanche como 'Lanche'. */
+function totalComeRefeicao(dia,ref){
+  const membros=(DATA&&DATA.membros)||[];
+  const nMembros=membros.filter(m=>presModo(m,dia+'|'+ref)==='come').length;
+  const refConv=(ref==='Tarde')?'Lanche':ref;
+  const nConv=((DATA&&DATA.convidados)||[]).filter(g=>g.dia===dia&&g.ref===refConv).length;
+  return nMembros+nConv;
+}
 function _flushPresLog(key){
   const e=_presLogPend.get(key);
   if(!e)return;
   if(e.timer)clearTimeout(e.timer);
   _presLogPend.delete(key);
   if(e.origem===e.final)return;                       // voltou ao mesmo -> nada a registar
+  // Transições de "só bebe" silenciadas — não geram registo no histórico nem,
+  // por consequência, aviso Telegram: #2 (vazio→só bebe) e #6 (só bebe→vazio).
+  // A presença já foi gravada na BD; só o registo é que é omitido.
+  // Para REATIVAR os avisos destas duas transições, comenta/remove esta linha:
+  if((e.origem===null&&e.final==='bebe')||(e.origem==='bebe'&&e.final===null))return;
   const accao=e.origem===null?'marcou':(e.final===null?'removeu':'mudou');
-  sbLog('presenca',accao,e.alvo,{dia:e.dia,ref:e.ref,de:e.origem,para:e.final});
+  sbLog('presenca',accao,e.alvo,{dia:e.dia,ref:e.ref,de:e.origem,para:e.final,totalCome:totalComeRefeicao(e.dia,e.ref)});
 }
 function flushPresLogs(){for(const k of [..._presLogPend.keys()])_flushPresLog(k);}
 
