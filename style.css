@@ -1029,6 +1029,11 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 #view-compras .cmp-tab.on .cmp-tab-ico{filter:none;opacity:1}
 #view-compras .cmp-tab.on .cmp-tab-n{background:var(--gold);color:#fff}
 
+/* ── Linha-irmã da do título (mais fina e ténue) a separar os
+   sub-separadores dos chips de ordenação ── */
+#view-compras .cmp-sort{position:relative;padding-top:11px}
+#view-compras .cmp-sort::before{content:"";position:absolute;top:0;left:2px;right:10px;height:3px;border-radius:2px;background:linear-gradient(90deg,rgba(168,123,20,.4) 0%,rgba(168,123,20,.18) 55%,rgba(168,123,20,.03) 100%);transform:skewX(-18deg)}
+
 /* ── Chips de ordenação/filtro: etiquetas kraft com furo e cordel ── */
 #view-compras .cmp-sort .sd-chip,#view-stock .stk-filter .sd-chip{background:#F3EAD2;border-radius:5px 14px 14px 5px;position:relative;padding-left:19px}
 #view-compras .cmp-sort .sd-chip::before,#view-stock .stk-filter .sd-chip::before{content:"";position:absolute;left:7px;top:50%;width:5px;height:5px;margin-top:-2.5px;border-radius:50%;background:var(--bg);box-shadow:inset 0 0 0 1.5px rgba(110,75,25,.45)}
