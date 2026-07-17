@@ -784,6 +784,9 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .cmp-grp-hdr:first-child{margin-top:2px}
 .cmp-grp-hdr::after{content:'';flex:1;height:1px;background:var(--line)}
 .cmp-grp-hdr .cmp-count{margin-left:0}
+/* Label do cabeçalho num span próprio: nunca parte para 2 linhas — encolhe com
+   reticências se não couber (o essencial — refeição + data — fica no início) */
+.cmp-grp-label{flex:0 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 /* Lista de compras dentro do cartão da refeição (tab Refeições) */
 .msl{cursor:default}
 .msl-det{margin-top:0;border-top:none;padding-top:0}
@@ -1058,6 +1061,9 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 #view-compras .cmp-grp-hdr:first-child{margin-top:4px}
 #view-compras .cmp-grp-hdr::after{height:0;background:none;border-top:1px dashed rgba(133,41,26,.4)}
 #view-compras .cmp-grp-hdr .cmp-count{background:transparent;border:1.5px solid rgba(133,41,26,.55);color:var(--campino-tinta);font-weight:800;transform:rotate(-4deg)}
+/* iPhone estreito (mini/SE/standard): aperta a fonte para o cabeçalho da
+   refeição caber numa linha em vez de partir a meio do prato */
+@media (max-width:400px){#view-compras .cmp-grp-hdr{font-size:11.5px;letter-spacing:.03em;gap:5px}}
 #view-compras .cmp-sec-hdr{font-size:16px;color:var(--campino-escuro)}
 
 /* ── Bolinha do carrinho: carimbo verde com estampada ── */

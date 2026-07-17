@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v54 · 2026-07-16 · Shop List: linha dourada ténue entre sub-separadores e ordenação';
+const APP_BUILD = 'v55 · 2026-07-17 · Shop List: cabeçalho da refeição já não parte em 2 linhas no iPhone pequeno';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -3599,7 +3599,7 @@ function shopGroupedList(list,mineView){
   let h='',last=null;
   list.forEach(it=>{
     const k=shopGroupKey(it);
-    if(k!==last){h+=`<div class="cmp-grp-hdr sf">${shopGroupLabel(it.tipo,it.dataValor)} <span class="cmp-count">${counts[k]}</span></div>`;last=k;}
+    if(k!==last){h+=`<div class="cmp-grp-hdr sf"><span class="cmp-grp-label">${shopGroupLabel(it.tipo,it.dataValor)}</span><span class="cmp-count">${counts[k]}</span></div>`;last=k;}
     h+=shopItemCard(it,mineView,true);
   });
   return '<div class="cmp-list">'+h+'</div>';
@@ -3619,7 +3619,7 @@ function shopCatGroupedList(list,mineView){
     if(k!==last){
       const c=artCat(it.artigo);
       const nome=c?c.nome:'Outros';
-      h+=`<div class="cmp-grp-hdr sf">${catEmoji(nome)} ${escHtml(nome)} <span class="cmp-count">${counts[k]}</span></div>`;
+      h+=`<div class="cmp-grp-hdr sf"><span class="cmp-grp-label">${catEmoji(nome)} ${escHtml(nome)}</span><span class="cmp-count">${counts[k]}</span></div>`;
       last=k;
     }
     h+=shopItemCard(it,mineView,false);
