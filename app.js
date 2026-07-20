@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v57 · 2026-07-20 · Shop List: chips de ordenação (Por refeição/artigo/categoria) já não partem em ecrãs pequenos';
+const APP_BUILD = 'v58 · 2026-07-20 · Shop List: a aba Carrinho mostra só os meus artigos (os do cônjuge ficam em "Já em carrinhos", com o nome dele)';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -3399,6 +3399,12 @@ function shopQtyLabel(it){const q=normalizeQty(it.quantidade),t=(it.tamanho||'')
 // Nomes com que reclamo artigos (próprio + cônjuge; admin sem membro → 'Admin')
 function myClaimNames(){const s=new Set(MY_NAMES);const p=myPrimaryName()||(isAdmin()?'Admin':'');if(p)s.add(p);return s;}
 function shopMine(it){return !!it.tratadoPor&&myClaimNames().has(it.tratadoPor);}
+// "Meu carrinho" é PESSOAL: só conta o que reclamei em meu próprio nome (não o
+// do cônjuge). O agregado continua a co-gerir (largar/marcar), mas a checklist
+// da aba Carrinho mostra só os meus — o que o cônjuge leva vê-se em "Já em
+// carrinhos", com o nome dele.
+function myOwnClaimName(){return myPrimaryName()||(isAdmin()?'Admin':'');}
+function shopMineOwn(it){const n=myOwnClaimName();return !!n&&it.tratadoPor===n;}
 function shopCanEditItem(it){return isAdmin()||(it.criadoPor&&myClaimNames().has(it.criadoPor));}
 
 /* ── STOCK POR REFEIÇÃO ──────────────────────────────────────────────
@@ -3735,7 +3741,7 @@ function renderCompras(){
   const listOf=(arr,mineView)=>byCat?shopCatGroupedList(arr,mineView)
     :byArt?'<div class="cmp-list">'+arr.map(it=>shopItemCard(it,mineView,false)).join('')+'</div>'
     :shopGroupedList(arr,mineView);
-  const mine=act.filter(shopMine).sort(sortF);                                   // a minha checklist (inclui removidos c/ alerta)
+  const mine=act.filter(shopMineOwn).sort(sortF);                                // a MINHA checklist pessoal (só o próprio, não o cônjuge; inclui removidos c/ alerta)
   const falta=act.filter(x=>!x.tratadoPor&&!shopIsRemoved(x)).sort(sortF);       // livres, por tratar
   const carrinhos=act.filter(x=>x.tratadoPor&&!shopIsRemoved(x)).sort(sortF);    // já no carrinho de alguém (incl. o meu — todos veem)
   const removidos=act.filter(x=>shopIsRemoved(x)&&!x.tratadoPor).sort(sortF);    // histórico de removidos
@@ -4291,10 +4297,10 @@ function openCompra(compraId){
   // "＋ Artigo fora da lista") — abre sozinho quando ainda nada está marcado.
   let pl='';
   if(pickItems.length){
-    const nOn=pickItems.filter(it=>isEdit?it.compraId===compraId:shopMine(it)).length;
+    const nOn=pickItems.filter(it=>isEdit?it.compraId===compraId:shopMineOwn(it)).length;
     let rows='';
     pickItems.slice().sort((a,b)=>a.artigo.localeCompare(b.artigo,'pt')).forEach(it=>{
-      const on=isEdit?it.compraId===compraId:shopMine(it);
+      const on=isEdit?it.compraId===compraId:shopMineOwn(it);
       const ql=shopQtyLabel(it);
       rows+=`<label class="cmp-pick-row"><input type="checkbox" class="shop-pick" value="${it._id}" ${on?'checked':''} onchange="compraPickChanged()">
         <span>${escHtml(it.artigo)}${ql?' <i>('+escHtml(ql)+')</i>':''}${shopIsRemoved(it)?' ⚠️':''}</span>
