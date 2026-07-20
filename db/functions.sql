@@ -143,4 +143,8 @@ CREATE TRIGGER trg_guard_fecho
 --     '{}',
 --     '5000'
 --   );
+--
+-- Existe um segundo webhook igual (também gerido pelo dashboard) em
+-- festasbv.access_requests (AFTER INSERT) -> notif-festas: avisa o admin no
+-- Telegram quando há um pedido de acesso pendente. Ver db/telegram.md.
 -- ---------------------------------------------------------------------
