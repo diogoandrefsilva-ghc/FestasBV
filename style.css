@@ -728,6 +728,7 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .cmp-empty b{color:var(--muted)}
 /* Chips de ordenação (tab Shop List) e de modo de preço (Registar Compra) */
 .cmp-sort{display:flex;gap:6px;margin:0 0 12px}
+.cmp-sort .sd-chip{white-space:nowrap}
 #shop-ref-multi{background:#FFFDF6;border:1px solid var(--line);border-radius:9px;padding:2px 12px;max-height:230px;overflow-y:auto}
 #shop-ref-multi .cmp-pick-row:last-child{border-bottom:none}
 /* Refeição de destino trancada (adicionar ingrediente a partir de uma refeição) */
@@ -1041,6 +1042,17 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 #view-compras .cmp-sort .sd-chip,#view-stock .stk-filter .sd-chip{background:#F3EAD2;border-radius:5px 14px 14px 5px;position:relative;padding-left:19px}
 #view-compras .cmp-sort .sd-chip::before,#view-stock .stk-filter .sd-chip::before{content:"";position:absolute;left:7px;top:50%;width:5px;height:5px;margin-top:-2.5px;border-radius:50%;background:var(--bg);box-shadow:inset 0 0 0 1.5px rgba(110,75,25,.45)}
 #view-compras .cmp-sort .sd-chip.on,#view-stock .stk-filter .sd-chip.on{background:rgba(30,122,77,.12)}
+/* iPhone estreito: as 3 chips de ordenação cabem numa linha em vez de o
+   texto ("Por refeição/artigo/categoria") partir dentro de cada etiqueta */
+@media (max-width:400px){
+  #view-compras .cmp-sort{gap:4px}
+  #view-compras .cmp-sort .sd-chip{font-size:11px;gap:4px;padding:6px 10px 6px 17px}
+}
+@media (max-width:360px){
+  #view-compras .cmp-sort{gap:3px}
+  #view-compras .cmp-sort .sd-chip{font-size:10px;gap:3px;padding:6px 8px 6px 14px}
+  #view-compras .cmp-sort .sd-chip::before{left:5px}
+}
 /* Nos filtros do Stock (chips ao alto) o furo caía em cima do emoji —
    ficam etiquetas kraft lisas, sem furo e com canto simétrico */
 #view-stock .stk-filter .sd-chip{padding:6px 10px 7px;border-radius:11px}
