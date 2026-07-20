@@ -557,6 +557,12 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .rdc-chips .rc.g{background:rgba(111,92,66,.12);color:var(--muted)}
 .rdc-sub{font-size:11.5px;color:var(--faint);margin-top:4px}
 .rdc-unit{display:flex;justify-content:space-between;align-items:baseline;margin-top:8px;padding-top:7px;border-top:1px solid rgba(110,75,25,.14);font-size:11.5px;color:var(--muted)}
+/* Cards de custos colapsáveis — fechados mostram só label + total */
+.rdc-fold>summary{list-style:none;cursor:pointer;user-select:none}
+.rdc-fold>summary .rdc-lbl{flex:1}
+.rdc-fold>summary::-webkit-details-marker{display:none}
+.rdc-fold-arrow{font-size:16px;font-weight:600;color:var(--faint);line-height:1;align-self:center;transition:transform .2s}
+.rdc-fold[open]>summary .rdc-fold-arrow{transform:rotate(90deg)}
 .rdc-unit-v{font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums}
 .rdc-hero{background:rgba(168,123,20,.09);border-color:var(--gold)}
 .rdc-people{font-size:11.5px;color:var(--muted);margin-top:5px}

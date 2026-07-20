@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v66A · 2026-07-20 · Refeições: ementa do dia (entradas/prato/sobremesa) — Proposta A "ementa de tasca"';
+const APP_BUILD = 'v66 · 2026-07-20 · Refeições: ementa do dia (entradas/prato/sobremesa) + custos colapsáveis';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -915,11 +915,12 @@ function renderAll(){
         const chipsHtml=ind.map(x=>`<span class="rc ${x.c}">${x.lbl} ${eur(x.v)}</span>`).join('');
         const pesoHtml=rd.peso!=null?`<div class="rdc-peso"><span class="rdc-peso-lbl">Peso <b>${pesoDisplay}</b></span><span class="rdc-peso-rule"></span></div>`:'';
         const notaBebe=calcRef.temBebe?' <span class="rdc-note">= custo p/ quem só bebe</span>':'';
-        costCards+=`<div class="rdc sf">
-          <div class="rdc-hdr"><span class="rdc-lbl">Custos indiretos</span><span class="rdc-tot">${eur(indTot)}</span></div>
+        // Colapsados por defeito (só label + total); toque expande o detalhe
+        costCards+=`<details class="rdc rdc-fold sf" onclick="event.stopPropagation()">
+          <summary class="rdc-hdr"><span class="rdc-lbl">Custos indiretos</span><span class="rdc-tot">${eur(indTot)}</span><span class="rdc-fold-arrow">›</span></summary>
           ${pesoHtml}${chipsHtml?`<div class="rdc-chips">${chipsHtml}</div>`:''}
           <div class="rdc-unit"><span>Por pessoa${notaBebe}</span><span class="rdc-unit-v">${eur(indPP)}</span></div>
-        </div>`;
+        </details>`;
         const dirItems=(DATA.despesas||[]).filter(x=>x.tipo===rd.ref&&x.dataValor===rd.data).slice();
         // Alocações de stock a esta refeição contam como custo direto — entram no detalhe
         stockArr().forEach(l=>{if(!stockBacked(l)||!(l.qtd>0))return;(l.alocacoes||[]).forEach(a=>{if(a.tipo===rd.ref&&a.data===rd.data&&+a.qtd>0)dirItems.push({desc:'🧺 '+l.artigo+' ('+fmtQty(+a.qtd,l.unidade)+')',quem:'',valor:rnd(l.valor/l.qtd*a.qtd,2)});});});
@@ -929,12 +930,12 @@ function renderAll(){
           const drChip=`<div class="rdc-chips"><span class="rc cv">Despesa Refeição ${eur(dirTot)}</span></div>`;
           dirChipsRow=dirItems.length?`<details class="rdc-det rdc-det-chips" onclick="event.stopPropagation()"><summary>${drChip}<span class="rdc-det-arrow">›</span></summary>${dirDetBody}</details>`:drChip;
         }
-        costCards+=`<div class="rdc sf">
-          <div class="rdc-hdr"><span class="rdc-lbl">Custos diretos</span><span class="rdc-tot">${eur(dirTot)}</span></div>
+        costCards+=`<details class="rdc rdc-fold sf" onclick="event.stopPropagation()">
+          <summary class="rdc-hdr"><span class="rdc-lbl">Custos diretos</span><span class="rdc-tot">${eur(dirTot)}</span><span class="rdc-fold-arrow">›</span></summary>
           <div class="rdc-peso"><span class="rdc-peso-lbl">Compras</span><span class="rdc-peso-rule"></span></div>
           ${dirChipsRow}
           <div class="rdc-unit"><span>Por pessoa</span><span class="rdc-unit-v">${eur(dirPP)}</span></div>
-        </div>`;
+        </details>`;
         const membrosCount=Math.max(0,calcRef.D-calcRef.E);
         const rkey=`${rd.dia}|${rd.ref==='Lanche'?'Tarde':rd.ref}`;
         const membrosCome=(DATA.membros||[]).filter(m=>(m.presencas||[]).some(p=>p.k===rkey&&p.modo==='come')).map(m=>m.nome).sort((a,b)=>a.localeCompare(b,'pt'));
