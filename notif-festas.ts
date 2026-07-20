@@ -3,6 +3,11 @@
 // presenças ou convidados. Dispara do Database Webhook em festasbv.historico
 // (evento INSERT). A frase já vem redigida da app, no campo detalhe.frase.
 //
+// Recebe TAMBÉM o webhook de festasbv.access_requests (INSERT): avisa o admin
+// que há um pedido de acesso pendente para aprovar em Definições. Este aviso
+// ignora o switch notif_telegram de propósito — é raro e, sem aviso, o pedido
+// podia ficar semanas à espera.
+//
 // Switch ON/OFF: lê a flag festasbv.config.notif_telegram. Se estiver "false",
 // não envia (o histórico fica sempre registado — só o envio é que para).
 //
@@ -40,13 +45,29 @@ async function notifLigadas(): Promise<boolean> {
   }
 }
 
+async function enviar(text: string) {
+  await fetch(`https://api.telegram.org/bot${TG_TOKEN}/sendMessage`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ chat_id: TG_CHAT, text }),
+  });
+}
+
 Deno.serve(async (req) => {
   try {
-    const { type, record } = await req.json();
+    const { type, table, record } = await req.json();
 
-    // Só nos interessam inserções novas no histórico
+    // Só nos interessam inserções novas
     if (type !== "INSERT" || !record) {
       return new Response("skip", { status: 200 });
+    }
+
+    // Pedido de acesso pendente (webhook em festasbv.access_requests)
+    if (table === "access_requests") {
+      await enviar(
+        `🔑 ${record.email} pediu acesso à app — falta aprovares em Definições › Pedidos de acesso`,
+      );
+      return new Response("ok-acesso", { status: 200 });
     }
 
     // Não me notificar a mim próprio (mas o histórico regista na mesma)
@@ -66,11 +87,7 @@ Deno.serve(async (req) => {
       return new Response("skip-off", { status: 200 });
     }
 
-    await fetch(`https://api.telegram.org/bot${TG_TOKEN}/sendMessage`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ chat_id: TG_CHAT, text: formatar(record) }),
-    });
+    await enviar(formatar(record));
 
     return new Response("ok", { status: 200 });
   } catch (e) {

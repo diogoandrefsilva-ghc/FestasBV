@@ -39,6 +39,30 @@ o histórico continua a registar; só o envio é que para.
    segundos deves receber algo como: `✋ Barrona marcou presença — Sáb · Jantar`.
    Se não chegar: Edge Functions → notif-festas → Logs.
 
+## Aviso de pedido de acesso pendente (admin)
+
+Quando alguém novo carrega em «Solicitar acesso» na app (INSERT em
+`festasbv.access_requests`), o admin recebe no Telegram:
+`🔑 fulano@gmail.com pediu acesso à app — falta aprovares em Definições › Pedidos de acesso`.
+
+```
+Solicitar acesso → INSERT em festasbv.access_requests → Database Webhook → notif-festas → Telegram (admin)
+```
+
+É a MESMA Edge Function `notif-festas` (distingue pelo campo `table` do payload
+do webhook). Este aviso ignora de propósito o switch `notif_telegram` — é raro
+e importante; sem ele o pedido podia ficar semanas à espera.
+
+### Setup (uma vez)
+
+1. **Deploy** da `notif-festas` atualizada (dashboard ou
+   `supabase functions deploy notif-festas`).
+2. **Webhook** — Database → Webhooks → Create: Table `festasbv.access_requests`,
+   Events só **Insert**, Type **Supabase Edge Functions** → `notif-festas`
+   (fica ao lado do webhook do `historico`, a apontar para a mesma função).
+3. **Testar** — com outra conta (ou conta nova) carrega em «Solicitar acesso»;
+   deves receber o 🔑 em segundos. Se não chegar: Edge Functions → notif-festas → Logs.
+
 ## Notificações PESSOAIS (por utilizador) — Edge Function `notif-pessoais`
 
 Além do aviso ao admin (acima, intocado), cada utilizador pode ligar o SEU

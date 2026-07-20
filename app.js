@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v54 · 2026-07-16 · Shop List: linha dourada ténue entre sub-separadores e ordenação';
+const APP_BUILD = 'v66 · 2026-07-20 · Refeições: ementa do dia (entradas/prato/sobremesa) + custos colapsáveis';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -915,11 +915,12 @@ function renderAll(){
         const chipsHtml=ind.map(x=>`<span class="rc ${x.c}">${x.lbl} ${eur(x.v)}</span>`).join('');
         const pesoHtml=rd.peso!=null?`<div class="rdc-peso"><span class="rdc-peso-lbl">Peso <b>${pesoDisplay}</b></span><span class="rdc-peso-rule"></span></div>`:'';
         const notaBebe=calcRef.temBebe?' <span class="rdc-note">= custo p/ quem só bebe</span>':'';
-        costCards+=`<div class="rdc sf">
-          <div class="rdc-hdr"><span class="rdc-lbl">Custos indiretos</span><span class="rdc-tot">${eur(indTot)}</span></div>
+        // Colapsados por defeito (só label + total); toque expande o detalhe
+        costCards+=`<details class="rdc rdc-fold sf" onclick="event.stopPropagation()">
+          <summary class="rdc-hdr"><span class="rdc-lbl">Custos indiretos</span><span class="rdc-tot">${eur(indTot)}</span><span class="rdc-fold-arrow">›</span></summary>
           ${pesoHtml}${chipsHtml?`<div class="rdc-chips">${chipsHtml}</div>`:''}
           <div class="rdc-unit"><span>Por pessoa${notaBebe}</span><span class="rdc-unit-v">${eur(indPP)}</span></div>
-        </div>`;
+        </details>`;
         const dirItems=(DATA.despesas||[]).filter(x=>x.tipo===rd.ref&&x.dataValor===rd.data).slice();
         // Alocações de stock a esta refeição contam como custo direto — entram no detalhe
         stockArr().forEach(l=>{if(!stockBacked(l)||!(l.qtd>0))return;(l.alocacoes||[]).forEach(a=>{if(a.tipo===rd.ref&&a.data===rd.data&&+a.qtd>0)dirItems.push({desc:'🧺 '+l.artigo+' ('+fmtQty(+a.qtd,l.unidade)+')',quem:'',valor:rnd(l.valor/l.qtd*a.qtd,2)});});});
@@ -929,12 +930,12 @@ function renderAll(){
           const drChip=`<div class="rdc-chips"><span class="rc cv">Despesa Refeição ${eur(dirTot)}</span></div>`;
           dirChipsRow=dirItems.length?`<details class="rdc-det rdc-det-chips" onclick="event.stopPropagation()"><summary>${drChip}<span class="rdc-det-arrow">›</span></summary>${dirDetBody}</details>`:drChip;
         }
-        costCards+=`<div class="rdc sf">
-          <div class="rdc-hdr"><span class="rdc-lbl">Custos diretos</span><span class="rdc-tot">${eur(dirTot)}</span></div>
+        costCards+=`<details class="rdc rdc-fold sf" onclick="event.stopPropagation()">
+          <summary class="rdc-hdr"><span class="rdc-lbl">Custos diretos</span><span class="rdc-tot">${eur(dirTot)}</span><span class="rdc-fold-arrow">›</span></summary>
           <div class="rdc-peso"><span class="rdc-peso-lbl">Compras</span><span class="rdc-peso-rule"></span></div>
           ${dirChipsRow}
           <div class="rdc-unit"><span>Por pessoa</span><span class="rdc-unit-v">${eur(dirPP)}</span></div>
-        </div>`;
+        </details>`;
         const membrosCount=Math.max(0,calcRef.D-calcRef.E);
         const rkey=`${rd.dia}|${rd.ref==='Lanche'?'Tarde':rd.ref}`;
         const membrosCome=(DATA.membros||[]).filter(m=>(m.presencas||[]).some(p=>p.k===rkey&&p.modo==='come')).map(m=>m.nome).sort((a,b)=>a.localeCompare(b,'pt'));
@@ -956,16 +957,27 @@ function renderAll(){
           ${memPanel}${guestPanel}
         </div>`;
       }
+      // Ementa do dia — entradas · prato principal · sobremesa (estilo ementa de tasca)
+      const mp=parseMenuParts(rd.menu);
+      const cursos=[];
+      if(mp.entradas)cursos.push({k:'Entradas',v:mp.entradas});
+      if(rd.prato)cursos.push({k:'Prato principal',v:rd.prato,main:true});
+      if(mp.sobremesa)cursos.push({k:'Sobremesa',v:mp.sobremesa});
+      const ementa=(cursos.length||mp.outras)?`<div class="ementa sf">
+        <div class="ementa-hd">Ementa do dia</div>
+        ${cursos.map(c=>`<div class="em-curso${c.main?' em-main':''}"><div class="em-k">${c.k}</div><div class="em-v">${escHtml(c.v)}</div></div>`).join('<div class="em-sep"><span></span>✦<span></span></div>')}
+        ${mp.outras?`<div class="em-notas">${escHtml(mp.outras)}</div>`:''}
+      </div>`:'';
       r+=`<div class="refmeal" data-i="${rd._idx}" style="${rd._idx===sel?'':'display:none'}">
         <div class="refdef-day-hdr sf">${diaExtenso(rd.data)||rd.dia} · ${rd.data}</div>
         <div class="refdef-row${isAdmin()?' refdef-click':''}" style="flex-wrap:wrap"${isAdmin()?` onclick="openRefdefModal(${rd._idx})"`:''}>
           <span class="refdef-icon">${icon}</span>
           <div class="refdef-info">
-            <div class="refdef-ref sf">${rd.ref}${rd.prato?`<span class="refdef-prato sf"> · ${escHtml(rd.prato)}</span>`:''}</div>
-            ${rd.menu?`<div class="refdef-menu sf">${escHtml(rd.menu)}</div>`:''}
+            <div class="refdef-ref sf">${rd.ref}</div>
             ${rd.respCozinha?`<div class="refdef-resp sf">👨‍🍳 ${escHtml(rd.respCozinha)}</div>`:''}
           </div>
           ${isAdmin()?'<span class="refdef-chevron sf">›</span>':''}
+          ${ementa}
           ${costCards}${mealShopSection(rd)}
         </div>
       </div>`;
@@ -1088,6 +1100,10 @@ function renderCashFlows(){
   const personSet=new Set();
   visCf.forEach(cf=>(cf.people||[]).forEach(p=>personSet.add(p)));
   const personList=[...personSet].sort((a,b)=>a.localeCompare(b,'pt'));
+  // Filtro-fantasma: se a pessoa escolhida não existe neste mês/ano, o <select>
+  // volta visualmente a "Todas as pessoas" mas a variável ficava presa no nome
+  // antigo — a lista filtrava por alguém sem movimentos e aparecia vazia (0 de N).
+  if(cfFilterPerson!=='all'&&!personList.includes(cfFilterPerson))cfFilterPerson='all';
 
   // Resumo: resultado líquido do grupo (entradas − saídas) + 4 pílulas-filtro
   // numa só fila, sem scroll horizontal.
@@ -3395,6 +3411,12 @@ function shopQtyLabel(it){const q=normalizeQty(it.quantidade),t=(it.tamanho||'')
 // Nomes com que reclamo artigos (próprio + cônjuge; admin sem membro → 'Admin')
 function myClaimNames(){const s=new Set(MY_NAMES);const p=myPrimaryName()||(isAdmin()?'Admin':'');if(p)s.add(p);return s;}
 function shopMine(it){return !!it.tratadoPor&&myClaimNames().has(it.tratadoPor);}
+// "Meu carrinho" é PESSOAL: só conta o que reclamei em meu próprio nome (não o
+// do cônjuge). O agregado continua a co-gerir (largar/marcar), mas a checklist
+// da aba Carrinho mostra só os meus — o que o cônjuge leva vê-se em "Já em
+// carrinhos", com o nome dele.
+function myOwnClaimName(){return myPrimaryName()||(isAdmin()?'Admin':'');}
+function shopMineOwn(it){const n=myOwnClaimName();return !!n&&it.tratadoPor===n;}
 function shopCanEditItem(it){return isAdmin()||(it.criadoPor&&myClaimNames().has(it.criadoPor));}
 
 /* ── STOCK POR REFEIÇÃO ──────────────────────────────────────────────
@@ -3575,13 +3597,15 @@ function shopItemCard(it,mineView,noBadge){
     // Checklist de compras: a bolinha marca "já está no carrinho físico".
     // Este estado é só para orientação de quem trata — os outros não o veem.
     check=`<button class="cmp-check write-action ${it.noCarrinho?'on':''}" onclick="event.stopPropagation();toggleCart(${it._id})" aria-label="Já no carrinho">✓</button>`;
+    // ✕ = largar o artigo (volta a "Em falta") sem ter de abrir o detalhe
+    right=`<button class="cmp-x write-action" aria-label="Tirar do carrinho" onclick="event.stopPropagation();unclaimItem(${it._id})">✕</button>`;
   }else if(it.tratadoPor){
     // Para quem não trata, basta saber QUE está entregue e a QUEM (o estado
     // do carrinho é detalhe de quem anda nas compras).
     right=`<span class="cmp-chip">🛒 ${escHtml(it.tratadoPor)}</span>`;
   }else{
     if(it.criadoPor)sub=`<div class="cmp-sub">pedido por ${escHtml(it.criadoPor)}</div>`;
-    right=`<button class="cmp-mini cart write-action" onclick="event.stopPropagation();claimItem(${it._id})">🛒 Carrinho</button>`;
+    right=`<button class="cmp-mini cart write-action" onclick="event.stopPropagation();claimItem(${it._id})"><i class="cmp-plus">＋</i>🛒 Carrinho</button>`;
   }
   if(removed)sub=`<div class="cmp-sub alert">⚠️ removido por ${escHtml(it.cfDesc||'?')}${mineView?' — abre para largar':''}</div>`;
   return `<div class="cmp-item cmp-line cmp-tap${mineView&&it.noCarrinho?' incart':''}${removed?' removed':''}" onclick="openShopItemModal(${it._id})">
@@ -3599,7 +3623,7 @@ function shopGroupedList(list,mineView){
   let h='',last=null;
   list.forEach(it=>{
     const k=shopGroupKey(it);
-    if(k!==last){h+=`<div class="cmp-grp-hdr sf">${shopGroupLabel(it.tipo,it.dataValor)} <span class="cmp-count">${counts[k]}</span></div>`;last=k;}
+    if(k!==last){h+=`<div class="cmp-grp-hdr sf"><span class="cmp-grp-label">${shopGroupLabel(it.tipo,it.dataValor)}</span><span class="cmp-count">${counts[k]}</span></div>`;last=k;}
     h+=shopItemCard(it,mineView,true);
   });
   return '<div class="cmp-list">'+h+'</div>';
@@ -3619,7 +3643,7 @@ function shopCatGroupedList(list,mineView){
     if(k!==last){
       const c=artCat(it.artigo);
       const nome=c?c.nome:'Outros';
-      h+=`<div class="cmp-grp-hdr sf">${catEmoji(nome)} ${escHtml(nome)} <span class="cmp-count">${counts[k]}</span></div>`;
+      h+=`<div class="cmp-grp-hdr sf"><span class="cmp-grp-label">${catEmoji(nome)} ${escHtml(nome)}</span><span class="cmp-count">${counts[k]}</span></div>`;
       last=k;
     }
     h+=shopItemCard(it,mineView,false);
@@ -3673,7 +3697,11 @@ function mealShopSection(rd){
   // para a refeição (lotes alocados c/ € + artigos comprados sem lote — um pedido
   // comprado cujo artigo tem lote é redundante: a linha do lote mostra qtd e €).
   const pend=items.filter(it=>!shopIsBought(it));
-  const bought=items.filter(it=>shopIsBought(it)&&!alocs.some(x=>shopSameArtigo(x.l.artigo,it.artigo)||faturaScore(it.artigo,x.l.artigo)>=0.5));
+  // "Sem lote" = sem NENHUM lote do artigo em stock (não só os alocados a esta
+  // refeição): se o admin mover a alocação para outra refeição, o pedido não
+  // pode reaparecer aqui como "comprado" — os lotes são a fonte de verdade.
+  const temLote=it=>stockArr().some(l=>stockBacked(l)&&(shopSameArtigo(l.artigo,it.artigo)||faturaScore(it.artigo,l.artigo)>=0.5));
+  const bought=items.filter(it=>shopIsBought(it)&&!temLote(it));
   const nComp=alocs.length+bought.length;
   const det=(sub,lbl,cnt,body)=>{
     const k=key+sub;
@@ -3731,7 +3759,7 @@ function renderCompras(){
   const listOf=(arr,mineView)=>byCat?shopCatGroupedList(arr,mineView)
     :byArt?'<div class="cmp-list">'+arr.map(it=>shopItemCard(it,mineView,false)).join('')+'</div>'
     :shopGroupedList(arr,mineView);
-  const mine=act.filter(shopMine).sort(sortF);                                   // a minha checklist (inclui removidos c/ alerta)
+  const mine=act.filter(shopMineOwn).sort(sortF);                                // a MINHA checklist pessoal (só o próprio, não o cônjuge; inclui removidos c/ alerta)
   const falta=act.filter(x=>!x.tratadoPor&&!shopIsRemoved(x)).sort(sortF);       // livres, por tratar
   const carrinhos=act.filter(x=>x.tratadoPor&&!shopIsRemoved(x)).sort(sortF);    // já no carrinho de alguém (incl. o meu — todos veem)
   const removidos=act.filter(x=>shopIsRemoved(x)&&!x.tratadoPor).sort(sortF);    // histórico de removidos
@@ -3752,13 +3780,17 @@ function renderCompras(){
     ${tabBtn('hist','🕘','Histórico',nHist)}
   </div>`;
 
-  // Ordenação só faz sentido nas listas ativas (no histórico manda a data)
+  // Ordenação só faz sentido nas listas ativas (no histórico manda a data).
+  // No Histórico não há chips, mas mantém-se a mesma linha divisória dos outros
+  // sub-separadores para o cabeçalho ficar coerente.
   if(SHOP_TAB!=='hist'){
     h+=`<div class="cmp-sort">
       <span class="sd-chip${(byArt||byCat)?'':' on'}" onclick="setShopOrder('ref')">📅 Por refeição</span>
       <span class="sd-chip${byArt?' on':''}" onclick="setShopOrder('art')">🔤 Por artigo</span>
       ${CATS_TABLE?`<span class="sd-chip${byCat?' on':''}" onclick="setShopOrder('cat')">🏷️ Por categoria</span>`:''}
     </div>`;
+  }else{
+    h+='<div class="cmp-divider"></div>';
   }
 
   if(SHOP_TAB==='falta'){
@@ -4287,10 +4319,10 @@ function openCompra(compraId){
   // "＋ Artigo fora da lista") — abre sozinho quando ainda nada está marcado.
   let pl='';
   if(pickItems.length){
-    const nOn=pickItems.filter(it=>isEdit?it.compraId===compraId:shopMine(it)).length;
+    const nOn=pickItems.filter(it=>isEdit?it.compraId===compraId:shopMineOwn(it)).length;
     let rows='';
     pickItems.slice().sort((a,b)=>a.artigo.localeCompare(b.artigo,'pt')).forEach(it=>{
-      const on=isEdit?it.compraId===compraId:shopMine(it);
+      const on=isEdit?it.compraId===compraId:shopMineOwn(it);
       const ql=shopQtyLabel(it);
       rows+=`<label class="cmp-pick-row"><input type="checkbox" class="shop-pick" value="${it._id}" ${on?'checked':''} onchange="compraPickChanged()">
         <span>${escHtml(it.artigo)}${ql?' <i>('+escHtml(ql)+')</i>':''}${shopIsRemoved(it)?' ⚠️':''}</span>
@@ -5599,6 +5631,28 @@ function paintPresBtn(btn,modo){
 /* ═══ REFEIÇÕES DEF CRUD ═══ */
 let editingRefdef=null;
 
+/* Menu estruturado dentro da coluna `menu` (sem migração de BD):
+   linhas "Entradas: …" e "Sobremesa: …" + notas livres no resto. */
+function parseMenuParts(menu){
+  const out={entradas:'',sobremesa:'',outras:[]};
+  (menu||'').split('\n').forEach(l=>{
+    const t=l.trim();if(!t)return;
+    const m=t.match(/^(entradas?|sobremesas?)\s*:\s*(.*)$/i);
+    if(m&&m[2]){
+      const k=m[1].toLowerCase().startsWith('entrada')?'entradas':'sobremesa';
+      out[k]=out[k]?out[k]+' · '+m[2].trim():m[2].trim();
+    } else out.outras.push(t);
+  });
+  return {entradas:out.entradas,sobremesa:out.sobremesa,outras:out.outras.join('\n')};
+}
+function buildMenu(entradas,sobremesa,outras){
+  const L=[];
+  if(entradas)L.push('Entradas: '+entradas);
+  if(sobremesa)L.push('Sobremesa: '+sobremesa);
+  if(outras)L.push(outras);
+  return L.join('\n');
+}
+
 // Modo consulta (não-admin): bloqueia campos e remove os placeholders de exemplo
 function applyRoFields(modalEl,ro){
   if(!modalEl)return;
@@ -5635,7 +5689,10 @@ function openRefdefModal(editIdx){
   if(isEdit){
     const rd=DATA.refeicoesDef[editingRefdef];
     document.getElementById('rd-resp-coz').innerHTML=_respOptions(rd.respCozinha||'');
-    document.getElementById('rd-menu').value=rd.menu||'';
+    const mp=parseMenuParts(rd.menu||'');
+    document.getElementById('rd-entradas').value=mp.entradas;
+    document.getElementById('rd-sobremesa').value=mp.sobremesa;
+    document.getElementById('rd-menu').value=mp.outras;
     document.getElementById('rd-data').value=rd.data||'';
     document.getElementById('rd-ref').value=rd.ref||'Jantar';
     document.getElementById('rd-prato').value=rd.prato||'';
@@ -5645,6 +5702,8 @@ function openRefdefModal(editIdx){
     document.getElementById('rd-extraconv').value=rd.extraConv||2;
   } else {
     document.getElementById('rd-resp-coz').innerHTML=_respOptions('');
+    document.getElementById('rd-entradas').value='';
+    document.getElementById('rd-sobremesa').value='';
     document.getElementById('rd-menu').value='';
     document.getElementById('rd-data').value='';
     document.getElementById('rd-ref').value='Jantar';
@@ -5709,7 +5768,11 @@ async function saveRefdef(){
   const wasEdit=editingRefdef!==null;
   const anterior=wasEdit?DATA.refeicoesDef[editingRefdef]:null;
   const respCozinha=REFDEF_RESP_COLS?(document.getElementById('rd-resp-coz').value||''):((anterior&&anterior.respCozinha)||'');
-  const menu=REFDEF_RESP_COLS?(document.getElementById('rd-menu').value||'').trim():((anterior&&anterior.menu)||'');
+  const menu=REFDEF_RESP_COLS?buildMenu(
+    (document.getElementById('rd-entradas').value||'').trim(),
+    (document.getElementById('rd-sobremesa').value||'').trim(),
+    (document.getElementById('rd-menu').value||'').trim()
+  ):((anterior&&anterior.menu)||'');
   const entry={data,dia,ref,prato:prato||'',peso:ref==='Lanche'?null:peso,minMEO,minConv,extraConv,respCozinha,menu};
 
   document.getElementById('rd-save').disabled=true;

@@ -504,6 +504,18 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .refdef-prato{font-weight:500;color:var(--gold);font-size:12.5px}
 .refdef-resp{font-size:11.5px;color:var(--faint);margin-top:2px}
 .refdef-menu{font-size:11.5px;color:var(--muted);margin-top:2px;white-space:pre-line;line-height:1.45}
+/* ═══ Ementa do dia (Proposta A — estilo ementa de tasca) ═══ */
+.ementa{width:100%;margin-top:6px;background:linear-gradient(165deg,var(--sal),var(--panel2));border:1px solid var(--line);border-radius:12px;padding:15px 14px 13px;text-align:center;position:relative;overflow:hidden}
+.ementa::before{content:"";position:absolute;inset:5px;border:1px solid rgba(168,123,20,.30);border-radius:9px;pointer-events:none}
+.ementa-hd{font-family:var(--display);font-size:11px;font-weight:600;letter-spacing:.32em;text-transform:uppercase;color:var(--campino);margin-bottom:9px}
+.em-curso{padding:2px 6px}
+.em-k{font-family:var(--display);font-size:10.5px;font-weight:600;letter-spacing:.2em;text-transform:uppercase;color:var(--faint)}
+.em-v{font-size:13px;font-weight:600;color:var(--ink);line-height:1.35;margin-top:1px}
+.em-main .em-v{font-family:var(--display);font-size:20px;font-weight:600;letter-spacing:.02em;color:var(--gold);line-height:1.15}
+.em-sep{display:flex;align-items:center;gap:8px;color:var(--gold);font-size:9px;margin:5px auto;max-width:160px;opacity:.75}
+.em-sep span{flex:1;height:1px;background:linear-gradient(90deg,transparent,var(--gold))}
+.em-sep span:last-child{background:linear-gradient(90deg,var(--gold),transparent)}
+.em-notas{font-size:11px;color:var(--muted);margin-top:9px;white-space:pre-line;line-height:1.4;font-style:italic}
 /* Detalhe "quem vai" por agregado (casal + convidados em tom apagado) */
 .rdc-ppl.casais{flex-direction:column;align-items:stretch;gap:7px}
 .rdc-casal-n{font-size:11.5px;font-weight:700;color:var(--ink)}
@@ -545,6 +557,12 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .rdc-chips .rc.g{background:rgba(111,92,66,.12);color:var(--muted)}
 .rdc-sub{font-size:11.5px;color:var(--faint);margin-top:4px}
 .rdc-unit{display:flex;justify-content:space-between;align-items:baseline;margin-top:8px;padding-top:7px;border-top:1px solid rgba(110,75,25,.14);font-size:11.5px;color:var(--muted)}
+/* Cards de custos colapsáveis — fechados mostram só label + total */
+.rdc-fold>summary{list-style:none;cursor:pointer;user-select:none}
+.rdc-fold>summary .rdc-lbl{flex:1}
+.rdc-fold>summary::-webkit-details-marker{display:none}
+.rdc-fold-arrow{font-size:16px;font-weight:600;color:var(--faint);line-height:1;align-self:center;transition:transform .2s}
+.rdc-fold[open]>summary .rdc-fold-arrow{transform:rotate(90deg)}
 .rdc-unit-v{font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums}
 .rdc-hero{background:rgba(168,123,20,.09);border-color:var(--gold)}
 .rdc-people{font-size:11.5px;color:var(--muted);margin-top:5px}
@@ -683,6 +701,11 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 /* Botão "🛒 Carrinho": fundo claro para o emoji (cinzento) se ver — o verde
    cheio engolia-o. Contorno e texto verdes mantêm o destaque de ação primária */
 .cmp-mini.cart{background:#FFFDF6;border:1.5px solid var(--barrete);color:var(--barrete);font-weight:700;padding:4px 9px}
+/* ＋ dentro do botão Carrinho: sinal discreto de "adicionar ao carrinho" */
+.cmp-mini.cart .cmp-plus{font-style:normal;font-weight:800;font-size:13px;line-height:1;margin-right:2px;vertical-align:-1px}
+/* ✕ no cartão do Carrinho: largar o artigo (volta a "Em falta") */
+.cmp-x{flex:0 0 auto;width:24px;height:24px;border-radius:50%;border:1.5px solid var(--line);background:transparent;color:var(--faint);font-size:12px;font-weight:700;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0}
+.cmp-x:active{color:var(--red);border-color:var(--red)}
 .cmp-mini.on{background:rgba(30,122,77,.14);border-color:var(--barrete);color:var(--green)}
 .cmp-done-hdr{display:flex;align-items:center;justify-content:space-between;margin:18px 0 0;padding:10px 2px;cursor:pointer;font-family:var(--display);font-size:15px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
 .cmp-done-hdr .cmp-chev{transition:transform .2s}
@@ -727,7 +750,8 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .cmp-empty .cmp-empty-ico{display:block;font-size:34px;margin-bottom:8px}
 .cmp-empty b{color:var(--muted)}
 /* Chips de ordenação (tab Shop List) e de modo de preço (Registar Compra) */
-.cmp-sort{display:flex;gap:6px;margin:0 0 12px}
+.cmp-sort{display:flex;flex-wrap:nowrap;gap:6px;margin:0 0 12px}
+.cmp-sort .sd-chip{white-space:nowrap}
 #shop-ref-multi{background:#FFFDF6;border:1px solid var(--line);border-radius:9px;padding:2px 12px;max-height:230px;overflow-y:auto}
 #shop-ref-multi .cmp-pick-row:last-child{border-bottom:none}
 /* Refeição de destino trancada (adicionar ingrediente a partir de uma refeição) */
@@ -784,6 +808,9 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .cmp-grp-hdr:first-child{margin-top:2px}
 .cmp-grp-hdr::after{content:'';flex:1;height:1px;background:var(--line)}
 .cmp-grp-hdr .cmp-count{margin-left:0}
+/* Label do cabeçalho num span próprio: nunca parte para 2 linhas — encolhe com
+   reticências se não couber (o essencial — refeição + data — fica no início) */
+.cmp-grp-label{flex:0 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 /* Lista de compras dentro do cartão da refeição (tab Refeições) */
 .msl{cursor:default}
 .msl-det{margin-top:0;border-top:none;padding-top:0}
@@ -1033,11 +1060,26 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
    sub-separadores dos chips de ordenação ── */
 #view-compras .cmp-sort{position:relative;padding-top:11px}
 #view-compras .cmp-sort::before{content:"";position:absolute;top:0;left:2px;right:10px;height:3px;border-radius:2px;background:linear-gradient(90deg,rgba(168,123,20,.4) 0%,rgba(168,123,20,.18) 55%,rgba(168,123,20,.03) 100%);transform:skewX(-18deg)}
+/* Histórico: mesma linha divisória dos outros sub-separadores (sem chips) */
+#view-compras .cmp-divider{height:3px;border-radius:2px;margin:0 10px 20px 2px;background:linear-gradient(90deg,rgba(168,123,20,.4) 0%,rgba(168,123,20,.18) 55%,rgba(168,123,20,.03) 100%);transform:skewX(-18deg)}
 
-/* ── Chips de ordenação/filtro: etiquetas kraft com furo e cordel ── */
-#view-compras .cmp-sort .sd-chip,#view-stock .stk-filter .sd-chip{background:#F3EAD2;border-radius:5px 14px 14px 5px;position:relative;padding-left:19px}
-#view-compras .cmp-sort .sd-chip::before,#view-stock .stk-filter .sd-chip::before{content:"";position:absolute;left:7px;top:50%;width:5px;height:5px;margin-top:-2.5px;border-radius:50%;background:var(--bg);box-shadow:inset 0 0 0 1.5px rgba(110,75,25,.45)}
+/* ── Chips de ordenação/filtro: etiquetas kraft ── */
+#view-compras .cmp-sort .sd-chip,#view-stock .stk-filter .sd-chip{background:#F3EAD2;border-radius:5px 14px 14px 5px;position:relative}
+/* Ícone de ordenação (setas ↑↓) no início de cada chip — substitui o antigo
+   "furinho". Inline (auto-centra com o texto), escala com a fonte fluida (em)
+   e herda a cor da chip (currentColor: esbatido quando inativa, tinta/ink
+   quando ativa). SVG em mask para poder ser colorido por currentColor. */
+#view-compras .cmp-sort .sd-chip::before{content:"";flex:0 0 auto;width:.95em;height:.95em;background:currentColor;opacity:.55;-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M7 5v14M4 8l3-3 3 3M17 19V5M14 16l3 3 3-3'/%3E%3C/svg%3E") center/contain no-repeat;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M7 5v14M4 8l3-3 3 3M17 19V5M14 16l3 3 3-3'/%3E%3C/svg%3E") center/contain no-repeat}
+#view-compras .cmp-sort .sd-chip.on::before{opacity:.8}
 #view-compras .cmp-sort .sd-chip.on,#view-stock .stk-filter .sd-chip.on{background:rgba(30,122,77,.12)}
+/* As 3 chips de ordenação em PARTES IGUAIS (1/3 cada) com fonte FLUIDA
+   (escala com a largura do ecrã, travada a 13px). Assim cabem SEMPRE numa
+   linha, todas no ecrã, sem scroll horizontal, sem quebra de texto e sem
+   nenhuma passar para baixo — em qualquer largura, pequena ou grande.
+   Partes iguais → a soma é exatamente a largura da linha, nunca transborda;
+   fonte em vw → o texto encolhe o suficiente para caber em ecrãs estreitos. */
+#view-compras .cmp-sort{flex-wrap:nowrap;gap:5px}
+#view-compras .cmp-sort .sd-chip{flex:1 1 0;min-width:0;justify-content:center;overflow:hidden;font-size:min(13px,2.6vw);gap:.3em;padding:.5em .6em}
 /* Nos filtros do Stock (chips ao alto) o furo caía em cima do emoji —
    ficam etiquetas kraft lisas, sem furo e com canto simétrico */
 #view-stock .stk-filter .sd-chip{padding:6px 10px 7px;border-radius:11px}
@@ -1058,6 +1100,9 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 #view-compras .cmp-grp-hdr:first-child{margin-top:4px}
 #view-compras .cmp-grp-hdr::after{height:0;background:none;border-top:1px dashed rgba(133,41,26,.4)}
 #view-compras .cmp-grp-hdr .cmp-count{background:transparent;border:1.5px solid rgba(133,41,26,.55);color:var(--campino-tinta);font-weight:800;transform:rotate(-4deg)}
+/* iPhone estreito (mini/SE/standard): aperta a fonte para o cabeçalho da
+   refeição caber numa linha em vez de partir a meio do prato */
+@media (max-width:400px){#view-compras .cmp-grp-hdr{font-size:11.5px;letter-spacing:.03em;gap:5px}}
 #view-compras .cmp-sec-hdr{font-size:16px;color:var(--campino-escuro)}
 
 /* ── Bolinha do carrinho: carimbo verde com estampada ── */
