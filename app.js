@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v58 · 2026-07-20 · Shop List: a aba Carrinho mostra só os meus artigos (os do cônjuge ficam em "Já em carrinhos", com o nome dele)';
+const APP_BUILD = 'v59 · 2026-07-20 · Shop List: Histórico ganha a linha divisória "🧾 Compras registadas" a condizer com "Em falta" e "Carrinho"';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -3963,7 +3963,8 @@ function renderComprados(){
       <div class="cmp-done-top"><b>${escHtml(desc)}</b><span class="cmp-done-meta">${date?fmtDiaMes(date)+' · ':''}<b class="cmp-done-tot">${eur(total)}</b></span><span class="stk-chev">›</span></div>
     </div>`};
   }).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
-  return '<div class="cmp-list" style="margin-top:2px">'+cards.map(c=>c.html).join('')+'</div>';
+  return `<div class="cmp-sec-hdr sf cmp-sec-done">🧾 Compras registadas <span class="cmp-count">${cards.length}</span></div>`
+    +'<div class="cmp-list" style="margin-top:2px">'+cards.map(c=>c.html).join('')+'</div>';
 }
 
 /* ── Detalhe / Adicionar / Editar artigo ──
