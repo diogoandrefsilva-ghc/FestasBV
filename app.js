@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v63 · 2026-07-20 · Shop List: chips de ordenação com ícone de setas ↑↓ em vez do furinho';
+const APP_BUILD = 'v64 · 2026-07-20 · Refeições: pedido comprado com lote em stock deixa de reaparecer no bloco Comprado quando a alocação vai para outra refeição';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -3683,7 +3683,11 @@ function mealShopSection(rd){
   // para a refeição (lotes alocados c/ € + artigos comprados sem lote — um pedido
   // comprado cujo artigo tem lote é redundante: a linha do lote mostra qtd e €).
   const pend=items.filter(it=>!shopIsBought(it));
-  const bought=items.filter(it=>shopIsBought(it)&&!alocs.some(x=>shopSameArtigo(x.l.artigo,it.artigo)||faturaScore(it.artigo,x.l.artigo)>=0.5));
+  // "Sem lote" = sem NENHUM lote do artigo em stock (não só os alocados a esta
+  // refeição): se o admin mover a alocação para outra refeição, o pedido não
+  // pode reaparecer aqui como "comprado" — os lotes são a fonte de verdade.
+  const temLote=it=>stockArr().some(l=>stockBacked(l)&&(shopSameArtigo(l.artigo,it.artigo)||faturaScore(it.artigo,l.artigo)>=0.5));
+  const bought=items.filter(it=>shopIsBought(it)&&!temLote(it));
   const nComp=alocs.length+bought.length;
   const det=(sub,lbl,cnt,body)=>{
     const k=key+sub;
