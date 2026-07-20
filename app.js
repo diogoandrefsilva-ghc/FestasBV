@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v55 · 2026-07-17 · Shop List: cabeçalho da refeição já não parte em 2 linhas no iPhone pequeno';
+const APP_BUILD = 'v56 · 2026-07-20 · Cash-Flows: filtro de pessoa preso de outro mês/ano deixava a lista vazia (0 de N) apesar do select mostrar "Todas as pessoas"';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -1088,6 +1088,10 @@ function renderCashFlows(){
   const personSet=new Set();
   visCf.forEach(cf=>(cf.people||[]).forEach(p=>personSet.add(p)));
   const personList=[...personSet].sort((a,b)=>a.localeCompare(b,'pt'));
+  // Filtro-fantasma: se a pessoa escolhida não existe neste mês/ano, o <select>
+  // volta visualmente a "Todas as pessoas" mas a variável ficava presa no nome
+  // antigo — a lista filtrava por alguém sem movimentos e aparecia vazia (0 de N).
+  if(cfFilterPerson!=='all'&&!personList.includes(cfFilterPerson))cfFilterPerson='all';
 
   // Resumo: resultado líquido do grupo (entradas − saídas) + 4 pílulas-filtro
   // numa só fila, sem scroll horizontal.
