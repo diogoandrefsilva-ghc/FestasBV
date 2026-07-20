@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v65 · 2026-07-20 · Shop List: ＋ no botão Carrinho e ✕ para largar artigos no separador Carrinho';
+const APP_BUILD = 'v66A · 2026-07-20 · Refeições: ementa do dia (entradas/prato/sobremesa) — Proposta A "ementa de tasca"';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -956,16 +956,27 @@ function renderAll(){
           ${memPanel}${guestPanel}
         </div>`;
       }
+      // Ementa do dia — entradas · prato principal · sobremesa (estilo ementa de tasca)
+      const mp=parseMenuParts(rd.menu);
+      const cursos=[];
+      if(mp.entradas)cursos.push({k:'Entradas',v:mp.entradas});
+      if(rd.prato)cursos.push({k:'Prato principal',v:rd.prato,main:true});
+      if(mp.sobremesa)cursos.push({k:'Sobremesa',v:mp.sobremesa});
+      const ementa=(cursos.length||mp.outras)?`<div class="ementa sf">
+        <div class="ementa-hd">Ementa do dia</div>
+        ${cursos.map(c=>`<div class="em-curso${c.main?' em-main':''}"><div class="em-k">${c.k}</div><div class="em-v">${escHtml(c.v)}</div></div>`).join('<div class="em-sep"><span></span>✦<span></span></div>')}
+        ${mp.outras?`<div class="em-notas">${escHtml(mp.outras)}</div>`:''}
+      </div>`:'';
       r+=`<div class="refmeal" data-i="${rd._idx}" style="${rd._idx===sel?'':'display:none'}">
         <div class="refdef-day-hdr sf">${diaExtenso(rd.data)||rd.dia} · ${rd.data}</div>
         <div class="refdef-row${isAdmin()?' refdef-click':''}" style="flex-wrap:wrap"${isAdmin()?` onclick="openRefdefModal(${rd._idx})"`:''}>
           <span class="refdef-icon">${icon}</span>
           <div class="refdef-info">
-            <div class="refdef-ref sf">${rd.ref}${rd.prato?`<span class="refdef-prato sf"> · ${escHtml(rd.prato)}</span>`:''}</div>
-            ${rd.menu?`<div class="refdef-menu sf">${escHtml(rd.menu)}</div>`:''}
+            <div class="refdef-ref sf">${rd.ref}</div>
             ${rd.respCozinha?`<div class="refdef-resp sf">👨‍🍳 ${escHtml(rd.respCozinha)}</div>`:''}
           </div>
           ${isAdmin()?'<span class="refdef-chevron sf">›</span>':''}
+          ${ementa}
           ${costCards}${mealShopSection(rd)}
         </div>
       </div>`;
