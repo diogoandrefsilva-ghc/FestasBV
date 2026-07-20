@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v66 · 2026-07-20 · Refeições: ementa do dia (entradas/prato/sobremesa) + custos colapsáveis';
+const APP_BUILD = 'v67 · 2026-07-20 · Refeições: montantes dos cards de custos alinhados à direita';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -951,7 +951,7 @@ function renderAll(){
         const convCell=`<div ${guestAttrs}><div class="rdc-cell-k">Convidado${calcRef.E?`<span class="rdc-cell-n">${calcRef.E}</span>`:''}${guestsPay.length?'<span class="rdc-cell-arrow">›</span>':''}</div><div class="rdc-cell-v">${calcRef.E?eur(calcRef.Q):'<span class="rdc-na">N/A</span>'}</div></div>`;
         const presNota=calcRef.D>0?'':'<div class="rdc-sempres">Sem presenças marcadas</div>';
         costCards+=`<div class="rdc rdc-hero sf">
-          <div class="rdc-hdr"><span class="rdc-lbl rdc-lbl-green">Custo da refeição</span><span class="rdc-tot">${eur(calcRef.custoTotal)}</span></div>
+          <div class="rdc-hdr"><span class="rdc-lbl rdc-lbl-green">Custo da refeição</span><span class="rdc-tot">${eur(calcRef.custoTotal)}</span><span class="rdc-fold-arrow" style="visibility:hidden">›</span></div>
           ${presNota}
           <div class="rdc-cells">${membroCell}${convCell}</div>
           ${memPanel}${guestPanel}
