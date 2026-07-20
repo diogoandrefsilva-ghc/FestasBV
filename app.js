@@ -5619,6 +5619,28 @@ function paintPresBtn(btn,modo){
 /* ═══ REFEIÇÕES DEF CRUD ═══ */
 let editingRefdef=null;
 
+/* Menu estruturado dentro da coluna `menu` (sem migração de BD):
+   linhas "Entradas: …" e "Sobremesa: …" + notas livres no resto. */
+function parseMenuParts(menu){
+  const out={entradas:'',sobremesa:'',outras:[]};
+  (menu||'').split('\n').forEach(l=>{
+    const t=l.trim();if(!t)return;
+    const m=t.match(/^(entradas?|sobremesas?)\s*:\s*(.*)$/i);
+    if(m&&m[2]){
+      const k=m[1].toLowerCase().startsWith('entrada')?'entradas':'sobremesa';
+      out[k]=out[k]?out[k]+' · '+m[2].trim():m[2].trim();
+    } else out.outras.push(t);
+  });
+  return {entradas:out.entradas,sobremesa:out.sobremesa,outras:out.outras.join('\n')};
+}
+function buildMenu(entradas,sobremesa,outras){
+  const L=[];
+  if(entradas)L.push('Entradas: '+entradas);
+  if(sobremesa)L.push('Sobremesa: '+sobremesa);
+  if(outras)L.push(outras);
+  return L.join('\n');
+}
+
 // Modo consulta (não-admin): bloqueia campos e remove os placeholders de exemplo
 function applyRoFields(modalEl,ro){
   if(!modalEl)return;
@@ -5655,7 +5677,10 @@ function openRefdefModal(editIdx){
   if(isEdit){
     const rd=DATA.refeicoesDef[editingRefdef];
     document.getElementById('rd-resp-coz').innerHTML=_respOptions(rd.respCozinha||'');
-    document.getElementById('rd-menu').value=rd.menu||'';
+    const mp=parseMenuParts(rd.menu||'');
+    document.getElementById('rd-entradas').value=mp.entradas;
+    document.getElementById('rd-sobremesa').value=mp.sobremesa;
+    document.getElementById('rd-menu').value=mp.outras;
     document.getElementById('rd-data').value=rd.data||'';
     document.getElementById('rd-ref').value=rd.ref||'Jantar';
     document.getElementById('rd-prato').value=rd.prato||'';
@@ -5665,6 +5690,8 @@ function openRefdefModal(editIdx){
     document.getElementById('rd-extraconv').value=rd.extraConv||2;
   } else {
     document.getElementById('rd-resp-coz').innerHTML=_respOptions('');
+    document.getElementById('rd-entradas').value='';
+    document.getElementById('rd-sobremesa').value='';
     document.getElementById('rd-menu').value='';
     document.getElementById('rd-data').value='';
     document.getElementById('rd-ref').value='Jantar';
@@ -5729,7 +5756,11 @@ async function saveRefdef(){
   const wasEdit=editingRefdef!==null;
   const anterior=wasEdit?DATA.refeicoesDef[editingRefdef]:null;
   const respCozinha=REFDEF_RESP_COLS?(document.getElementById('rd-resp-coz').value||''):((anterior&&anterior.respCozinha)||'');
-  const menu=REFDEF_RESP_COLS?(document.getElementById('rd-menu').value||'').trim():((anterior&&anterior.menu)||'');
+  const menu=REFDEF_RESP_COLS?buildMenu(
+    (document.getElementById('rd-entradas').value||'').trim(),
+    (document.getElementById('rd-sobremesa').value||'').trim(),
+    (document.getElementById('rd-menu').value||'').trim()
+  ):((anterior&&anterior.menu)||'');
   const entry={data,dia,ref,prato:prato||'',peso:ref==='Lanche'?null:peso,minMEO,minConv,extraConv,respCozinha,menu};
 
   document.getElementById('rd-save').disabled=true;
