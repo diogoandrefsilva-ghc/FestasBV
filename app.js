@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v61 · 2026-07-20 · Shop List: chips de ordenação em 1/3 cada com fonte fluida — sempre numa linha e no ecrã, em qualquer tamanho';
+const APP_BUILD = 'v62 · 2026-07-20 · Shop List: Histórico ganha a mesma linha divisória dourada dos sub-separadores "Em falta" e "Carrinho"';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -3762,13 +3762,17 @@ function renderCompras(){
     ${tabBtn('hist','🕘','Histórico',nHist)}
   </div>`;
 
-  // Ordenação só faz sentido nas listas ativas (no histórico manda a data)
+  // Ordenação só faz sentido nas listas ativas (no histórico manda a data).
+  // No Histórico não há chips, mas mantém-se a mesma linha divisória dos outros
+  // sub-separadores para o cabeçalho ficar coerente.
   if(SHOP_TAB!=='hist'){
     h+=`<div class="cmp-sort">
       <span class="sd-chip${(byArt||byCat)?'':' on'}" onclick="setShopOrder('ref')">📅 Por refeição</span>
       <span class="sd-chip${byArt?' on':''}" onclick="setShopOrder('art')">🔤 Por artigo</span>
       ${CATS_TABLE?`<span class="sd-chip${byCat?' on':''}" onclick="setShopOrder('cat')">🏷️ Por categoria</span>`:''}
     </div>`;
+  }else{
+    h+='<div class="cmp-divider"></div>';
   }
 
   if(SHOP_TAB==='falta'){
@@ -3963,8 +3967,7 @@ function renderComprados(){
       <div class="cmp-done-top"><b>${escHtml(desc)}</b><span class="cmp-done-meta">${date?fmtDiaMes(date)+' · ':''}<b class="cmp-done-tot">${eur(total)}</b></span><span class="stk-chev">›</span></div>
     </div>`};
   }).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
-  return `<div class="cmp-sec-hdr sf cmp-sec-done">🧾 Compras registadas <span class="cmp-count">${cards.length}</span></div>`
-    +'<div class="cmp-list" style="margin-top:2px">'+cards.map(c=>c.html).join('')+'</div>';
+  return '<div class="cmp-list" style="margin-top:2px">'+cards.map(c=>c.html).join('')+'</div>';
 }
 
 /* ── Detalhe / Adicionar / Editar artigo ──

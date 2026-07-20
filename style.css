@@ -1037,6 +1037,8 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
    sub-separadores dos chips de ordenação ── */
 #view-compras .cmp-sort{position:relative;padding-top:11px}
 #view-compras .cmp-sort::before{content:"";position:absolute;top:0;left:2px;right:10px;height:3px;border-radius:2px;background:linear-gradient(90deg,rgba(168,123,20,.4) 0%,rgba(168,123,20,.18) 55%,rgba(168,123,20,.03) 100%);transform:skewX(-18deg)}
+/* Histórico: mesma linha divisória dos outros sub-separadores (sem chips) */
+#view-compras .cmp-divider{height:3px;border-radius:2px;margin:0 10px 20px 2px;background:linear-gradient(90deg,rgba(168,123,20,.4) 0%,rgba(168,123,20,.18) 55%,rgba(168,123,20,.03) 100%);transform:skewX(-18deg)}
 
 /* ── Chips de ordenação/filtro: etiquetas kraft com furo e cordel ── */
 #view-compras .cmp-sort .sd-chip,#view-stock .stk-filter .sd-chip{background:#F3EAD2;border-radius:5px 14px 14px 5px;position:relative;padding-left:19px}
@@ -1124,7 +1126,6 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
    com o botão de ação "🛒 Carrinho" dos artigos livres. */
 #view-compras .cmp-sec-falta{color:var(--campino-tinta)}
 #view-compras .cmp-sec-claim{color:var(--green)}
-#view-compras .cmp-sec-done{color:var(--campino-escuro)}
 #view-compras .cmp-free .cmp-list{border-left:4px solid rgba(156,47,29,.55)}
 #view-compras .cmp-claimed .cmp-list{border-left:4px solid rgba(30,122,77,.55);background:linear-gradient(90deg,rgba(30,122,77,.07),var(--sal) 60%)}
 #view-compras .cmp-claimed .cmp-chip{background:rgba(30,122,77,.13);border-color:rgba(30,122,77,.3);color:var(--green)}
