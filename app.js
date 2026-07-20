@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v60 · 2026-07-20 · Shop List: chips de ordenação — a linha quebra em vez de a última chip (Por categoria) sair do ecrã';
+const APP_BUILD = 'v61 · 2026-07-20 · Shop List: chips de ordenação em 1/3 cada com fonte fluida — sempre numa linha e no ecrã, em qualquer tamanho';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
