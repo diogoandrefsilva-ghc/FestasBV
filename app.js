@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v64 · 2026-07-20 · Refeições: pedido comprado com lote em stock deixa de reaparecer no bloco Comprado quando a alocação vai para outra refeição';
+const APP_BUILD = 'v65 · 2026-07-20 · Shop List: ＋ no botão Carrinho e ✕ para largar artigos no separador Carrinho';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -3585,13 +3585,15 @@ function shopItemCard(it,mineView,noBadge){
     // Checklist de compras: a bolinha marca "já está no carrinho físico".
     // Este estado é só para orientação de quem trata — os outros não o veem.
     check=`<button class="cmp-check write-action ${it.noCarrinho?'on':''}" onclick="event.stopPropagation();toggleCart(${it._id})" aria-label="Já no carrinho">✓</button>`;
+    // ✕ = largar o artigo (volta a "Em falta") sem ter de abrir o detalhe
+    right=`<button class="cmp-x write-action" aria-label="Tirar do carrinho" onclick="event.stopPropagation();unclaimItem(${it._id})">✕</button>`;
   }else if(it.tratadoPor){
     // Para quem não trata, basta saber QUE está entregue e a QUEM (o estado
     // do carrinho é detalhe de quem anda nas compras).
     right=`<span class="cmp-chip">🛒 ${escHtml(it.tratadoPor)}</span>`;
   }else{
     if(it.criadoPor)sub=`<div class="cmp-sub">pedido por ${escHtml(it.criadoPor)}</div>`;
-    right=`<button class="cmp-mini cart write-action" onclick="event.stopPropagation();claimItem(${it._id})">🛒 Carrinho</button>`;
+    right=`<button class="cmp-mini cart write-action" onclick="event.stopPropagation();claimItem(${it._id})"><i class="cmp-plus">＋</i>🛒 Carrinho</button>`;
   }
   if(removed)sub=`<div class="cmp-sub alert">⚠️ removido por ${escHtml(it.cfDesc||'?')}${mineView?' — abre para largar':''}</div>`;
   return `<div class="cmp-item cmp-line cmp-tap${mineView&&it.noCarrinho?' incart':''}${removed?' removed':''}" onclick="openShopItemModal(${it._id})">
