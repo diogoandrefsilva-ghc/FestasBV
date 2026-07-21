@@ -504,18 +504,14 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .refdef-prato{font-weight:500;color:var(--gold);font-size:12.5px}
 .refdef-resp{font-size:11.5px;color:var(--faint);margin-top:2px}
 .refdef-menu{font-size:11.5px;color:var(--muted);margin-top:2px;white-space:pre-line;line-height:1.45}
-/* ═══ Ementa do dia (Proposta A — estilo ementa de tasca) ═══ */
-.ementa{width:100%;margin-top:6px;background:linear-gradient(165deg,var(--sal),var(--panel2));border:1px solid var(--line);border-radius:12px;padding:15px 14px 13px;text-align:center;position:relative;overflow:hidden}
-.ementa::before{content:"";position:absolute;inset:5px;border:1px solid rgba(168,123,20,.30);border-radius:9px;pointer-events:none}
-.ementa-hd{font-family:var(--display);font-size:11px;font-weight:600;letter-spacing:.32em;text-transform:uppercase;color:var(--campino);margin-bottom:9px}
-.em-curso{padding:2px 6px}
-.em-k{font-family:var(--display);font-size:10.5px;font-weight:600;letter-spacing:.2em;text-transform:uppercase;color:var(--faint)}
-.em-v{font-size:13px;font-weight:600;color:var(--ink);line-height:1.35;margin-top:1px}
-.em-main .em-v{font-family:var(--display);font-size:20px;font-weight:600;letter-spacing:.02em;color:var(--gold);line-height:1.15}
-.em-sep{display:flex;align-items:center;gap:8px;color:var(--gold);font-size:9px;margin:5px auto;max-width:160px;opacity:.75}
-.em-sep span{flex:1;height:1px;background:linear-gradient(90deg,transparent,var(--gold))}
-.em-sep span:last-child{background:linear-gradient(90deg,var(--gold),transparent)}
-.em-notas{font-size:11px;color:var(--muted);margin-top:9px;white-space:pre-line;line-height:1.4;font-style:italic}
+/* ═══ Ementa do dia — card campino em destaque, compacto ═══ */
+.ementa{width:100%;margin-top:6px;background:repeating-linear-gradient(0deg,rgba(255,255,255,.05) 0 7px,transparent 7px 14px),var(--campino-escuro);border:1px solid var(--campino-escuro);border-radius:12px;padding:9px 12px 8px;text-align:center;position:relative;overflow:hidden;box-shadow:0 3px 10px rgba(110,32,18,.28)}
+.ementa::before{content:"";position:absolute;inset:4px;border:1px solid rgba(243,217,168,.32);border-radius:9px;pointer-events:none}
+.ementa-hd{font-family:var(--display);font-size:10.5px;font-weight:600;letter-spacing:.3em;text-transform:uppercase;color:#EFC9A8;margin-bottom:2px}
+.em-prato{font-family:var(--display);font-size:22px;font-weight:600;letter-spacing:.02em;color:#F3D9A8;line-height:1.12;margin-bottom:1px}
+.em-linha{font-size:12px;font-weight:500;color:var(--sal);line-height:1.4;margin-top:2px}
+.em-lk{font-family:var(--display);font-size:10.5px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:#EFC9A8;margin-right:6px}
+.em-notas{font-size:10.5px;color:#EFC9A8;opacity:.85;margin-top:3px;white-space:pre-line;line-height:1.35;font-style:italic}
 /* Detalhe "quem vai" por agregado (casal + convidados em tom apagado) */
 .rdc-ppl.casais{flex-direction:column;align-items:stretch;gap:7px}
 .rdc-casal-n{font-size:11.5px;font-weight:700;color:var(--ink)}
@@ -562,6 +558,7 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .rdc-hdr .rdc-lbl{flex:1}
 .rdc-fold>summary::-webkit-details-marker{display:none}
 .rdc-fold-arrow{font-size:16px;font-weight:600;color:var(--faint);line-height:1;align-self:center;transition:transform .2s}
+.rdc-pp{display:inline-block;min-width:76px;text-align:right;font-size:10px;font-weight:600;color:var(--faint);font-variant-numeric:tabular-nums;white-space:nowrap;align-self:center}
 .rdc-fold[open]>summary .rdc-fold-arrow{transform:rotate(90deg)}
 .rdc-unit-v{font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums}
 .rdc-hero{background:rgba(168,123,20,.09);border-color:var(--gold)}
