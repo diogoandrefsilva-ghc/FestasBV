@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v67 · 2026-07-20 · Refeições: montantes dos cards de custos alinhados à direita';
+const APP_BUILD = 'v68 · 2026-07-21 · Refeições: ementa em destaque (campino, compacta) + custo p.p. nos cabeçalhos';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -907,6 +907,8 @@ function renderAll(){
         if(indPP===0&&indTot>0&&calcRef.D>0)indPP=rnd(indTot/calcRef.D,2);
         let dirPP=dirTot>0?rnd((calcRef.custoUnit||0)-(calcRef.custoUnitBebe||0),2):0;
         if(dirPP<0)dirPP=0;
+        // Custo por pessoa discreto no cabeçalho (slot de largura fixa p/ alinhar os 3 cards)
+        const ppTag=v=>`<span class="rdc-pp">${calcRef.D>0?`(${eur(v)} p.p.)`:''}</span>`;
         const ind=[
           {c:'b',lbl:'Bebidas',v:calcRef.cBebidas},
           {c:'cv',lbl:'Cerveja',v:calcRef.cCerveja},
@@ -917,7 +919,7 @@ function renderAll(){
         const notaBebe=calcRef.temBebe?' <span class="rdc-note">= custo p/ quem só bebe</span>':'';
         // Colapsados por defeito (só label + total); toque expande o detalhe
         costCards+=`<details class="rdc rdc-fold sf" onclick="event.stopPropagation()">
-          <summary class="rdc-hdr"><span class="rdc-lbl">Custos indiretos</span><span class="rdc-tot">${eur(indTot)}</span><span class="rdc-fold-arrow">›</span></summary>
+          <summary class="rdc-hdr"><span class="rdc-lbl">Custos indiretos</span><span class="rdc-tot">${eur(indTot)}</span>${ppTag(indPP)}<span class="rdc-fold-arrow">›</span></summary>
           ${pesoHtml}${chipsHtml?`<div class="rdc-chips">${chipsHtml}</div>`:''}
           <div class="rdc-unit"><span>Por pessoa${notaBebe}</span><span class="rdc-unit-v">${eur(indPP)}</span></div>
         </details>`;
@@ -931,7 +933,7 @@ function renderAll(){
           dirChipsRow=dirItems.length?`<details class="rdc-det rdc-det-chips" onclick="event.stopPropagation()"><summary>${drChip}<span class="rdc-det-arrow">›</span></summary>${dirDetBody}</details>`:drChip;
         }
         costCards+=`<details class="rdc rdc-fold sf" onclick="event.stopPropagation()">
-          <summary class="rdc-hdr"><span class="rdc-lbl">Custos diretos</span><span class="rdc-tot">${eur(dirTot)}</span><span class="rdc-fold-arrow">›</span></summary>
+          <summary class="rdc-hdr"><span class="rdc-lbl">Custos diretos</span><span class="rdc-tot">${eur(dirTot)}</span>${ppTag(dirPP)}<span class="rdc-fold-arrow">›</span></summary>
           <div class="rdc-peso"><span class="rdc-peso-lbl">Compras</span><span class="rdc-peso-rule"></span></div>
           ${dirChipsRow}
           <div class="rdc-unit"><span>Por pessoa</span><span class="rdc-unit-v">${eur(dirPP)}</span></div>
@@ -951,21 +953,19 @@ function renderAll(){
         const convCell=`<div ${guestAttrs}><div class="rdc-cell-k">Convidado${calcRef.E?`<span class="rdc-cell-n">${calcRef.E}</span>`:''}${guestsPay.length?'<span class="rdc-cell-arrow">›</span>':''}</div><div class="rdc-cell-v">${calcRef.E?eur(calcRef.Q):'<span class="rdc-na">N/A</span>'}</div></div>`;
         const presNota=calcRef.D>0?'':'<div class="rdc-sempres">Sem presenças marcadas</div>';
         costCards+=`<div class="rdc rdc-hero sf">
-          <div class="rdc-hdr"><span class="rdc-lbl rdc-lbl-green">Custo da refeição</span><span class="rdc-tot">${eur(calcRef.custoTotal)}</span><span class="rdc-fold-arrow" style="visibility:hidden">›</span></div>
+          <div class="rdc-hdr"><span class="rdc-lbl rdc-lbl-green">Custo da refeição</span><span class="rdc-tot">${eur(calcRef.custoTotal)}</span>${ppTag(rnd(indPP+dirPP,2))}<span class="rdc-fold-arrow" style="visibility:hidden">›</span></div>
           ${presNota}
           <div class="rdc-cells">${membroCell}${convCell}</div>
           ${memPanel}${guestPanel}
         </div>`;
       }
-      // Ementa do dia — entradas · prato principal · sobremesa (estilo ementa de tasca)
+      // Ementa do dia — card campino em destaque: prato grande + entradas/sobremesa em linha
       const mp=parseMenuParts(rd.menu);
-      const cursos=[];
-      if(mp.entradas)cursos.push({k:'Entradas',v:mp.entradas});
-      if(rd.prato)cursos.push({k:'Prato principal',v:rd.prato,main:true});
-      if(mp.sobremesa)cursos.push({k:'Sobremesa',v:mp.sobremesa});
-      const ementa=(cursos.length||mp.outras)?`<div class="ementa sf">
+      const ementa=(rd.prato||mp.entradas||mp.sobremesa||mp.outras)?`<div class="ementa sf">
         <div class="ementa-hd">Ementa do dia</div>
-        ${cursos.map(c=>`<div class="em-curso${c.main?' em-main':''}"><div class="em-k">${c.k}</div><div class="em-v">${escHtml(c.v)}</div></div>`).join('<div class="em-sep"><span></span>✦<span></span></div>')}
+        ${rd.prato?`<div class="em-prato">${escHtml(rd.prato)}</div>`:''}
+        ${mp.entradas?`<div class="em-linha"><span class="em-lk">🥗 Entradas</span>${escHtml(mp.entradas)}</div>`:''}
+        ${mp.sobremesa?`<div class="em-linha"><span class="em-lk">🍰 Sobremesa</span>${escHtml(mp.sobremesa)}</div>`:''}
         ${mp.outras?`<div class="em-notas">${escHtml(mp.outras)}</div>`:''}
       </div>`:'';
       r+=`<div class="refmeal" data-i="${rd._idx}" style="${rd._idx===sel?'':'display:none'}">
