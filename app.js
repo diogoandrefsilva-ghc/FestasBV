@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v68 · 2026-07-21 · Refeições: ementa em destaque (campino, compacta) + custo p.p. nos cabeçalhos';
+const APP_BUILD = 'v69 · 2026-07-21 · Refeições: "Prato do dia" mais compacto + p.p. sem parêntesis';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -907,8 +907,9 @@ function renderAll(){
         if(indPP===0&&indTot>0&&calcRef.D>0)indPP=rnd(indTot/calcRef.D,2);
         let dirPP=dirTot>0?rnd((calcRef.custoUnit||0)-(calcRef.custoUnitBebe||0),2):0;
         if(dirPP<0)dirPP=0;
-        // Custo por pessoa discreto no cabeçalho (slot de largura fixa p/ alinhar os 3 cards)
-        const ppTag=v=>`<span class="rdc-pp">${calcRef.D>0?`(${eur(v)} p.p.)`:''}</span>`;
+        // Custo por pessoa discreto no cabeçalho (slot de largura fixa p/ alinhar os 3 cards;
+        // sem espaço antes do € para ficar mais curto)
+        const ppTag=v=>`<span class="rdc-pp">${calcRef.D>0?eur(v).replace(/\s*€/,'€')+' p.p.':''}</span>`;
         const ind=[
           {c:'b',lbl:'Bebidas',v:calcRef.cBebidas},
           {c:'cv',lbl:'Cerveja',v:calcRef.cCerveja},
@@ -962,10 +963,11 @@ function renderAll(){
       // Ementa do dia — card campino em destaque: prato grande + entradas/sobremesa em linha
       const mp=parseMenuParts(rd.menu);
       const ementa=(rd.prato||mp.entradas||mp.sobremesa||mp.outras)?`<div class="ementa sf">
-        <div class="ementa-hd">Ementa do dia</div>
+        <div class="ementa-hd">Prato do dia</div>
         ${rd.prato?`<div class="em-prato">${escHtml(rd.prato)}</div>`:''}
-        ${mp.entradas?`<div class="em-linha"><span class="em-lk">🥗 Entradas</span>${escHtml(mp.entradas)}</div>`:''}
-        ${mp.sobremesa?`<div class="em-linha"><span class="em-lk">🍰 Sobremesa</span>${escHtml(mp.sobremesa)}</div>`:''}
+        ${(mp.entradas||mp.sobremesa||mp.outras)?'<div class="em-rule"></div>':''}
+        ${mp.entradas?`<div class="em-linha"><span class="em-lk">Entradas</span>${escHtml(mp.entradas)}</div>`:''}
+        ${mp.sobremesa?`<div class="em-linha"><span class="em-lk">Sobremesa</span>${escHtml(mp.sobremesa)}</div>`:''}
         ${mp.outras?`<div class="em-notas">${escHtml(mp.outras)}</div>`:''}
       </div>`:'';
       r+=`<div class="refmeal" data-i="${rd._idx}" style="${rd._idx===sel?'':'display:none'}">
