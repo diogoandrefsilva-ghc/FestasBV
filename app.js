@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v69 · 2026-07-21 · Refeições: "Prato do dia" mais compacto + p.p. sem parêntesis';
+const APP_BUILD = 'v70 · 2026-07-21 · Refeições: responsável de cozinha na linha do tipo de refeição';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -975,8 +975,7 @@ function renderAll(){
         <div class="refdef-row${isAdmin()?' refdef-click':''}" style="flex-wrap:wrap"${isAdmin()?` onclick="openRefdefModal(${rd._idx})"`:''}>
           <span class="refdef-icon">${icon}</span>
           <div class="refdef-info">
-            <div class="refdef-ref sf">${rd.ref}</div>
-            ${rd.respCozinha?`<div class="refdef-resp sf">👨‍🍳 ${escHtml(rd.respCozinha)}</div>`:''}
+            <div class="refdef-ref sf">${rd.ref}${rd.respCozinha?`<span class="refdef-resp-inline sf"> · 👨‍🍳 ${escHtml(rd.respCozinha)}</span>`:''}</div>
           </div>
           ${isAdmin()?'<span class="refdef-chevron sf">›</span>':''}
           ${ementa}
