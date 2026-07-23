@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v70 · 2026-07-21 · Refeições: responsável de cozinha na linha do tipo de refeição';
+const APP_BUILD = 'v71 · 2026-07-23 · Registar compra: pré-marca só os artigos que estão no carrinho (✓)';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -4320,10 +4320,18 @@ function openCompra(compraId){
   // "＋ Artigo fora da lista") — abre sozinho quando ainda nada está marcado.
   let pl='';
   if(pickItems.length){
-    const nOn=pickItems.filter(it=>isEdit?it.compraId===compraId:shopMineOwn(it)).length;
+    // Compra nova: pré-marca só os artigos que já pus no carrinho físico (o ✓
+    // verde na aba Carrinho, noCarrinho). Se não marquei nenhum, cai para "todos
+    // os meus" (comportamento antigo) para o picker não abrir vazio. Os restantes
+    // ficam listados mas por marcar — dá para os juntar à mão. Na edição: os que
+    // já estão ligados a esta compra.
+    const mineOwn=pickItems.filter(it=>shopMineOwn(it));
+    const anyCart=mineOwn.some(it=>it.noCarrinho);
+    const defOn=it=>shopMineOwn(it)&&(!anyCart||it.noCarrinho);
+    const nOn=pickItems.filter(it=>isEdit?it.compraId===compraId:defOn(it)).length;
     let rows='';
     pickItems.slice().sort((a,b)=>a.artigo.localeCompare(b.artigo,'pt')).forEach(it=>{
-      const on=isEdit?it.compraId===compraId:shopMineOwn(it);
+      const on=isEdit?it.compraId===compraId:defOn(it);
       const ql=shopQtyLabel(it);
       rows+=`<label class="cmp-pick-row"><input type="checkbox" class="shop-pick" value="${it._id}" ${on?'checked':''} onchange="compraPickChanged()">
         <span>${escHtml(it.artigo)}${ql?' <i>('+escHtml(ql)+')</i>':''}${shopIsRemoved(it)?' ⚠️':''}</span>
