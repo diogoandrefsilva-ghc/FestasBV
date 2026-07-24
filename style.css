@@ -1156,7 +1156,11 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
    com o botão de ação "🛒 Carrinho" dos artigos livres. */
 #view-compras .cmp-sec-falta{color:var(--campino-tinta)}
 #view-compras .cmp-sec-claim{color:var(--green)}
+#view-compras .cmp-sec-stock{color:#8A6D2F}
 #view-compras .cmp-free .cmp-list{border-left:4px solid rgba(156,47,29,.55)}
 #view-compras .cmp-claimed .cmp-list{border-left:4px solid rgba(30,122,77,.55);background:linear-gradient(90deg,rgba(30,122,77,.07),var(--sal) 60%)}
+/* Cobertos pelo stock: pedidos satisfeitos por alocação — informativos, sem ação */
+#view-compras .cmp-covered .cmp-list{border-left:4px solid rgba(138,109,47,.45)}
+#view-compras .cmp-covered .cmp-item{opacity:.85}
 #view-compras .cmp-claimed .cmp-chip{background:rgba(30,122,77,.13);border-color:rgba(30,122,77,.3);color:var(--green)}
 #view-compras .cmp-claimed .cmp-chip::before{box-shadow:inset 0 0 0 1px rgba(30,122,77,.5)}

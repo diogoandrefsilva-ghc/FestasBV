@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v75 · 2026-07-24 · Registar compra: aloca só às refeições pedidas no carrinho; o excedente fica por alocar (bolsa comum)';
+const APP_BUILD = 'v76 · 2026-07-24 · Lista durável: pedidos cobertos pelo stock ficam "tratados" e voltam sozinhos se a alocação mudar';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -3506,26 +3506,71 @@ function mealStockAllocFor(artigo,u,ref,data){
   });
   return q;
 }
+// Há ALGUMA alocação deste artigo à refeição? (qualquer unidade — para a
+// cobertura binária de pedidos sem quantidade numérica)
+function mealStockAllocAnyFor(artigo,ref,data){
+  return stockArr().some(l=>stockBacked(l)&&shopSameArtigo(l.artigo,artigo)
+    &&(l.alocacoes||[]).some(a=>a.tipo===ref&&a.data===data&&+a.qtd>0));
+}
+/* ── Cobertura da necessidade (modelo "a lista nunca morre") ──
+   A quantidade pedida na lista é a NECESSIDADE durável da refeição; a cobertura
+   é DERIVADA a cada momento do stock alocado a essa refeição — nunca gravada.
+   Por isso é auto-reversível: tira-se a alocação (ou apaga-se a compra) e a
+   necessidade volta sozinha ao "Em falta"; aloca-se e o pedido fica tratado.
+   A conta faz-se ao nível do PAR artigo+refeição (todos os pedidos pendentes
+   do mesmo artigo para a mesma refeição partilham a mesma cobertura). */
+function shopItemCoverage(it){
+  if(!STOCK_TABLE||!shopIsMeal(it.tipo)||!it.dataValor)return null;
+  const q=qtyParse(it.quantidade);
+  if(!q)return null;
+  // A necessidade soma os pedidos pendentes E os comprados cujo artigo tem
+  // lote em stock — a compra desses materializou-se em alocação, que também
+  // está no `aloc`; sem os contar, o alocado deles "cobriria" pedidos novos.
+  // Comprado SEM lote foi satisfeito fora do stock (ex.: "Só totais") e fica
+  // de fora dos dois lados da conta.
+  const temLote=stockArr().some(l=>stockBacked(l)&&shopSameArtigo(l.artigo,it.artigo));
+  let need=0;
+  shopArr().forEach(x=>{
+    if(shopIsRemoved(x)||x.tipo!==it.tipo||x.dataValor!==it.dataValor)return;
+    if(!shopSameArtigo(x.artigo,it.artigo))return;
+    if(shopIsBought(x)&&!temLote)return;
+    const xq=qtyParse(x.quantidade);
+    if(xq&&xq.u===q.u)need=rnd(need+xq.n,3);
+  });
+  const aloc=mealStockAllocFor(it.artigo,q.u,it.tipo,it.dataValor);
+  return {need,aloc,falta:Math.max(0,rnd(need-aloc,3)),u:q.u};
+}
+/* Pedido pendente totalmente coberto pelo stock alocado à sua refeição —
+   sai do "falta quem trate" (não há nada a comprar) mas continua visível;
+   se a alocação mudar, volta sozinho. Sem qtd numérica: cobertura binária. */
+function shopIsCovered(it){
+  if(!STOCK_TABLE||!shopIsPending(it)||!shopIsMeal(it.tipo)||!it.dataValor)return false;
+  const c=shopItemCoverage(it);
+  if(c)return c.aloc>0.0005&&c.falta<=0.0005;
+  return mealStockAllocAnyFor(it.artigo,it.tipo,it.dataValor);
+}
 /* Dica de stock para um artigo da lista — partilhada pela lista da refeição e
    pelo Shop List (onde quem vai às compras a lê). Devolve {ok,txt} ou null:
-   - refeição futura com stock já alocado → quanto do pedido está coberto e
-     quanto falta comprar (ok=true, verde);
+   - pedido com stock alocado à refeição → quanto está coberto e quanto falta
+     comprar (ok=true, verde);
    - senão, se houver stock livre por alocar deste artigo → sugere alocá-lo. */
 function shopStockHint(it){
   if(!STOCK_TABLE||shopIsBought(it)||shopIsRemoved(it))return null;
-  const q=qtyParse(it.quantidade);
-  if(!q)return null;
-  if(shopIsMeal(it.tipo)&&it.dataValor&&it.dataValor>=hojeISO()){
-    const aloc=mealStockAllocFor(it.artigo,q.u,it.tipo,it.dataValor);
-    if(aloc>0){
-      const falta=Math.max(0,rnd(q.n-aloc,3));
-      return {ok:true,txt:falta>0
-        ?`🧺 ${fmtQty(aloc,q.u)} já em stock — falta comprar ${fmtQty(falta,q.u)}`
-        :`🧺 pedido já coberto pelo stock (${fmtQty(aloc,q.u)})`};
+  const c=shopItemCoverage(it);
+  if(c){
+    if(c.aloc>0.0005){
+      const cob=rnd(Math.min(c.aloc,c.need),3);
+      return {ok:true,txt:c.falta>0.0005
+        ?`🧺 ${fmtQty(cob,c.u)} já em stock — falta comprar ${fmtQty(c.falta,c.u)}`
+        :`🧺 pedido coberto pelo stock (${fmtQty(cob,c.u)})`};
     }
+    const free=stockFreeFor(it.artigo,c.u);
+    if(free>0)return {ok:false,txt:`🧺 há ${fmtQty(free,c.u)} em stock por alocar`};
+    return null;
   }
-  const free=stockFreeFor(it.artigo,q.u);
-  if(free>0)return {ok:false,txt:`🧺 há ${fmtQty(free,q.u)} em stock por alocar`};
+  // Sem quantidade numérica: cobertura binária (há/não há alocação à refeição)
+  if(shopIsMeal(it.tipo)&&it.dataValor&&mealStockAllocAnyFor(it.artigo,it.tipo,it.dataValor))
+    return {ok:true,txt:'🧺 coberto pelo stock'};
   return null;
 }
 /* Reparte a qtd do lote pelas refeições que ainda pedem o artigo, cobrindo a
@@ -3647,7 +3692,10 @@ function shopItemCard(it,mineView,noBadge){
     right=`<span class="cmp-chip">🛒 ${escHtml(it.tratadoPor)}</span>`;
   }else{
     if(it.criadoPor)sub=`<div class="cmp-sub">pedido por ${escHtml(it.criadoPor)}</div>`;
-    right=`<button class="cmp-mini cart write-action" onclick="event.stopPropagation();claimItem(${it._id})"><i class="cmp-plus">＋</i>🛒 Carrinho</button>`;
+    // Pedido coberto pelo stock: não há nada a comprar — sem botão de carrinho
+    // (a dica verde diz o estado; se a alocação mudar, o botão volta sozinho)
+    right=shopIsCovered(it)?''
+      :`<button class="cmp-mini cart write-action" onclick="event.stopPropagation();claimItem(${it._id})"><i class="cmp-plus">＋</i>🛒 Carrinho</button>`;
   }
   if(removed)sub=`<div class="cmp-sub alert">⚠️ removido por ${escHtml(it.cfDesc||'?')}${mineView?' — abre para largar':''}</div>`;
   // Mesma dica de stock da lista da refeição — aqui é onde quem faz as compras
@@ -3740,7 +3788,9 @@ function mealShopSection(rd){
   // Dois blocos independentes: 📝 a lista (pendentes) e 🧺 o que já foi comprado
   // para a refeição (lotes alocados c/ € + artigos comprados sem lote — um pedido
   // comprado cujo artigo tem lote é redundante: a linha do lote mostra qtd e €).
-  const pend=items.filter(it=>!shopIsBought(it));
+  // Pedidos COBERTOS pelo stock também saem dos pendentes: a linha do lote no
+  // bloco Comprado já os representa; se a alocação for desfeita, voltam sozinhos.
+  const pend=items.filter(it=>!shopIsBought(it)&&!shopIsCovered(it));
   // "Sem lote" = sem NENHUM lote do artigo em stock (não só os alocados a esta
   // refeição): se o admin mover a alocação para outra refeição, o pedido não
   // pode reaparecer aqui como "comprado" — os lotes são a fonte de verdade.
@@ -3804,7 +3854,8 @@ function renderCompras(){
     :byArt?'<div class="cmp-list">'+arr.map(it=>shopItemCard(it,mineView,false)).join('')+'</div>'
     :shopGroupedList(arr,mineView);
   const mine=act.filter(shopMineOwn).sort(sortF);                                // a MINHA checklist pessoal (só o próprio, não o cônjuge; inclui removidos c/ alerta)
-  const falta=act.filter(x=>!x.tratadoPor&&!shopIsRemoved(x)).sort(sortF);       // livres, por tratar
+  const falta=act.filter(x=>!x.tratadoPor&&!shopIsRemoved(x)&&!shopIsCovered(x)).sort(sortF);  // livres, por tratar (e não cobertos pelo stock)
+  const cobertos=act.filter(x=>!x.tratadoPor&&!shopIsRemoved(x)&&shopIsCovered(x)).sort(sortF);// pedidos satisfeitos pelo stock alocado — visíveis, mas sem nada a comprar
   const carrinhos=act.filter(x=>x.tratadoPor&&!shopIsRemoved(x)).sort(sortF);    // já no carrinho de alguém (incl. o meu — todos veem)
   const removidos=act.filter(x=>shopIsRemoved(x)&&!x.tratadoPor).sort(sortF);    // histórico de removidos
 
@@ -3838,10 +3889,12 @@ function renderCompras(){
   }
 
   if(SHOP_TAB==='falta'){
-    // ── Em falta (livres, ninguém trata) ──
+    // ── Em falta (livres, ninguém trata, não cobertos) ──
     if(!falta.length){
       h+=carrinhos.length
         ?'<div class="cmp-empty sf"><span class="cmp-empty-ico">🛒</span>Nada em falta — está tudo no carrinho de alguém 👇</div>'
+        :cobertos.length
+        ?'<div class="cmp-empty sf"><span class="cmp-empty-ico">🧺</span>Nada por comprar — o stock cobre o que está pedido 👇</div>'
         :'<div class="cmp-empty sf"><span class="cmp-empty-ico">🎉</span>A lista está vazia.<br>Toca em <b>＋ Artigo</b> para pedir o primeiro.</div>';
     }else{
       // Cabeçalho de estado + wrapper .cmp-free: distingue à vista o que ainda
@@ -3853,6 +3906,13 @@ function renderCompras(){
     if(carrinhos.length){
       h+=`<div class="cmp-sec-hdr sf cmp-sec-claim" style="margin-top:22px">🛒 Já em carrinhos <span class="cmp-count">${carrinhos.length}</span></div>`;
       h+='<div class="cmp-claimed">'+listOf(carrinhos,false)+'</div>';
+    }
+    // ── Cobertos pelo stock (a necessidade mantém-se registada; se a alocação
+    //    for desfeita, voltam sozinhos ao "Falta quem trate") ──
+    if(cobertos.length){
+      h+=`<div class="cmp-sec-hdr sf cmp-sec-stock" style="margin-top:22px">🧺 Cobertos pelo stock <span class="cmp-count">${cobertos.length}</span></div>`;
+      h+='<div class="cmp-covered">'+listOf(cobertos,false)+'</div>';
+      h+='<div class="note">Pedidos já satisfeitos pelo stock alocado às refeições — não há nada a comprar. Se a alocação mudar, voltam sozinhos a "Falta quem trate".</div>';
     }
   }else if(SHOP_TAB==='carrinho'){
     // ── O meu carrinho (artigos que disse que tratava) ──
@@ -4250,7 +4310,7 @@ async function claimItem(id){
 function shopArtKey(s){return (s||'').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');}
 function shopSameArtigo(a,b){return shopArtKey(a)===shopArtKey(b);}
 async function claimSameElsewhere(it,nome){
-  const others=shopArr().filter(x=>x._id!==it._id&&x._id!=null&&!x.tratadoPor&&shopIsPending(x)&&shopGroupKey(x)!==shopGroupKey(it)&&shopSameArtigo(x.artigo,it.artigo));
+  const others=shopArr().filter(x=>x._id!==it._id&&x._id!=null&&!x.tratadoPor&&shopIsPending(x)&&!shopIsCovered(x)&&shopGroupKey(x)!==shopGroupKey(it)&&shopSameArtigo(x.artigo,it.artigo));
   if(!others.length)return;
   const lst=others.map(o=>{const q=shopQtyLabel(o);return `• ${shopGroupLabel(o.tipo,o.dataValor)}${q?' — '+q:''}`;}).join('\n');
   if(!confirm(`"${it.artigo}" também está em falta em:\n\n${lst}\n\nLevas também?`))return;
@@ -4522,9 +4582,20 @@ function compraRefreshLotes(){
     // um lote gravado (edição, _id) vale pelo nome, seja qual for a origem
     const ex=prev.find(l=>!used.has(l)&&!l.free&&shopSameArtigo(l._listArt||l.artigo,d.artigo)&&(l._id!=null||((l.tipoFix||'')===(d.tipoFix||'')&&(l.dataFix||'')===(d.dataFix||''))));
     if(ex){used.add(ex);return Object.assign(ex,{keys});}
-    // qtd sugerida = soma das qtds pedidas (se numéricas e na mesma unidade)
-    let tot=0,u=null,ok=true;
-    d.items.forEach(i=>{const q=qtyParse(i.quantidade);if(!q){ok=false;return;}if(u==null)u=q.u;if(q.u!==u)ok=false;else tot=rnd(tot+q.n,3);});
+    // qtd sugerida = soma das qtds pedidas (se numéricas e na mesma unidade)…
+    let tot=0,u=null,ok=true;const pares={};
+    d.items.forEach(i=>{const q=qtyParse(i.quantidade);if(!q){ok=false;return;}if(u==null)u=q.u;if(q.u!==u)ok=false;else{tot=rnd(tot+q.n,3);if(shopIsMeal(i.tipo)&&i.dataValor){const k=i.tipo+'|'+i.dataValor;pares[k]=rnd((pares[k]||0)+q.n,3);}}});
+    // …menos o stock JÁ alocado a cada refeição (compra nova): sugere-se
+    // comprar só o que falta, não o pedido inteiro. Quem comprar mais, edita —
+    // o excedente fica por alocar (bolsa comum).
+    if(ok&&u!=null&&STOCK_TABLE&&!compraEdit.id){
+      let falta=0,emPar=0;
+      for(const k in pares){
+        const[tp,dt]=k.split('|');emPar=rnd(emPar+pares[k],3);
+        falta=rnd(falta+Math.max(0,rnd(pares[k]-mealStockAllocFor(d.artigo,u,tp,dt),3)),3);
+      }
+      tot=rnd(falta+Math.max(0,rnd(tot-emPar,3)),3);   // pedidos sem refeição ficam por inteiro
+    }
     let qtd=ok&&tot>0?fmtQty(tot,u):'';
     if(!qtd&&d.tipoFix&&d.items.length===1)qtd=shopQtyLabel(d.items[0]);
     // Destino: itens de tipo (Bebidas/Gerais/…) → esse tipo; refeição fixa (sem
