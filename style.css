@@ -1162,5 +1162,13 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 /* Cobertos pelo stock: pedidos satisfeitos por alocação — informativos, sem ação */
 #view-compras .cmp-covered .cmp-list{border-left:4px solid rgba(138,109,47,.45)}
 #view-compras .cmp-covered .cmp-item{opacity:.85}
+/* Chip "em stock" — pedido coberto pelo stock (verde, sem ação) */
+.cmp-chip.stock{background:rgba(30,122,77,.13);border-color:rgba(30,122,77,.3);color:var(--green)}
+#view-compras .cmp-chip.stock::before{background:var(--green);box-shadow:inset 0 0 0 1px rgba(30,122,77,.5)}
+/* "Cobertos pelo stock" recolhível: cabeçalho clicável + seta */
+.cmp-covered-det>summary{list-style:none;cursor:pointer;align-items:center}
+.cmp-covered-det>summary::-webkit-details-marker{display:none}
+.cmp-cov-chev{margin-left:8px;transition:transform .15s;color:var(--muted)}
+.cmp-covered-det[open]>summary .cmp-cov-chev{transform:rotate(180deg)}
 #view-compras .cmp-claimed .cmp-chip{background:rgba(30,122,77,.13);border-color:rgba(30,122,77,.3);color:var(--green)}
 #view-compras .cmp-claimed .cmp-chip::before{box-shadow:inset 0 0 0 1px rgba(30,122,77,.5)}

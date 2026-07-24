@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v78 · 2026-07-24 · Lista durável (modelo limpo): pedidos de refeição de stock não ficam "comprado" — cobertura deriva sempre da alocação; descoberto volta a ser item normal de comprar';
+const APP_BUILD = 'v79 · 2026-07-24 · Carrinho só com o diferencial: pedidos cobertos pelo stock saem do carrinho para "Cobertos pelo stock" (recolhível)';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -3565,8 +3565,12 @@ function normalizeStockNeeds(){
   const backed=id=>!!id&&(DATA.despesas||[]).some(d=>d.compraId===id);
   DATA.shoplist.forEach(it=>{
     if(it.estado!=='comprado'||!shopIsMeal(it.tipo)||!it.dataValor)return;
-    if(DATA.stockLotes.some(l=>l.compraId===it.compraId&&backed(l.compraId)&&shopSameArtigo(l.artigo,it.artigo)))
-      it.estado='pendente';
+    if(DATA.stockLotes.some(l=>l.compraId===it.compraId&&backed(l.compraId)&&shopSameArtigo(l.artigo,it.artigo))){
+      // Volta a necessidade durável (coberta pela alocação) e larga o carrinho:
+      // o claim era da compra antiga — a satisfação agora vem do stock, não de
+      // alguém o levar. (Só em memória; a BD converge quando o item for tocado.)
+      it.estado='pendente';it.tratadoPor=null;it.noCarrinho=false;
+    }
   });
 }
 /* Dica de stock para um artigo da lista — partilhada pela lista da refeição e
@@ -3699,8 +3703,15 @@ function shopItemCard(it,mineView,noBadge){
   const removed=shopIsRemoved(it);
   // Cartão de UMA linha (escala para dezenas de artigos). Editar/eliminar/largar
   // vivem no detalhe (toca no artigo); no cartão só a ação principal de cada vista.
+  // Coberto pelo stock: não há NADA a comprar — precede o carrinho. Sem check,
+  // sem botão, sem chip de "quem trata" (a dica verde diz "coberto pelo stock").
+  // Se a alocação mudar, o pedido volta sozinho ao estado normal.
+  const covered=shopIsCovered(it);
   let check='',right='',sub='';
-  if(mineView){
+  if(covered){
+    if(it.criadoPor)sub=`<div class="cmp-sub">pedido por ${escHtml(it.criadoPor)}</div>`;
+    right='<span class="cmp-chip stock">🧺 em stock</span>';
+  }else if(mineView){
     // Checklist de compras: a bolinha marca "já está no carrinho físico".
     // Este estado é só para orientação de quem trata — os outros não o veem.
     check=`<button class="cmp-check write-action ${it.noCarrinho?'on':''}" onclick="event.stopPropagation();toggleCart(${it._id})" aria-label="Já no carrinho">✓</button>`;
@@ -3712,15 +3723,12 @@ function shopItemCard(it,mineView,noBadge){
     right=`<span class="cmp-chip">🛒 ${escHtml(it.tratadoPor)}</span>`;
   }else{
     if(it.criadoPor)sub=`<div class="cmp-sub">pedido por ${escHtml(it.criadoPor)}</div>`;
-    // Pedido coberto pelo stock: não há nada a comprar — sem botão de carrinho
-    // (a dica verde diz o estado; se a alocação mudar, o botão volta sozinho)
-    right=shopIsCovered(it)?''
-      :`<button class="cmp-mini cart write-action" onclick="event.stopPropagation();claimItem(${it._id})"><i class="cmp-plus">＋</i>🛒 Carrinho</button>`;
+    right=`<button class="cmp-mini cart write-action" onclick="event.stopPropagation();claimItem(${it._id})"><i class="cmp-plus">＋</i>🛒 Carrinho</button>`;
   }
   if(removed)sub=`<div class="cmp-sub alert">⚠️ removido por ${escHtml(it.cfDesc||'?')}${mineView?' — abre para largar':''}</div>`;
-  // Mesma dica de stock da lista da refeição — aqui é onde quem faz as compras
-  // repara que parte (ou tudo) do pedido já está coberto pelo stock.
-  const sh=shopStockHint(it);
+  // Dica de stock: no PARCIAL diz quanto falta comprar; no coberto o chip "em
+  // stock" já o diz, não se repete a dica.
+  const sh=covered?null:shopStockHint(it);
   const hint=sh?`<div class="cmp-hint${sh.ok?' ok':''}">${escHtml(sh.txt)}</div>`:'';
   return `<div class="cmp-item cmp-line cmp-tap${mineView&&it.noCarrinho?' incart':''}${removed?' removed':''}" onclick="openShopItemModal(${it._id})">
     ${check}
@@ -3849,6 +3857,8 @@ function setShopOrder(o){SHOP_ORDER=o;try{localStorage.setItem('festasbv_shop_or
 // no aparelho — quem anda nas compras volta a cair direto no carrinho.
 let SHOP_TAB=(function(){try{const t=localStorage.getItem('festasbv_shop_tab');return['falta','carrinho','hist'].includes(t)?t:'falta';}catch(e){return 'falta';}})();
 function setShopTab(t){SHOP_TAB=t;try{localStorage.setItem('festasbv_shop_tab',t);}catch(e){}renderCompras();}
+// "Cobertos pelo stock" recolhido por defeito (só na sessão) — é informativo
+let SHOP_COVERED_OPEN=false;
 
 function renderCompras(){
   const el=document.getElementById('view-compras');if(!el||!DATA)return;
@@ -3874,10 +3884,14 @@ function renderCompras(){
   const listOf=(arr,mineView)=>byCat?shopCatGroupedList(arr,mineView)
     :byArt?'<div class="cmp-list">'+arr.map(it=>shopItemCard(it,mineView,false)).join('')+'</div>'
     :shopGroupedList(arr,mineView);
-  const mine=act.filter(shopMineOwn).sort(sortF);                                // a MINHA checklist pessoal (só o próprio, não o cônjuge; inclui removidos c/ alerta)
+  // A COBERTURA precede tudo: um pedido coberto pelo stock não está "em falta"
+  // nem "no carrinho" — está satisfeito. O carrinho fica só com o diferencial
+  // (o que falta depois do stock). tratadoPor obsoleto (de uma compra antiga)
+  // não o traz de volta ao carrinho.
+  const cobertos=act.filter(x=>!shopIsRemoved(x)&&shopIsCovered(x)).sort(sortF); // satisfeitos pelo stock alocado — visíveis, sem nada a comprar
+  const mine=act.filter(x=>!shopIsCovered(x)&&shopMineOwn(x)).sort(sortF);       // a MINHA checklist pessoal (só o diferencial por comprar)
   const falta=act.filter(x=>!x.tratadoPor&&!shopIsRemoved(x)&&!shopIsCovered(x)).sort(sortF);  // livres, por tratar (e não cobertos pelo stock)
-  const cobertos=act.filter(x=>!x.tratadoPor&&!shopIsRemoved(x)&&shopIsCovered(x)).sort(sortF);// pedidos satisfeitos pelo stock alocado — visíveis, mas sem nada a comprar
-  const carrinhos=act.filter(x=>x.tratadoPor&&!shopIsRemoved(x)).sort(sortF);    // já no carrinho de alguém (incl. o meu — todos veem)
+  const carrinhos=act.filter(x=>x.tratadoPor&&!shopIsRemoved(x)&&!shopIsCovered(x)).sort(sortF);// já no carrinho de alguém (só o que ainda falta comprar)
   const removidos=act.filter(x=>shopIsRemoved(x)&&!x.tratadoPor).sort(sortF);    // histórico de removidos
 
   let h='';
@@ -3929,11 +3943,14 @@ function renderCompras(){
       h+='<div class="cmp-claimed">'+listOf(carrinhos,false)+'</div>';
     }
     // ── Cobertos pelo stock (a necessidade mantém-se registada; se a alocação
-    //    for desfeita, voltam sozinhos ao "Falta quem trate") ──
+    //    for desfeita, voltam sozinhos ao "Falta quem trate") — recolhido, para
+    //    não poluir: são informativos, não têm nada a comprar. ──
     if(cobertos.length){
-      h+=`<div class="cmp-sec-hdr sf cmp-sec-stock" style="margin-top:22px">🧺 Cobertos pelo stock <span class="cmp-count">${cobertos.length}</span></div>`;
-      h+='<div class="cmp-covered">'+listOf(cobertos,false)+'</div>';
-      h+='<div class="note">Pedidos já satisfeitos pelo stock alocado às refeições — não há nada a comprar. Se a alocação mudar, voltam sozinhos a "Falta quem trate".</div>';
+      h+=`<details class="cmp-covered-det"${SHOP_COVERED_OPEN?' open':''} ontoggle="SHOP_COVERED_OPEN=this.open">
+        <summary class="cmp-sec-hdr sf cmp-sec-stock" style="margin-top:22px">🧺 Cobertos pelo stock <span class="cmp-count">${cobertos.length}</span><span class="cmp-cov-chev">▾</span></summary>
+        <div class="cmp-covered">${listOf(cobertos,false)}</div>
+        <div class="note">Pedidos já satisfeitos pelo stock alocado às refeições — não há nada a comprar. Se a alocação mudar, voltam sozinhos a "Falta quem trate".</div>
+      </details>`;
     }
   }else if(SHOP_TAB==='carrinho'){
     // ── O meu carrinho (artigos que disse que tratava) ──
