@@ -830,6 +830,11 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .msl-add{width:100%;margin-top:8px;justify-content:center}
 .msl-hint{font-size:10.5px;color:#9A6E0E;margin-top:1px}
 .msl-hint.ok{color:var(--green)}
+/* Dica-ação "alocar o livre" (um toque) — botão pequeno (na sua própria linha) */
+.msl-hint.alloc,.cmp-hint.alloc{display:flex;width:fit-content;max-width:100%;align-items:center;gap:2px;margin-top:3px;padding:2px 9px;border:1px solid rgba(30,122,77,.35);background:rgba(30,122,77,.08);color:var(--green);border-radius:20px;font-weight:600;cursor:pointer;font-family:inherit;text-align:left}
+.msl-hint.alloc{font-size:10.5px}
+.cmp-hint.alloc{font-size:11px}
+.msl-hint.alloc:active,.cmp-hint.alloc:active{background:rgba(30,122,77,.16)}
 /* Stock: chips das alocações nos cartões de lote (separador Compras) */
 /* Chips de filtro por tipologia no topo do Stock — ícone + legenda pequenina,
    para caberem todos sem scroll horizontal */
