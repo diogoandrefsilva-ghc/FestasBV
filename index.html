@@ -256,6 +256,12 @@ setTimeout(function(){ if (window.fbvEsconderSplash) window.fbvEsconderSplash();
       <label>Categoria 🏷️</label>
       <select id="lote-cat" onchange="loteCatChanged(this.value)"></select>
     </div>
+    <div id="lote-req-wrap" style="display:none">
+      <label>🔗 Cobre o pedido de</label>
+      <input id="lote-req" list="lote-req-list" placeholder="ex.: batatas fritas" onchange="loteReqChanged(this.value)">
+      <datalist id="lote-req-list"></datalist>
+      <div class="note" id="lote-req-note" style="margin-top:2px">Liga este stock a um pedido da lista com outro nome (ex.: Lays → batatas fritas), para o dar por coberto.</div>
+    </div>
     <div id="lote-alocs"></div>
     <button class="btn ghost write-action" id="lote-addline" style="width:100%;margin-top:8px" onclick="loteAddAloc()">＋ Alocar a refeição</button>
     <div class="note" id="lote-resto" style="margin-top:10px"></div>
