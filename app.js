@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v71 · 2026-07-23 · Registar compra: pré-marca só os artigos que estão no carrinho (✓)';
+const APP_BUILD = 'v72 · 2026-07-24 · Alocar stock: sugere a refeição que precisa do artigo + a lista de compras avisa o que já está coberto pelo stock';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -3496,6 +3496,16 @@ function stockFreeFor(artigo,u){
   });
   return free;
 }
+/* Qtd já alocada do stock a UMA refeição para um artigo — para a dica "já em
+   stock" na lista de compras dessa refeição (quanto do pedido já está coberto). */
+function mealStockAllocFor(artigo,u,ref,data){
+  let q=0;
+  stockArr().forEach(l=>{
+    if(!stockBacked(l)||!shopSameArtigo(l.artigo,artigo)||(l.unidade||'')!==u)return;
+    (l.alocacoes||[]).forEach(a=>{if(a.tipo===ref&&a.data===data)q=rnd(q+(+a.qtd||0),3);});
+  });
+  return q;
+}
 /* FIFO: reparte a qtd do lote pelas refeições por ordem de data, cobrindo a
    procura ainda em aberto; sobra fica sem alocação (bolsa comum). Se a procura
    não for numérica e o lote veio de UMA só refeição (fallbackKeys), vai tudo
@@ -3685,11 +3695,24 @@ function mealShopSection(rd){
     const st=done?''
       :it.tratadoPor?`<span class="msl-st">🛒 ${escHtml(it.tratadoPor)}</span>`
       :'<span class="msl-st falta">falta quem trate</span>';
-    // Dica: antes de comprar, há stock livre deste artigo por alocar
+    // Dica de stock: se já há stock alocado a ESTA refeição, avisa quanto do
+    // pedido já está coberto (e quanto falta comprar); senão, se houver stock
+    // livre por alocar deste artigo, sugere alocá-lo.
     let hint='';
     if(!done&&!past&&STOCK_TABLE){
       const q=qtyParse(it.quantidade);
-      if(q){const free=stockFreeFor(it.artigo,q.u);if(free>0)hint=`<div class="msl-hint">🧺 há ${escHtml(fmtQty(free,q.u))} em stock por alocar</div>`;}
+      if(q){
+        const aloc=mealStockAllocFor(it.artigo,q.u,rd.ref,rd.data);
+        if(aloc>0){
+          const falta=Math.max(0,rnd(q.n-aloc,3));
+          hint=falta>0
+            ?`<div class="msl-hint ok">🧺 ${escHtml(fmtQty(aloc,q.u))} já em stock — falta comprar ${escHtml(fmtQty(falta,q.u))}</div>`
+            :`<div class="msl-hint ok">🧺 pedido já coberto pelo stock (${escHtml(fmtQty(aloc,q.u))})</div>`;
+        }else{
+          const free=stockFreeFor(it.artigo,q.u);
+          if(free>0)hint=`<div class="msl-hint">🧺 há ${escHtml(fmtQty(free,q.u))} em stock por alocar</div>`;
+        }
+      }
     }
     return `<div class="msl-it${dim?' msl-dim':''}" onclick="openShopItemModal(${it._id})">
       <span class="msl-art">${escHtml(it.artigo)}${qtdTxt?` <i>${escHtml(qtdTxt)}</i>`:''}${hint}</span>${st}</div>`;
@@ -5104,9 +5127,29 @@ function loteDestPick(i){
   const a=editingLote&&editingLote.alocs[i];if(!a)return;
   openDestPicker(alocToDestino(a),v=>loteAlocField(i,'ref',v),'Alocar a');
 }
+/* Sugestão para uma linha de alocação NOVA: a próxima refeição que ainda pede
+   este artigo na lista de compras (procura por satisfazer), por ordem de data,
+   com a qtd em falta já pré-preenchida (limitada ao stock ainda livre). Ignora
+   refeições que já têm linha no modal. null se não houver procura em aberto. */
+function loteSuggestAloc(){
+  if(!editingLote)return null;
+  const dem=stockDemandFor(editingLote.artigo,editingLote.u);
+  const used=new Set(editingLote.alocs.map(a=>alocToDestino(a)));
+  const keys=Object.keys(dem).filter(k=>!used.has(k)&&dem[k]>0.0005)
+    .sort((a,b)=>(a.split('|')[1]).localeCompare(b.split('|')[1])||a.localeCompare(b));
+  if(!keys.length)return null;
+  const [tipo,data]=keys[0].split('|');
+  const usado=editingLote.alocs.reduce((s,a)=>s+(+a.qtd||0),0);
+  const livre=Math.max(0,rnd(editingLote.totQ-usado,3));
+  return {tipo,data,qtd:rnd(Math.min(dem[keys[0]],livre),3)};
+}
 function loteAddAloc(){
   if(!isAdmin()||!editingLote)return;
-  // Nova linha: refeição livre por preencher, senão um tipo puro (Gerais)
+  // 1.ª escolha: sugerir logo a refeição que ainda precisa deste artigo, com a
+  // qtd em falta pré-preenchida — poupa procurar a refeição e a quantidade.
+  const sug=loteSuggestAloc();
+  if(sug){editingLote.alocs.push(sug);loteRenderAlocs();return;}
+  // Sem procura em aberto: refeição livre por preencher, senão um tipo puro (Gerais)
   const used=new Set(editingLote.alocs.map(a=>alocToDestino(a)));
   const m=loteMeals().find(r=>!used.has(r.ref+'|'+r.data));
   editingLote.alocs.push(m?{tipo:m.ref,data:m.data,qtd:0}:{tipo:'Gerais',data:null,qtd:0});
