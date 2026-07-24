@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v80 · 2026-07-24 · Detalhe do lote: compras à esquerda ↔ pedidos da lista (necessidades por refeição) à direita';
+const APP_BUILD = 'v81 · 2026-07-24 · Fix: pôr no carrinho um pedido de stock antigo já não o faz desaparecer (a normalização passa a persistir na BD)';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -3557,21 +3557,37 @@ function shopIsCovered(it){
    à compra) e a cobertura é sempre derivada — coberto → "Cobertos pelo stock";
    descoberto (stock movido/insuficiente) → volta a ser um item normal de
    comprar, sozinho. Esta função normaliza dados ANTIGOS (comprados antes desta
-   regra) em memória: comprado + lote da própria compra → pendente. Só em
-   memória (a compra fica ligada por compra_id); o servidor converge quando o
-   item for tocado. */
+   regra): comprado + lote da própria compra → pendente. Aplica em memória e
+   PERSISTE na BD (admin) — se ficasse só em memória, qualquer releitura do
+   servidor (ex.: o claim ao pôr no carrinho) trazia de volta o 'comprado' e o
+   artigo desaparecia. A compra fica ligada por compra_id (não se toca). */
 function normalizeStockNeeds(){
   if(!DATA||!Array.isArray(DATA.shoplist)||!Array.isArray(DATA.stockLotes))return;
   const backed=id=>!!id&&(DATA.despesas||[]).some(d=>d.compraId===id);
+  const fixed=[];
   DATA.shoplist.forEach(it=>{
     if(it.estado!=='comprado'||!shopIsMeal(it.tipo)||!it.dataValor)return;
     if(DATA.stockLotes.some(l=>l.compraId===it.compraId&&backed(l.compraId)&&shopSameArtigo(l.artigo,it.artigo))){
       // Volta a necessidade durável (coberta pela alocação) e larga o carrinho:
-      // o claim era da compra antiga — a satisfação agora vem do stock, não de
-      // alguém o levar. (Só em memória; a BD converge quando o item for tocado.)
-      it.estado='pendente';it.tratadoPor=null;it.noCarrinho=false;
+      // o claim era da compra antiga — a satisfação agora vem do stock.
+      it.estado='pendente';it.tratadoPor=null;it.noCarrinho=false;it.cfDesc=null;it.compradoEm=null;
+      if(it._id!=null)fixed.push(it._id);
     }
   });
+  if(fixed.length)persistStockNeedsFix(fixed);
+}
+// Persiste a normalização acima na BD (uma vez, admin). Fire-and-forget: o ecrã
+// já mostra o estado normalizado; isto alinha o servidor para releituras.
+const _stockFixTried=new Set();
+async function persistStockNeedsFix(ids){
+  if(!isAdmin()||!_sbSession||contasFechadas())return;   // os outros veem a normalização em memória; só o admin escreve
+  const todo=ids.filter(id=>!_stockFixTried.has(id));
+  if(!todo.length)return;
+  todo.forEach(id=>_stockFixTried.add(id));
+  try{
+    await queueWrite(()=>sbReq('PATCH',`shoplist?id=in.(${todo.join(',')})`,{estado:'pendente',tratado_por:null,no_carrinho:false,cf_desc:null,comprado_em:null}));
+    syncMirror();
+  }catch(e){todo.forEach(id=>_stockFixTried.delete(id));}   // falhou → tenta de novo no próximo carregamento
 }
 /* Dica de stock para um artigo da lista — partilhada pela lista da refeição e
    pelo Shop List (onde quem vai às compras a lê). Devolve {ok,txt} ou null:
