@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v73 · 2026-07-24 · Shop List também avisa quanto do pedido já está coberto pelo stock';
+const APP_BUILD = 'v74 · 2026-07-24 · Registar compra: propõe primeiro a refeição para que o artigo foi pedido (antes do FIFO por data)';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -3528,14 +3528,18 @@ function shopStockHint(it){
   if(free>0)return {ok:false,txt:`🧺 há ${fmtQty(free,q.u)} em stock por alocar`};
   return null;
 }
-/* FIFO: reparte a qtd do lote pelas refeições por ordem de data, cobrindo a
-   procura ainda em aberto; sobra fica sem alocação (bolsa comum). Se a procura
-   não for numérica e o lote veio de UMA só refeição (fallbackKeys), vai tudo
-   para essa. */
-function fifoAlocar(artigo,qtd,u,skipLotId,fallbackKeys){
+/* Reparte a qtd do lote pelas refeições que ainda pedem o artigo. Ordem de
+   preenchimento: PRIMEIRO as refeições para que o artigo foi pedido (preferKeys
+   — é lá que deve entrar o que se comprou), só depois as restantes por ordem de
+   data (FIFO). Sobra fica sem alocação (bolsa comum). Sem procura numérica mas
+   pedido para UMA refeição concreta, vai tudo para essa. */
+function fifoAlocar(artigo,qtd,u,skipLotId,preferKeys){
   const dem=stockDemandFor(artigo,u);
   const done=stockAllocatedFor(artigo,u,skipLotId);
-  const keys=Object.keys(dem).sort((a,b)=>(a.split('|')[1]).localeCompare(b.split('|')[1])||a.localeCompare(b));
+  const byDate=Object.keys(dem).sort((a,b)=>(a.split('|')[1]).localeCompare(b.split('|')[1])||a.localeCompare(b));
+  // Refeições pedidas com procura em aberto vêm à cabeça; as outras seguem FIFO
+  const pref=(preferKeys||[]).filter(k=>dem[k]!=null);
+  const keys=pref.concat(byDate.filter(k=>!pref.includes(k)));
   let rest=qtd;const out=[];
   for(const k of keys){
     if(rest<=0)break;
@@ -3543,8 +3547,8 @@ function fifoAlocar(artigo,qtd,u,skipLotId,fallbackKeys){
     const take=Math.min(rest,falta);
     if(take>0){const[tipo,data]=k.split('|');out.push({tipo,data,qtd:rnd(take,3)});rest=rnd(rest-take,3);}
   }
-  if(!out.length&&fallbackKeys&&fallbackKeys.length===1){
-    const[tipo,data]=fallbackKeys[0].split('|');
+  if(!out.length&&preferKeys&&preferKeys.length===1){
+    const[tipo,data]=preferKeys[0].split('|');
     out.push({tipo,data,qtd:rnd(qtd,3)});
   }
   return out;
