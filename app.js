@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v83 · 2026-07-24 · Stock com nome diferente da lista (Lays → batatas fritas): ligação "Cobre o pedido de" no detalhe do lote; cobertura casa por esse nome';
+const APP_BUILD = 'v84 · 2026-07-24 · Shop List sem separador "Cobertos pelo stock": o que está coberto sai da lista de compras (vê-se na refeição/stock)';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -3932,8 +3932,6 @@ function setShopOrder(o){SHOP_ORDER=o;try{localStorage.setItem('festasbv_shop_or
 // no aparelho — quem anda nas compras volta a cair direto no carrinho.
 let SHOP_TAB=(function(){try{const t=localStorage.getItem('festasbv_shop_tab');return['falta','carrinho','hist'].includes(t)?t:'falta';}catch(e){return 'falta';}})();
 function setShopTab(t){SHOP_TAB=t;try{localStorage.setItem('festasbv_shop_tab',t);}catch(e){}renderCompras();}
-// "Cobertos pelo stock" recolhido por defeito (só na sessão) — é informativo
-let SHOP_COVERED_OPEN=false;
 
 function renderCompras(){
   const el=document.getElementById('view-compras');if(!el||!DATA)return;
@@ -3963,7 +3961,7 @@ function renderCompras(){
   // nem "no carrinho" — está satisfeito. O carrinho fica só com o diferencial
   // (o que falta depois do stock). tratadoPor obsoleto (de uma compra antiga)
   // não o traz de volta ao carrinho.
-  const cobertos=act.filter(x=>!shopIsRemoved(x)&&shopIsCovered(x)).sort(sortF); // satisfeitos pelo stock alocado — visíveis, sem nada a comprar
+  const nCobertos=act.filter(x=>!shopIsRemoved(x)&&shopIsCovered(x)).length;     // cobertos pelo stock: fora da shop list; só para a msg "nada por comprar"
   const mine=act.filter(x=>!shopIsCovered(x)&&shopMineOwn(x)).sort(sortF);       // a MINHA checklist pessoal (só o diferencial por comprar)
   const falta=act.filter(x=>!x.tratadoPor&&!shopIsRemoved(x)&&!shopIsCovered(x)).sort(sortF);  // livres, por tratar (e não cobertos pelo stock)
   const carrinhos=act.filter(x=>x.tratadoPor&&!shopIsRemoved(x)&&!shopIsCovered(x)).sort(sortF);// já no carrinho de alguém (só o que ainda falta comprar)
@@ -4003,8 +4001,8 @@ function renderCompras(){
     if(!falta.length){
       h+=carrinhos.length
         ?'<div class="cmp-empty sf"><span class="cmp-empty-ico">🛒</span>Nada em falta — está tudo no carrinho de alguém 👇</div>'
-        :cobertos.length
-        ?'<div class="cmp-empty sf"><span class="cmp-empty-ico">🧺</span>Nada por comprar — o stock cobre o que está pedido 👇</div>'
+        :nCobertos
+        ?'<div class="cmp-empty sf"><span class="cmp-empty-ico">🧺</span>Nada por comprar — o stock já cobre o que está pedido.</div>'
         :'<div class="cmp-empty sf"><span class="cmp-empty-ico">🎉</span>A lista está vazia.<br>Toca em <b>＋ Artigo</b> para pedir o primeiro.</div>';
     }else{
       // Cabeçalho de estado + wrapper .cmp-free: distingue à vista o que ainda
@@ -4017,16 +4015,8 @@ function renderCompras(){
       h+=`<div class="cmp-sec-hdr sf cmp-sec-claim" style="margin-top:22px">🛒 Já em carrinhos <span class="cmp-count">${carrinhos.length}</span></div>`;
       h+='<div class="cmp-claimed">'+listOf(carrinhos,false)+'</div>';
     }
-    // ── Cobertos pelo stock (a necessidade mantém-se registada; se a alocação
-    //    for desfeita, voltam sozinhos ao "Falta quem trate") — recolhido, para
-    //    não poluir: são informativos, não têm nada a comprar. ──
-    if(cobertos.length){
-      h+=`<details class="cmp-covered-det"${SHOP_COVERED_OPEN?' open':''} ontoggle="SHOP_COVERED_OPEN=this.open">
-        <summary class="cmp-sec-hdr sf cmp-sec-stock" style="margin-top:22px">🧺 Cobertos pelo stock <span class="cmp-count">${cobertos.length}</span><span class="cmp-cov-chev">▾</span></summary>
-        <div class="cmp-covered">${listOf(cobertos,false)}</div>
-        <div class="note">Pedidos já satisfeitos pelo stock alocado às refeições — não há nada a comprar. Se a alocação mudar, voltam sozinhos a "Falta quem trate".</div>
-      </details>`;
-    }
+    // Pedidos cobertos pelo stock NÃO entram na shop list — não há nada a
+    // comprar. Vêem-se no cartão da refeição (bloco "Comprado") e no Stock.
   }else if(SHOP_TAB==='carrinho'){
     // ── O meu carrinho (artigos que disse que tratava) ──
     if(!mine.length){
