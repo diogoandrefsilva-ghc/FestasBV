@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v72 · 2026-07-24 · Alocar stock: sugere a refeição que precisa do artigo + a lista de compras avisa o que já está coberto pelo stock';
+const APP_BUILD = 'v73 · 2026-07-24 · Shop List também avisa quanto do pedido já está coberto pelo stock';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -3506,6 +3506,28 @@ function mealStockAllocFor(artigo,u,ref,data){
   });
   return q;
 }
+/* Dica de stock para um artigo da lista — partilhada pela lista da refeição e
+   pelo Shop List (onde quem vai às compras a lê). Devolve {ok,txt} ou null:
+   - refeição futura com stock já alocado → quanto do pedido está coberto e
+     quanto falta comprar (ok=true, verde);
+   - senão, se houver stock livre por alocar deste artigo → sugere alocá-lo. */
+function shopStockHint(it){
+  if(!STOCK_TABLE||shopIsBought(it)||shopIsRemoved(it))return null;
+  const q=qtyParse(it.quantidade);
+  if(!q)return null;
+  if(shopIsMeal(it.tipo)&&it.dataValor&&it.dataValor>=hojeISO()){
+    const aloc=mealStockAllocFor(it.artigo,q.u,it.tipo,it.dataValor);
+    if(aloc>0){
+      const falta=Math.max(0,rnd(q.n-aloc,3));
+      return {ok:true,txt:falta>0
+        ?`🧺 ${fmtQty(aloc,q.u)} já em stock — falta comprar ${fmtQty(falta,q.u)}`
+        :`🧺 pedido já coberto pelo stock (${fmtQty(aloc,q.u)})`};
+    }
+  }
+  const free=stockFreeFor(it.artigo,q.u);
+  if(free>0)return {ok:false,txt:`🧺 há ${fmtQty(free,q.u)} em stock por alocar`};
+  return null;
+}
 /* FIFO: reparte a qtd do lote pelas refeições por ordem de data, cobrindo a
    procura ainda em aberto; sobra fica sem alocação (bolsa comum). Se a procura
    não for numérica e o lote veio de UMA só refeição (fallbackKeys), vai tudo
@@ -3619,9 +3641,13 @@ function shopItemCard(it,mineView,noBadge){
     right=`<button class="cmp-mini cart write-action" onclick="event.stopPropagation();claimItem(${it._id})"><i class="cmp-plus">＋</i>🛒 Carrinho</button>`;
   }
   if(removed)sub=`<div class="cmp-sub alert">⚠️ removido por ${escHtml(it.cfDesc||'?')}${mineView?' — abre para largar':''}</div>`;
+  // Mesma dica de stock da lista da refeição — aqui é onde quem faz as compras
+  // repara que parte (ou tudo) do pedido já está coberto pelo stock.
+  const sh=shopStockHint(it);
+  const hint=sh?`<div class="cmp-hint${sh.ok?' ok':''}">${escHtml(sh.txt)}</div>`:'';
   return `<div class="cmp-item cmp-line cmp-tap${mineView&&it.noCarrinho?' incart':''}${removed?' removed':''}" onclick="openShopItemModal(${it._id})">
     ${check}
-    <div class="cmp-main"><div class="cmp-artigo">${escHtml(it.artigo)}${qtd}</div>${sub}</div>
+    <div class="cmp-main"><div class="cmp-artigo">${escHtml(it.artigo)}${qtd}</div>${hint}${sub}</div>
     ${badge}${right}<span class="cmp-chev-r">›</span>
   </div>`;
 }
@@ -3695,25 +3721,10 @@ function mealShopSection(rd){
     const st=done?''
       :it.tratadoPor?`<span class="msl-st">🛒 ${escHtml(it.tratadoPor)}</span>`
       :'<span class="msl-st falta">falta quem trate</span>';
-    // Dica de stock: se já há stock alocado a ESTA refeição, avisa quanto do
-    // pedido já está coberto (e quanto falta comprar); senão, se houver stock
-    // livre por alocar deste artigo, sugere alocá-lo.
+    // Dica de stock: quanto do pedido já está coberto por stock alocado a esta
+    // refeição (e quanto falta), ou stock livre por alocar. Ver shopStockHint.
     let hint='';
-    if(!done&&!past&&STOCK_TABLE){
-      const q=qtyParse(it.quantidade);
-      if(q){
-        const aloc=mealStockAllocFor(it.artigo,q.u,rd.ref,rd.data);
-        if(aloc>0){
-          const falta=Math.max(0,rnd(q.n-aloc,3));
-          hint=falta>0
-            ?`<div class="msl-hint ok">🧺 ${escHtml(fmtQty(aloc,q.u))} já em stock — falta comprar ${escHtml(fmtQty(falta,q.u))}</div>`
-            :`<div class="msl-hint ok">🧺 pedido já coberto pelo stock (${escHtml(fmtQty(aloc,q.u))})</div>`;
-        }else{
-          const free=stockFreeFor(it.artigo,q.u);
-          if(free>0)hint=`<div class="msl-hint">🧺 há ${escHtml(fmtQty(free,q.u))} em stock por alocar</div>`;
-        }
-      }
-    }
+    if(!done&&!past){const sh=shopStockHint(it);if(sh)hint=`<div class="msl-hint${sh.ok?' ok':''}">${escHtml(sh.txt)}</div>`;}
     return `<div class="msl-it${dim?' msl-dim':''}" onclick="openShopItemModal(${it._id})">
       <span class="msl-art">${escHtml(it.artigo)}${qtdTxt?` <i>${escHtml(qtdTxt)}</i>`:''}${hint}</span>${st}</div>`;
   };
