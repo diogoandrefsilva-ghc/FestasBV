@@ -950,6 +950,14 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 /* Compras de origem — agora só no detalhe do artigo */
 .lote-cmps{margin-top:7px;border-top:1px solid var(--line);padding-top:5px}
 .lote-cmp-row{font-size:12px;color:var(--muted);padding:2px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* Detalhe do lote: compras (esquerda) ↔ pedidos da lista (direita) */
+.lote-cols{display:flex;gap:14px;margin-top:8px;border-top:1px solid var(--line);padding-top:7px}
+.lote-col{flex:1;min-width:0}
+.lote-col:first-child{border-right:1px solid var(--line);padding-right:14px}
+.lote-col-h{font-size:10.5px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;color:var(--faint);margin-bottom:3px}
+.lote-need-row{font-size:12px;color:var(--muted);padding:2px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lote-need-row b{color:var(--ink);font-weight:700}
+.lote-need-row.empty{color:var(--faint);font-style:italic}
 
 /* ═══ CASH-FLOWS — "Mista" (versão C: cabeçalho extrato + cronologia) ═══ */
 .cfc-net{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 16px;margin:0 0 10px}

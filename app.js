@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v79 · 2026-07-24 · Carrinho só com o diferencial: pedidos cobertos pelo stock saem do carrinho para "Cobertos pelo stock" (recolhível)';
+const APP_BUILD = 'v80 · 2026-07-24 · Detalhe do lote: compras à esquerda ↔ pedidos da lista (necessidades por refeição) à direita';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -5207,18 +5207,29 @@ function openLoteModal(id){
   editingLote={artigo:base.artigo,u:base.unidade||'',ids:lotes.map(l=>l._id),totQ,totV,
     alocs:Object.keys(by).sort(destKeyCmp).map(k=>destinoAloc(k,by[k]))};
   document.getElementById('lote-title').textContent='🧺 '+base.artigo;
-  // As compras de origem mostram-se aqui (saíram do cartão do ecrã principal)
+  // As compras de origem (esquerda) — saíram do cartão do ecrã principal
   const comprasRows=lotes.map(l=>{
     const dsp=(DATA.despesas||[]).find(d=>d.compraId===l.compraId);
     const parts=[];
     if(dsp&&dsp.dataDesp)parts.push(fmtDiaMes(dsp.dataDesp));
     parts.push(escHtml(fmtQty(l.qtd,l.unidade)),eur(l.valor));
     if(dsp&&dsp.desc&&dsp.desc!=='Compras')parts.push(escHtml(dsp.desc));
-    return `<div class="lote-cmp-row">🛒 ${parts.join(' · ')}</div>`;
+    return `<div class="lote-cmp-row">${parts.join(' · ')}</div>`;
   }).join('');
+  // As necessidades (direita) — refeições que pedem este artigo na lista de
+  // compras, por ordem de data. Dá contexto para alocar: compras ↔ pedidos.
+  const dem=stockDemandFor(editingLote.artigo,editingLote.u);
+  const needKeys=Object.keys(dem).sort((a,b)=>(a.split('|')[1]).localeCompare(b.split('|')[1])||a.localeCompare(b));
+  const needRows=needKeys.length?needKeys.map(k=>{
+    const a=destinoAloc(k,0);const ic=shopTipoIcon(a.tipo);
+    return `<div class="lote-need-row">${ic} ${escHtml(diaAbrev(a.data)+' '+fmtDiaMes(a.data))} · <b>${escHtml(fmtQty(dem[k],editingLote.u))}</b></div>`;
+  }).join(''):`<div class="lote-need-row empty">— sem pedidos na lista —</div>`;
   document.getElementById('lote-info').innerHTML=
     `Em stock: <b>${escHtml(fmtQty(totQ,editingLote.u))}</b> por <b>${eur(totV)}</b>${lotes.length>1?` · ${lotes.length} compras — a distribuição pelas compras é automática (FIFO)`:''}`+
-    `<div class="lote-cmps">${comprasRows}</div>`;
+    `<div class="lote-cols">
+      <div class="lote-col"><div class="lote-col-h">🛒 Compras</div>${comprasRows}</div>
+      <div class="lote-col"><div class="lote-col-h">📋 Pedidos na lista</div>${needRows}</div>
+    </div>`;
   const canEdit=isAdmin()&&!contasFechadas();
   ['lote-save','lote-addline'].forEach(i=>{document.getElementById(i).style.display=canEdit?'':'none';});
   loteCatFill();
