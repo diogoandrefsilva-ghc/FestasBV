@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v74 · 2026-07-24 · Registar compra: propõe primeiro a refeição para que o artigo foi pedido (antes do FIFO por data)';
+const APP_BUILD = 'v75 · 2026-07-24 · Registar compra: aloca só às refeições pedidas no carrinho; o excedente fica por alocar (bolsa comum)';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -3528,18 +3528,20 @@ function shopStockHint(it){
   if(free>0)return {ok:false,txt:`🧺 há ${fmtQty(free,q.u)} em stock por alocar`};
   return null;
 }
-/* Reparte a qtd do lote pelas refeições que ainda pedem o artigo. Ordem de
-   preenchimento: PRIMEIRO as refeições para que o artigo foi pedido (preferKeys
-   — é lá que deve entrar o que se comprou), só depois as restantes por ordem de
-   data (FIFO). Sobra fica sem alocação (bolsa comum). Sem procura numérica mas
-   pedido para UMA refeição concreta, vai tudo para essa. */
+/* Reparte a qtd do lote pelas refeições que ainda pedem o artigo, cobrindo a
+   procura ainda em aberto (procura da lista menos o que já está alocado).
+   - Com refeições PEDIDAS (preferKeys — as do carrinho desta compra), aloca-se
+     SÓ a essas: o que sobrar fica na bolsa comum, não se espalha por refeições
+     que esta compra não pediu.
+   - Sem refeições pedidas, cobre-se toda a procura por ordem de data (FIFO).
+   A sobra fica sempre sem alocação (bolsa comum). Se o artigo foi pedido para
+   UMA refeição mas sem quantidade numérica na lista, vai tudo para essa. */
 function fifoAlocar(artigo,qtd,u,skipLotId,preferKeys){
   const dem=stockDemandFor(artigo,u);
   const done=stockAllocatedFor(artigo,u,skipLotId);
-  const byDate=Object.keys(dem).sort((a,b)=>(a.split('|')[1]).localeCompare(b.split('|')[1])||a.localeCompare(b));
-  // Refeições pedidas com procura em aberto vêm à cabeça; as outras seguem FIFO
-  const pref=(preferKeys||[]).filter(k=>dem[k]!=null);
-  const keys=pref.concat(byDate.filter(k=>!pref.includes(k)));
+  const byDate=ks=>ks.slice().sort((a,b)=>(a.split('|')[1]).localeCompare(b.split('|')[1])||a.localeCompare(b));
+  const hasPref=!!(preferKeys&&preferKeys.length);
+  const keys=hasPref?byDate(preferKeys.filter(k=>dem[k]!=null)):byDate(Object.keys(dem));
   let rest=qtd;const out=[];
   for(const k of keys){
     if(rest<=0)break;
@@ -3547,7 +3549,10 @@ function fifoAlocar(artigo,qtd,u,skipLotId,preferKeys){
     const take=Math.min(rest,falta);
     if(take>0){const[tipo,data]=k.split('|');out.push({tipo,data,qtd:rnd(take,3)});rest=rnd(rest-take,3);}
   }
-  if(!out.length&&preferKeys&&preferKeys.length===1){
+  // Pedido para UMA refeição SEM procura numérica na lista → vai tudo para lá
+  // (não há falta a calcular; honra-se o pedido). Se a procura existe mas já
+  // está coberta, a sobra fica antes na bolsa comum (não se empilha).
+  if(!out.length&&preferKeys&&preferKeys.length===1&&dem[preferKeys[0]]==null){
     const[tipo,data]=preferKeys[0].split('|');
     out.push({tipo,data,qtd:rnd(qtd,3)});
   }
@@ -4578,8 +4583,9 @@ function openDestPicker(current,cb,title){
 function pickDest(idx){const d=_dpick;closeDestPicker();if(d&&d.cb)d.cb(d.items[idx].value);}
 function closeDestPicker(e){if(e&&e.target&&e.target.id!=='dpick-bg')return;document.getElementById('dpick-bg').classList.remove('show');_dpick=null;}
 /* Propõe uma alocação CONCRETA para um lote de refeição (FIFO nos bastidores):
-   1 destino → destino simples; vários → split; sem procura → refeição pedida
-   (se só uma) ou Gerais. Só para lotes de refeição — os de tipo mantêm o tipo. */
+   um destino que cobre a compra toda → destino simples; vários destinos, OU um
+   destino que não cobre tudo (a sobra fica por alocar) → split; sem procura →
+   refeição pedida (se só uma) ou Gerais. Só para lotes de refeição. */
 function compraProporDestino(l){
   // A procura casa-se pelo nome da LISTA (se a fatura renomeou o artigo, o
   // pedido continua a chamar-se como na lista); um lote já gravado não se
@@ -4587,7 +4593,12 @@ function compraProporDestino(l){
   const q=qtyParse(l.qtd);
   if(q&&q.n>0){
     const al=fifoAlocar(l._listArt||l.artigo,q.n,q.u,l._id!=null?l._id:null,(l.keys&&l.keys.length)?l.keys:null);
-    if(al.length>=2){l.splits=al.map(a=>({destino:alocToDestino(a),qtd:a.qtd}));l.destino='';return;}
+    const totAl=rnd(al.reduce((s,a)=>s+a.qtd,0),3);
+    // Vários destinos, ou um só que não chega para toda a compra → split, para
+    // a sobra ficar mesmo por alocar (a bolsa comum) e não inflar um destino.
+    if(al.length>=2||(al.length===1&&totAl<q.n-0.0005)){
+      l.splits=al.map(a=>({destino:alocToDestino(a),qtd:a.qtd}));l.destino='';return;
+    }
     if(al.length===1){l.destino=alocToDestino(al[0]);l.splits=null;return;}
   }
   l.splits=null;
