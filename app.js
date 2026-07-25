@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v87 · 2026-07-25 · Stock por pedido genérico: marcas (Ruffles/Castelões) agrupam sob "Batatas Fritas"/"Queijos" — AI liga na fatura, aloca-se por marca ou fixa-se marca à refeição';
+const APP_BUILD = 'v88 · 2026-07-25 · Polish: stock aloca por container de refeição · "Por artigo" soma o total por artigo · modal Normalizar mais limpo';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -3446,11 +3446,13 @@ function shopNormRender(){
     `${_normViaAI?'✨ ':''}${_normGroups.length} grupo(s) de grafias parecidas${_normViaAI?' (sugeridos pela AI)':' (deteção básica)'}. Escolhe o nome final de cada um (toca numa grafia ou escreve), tira o visto para deixar como está, e grava.`;
   document.getElementById('shopnorm-list').innerHTML=_normGroups.map((g,i)=>{
     const canK=shopArtKey(g.canon);
-    const chips=g.variants.map(v=>`<button type="button" class="norm-chip${shopArtKey(v.name)===canK?' on':''}" onclick="shopNormPick(${i},this.dataset.n)" data-n="${escHtml(v.name)}">${escHtml(v.name)}${v.count>1?` ·${v.count}`:''}</button>`).join('');
+    const chips=g.variants.map(v=>`<button type="button" class="norm-chip${shopArtKey(v.name)===canK?' on':''}" onclick="shopNormPick(${i},this.dataset.n)" data-n="${escHtml(v.name)}">${escHtml(v.name)}${v.count>1?`<i>·${v.count}</i>`:''}</button>`).join('');
     return `<div class="norm-row${g.apply?'':' off'}">
-      <label class="norm-head"><input type="checkbox" ${g.apply?'checked':''} onchange="_normGroups[${i}].apply=this.checked;shopNormRender()"><span>${g.variants.length} grafias</span></label>
-      <div class="norm-vars">${chips}</div>
-      <input class="norm-canon" value="${escHtml(g.canon)}" oninput="_normGroups[${i}].canon=this.value" placeholder="nome final" ${g.apply?'':'disabled'}>
+      <div class="norm-head">
+        <input type="checkbox" class="norm-cb" ${g.apply?'checked':''} onchange="_normGroups[${i}].apply=this.checked;shopNormRender()">
+        <input class="norm-canon" value="${escHtml(g.canon)}" oninput="_normGroups[${i}].canon=this.value" placeholder="nome final" ${g.apply?'':'disabled'}>
+      </div>
+      <div class="norm-vars"><span class="norm-vars-lbl">juntar</span>${chips}</div>
     </div>`;
   }).join('');
   const save=document.getElementById('shopnorm-save');
@@ -4030,6 +4032,32 @@ function shopGroupedList(list,mineView){
   return '<div class="cmp-list">'+h+'</div>';
 }
 
+// Soma as quantidades de vários pedidos do mesmo artigo, por unidade
+// (ex.: 1 kg + 2 kg → "3 kg"). '' se nenhum tiver quantidade numérica.
+function shopSumQtys(items){
+  const byU={};let hasNum=false;
+  items.forEach(it=>{const q=qtyParse(it.quantidade);if(q){hasNum=true;byU[q.u]=rnd((byU[q.u]||0)+q.n,3);}});
+  if(!hasNum)return '';
+  return Object.keys(byU).map(u=>fmtQty(byU[u],u)).join(' + ');
+}
+/* Lista agrupada por ARTIGO: junta os pedidos do mesmo artigo (ex.: "Chouriços"
+   para dois jantares) sob um cabeçalho com o TOTAL a comprar; cada refeição fica
+   como cartão por baixo (com o seu badge). Um artigo com um só pedido é um cartão
+   simples. Responde à dúvida "quanto preciso ao todo deste artigo". */
+function shopArtGroupedList(list,mineView){
+  const groups={},order=[];
+  list.forEach(it=>{const k=shopArtKey(it.artigo);if(!groups[k]){groups[k]={artigo:it.artigo,items:[]};order.push(k);}groups[k].items.push(it);});
+  let h='';
+  order.forEach(k=>{
+    const g=groups[k];
+    if(g.items.length===1){h+=shopItemCard(g.items[0],mineView,false);return;}
+    const tot=shopSumQtys(g.items);
+    h+=`<div class="cmp-grp-hdr sf cmp-grp-art"><span class="cmp-grp-label">${escHtml(g.artigo)}</span>${tot?`<span class="cmp-qtd-total">${escHtml(tot)}</span>`:''}<span class="cmp-count">${g.items.length}</span></div>`;
+    g.items.forEach(it=>{h+=shopItemCard(it,mineView,false);});
+  });
+  return '<div class="cmp-list">'+h+'</div>';
+}
+
 /* Lista agrupada por CATEGORIA de produto (Sumos, Talho, …): a vista para
    fazer as compras "por corredor". O badge de refeição/tipo mantém-se em cada
    cartão — o cabeçalho diz o produto, não o destino. Sem categoria no fim. */
@@ -4158,7 +4186,7 @@ function renderCompras(){
     :(a,b)=>(ord[a.tipo]-ord[b.tipo])||((a.dataValor||'').localeCompare(b.dataValor||''))||a.artigo.localeCompare(b.artigo,'pt');
   // Por artigo: lista plana com o badge da refeição em cada cartão
   const listOf=(arr,mineView)=>byCat?shopCatGroupedList(arr,mineView)
-    :byArt?'<div class="cmp-list">'+arr.map(it=>shopItemCard(it,mineView,false)).join('')+'</div>'
+    :byArt?shopArtGroupedList(arr,mineView)
     :shopGroupedList(arr,mineView);
   // A COBERTURA precede tudo: um pedido coberto pelo stock não está "em falta"
   // nem "no carrinho" — está satisfeito. O carrinho fica só com o diferencial
@@ -5654,20 +5682,37 @@ function loteRenderAlocs(){
   if(!editingLote)return;
   const canEdit=isAdmin()&&!contasFechadas();
   const unit=editingLote.totQ>0?editingLote.totV/editingLote.totQ:0;
-  // Com várias marcas no guarda-chuva, cada linha pode fixar uma marca (ou
-  // "qualquer marca" = a app escolhe por FIFO). Com uma só marca, não aparece.
+  const dem=stockDemandFor(editingLote.reqName||editingLote.artigo,editingLote.u);
+  // Um container por REFEIÇÃO/destino: fica claro a que refeição vai cada
+  // quantidade. Com várias marcas, cada linha dentro fixa uma marca (ou
+  // "qualquer marca" = FIFO). As alocações continuam num array plano.
+  const groups={},order=[];
+  editingLote.alocs.forEach((a,i)=>{const k=alocToDestino(a);if(!groups[k]){groups[k]={idx:[]};order.push(k);}groups[k].idx.push(i);});
+  order.sort(destKeyCmp);
   const brandSel=(a,i)=>{
     if(!editingLote.multi)return '';
     const opts=`<option value="">qualquer marca</option>`+editingLote.brands.map(b=>`<option value="${escHtml(b)}"${a.marca===b?' selected':''}>${escHtml(b)}</option>`).join('');
     return `<select class="lote-marca" ${canEdit?'':'disabled'} onchange="loteAlocField(${i},'marca',this.value)">${opts}</select>`;
   };
-  document.getElementById('lote-alocs').innerHTML=editingLote.alocs.map((a,i)=>{
-    return `<div class="lote-ln${editingLote.multi?' has-marca':''}">
-      ${destBtnHtml(alocToDestino(a),`loteDestPick(${i})`,!canEdit)}
-      <input type="number" step="any" min="0" inputmode="decimal" ${canEdit?'':'disabled'} value="${a.qtd||''}" placeholder="qtd" onchange="loteAlocField(${i},'qtd',this.value)">
-      <span class="lote-val">${eur(rnd(unit*(+a.qtd||0),2))}</span>
-      ${canEdit?`<button class="cmp-ln-del" title="Remover" onclick="loteDelAloc(${i})">✕</button>`:''}
-      ${brandSel(a,i)}
+  document.getElementById('lote-alocs').innerHTML=order.map(k=>{
+    const idx=groups[k].idx;
+    const a0=destinoAloc(k,0);const meal=alocIsMeal(a0);
+    const lbl=meal?`${diaAbrev(a0.data)} ${fmtDiaMes(a0.data)}`:a0.tipo;
+    const need=dem[k];
+    const rows=idx.map(i=>{const a=editingLote.alocs[i];
+      return `<div class="lote-aloc-row">
+        ${brandSel(a,i)}
+        <input type="number" step="any" min="0" inputmode="decimal" ${canEdit?'':'disabled'} value="${a.qtd||''}" placeholder="qtd" onchange="loteAlocField(${i},'qtd',this.value)">
+        <span class="lote-val">${eur(rnd(unit*(+a.qtd||0),2))}</span>
+        ${canEdit?`<button class="cmp-ln-del" title="Remover" onclick="loteDelAloc(${i})">✕</button>`:''}
+      </div>`;}).join('');
+    return `<div class="lote-dest">
+      <div class="lote-dest-h">
+        <button class="lote-dest-name" ${canEdit?'':'disabled'} onclick="loteGroupDest(${idx[0]})">${shopTipoIcon(a0.tipo)} ${escHtml(lbl)}${canEdit?' <i class="lote-dest-ed">▾</i>':''}</button>
+        ${need>0.0005?`<span class="lote-dest-need">precisa ${escHtml(fmtQty(need,editingLote.u))}</span>`:''}
+      </div>
+      ${rows}
+      ${canEdit&&editingLote.multi?`<button class="lote-addmarca" onclick="loteAddToGroup(${idx[0]})">＋ marca</button>`:''}
     </div>`;
   }).join('')||'<div class="empty sf" style="margin-top:8px">Sem alocações — está tudo na bolsa comum.</div>';
   const tot=editingLote.alocs.reduce((s,a)=>s+(+a.qtd||0),0);
@@ -5688,6 +5733,24 @@ function loteDestPick(i){
   if(!isAdmin())return;
   const a=editingLote&&editingLote.alocs[i];if(!a)return;
   openDestPicker(alocToDestino(a),v=>loteAlocField(i,'ref',v),'Alocar a');
+}
+// Muda a refeição de TODO o container (todas as linhas com o mesmo destino)
+function loteGroupDest(i){
+  if(!isAdmin()||!editingLote)return;
+  const a=editingLote.alocs[i];if(!a)return;
+  const oldK=alocToDestino(a);
+  openDestPicker(oldK,v=>{
+    const d=destinoAloc(v,0);
+    editingLote.alocs.forEach(x=>{if(alocToDestino(x)===oldK){x.tipo=d?d.tipo:v;x.data=d?d.data:null;}});
+    loteRenderAlocs();
+  },'Alocar a');
+}
+// Acrescenta uma linha (outra marca) ao mesmo destino do container
+function loteAddToGroup(i){
+  if(!isAdmin()||!editingLote)return;
+  const a=editingLote.alocs[i];if(!a)return;
+  editingLote.alocs.push({tipo:a.tipo,data:a.data,qtd:0,marca:''});
+  loteRenderAlocs();
 }
 /* Sugestão para uma linha de alocação NOVA: a próxima refeição que ainda pede
    este artigo na lista de compras (procura por satisfazer), por ordem de data,

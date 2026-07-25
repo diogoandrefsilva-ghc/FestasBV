@@ -812,6 +812,9 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 /* Label do cabeçalho num span próprio: nunca parte para 2 linhas — encolhe com
    reticências se não couber (o essencial — refeição + data — fica no início) */
 .cmp-grp-label{flex:0 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* Total por artigo no cabeçalho da vista "Por artigo" (ex.: "3 kg") */
+.cmp-qtd-total{flex:0 0 auto;font-family:-apple-system,sans-serif;font-size:11.5px;font-weight:700;letter-spacing:0;text-transform:none;color:var(--green);background:rgba(30,122,77,.1);border:1px solid rgba(30,122,77,.28);border-radius:20px;padding:1px 9px;white-space:nowrap}
+#view-compras .cmp-grp-art .cmp-qtd-total{transform:rotate(-2deg)}
 /* Lista de compras dentro do cartão da refeição (tab Refeições) */
 .msl{cursor:default}
 .msl-det{margin-top:0;border-top:none;padding-top:0}
@@ -859,10 +862,20 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .lote-ln{display:flex;align-items:center;gap:7px;margin-top:8px}
 .lote-ln select{flex:1;min-width:0;margin:0}
 .lote-ln input{flex:0 0 74px;margin:0;text-align:right}
-/* Seletor de marca por linha de alocação (guarda-chuva com várias marcas) —
-   desce para uma 2.ª linha da própria alocação */
-.lote-ln.has-marca{flex-wrap:wrap}
-.lote-marca{flex:1 1 100%!important;order:5;margin:2px 0 0!important;height:34px;font-size:12.5px;border:1px solid var(--line);border-radius:8px;background:#FFFDF6;color:var(--muted);padding:0 8px}
+/* Container por refeição no detalhe do stock: fica claro a que refeição vai
+   cada quantidade; com várias marcas, uma linha por marca lá dentro */
+.lote-dest{border:1px solid var(--line);border-radius:11px;padding:8px 10px 9px;margin-top:9px;background:var(--panel2)}
+.lote-dest-h{display:flex;align-items:center;gap:8px}
+.lote-dest-name{flex:1;min-width:0;display:flex;align-items:center;gap:6px;text-align:left;background:transparent;border:none;font-size:14px;font-weight:700;color:var(--ink);padding:2px 0;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lote-dest-name:disabled{cursor:default}
+.lote-dest-ed{font-style:normal;color:var(--faint);font-size:12px;font-weight:400}
+.lote-dest-need{flex:0 0 auto;font-size:11px;font-weight:700;color:var(--gold);background:rgba(168,123,20,.14);border-radius:20px;padding:2px 9px;white-space:nowrap}
+.lote-aloc-row{display:flex;align-items:center;gap:7px;margin-top:6px}
+.lote-aloc-row input[type=number]{flex:0 0 82px;height:38px;margin:0;text-align:right;padding:0 8px;font-size:13px;border:1px solid var(--line);border-radius:8px;background:#FFFDF6;color:var(--ink)}
+.lote-aloc-row .lote-val{margin-left:auto;font-size:12.5px;color:var(--muted);font-weight:600;white-space:nowrap}
+.lote-marca{flex:1 1 auto;min-width:0;height:38px;margin:0;font-size:12.5px;border:1px solid var(--line);border-radius:8px;background:#FFFDF6;color:var(--ink);padding:0 8px}
+.lote-addmarca{margin-top:7px;background:transparent;border:1px dashed var(--line);border-radius:8px;color:var(--muted);font-size:12px;font-weight:600;padding:6px 11px;cursor:pointer}
+.lote-addmarca:active{transform:scale(.97)}
 /* Marcas listadas no cartão de stock (Ruffles · Lays) */
 .stk-marcas{font-size:11.5px;color:var(--muted);margin:1px 0 5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 /* Ligação manual "pertence a" no registo da compra (lotes livres) */
@@ -1061,16 +1074,18 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 #shop-norm-btn{background:var(--panel2);border:1px solid var(--line);color:var(--muted);white-space:nowrap}
 
 /* Normalizar artigos — cada grupo de grafias parecidas */
-.norm-row{border:1px solid var(--line);border-radius:11px;padding:9px 11px;margin-top:8px;background:var(--panel2)}
+.norm-row{border:1px solid var(--line);border-radius:12px;padding:11px 12px;margin-top:9px;background:var(--panel)}
 .norm-row.off{opacity:.5}
-.norm-head{display:flex;align-items:center;gap:7px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);cursor:pointer;user-select:none}
-.norm-head input{width:16px;height:16px;flex:0 0 auto}
-.norm-vars{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
-.norm-chip{border:1.5px solid var(--line);background:#FFFDF6;color:var(--muted);font-size:12.5px;font-weight:600;border-radius:16px;padding:5px 11px;cursor:pointer;transition:.12s}
+.norm-head{display:flex;align-items:center;gap:11px}
+.norm-cb{width:22px;height:22px;flex:0 0 auto;accent-color:var(--barrete);cursor:pointer}
+.norm-canon{flex:1;min-width:0;box-sizing:border-box;font-size:15px;font-weight:700;padding:9px 11px;border:1.5px solid var(--line);border-radius:9px;background:#FFFDF6;color:var(--ink)}
+.norm-canon:disabled{background:var(--panel2);color:var(--faint)}
+.norm-vars{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:9px;padding-left:33px}
+.norm-vars-lbl{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--faint);margin-right:1px}
+.norm-chip{display:inline-flex;align-items:center;gap:3px;border:1.5px solid var(--line);background:var(--panel2);color:var(--muted);font-size:12.5px;font-weight:600;border-radius:16px;padding:5px 11px;cursor:pointer;transition:.12s}
 .norm-chip:active{transform:scale(.95)}
 .norm-chip.on{border-color:var(--barrete);background:rgba(30,122,77,.12);color:var(--ink)}
-.norm-canon{width:100%;box-sizing:border-box;font-size:14px;font-weight:600;padding:8px 10px;border:1px solid var(--line);border-radius:9px;background:#FFFDF6;color:var(--ink)}
-.norm-canon:disabled{background:var(--panel);color:var(--faint)}
+.norm-chip i{font-style:normal;font-weight:700;opacity:.6;font-size:11px}
 
 /* ═══════════════════════════════════════════════════════════════════════
    REDESIGN Compras & Stock — VARIANTE A · "Talão de Mercado"
