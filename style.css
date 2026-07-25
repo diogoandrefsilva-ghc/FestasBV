@@ -846,14 +846,18 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .cmp-hint.alloc{font-size:11px}
 .msl-hint.alloc:active,.cmp-hint.alloc:active{background:rgba(30,122,77,.16)}
 /* Stock: chips das alocações nos cartões de lote (separador Compras) */
-/* Chips de filtro por estado no topo do Stock — ícone + legenda pequenina,
-   para caberem todos sem scroll horizontal */
-.stk-filter{flex-wrap:wrap;gap:4px;margin-bottom:4px}
+/* Chips de filtro por estado no topo do Stock — ícone + legenda pequenina.
+   SEMPRE numa linha só, a ocupar a largura toda: "Tudo" fica do tamanho do
+   seu texto e os três estados repartem o resto em partes iguais (flex:1 1 0
+   → a soma é exatamente a linha, nunca transborda nem passa para baixo). As
+   fontes são fluidas (vw travado ao máximo) para o texto encolher o
+   suficiente em ecrãs estreitos em vez de quebrar. */
+.stk-filter{flex-wrap:nowrap;gap:4px;margin-bottom:4px}
 .stk-legenda{font-size:10.5px;line-height:1.4;margin-bottom:8px}
-.stk-filter .sd-chip{flex-direction:column;gap:2px;padding:6px 9px 7px;line-height:1;min-height:42px;justify-content:center}
-.stk-filter .sd-chip i{font-style:normal;font-size:15px;line-height:1.2}
-.stk-filter .sd-chip small{font-size:8.5px;font-weight:700;letter-spacing:0;text-transform:uppercase;color:inherit}
-.stk-filter .sd-chip.txt{font-size:13px;padding:6px 12px 7px}
+.stk-filter .sd-chip{flex:1 1 0;min-width:0;overflow:hidden;flex-direction:column;gap:2px;padding:6px 4px 7px;line-height:1;min-height:42px;justify-content:center}
+.stk-filter .sd-chip i{font-style:normal;font-size:min(15px,3.6vw);line-height:1.2}
+.stk-filter .sd-chip small{font-size:min(8.5px,2.2vw);font-weight:700;letter-spacing:0;text-transform:uppercase;color:inherit;white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+.stk-filter .sd-chip.txt{flex:0 1 auto;font-size:min(13px,3vw);padding:6px 10px 7px;white-space:nowrap}
 /* Estado sem artigos: continua lá (o filtro é a chave de leitura) mas apagado */
 .stk-filter .sd-chip.vazio{opacity:.45}
 /* Cartão do Stock: toca-se no artigo para alocar — o chevron é a única pista */
@@ -1185,7 +1189,7 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 #view-compras .cmp-sort .sd-chip{flex:1 1 0;min-width:0;justify-content:center;overflow:hidden;font-size:min(13px,2.6vw);gap:.3em;padding:.5em .6em}
 /* Nos filtros do Stock (chips ao alto) o furo caía em cima do emoji —
    ficam etiquetas kraft lisas, sem furo e com canto simétrico */
-#view-stock .stk-filter .sd-chip{padding:6px 10px 7px;border-radius:11px}
+#view-stock .stk-filter .sd-chip{border-radius:11px}
 #view-stock .stk-filter .sd-chip::before{display:none}
 
 /* ── A lista é UM talão: papel contínuo com perfuração no topo ── */

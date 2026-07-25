@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v93 · 2026-07-25 · Stock: os 3 filtros de estado aparecem sempre, com a contagem de artigos (antes sumiam com o stock todo no mesmo estado)';
+const APP_BUILD = 'v94 · 2026-07-25 · Stock: filtros numa linha só a ocupar o ecrã todo (fonte fluida) e por ordem Consumido · Alocado · Disponível';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -4406,13 +4406,14 @@ function renderStock(){
   // Chips de filtro por estado: os três aparecem SEMPRE (com a contagem de
   // artigos), mesmo a zero — são a chave de leitura do separador, não podem
   // sumir só porque o stock está todo no mesmo estado
-  const FILTROS=[['disponivel','🧺','Disponível'],['alocado','🗓️','Alocado'],['consumido','🍽️','Consumido']]
+  // Ordem: do que já foi gasto para o que ainda está por gastar
+  const FILTROS=[['consumido','🍽️','Consumido'],['alocado','🗓️','Alocado'],['disponivel','🧺','Disponível']]
     .map(f=>f.concat(arr.filter(g=>g.estados.has(f[0])).length));
   h+=`<div class="cmp-sort stk-filter">
     <span class="sd-chip txt${STOCK_FILTER==='all'?' on':''}" onclick="setStockFilter('all')">Tudo</span>
     ${FILTROS.map(([s,ic,lbl,n])=>`<span class="sd-chip${STOCK_FILTER===s?' on':''}${n?'':' vazio'}" onclick="setStockFilter('${s}')"><i>${ic}</i><small>${lbl} ${n}</small></span>`).join('')}
   </div>
-  <div class="note stk-legenda">🧺 por alocar · 🗓️ alocado a refeições de hoje ou dos próximos dias · 🍽️ consumido em refeições já passadas</div>`;
+  <div class="note stk-legenda">🍽️ consumido em refeições já passadas · 🗓️ alocado a refeições de hoje ou dos próximos dias · 🧺 ainda por alocar</div>`;
   const vis=STOCK_FILTER==='all'?arr:arr.filter(g=>g.estados.has(STOCK_FILTER));
   if(!vis.length)h+=`<div class="empty sf">${STOCK_FILTER==='disponivel'?'Não há stock por alocar — está tudo entregue a refeições.':STOCK_FILTER==='consumido'?'Ainda não há stock consumido.':'Nada alocado a refeições de hoje ou dos próximos dias.'}</div>`;
   else if(!CATS_TABLE)h+=vis.map(g=>stockArticleCard(g)).join('');
