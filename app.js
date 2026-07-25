@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v84 · 2026-07-24 · Shop List sem separador "Cobertos pelo stock": o que está coberto sai da lista de compras (vê-se na refeição/stock)';
+const APP_BUILD = 'v85 · 2026-07-25 · Shop List: botão 🔤 Normalizar (admin) junta grafias do mesmo artigo (chouriço/chouriços, 1000ml/1L) na lista e no stock';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -3311,6 +3311,146 @@ async function catSugApply(){
   btn.disabled=false;
 }
 
+/* ═══ NORMALIZAR ARTIGOS (Shop List, só admin) ═══
+   Diferentes pessoas escrevem o mesmo produto de formas diferentes
+   ("Chouriço"/"Chouriços", "Polpa Tomate 1000ml"/"Polpa Tomate 1L"). A app já
+   trata maiúsculas/acentos como iguais (shopArtKey), mas plurais, unidades e
+   pontuação continuam a contar como artigos distintos — o que parte a soma da
+   procura por refeição e a cobertura pelo stock. Este botão agrupa por uma
+   chave "solta" (singular + unidades canónicas + sem pontuação), mostra os
+   grupos com >1 grafia e deixa o admin escolher o nome final; ao aplicar,
+   reescreve o nome em todos os pedidos da lista e nos lotes de stock (artigo e
+   lista_artigo) — a partir daí somam e casam como um só. É puro cliente (offline,
+   sem AI e sem redeploy) — a revisão do admin é a rede de segurança. */
+let _normGroups=null;   // [{lk,variants:[{name,count}],canon,apply}]
+// Chave "solta" para agrupar grafias do mesmo produto: sem acentos/maiúsculas,
+// unidades embutidas em forma canónica (1000ml→1l, 500gr→500g), sem pontuação e
+// com plurais simples reduzidos ao singular (batatas→batata, chouriços→chouriço).
+function shopNormLoose(s){
+  let t=(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  t=t.replace(/(\d+(?:[.,]\d+)?)\s*(mililitros?|litros?|gramas?|ml|cl|kg|lts?|grs?|l|g)\b/g,(m,num,u)=>{
+    let n=parseFloat(num.replace(',','.'));
+    if(/^(ml|mililitro)/.test(u)){if(n>=1000){n/=1000;u='l';}else u='ml';}
+    else if(u==='cl'){n=n*10;if(n>=1000){n/=1000;u='l';}else u='ml';}
+    else if(/^(l|lt|litro)/.test(u))u='l';
+    else if(/^(g|gr|grama)/.test(u)){if(n>=1000){n/=1000;u='kg';}else u='g';}
+    else if(u==='kg')u='kg';
+    return String(Math.round(n*1000)/1000)+u;
+  });
+  return t.replace(/[^a-z0-9]+/g,' ').trim()
+    .split(' ').map(w=>w.length>3&&w.endsWith('s')?w.slice(0,-1):w).join(' ');
+}
+// Agrupa os nomes usados (lista + stock) pela chave solta. Uma "grafia" =
+// nome distinto para a app (shopArtKey); só interessam grupos com ≥2 grafias.
+function shopNormGroups(){
+  const map={};   // lk → { ak → {name,count} }
+  const push=nome=>{
+    const nm=(nome||'').trim();if(!nm)return;
+    const lk=shopNormLoose(nm);if(!lk)return;
+    const ak=shopArtKey(nm);
+    const g=(map[lk]=map[lk]||{});
+    if(!g[ak])g[ak]={name:nm,count:0};
+    g[ak].count++;
+    // Mostra a grafia mais "completa" (mais longa) como representante da variante
+    if(nm.length>g[ak].name.length)g[ak].name=nm;
+  };
+  shopArr().forEach(it=>{if(!shopIsRemoved(it))push(it.artigo);});
+  stockArr().forEach(l=>{if(stockBacked(l))push(l.artigo);});
+  const groups=[];
+  Object.keys(map).forEach(lk=>{
+    const vs=Object.values(map[lk]);
+    if(vs.length<2)return;
+    vs.sort((a,b)=>b.count-a.count||b.name.length-a.name.length);
+    groups.push({lk,variants:vs,canon:vs[0].name,apply:true});
+  });
+  // Mais grafias primeiro (os mais "sujos" ao cimo)
+  groups.sort((a,b)=>b.variants.length-a.variants.length||b.variants.reduce((s,v)=>s+v.count,0)-a.variants.reduce((s,v)=>s+v.count,0));
+  return groups;
+}
+function shopNormOpen(){
+  if(!isAdmin()){toast('Só o admin normaliza artigos','bad');return;}
+  if(contasFechadas()){toast('Contas fechadas','bad');return;}
+  _normGroups=shopNormGroups();
+  if(!_normGroups.length){toast('Nada a normalizar — as grafias já batem certo 🎉','ok');_normGroups=null;return;}
+  shopNormRender();
+  document.getElementById('shopnorm-bg').classList.add('show');
+  document.body.classList.add('no-scroll');
+}
+function shopNormRender(){
+  if(!_normGroups)return;
+  const nOn=_normGroups.filter(g=>g.apply).length;
+  document.getElementById('shopnorm-info').textContent=
+    `${_normGroups.length} grupo(s) de grafias parecidas. Escolhe o nome final de cada um (toca numa grafia ou escreve), tira o visto para deixar como está, e grava.`;
+  document.getElementById('shopnorm-list').innerHTML=_normGroups.map((g,i)=>{
+    const canK=shopArtKey(g.canon);
+    const chips=g.variants.map(v=>`<button type="button" class="norm-chip${shopArtKey(v.name)===canK?' on':''}" onclick="shopNormPick(${i},this.dataset.n)" data-n="${escHtml(v.name)}">${escHtml(v.name)}${v.count>1?` ·${v.count}`:''}</button>`).join('');
+    return `<div class="norm-row${g.apply?'':' off'}">
+      <label class="norm-head"><input type="checkbox" ${g.apply?'checked':''} onchange="_normGroups[${i}].apply=this.checked;shopNormRender()"><span>${g.variants.length} grafias</span></label>
+      <div class="norm-vars">${chips}</div>
+      <input class="norm-canon" value="${escHtml(g.canon)}" oninput="_normGroups[${i}].canon=this.value" placeholder="nome final" ${g.apply?'':'disabled'}>
+    </div>`;
+  }).join('');
+  const save=document.getElementById('shopnorm-save');
+  if(save){save.disabled=!nOn;save.textContent=nOn?`Normalizar ${nOn} grupo(s)`:'Normalizar';}
+}
+function shopNormPick(i,name){
+  if(!_normGroups||!_normGroups[i])return;
+  _normGroups[i].canon=name;
+  shopNormRender();
+}
+function shopNormClose(){
+  document.getElementById('shopnorm-bg').classList.remove('show');
+  document.body.classList.remove('no-scroll');
+  _normGroups=null;
+}
+async function shopNormApply(){
+  if(!_normGroups)return;
+  if(!isAdmin()){toast('Só o admin normaliza artigos','bad');return;}
+  if(contasFechadas()){toast('Contas fechadas','bad');return;}
+  const shopTo={};                 // shoplist _id → nome final
+  const loteArt=[],loteList=[];    // {id,l,canon}
+  let nGroups=0;
+  _normGroups.forEach(g=>{
+    const canon=(g.canon||'').trim();
+    if(!g.apply||!canon)return;
+    const aks=new Set(g.variants.map(v=>shopArtKey(v.name)));
+    let touched=false;
+    shopArr().forEach(it=>{
+      if(it._id==null||shopIsRemoved(it))return;
+      if(aks.has(shopArtKey(it.artigo))&&it.artigo!==canon){shopTo[it._id]=canon;touched=true;}
+    });
+    stockArr().forEach(l=>{
+      if(l._id==null)return;
+      if(aks.has(shopArtKey(l.artigo))&&l.artigo!==canon){loteArt.push({id:l._id,l,canon});touched=true;}
+      if(l._listArt&&aks.has(shopArtKey(l._listArt))&&l._listArt!==canon){loteList.push({id:l._id,l,canon});touched=true;}
+    });
+    if(touched)nGroups++;
+  });
+  const ids=Object.keys(shopTo);
+  if(!ids.length&&!loteArt.length&&!loteList.length){toast('Nada mudou — os nomes finais já estavam aplicados','ok');shopNormClose();return;}
+  const btn=document.getElementById('shopnorm-save');if(btn)btn.disabled=true;
+  setSync('load','a guardar…');
+  try{
+    // Shoplist: um PATCH por nome final (agrupa os ids que vão para o mesmo nome)
+    const byName={};ids.forEach(id=>{(byName[shopTo[id]]=byName[shopTo[id]]||[]).push(id);});
+    let nItems=0;
+    for(const name in byName){
+      const grp=byName[name];
+      await queueWrite(()=>sbReq('PATCH',`shoplist?id=in.(${grp.join(',')})`,{artigo:name}));
+      grp.forEach(id=>{const it=shopArr().find(x=>x._id===+id);if(it)it.artigo=name;});
+      nItems+=grp.length;
+    }
+    for(const p of loteArt){await queueWrite(()=>sbReq('PATCH',`stock_lotes?id=eq.${p.id}`,{artigo:p.canon}));p.l.artigo=p.canon;}
+    for(const p of loteList){await queueWrite(()=>sbReq('PATCH',`stock_lotes?id=eq.${p.id}`,{lista_artigo:p.canon}));p.l._listArt=p.canon;}
+    syncMirror();marcaGuardado();
+    if(CALC)CALC=calcular(JSON.parse(JSON.stringify(DATA)));
+    shopNormClose();
+    toast(`${nItems} artigo(s) normalizados em ${nGroups} grupo(s) ✓`,'ok');
+    renderShopViews();
+    if(STOCK_TABLE&&TAB==='stock')renderStock();
+  }catch(e){setSync('err','erro ao guardar');toast(permErrorMsg(e),'bad');if(btn)btn.disabled=false;}
+}
+
 /* ═══ COMPRAS / SHOPLIST ═══
    Lista partilhada de artigos em falta. Fluxo:
    1) alguém adiciona artigos (artigo, qtd, tipo, e se Almoço/Jantar a refeição alvo)
@@ -3970,7 +4110,10 @@ function renderCompras(){
   let h='';
   h+=`<div class="cmp-hdr">
     <div class="cmp-hdr-title sf">🛒 Shop List</div>
-    <button class="btn prim write-action" onclick="openShopItemModal()" ${canW?'':'disabled'}>＋ Artigo</button>
+    <div class="cmp-hdr-acts">
+      ${isAdmin()?`<button class="btn write-action" id="shop-norm-btn" onclick="shopNormOpen()" title="Juntar grafias do mesmo artigo (chouriço/chouriços…)">🔤 Normalizar</button>`:''}
+      <button class="btn prim write-action" onclick="openShopItemModal()" ${canW?'':'disabled'}>＋ Artigo</button>
+    </div>
   </div>`;
 
   // ── Sub-separadores: Em falta · O Meu Carrinho · Histórico ──

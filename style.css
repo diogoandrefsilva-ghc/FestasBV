@@ -1047,6 +1047,22 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .catsug-art{flex:1;font-size:13px;min-width:0;overflow-wrap:anywhere}
 .catsug-row select{flex:0 0 46%;max-width:46%;margin-top:0}
 
+/* Cabeçalho da Shop List com duas ações (Normalizar + ＋ Artigo) */
+.cmp-hdr-acts{display:flex;align-items:center;gap:8px;flex:0 0 auto}
+#shop-norm-btn{background:var(--panel2);border:1px solid var(--line);color:var(--muted);white-space:nowrap}
+
+/* Normalizar artigos — cada grupo de grafias parecidas */
+.norm-row{border:1px solid var(--line);border-radius:11px;padding:9px 11px;margin-top:8px;background:var(--panel2)}
+.norm-row.off{opacity:.5}
+.norm-head{display:flex;align-items:center;gap:7px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);cursor:pointer;user-select:none}
+.norm-head input{width:16px;height:16px;flex:0 0 auto}
+.norm-vars{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
+.norm-chip{border:1.5px solid var(--line);background:#FFFDF6;color:var(--muted);font-size:12.5px;font-weight:600;border-radius:16px;padding:5px 11px;cursor:pointer;transition:.12s}
+.norm-chip:active{transform:scale(.95)}
+.norm-chip.on{border-color:var(--barrete);background:rgba(30,122,77,.12);color:var(--ink)}
+.norm-canon{width:100%;box-sizing:border-box;font-size:14px;font-weight:600;padding:8px 10px;border:1px solid var(--line);border-radius:9px;background:#FFFDF6;color:var(--ink)}
+.norm-canon:disabled{background:var(--panel);color:var(--faint)}
+
 /* ═══════════════════════════════════════════════════════════════════════
    REDESIGN Compras & Stock — VARIANTE A · "Talão de Mercado"
    A lista é um talão de mercearia: papel-sal com perfuração, linhas
