@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v91 · 2026-07-25 · Detalhe do stock numa linha só: refeição/marca · qtd · € · ✕ (marca passou a bottom-sheet), lista corrida quando há uma marca só';
+const APP_BUILD = 'v92 · 2026-07-25 · Stock: filtros por estado (Disponível · Alocado · Consumido) em vez de tipologia — consumido = alocado a refeição já passada';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -4330,37 +4330,61 @@ function stockDestChip(k,qtd,u){
   const meal=alocIsMeal(a);
   const ic=shopTipoIcon(a.tipo);
   const lbl=meal?`${diaAbrev(a.data)} ${fmtDiaMes(a.data)}`:a.tipo;
-  return `<span class="stk-chip">${ic} ${escHtml(lbl)} · ${escHtml(fmtQty(qtd,u))}</span>`;
+  const cls=stockDestEstado(k)==='consumido'?' usado':'';
+  return `<span class="stk-chip${cls}">${ic} ${escHtml(lbl)} · ${escHtml(fmtQty(qtd,u))}</span>`;
 }
 // Cartão minimal: nome + chips (refeições por ordem do calendário, com a qtd
-// à frente; a sobra ganha o badge "a sobrar"). As compras de origem e o total
+// à frente; a sobra ganha o badge "disponível"). As compras de origem e o total
 // em € vivem no detalhe — toca-se no cartão para o abrir.
 function stockArticleCard(g){
   const ag=stockAggAlocs(g.lotes);
-  const dests=Object.keys(ag.dest).sort(destKeyCmp);
+  // Com um estado escolhido nos chips de filtro, o cartão mostra só a parte do
+  // artigo que está nesse estado (o resto vê-se em "Tudo")
+  const st=STOCK_FILTER;
+  const dests=Object.keys(ag.dest).filter(k=>st==='all'||stockDestEstado(k)===st).sort(destKeyCmp);
   const chips=dests.map(k=>stockDestChip(k,ag.dest[k].qtd,ag.u)).join('')
-    +(ag.freeQ>0?`<span class="stk-chip livre">🧺 a sobrar · ${escHtml(fmtQty(ag.freeQ,ag.u))}</span>`:'');
+    +((ag.freeQ>0&&(st==='all'||st==='disponivel'))?`<span class="stk-chip livre">🧺 disponível · ${escHtml(fmtQty(ag.freeQ,ag.u))}</span>`:'');
   // Marcas debaixo do guarda-chuva (Ruffles · Lays) — só quando diferem do nome
   const marcas=(g.marcas&&g.marcas.length)?`<div class="stk-marcas">${g.marcas.map(m=>escHtml(m)).join(' · ')}</div>`:'';
-  return `<div class="stk-card stk-tap" onclick="openLoteModal(${g.lotes[0]._id})">
+  // Com filtro de estado abre o lote que tem essa parte (não o primeiro do grupo)
+  const tgt=(st==='all'?null:g.lotes.find(l=>stockGroupEstados(stockAggAlocs([l])).has(st)))||g.lotes[0];
+  return `<div class="stk-card stk-tap" onclick="openLoteModal(${tgt._id})">
     <div class="stk-card-top"><b>${escHtml(g.artigo)}</b><span class="stk-chev">›</span></div>
     ${marcas}
     <div class="stk-chips">${chips}</div>
   </div>`;
 }
-// Filtro do separador Stock por tipologia de destino ('all' | 'Gerais' | …).
-// Só vive na sessão — ao reabrir a app volta a "Tudo".
+// Filtro do separador Stock por ESTADO ('all' | 'disponivel' | 'alocado' |
+// 'consumido'). Só vive na sessão — ao reabrir a app volta a "Tudo".
 let STOCK_FILTER='all';
 // Containers de categoria abertos/fechados (só na sessão; abertos por defeito)
 const STOCK_CAT_OPEN={};
 function setStockFilter(f){STOCK_FILTER=f;renderStock();}
-// Tipologias em que um artigo toca: destinos das alocações + bolsa comum
-// (o que está por alocar cai no pool Gerais)
-function stockGroupTipos(ag){
+/* Estado de um destino de alocação — derivado, nunca gravado (o admin pode
+   sempre reabrir o lote e mudar a alocação, e o estado acompanha):
+   · 'disponivel' — sem destino, ainda por alocar a qualquer refeição;
+   · 'alocado'    — refeição de hoje ou de um dia futuro (ou tipo puro
+                    Bebidas/Cerveja/Gerais, que não tem data);
+   · 'consumido'  — refeição de um dia já passado. */
+function stockDestEstado(k){
+  const a=destinoAloc(k,0);
+  if(!a)return 'disponivel';
+  if(!alocIsMeal(a))return 'alocado';
+  return a.data<hojeISO()?'consumido':'alocado';
+}
+// Estados em que um artigo toca: destinos das alocações + o que está por alocar
+function stockGroupEstados(ag){
   const s=new Set();
-  Object.keys(ag.dest).forEach(k=>{const a=destinoAloc(k,0);if(a)s.add(a.tipo);});
-  if(ag.freeQ>0)s.add('Gerais');
+  Object.keys(ag.dest).forEach(k=>{if(ag.dest[k].qtd>0)s.add(stockDestEstado(k));});
+  if(ag.freeQ>0)s.add('disponivel');
   return s;
+}
+// € do artigo dentro de um estado (para os totais dos containers de categoria)
+function stockEstadoVal(ag,st){
+  if(st==='all')return ag.totV;
+  let v=st==='disponivel'?ag.freeV:0;
+  Object.keys(ag.dest).forEach(k=>{if(stockDestEstado(k)===st)v=rnd(v+ag.dest[k].val,2);});
+  return rnd(v,2);
 }
 function renderStock(){
   const el=document.getElementById('view-stock');if(!el||!DATA)return;
@@ -4371,7 +4395,7 @@ function renderStock(){
   // Fritas" caem num só cartão; as marcas ficam listadas lá dentro.
   lots.forEach(l=>{const rn=loteReqArtigo(l);const k=shopArtKey(rn);(groups[k]=groups[k]||{artigo:rn,lotes:[]}).lotes.push(l);});
   const arr=Object.values(groups).sort((a,b)=>a.artigo.localeCompare(b.artigo,'pt'))
-    .map(g=>Object.assign(g,{tipos:stockGroupTipos(stockAggAlocs(g.lotes)),marcas:[...new Set(g.lotes.map(l=>l.artigo))].filter(m=>!shopSameArtigo(m,g.artigo))}));
+    .map(g=>Object.assign(g,{estados:stockGroupEstados(stockAggAlocs(g.lotes)),marcas:[...new Set(g.lotes.map(l=>l.artigo))].filter(m=>!shopSameArtigo(m,g.artigo))}));
   const canEdit=isAdmin();
   // ✨: pedir à AI categorias para o que ainda não tem (só admin, com migração)
   const aiBtn=(CATS_TABLE&&canEdit&&catNamesPorCategorizar().length)
@@ -4379,15 +4403,16 @@ function renderStock(){
   let h=`<div class="cmp-hdr"><div class="cmp-hdr-title sf">🧺 Gestão de Stock</div>${aiBtn}</div>`;
   h+=`<div class="note" style="margin-top:2px;margin-bottom:8px">${canEdit?'Toca num artigo para o alocar às refeições e categorias — as contas recalculam sozinhas.':'Toca num artigo para ver como está alocado às refeições e categorias.'}</div>`;
   if(!arr.length){el.innerHTML=h+'<div class="empty sf">Ainda não há stock. Regista uma compra itemizada ou importa uma fatura.</div>';return;}
-  // Chips de filtro: ícones abreviados, só as tipologias com artigos
-  const FILTROS=[['Gerais','🧾'],['Bebidas','🥤'],['Cerveja','🍺'],['Almoço','☀️'],['Jantar','🌙']].filter(([t])=>arr.some(g=>g.tipos.has(t)));
-  if(STOCK_FILTER!=='all'&&!FILTROS.some(([t])=>t===STOCK_FILTER))STOCK_FILTER='all';
+  // Chips de filtro por estado: só os estados que têm artigos
+  const FILTROS=[['disponivel','🧺','Disponível'],['alocado','🗓️','Alocado'],['consumido','🍽️','Consumido']].filter(([s])=>arr.some(g=>g.estados.has(s)));
+  if(STOCK_FILTER!=='all'&&!FILTROS.some(([s])=>s===STOCK_FILTER))STOCK_FILTER='all';
   if(FILTROS.length>1)h+=`<div class="cmp-sort stk-filter">
     <span class="sd-chip txt${STOCK_FILTER==='all'?' on':''}" onclick="setStockFilter('all')">Tudo</span>
-    ${FILTROS.map(([t,ic])=>`<span class="sd-chip${STOCK_FILTER===t?' on':''}" onclick="setStockFilter('${t}')"><i>${ic}</i><small>${t}</small></span>`).join('')}
-  </div>`;
-  const vis=STOCK_FILTER==='all'?arr:arr.filter(g=>g.tipos.has(STOCK_FILTER));
-  if(!vis.length)h+='<div class="empty sf">Sem artigos nesta tipologia.</div>';
+    ${FILTROS.map(([s,ic,lbl])=>`<span class="sd-chip${STOCK_FILTER===s?' on':''}" onclick="setStockFilter('${s}')"><i>${ic}</i><small>${lbl}</small></span>`).join('')}
+  </div>
+  <div class="note stk-legenda">🧺 por alocar · 🗓️ alocado a refeições de hoje ou dos próximos dias · 🍽️ consumido em refeições já passadas</div>`;
+  const vis=STOCK_FILTER==='all'?arr:arr.filter(g=>g.estados.has(STOCK_FILTER));
+  if(!vis.length)h+=`<div class="empty sf">${STOCK_FILTER==='disponivel'?'Não há stock por alocar — está tudo entregue a refeições.':STOCK_FILTER==='consumido'?'Ainda não há stock consumido.':'Nada alocado a refeições de hoje ou dos próximos dias.'}</div>`;
   else if(!CATS_TABLE)h+=vis.map(g=>stockArticleCard(g)).join('');
   else{
     // Containers por categoria de produto (Sumos, Talho, …), colapsáveis; os
@@ -4409,7 +4434,8 @@ function renderStock(){
     h+=order.map(k=>{
       const s=secs[k];
       const nome=s.cat?s.cat.nome:'Outros';
-      const totV=rnd(s.groups.reduce((a,g)=>a+stockAggAlocs(g.lotes).totV,0),2);
+      // € do container: com filtro de estado, só a parte que está nesse estado
+      const totV=rnd(s.groups.reduce((a,g)=>a+stockEstadoVal(stockAggAlocs(g.lotes),STOCK_FILTER),0),2);
       const open=STOCK_CAT_OPEN[k]!==false;   // aberto por defeito; fecho é da sessão
       return `<details class="stk-cat${s.cat?'':' stk-cat-outros'}"${open?' open':''} ontoggle="STOCK_CAT_OPEN['${k}']=this.open">
         <summary class="stk-cat-sum">
