@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v96 · 2026-07-25 · Stock sem compra: ➕ Stock para ofertas e sobras do ano anterior (custo 0 €, sem tocar nas contas); € por alocação passa a seguir o FIFO real dos lotes';
+const APP_BUILD = 'v97 · 2026-07-25 · Compras: sugestões de nomes já em uso ao adicionar artigo, primeira letra em maiúscula e categoria sugerida a partir de nomes parecidos (Batatas ← Batata)';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -3614,6 +3614,13 @@ function normalizeQty(raw){
   if(rest)return `${fmt(num)} ${rest}`;   // unidade desconhecida → nº normalizado + texto original
   return fmt(num);                        // só número
 }
+// Primeira letra maiúscula, e só essa — "feijão preto" → "Feijão preto". Não
+// mexe no resto do nome de propósito: marcas e siglas ("Coca-Cola", "1L UHT")
+// ficam como quem escreveu as pôs.
+function shopCapArtigo(s){
+  const t=(s||'').trim();
+  return t?t.charAt(0).toUpperCase()+t.slice(1):'';
+}
 // Etiqueta qtd + tamanho/embalagem para mostrar (ex.: "4 × lata 250 ml").
 // Na BD são colunas separadas (quantidade, tamanho) — juntam-se só na UI.
 function shopQtyLabel(it){const q=normalizeQty(it.quantidade),t=(it.tamanho||'').trim();return q&&t?`${q} × ${t}`:(q||t);}
@@ -4517,6 +4524,10 @@ function openShopItemModal(id,presetTipo,presetData){
   const canEdit=it?shopCanEditItem(it):true;   // criação = pode
   document.getElementById('shop-item-title').textContent=it?(canEdit?'Editar Artigo':'Detalhe do Artigo'):(shopCtxLock?'Adicionar Ingrediente':'Adicionar Artigo');
   document.getElementById('shop-artigo').value=it?it.artigo:'';
+  // Nomes já em uso (stock + lista) como sugestões — a melhor forma de não
+  // nascerem grafias novas para o mesmo produto. stkAddNomes() já junta as duas.
+  const artList=document.getElementById('shop-artigo-list');
+  if(artList)artList.innerHTML=stkAddNomes().map(n=>`<option value="${escHtml(n)}">`).join('');
   document.getElementById('shop-qtd').value=it?normalizeQty(it.quantidade):'';
   document.getElementById('shop-tam').value=it?(it.tamanho||''):'';
   document.getElementById('shop-tipo').value=it?it.tipo:(presetTipo||'Gerais');
@@ -4560,6 +4571,7 @@ function openShopItemModal(id,presetTipo,presetData){
   }
   // Campos editáveis só quem pode; senão, detalhe em leitura
   document.querySelectorAll('#shop-item-modal input,#shop-item-modal select').forEach(el=>{el.disabled=!canEdit;el.style.opacity=canEdit?'':'.75';});
+  _shopCatRO=!canEdit;
   shopCatSync();   // depois do disable geral: a categoria tem regras próprias
   const saveBtn=document.getElementById('shop-item-save');
   saveBtn.textContent=it?'Guardar':'Adicionar';
@@ -4602,9 +4614,23 @@ function shopTipoChanged(){
   if(creating)multi.innerHTML=shopMealChecks(tipo);
   else document.getElementById('shop-ref').innerHTML=shopMealOptions(tipo,'');
 }
+/* Palpite de categoria pela chave "solta" (shopNormLoose: singular, unidades
+   canónicas, sem pontuação) — é o que faz "Batatas" herdar a categoria de
+   "Batata", que o shopArtKey (só maiúsculas/acentos) deixa passar ao lado.
+   Devolve {catId,nome do artigo de origem} ou null. É só sugestão: preenche
+   o select mas nunca o tranca. */
+function shopCatGuess(artigo){
+  const lk=shopNormLoose(artigo);if(!lk)return null;
+  const key=Object.keys(ART_CATS).find(k=>shopNormLoose(k)===lk&&catById(ART_CATS[k].catId));
+  if(!key)return null;
+  const st=shopNormNameStats()[key];   // grafia bonita para mostrar na nota
+  return {catId:ART_CATS[key].catId,nome:(st&&st.name)||key};
+}
 /* Categoria no detalhe do artigo: mostra a associação do nome escrito e
    deixa preencher (qualquer membro) ou alterar (só admin). Corre DEPOIS do
-   disable geral do modal — um detalhe em leitura fica em leitura. */
+   disable geral do modal — um detalhe em leitura fica em leitura (_shopCatRO,
+   porque o onchange do nome volta a chamar isto sem passar pelo disable). */
+let _shopCatRO=false;
 function shopCatSync(){
   const wrap=document.getElementById('shop-cat-wrap');if(!wrap)return;
   if(!CATS_TABLE){wrap.style.display='none';return;}
@@ -4613,15 +4639,20 @@ function shopCatSync(){
   const note=document.getElementById('shop-cat-note');
   const artigo=(document.getElementById('shop-artigo').value||'').trim();
   const m=ART_CATS[shopArtKey(artigo)];
-  sel.innerHTML=catOptionsHtml(m?m.catId:null);
+  const g=m?null:shopCatGuess(artigo);
+  sel.innerHTML=catOptionsHtml(m?m.catId:(g?g.catId:null));
   const locked=!!(m&&!isAdmin());
-  if(locked&&!sel.disabled){sel.disabled=true;sel.style.opacity='.75';}
-  note.textContent='Categoria já definida — só o admin a altera.';
-  note.style.display=locked?'':'none';
+  sel.disabled=_shopCatRO||locked;
+  sel.style.opacity=sel.disabled?'.75':'';
+  note.textContent=locked?'Categoria já definida — só o admin a altera.'
+    :(g?`Sugerida a partir de "${g.nome}" — confirma antes de guardar.`:'');
+  note.style.display=note.textContent?'':'none';
 }
 async function saveShopItem(){
   if(!DATA._sbId){toast('Sem ligação — recarrega a página','bad');return;}
-  const artigo=(document.getElementById('shop-artigo').value||'').trim();
+  // Rede de segurança da capitalização: o onchange do campo já a aplica, mas
+  // guardar sem sair do campo (Enter/tap no botão) não dispara o onchange.
+  const artigo=shopCapArtigo(document.getElementById('shop-artigo').value);
   const qtd=normalizeQty(document.getElementById('shop-qtd').value);
   const tam=normalizeQty(document.getElementById('shop-tam').value);
   const tipo=shopCtxLock?shopCtxLock.tipo:document.getElementById('shop-tipo').value;
