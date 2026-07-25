@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v90 · 2026-07-25 · Detalhe do stock arrumado: marca já não corta o texto, compras/pedidos quebram em vez de truncar, unidade no campo da qtd e menos caixas dentro de caixas';
+const APP_BUILD = 'v91 · 2026-07-25 · Detalhe do stock numa linha só: refeição/marca · qtd · € · ✕ (marca passou a bottom-sheet), lista corrida quando há uma marca só';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -5701,43 +5701,45 @@ function loteRenderAlocs(){
   // percebe se o 0,5 são quilos, litros ou unidades. Vazio = à unidade.
   const uLbl=fmtQty(0,editingLote.u).split(' ')[1]||'';
   const dem=stockDemandFor(editingLote.reqName||editingLote.artigo,editingLote.u);
-  // Um container por REFEIÇÃO/destino: fica claro a que refeição vai cada
-  // quantidade. Com várias marcas, cada linha dentro fixa uma marca (ou
-  // "qualquer marca" = FIFO). As alocações continuam num array plano.
+  // Cada alocação cabe numa LINHA só: artigo/refeição · qtd · € · ✕.
+  // Com uma marca só, as linhas são a lista toda (uma refeição por linha, sem
+  // cartões). Com várias marcas, agrupa-se por refeição e cada linha lá dentro
+  // fixa uma marca (ou "qualquer marca" = FIFO). O array continua plano.
   const groups={},order=[];
   editingLote.alocs.forEach((a,i)=>{const k=alocToDestino(a);if(!groups[k]){groups[k]={idx:[]};order.push(k);}groups[k].idx.push(i);});
   order.sort(destKeyCmp);
-  const brandSel=(a,i)=>{
-    if(!editingLote.multi)return '';
-    const opts=`<option value="">qualquer marca</option>`+editingLote.brands.map(b=>`<option value="${escHtml(b)}"${a.marca===b?' selected':''}>${escHtml(b)}</option>`).join('');
-    return `<select class="lote-marca" ${canEdit?'':'disabled'} onchange="loteAlocField(${i},'marca',this.value)">${opts}</select>`;
-  };
-  document.getElementById('lote-alocs').innerHTML=order.map(k=>{
+  const solo=!editingLote.multi;
+  // Peças da linha, iguais nos dois modos
+  const qtyCell=(i,a)=>`<div class="lote-qty-w${uLbl?'':' nou'}">
+      <input type="number" step="any" min="0" inputmode="decimal" ${canEdit?'':'disabled'} value="${a.qtd||''}" placeholder="qtd" onchange="loteAlocField(${i},'qtd',this.value)">
+      ${uLbl?`<i>${escHtml(uLbl)}</i>`:''}
+    </div>`;
+  const endCells=(i,a)=>qtyCell(i,a)+`<span class="lote-val">${eur(rnd(unit*(+a.qtd||0),2))}</span>`+
+    (canEdit?`<button class="cmp-ln-del" title="Remover" onclick="loteDelAloc(${i})">✕</button>`:'');
+  // Botão-texto que abre um bottom-sheet (o mesmo padrão do destino): ao
+  // contrário de um <select>, corta com "…" e cabe na linha.
+  const pickBtn=(cls,ic,txt,fn)=>`<button class="lote-pick ${cls}" ${canEdit?'':'disabled'} onclick="${fn}">${ic?`<span class="lp-ic">${ic}</span>`:''}<span class="lp-lbl">${escHtml(txt)}</span>${canEdit?'<i class="lp-ed">▾</i>':''}</button>`;
+  const needTag=k=>dem[k]>0.0005?`<span class="lote-dest-need">precisa ${escHtml(fmtQty(dem[k],editingLote.u))}</span>`:'';
+  const html=order.map(k=>{
     const idx=groups[k].idx;
     const a0=destinoAloc(k,0);const meal=alocIsMeal(a0);
     const lbl=meal?`${diaAbrev(a0.data)} ${fmtDiaMes(a0.data)}`:a0.tipo;
-    const need=dem[k];
-    const rows=idx.map(i=>{const a=editingLote.alocs[i];const bs=brandSel(a,i);
-      return `<div class="lote-aloc-row${bs?' multi':''}">
-        ${bs}
-        <div class="lote-aloc-line">
-          <div class="lote-qty-w${uLbl?'':' nou'}">
-            <input type="number" step="any" min="0" inputmode="decimal" ${canEdit?'':'disabled'} value="${a.qtd||''}" placeholder="qtd" onchange="loteAlocField(${i},'qtd',this.value)">
-            ${uLbl?`<i>${escHtml(uLbl)}</i>`:''}
-          </div>
-          <span class="lote-val">${eur(rnd(unit*(+a.qtd||0),2))}</span>
-          ${canEdit?`<button class="cmp-ln-del" title="Remover" onclick="loteDelAloc(${i})">✕</button>`:''}
-        </div>
-      </div>`;}).join('');
+    // Sem selo "precisa" nas linhas simples: não cabe ao lado da qtd em ecrãs
+    // estreitos e o painel "Pedidos na lista" (acima) já diz o mesmo.
+    if(solo)return idx.map(i=>`<div class="lote-al">
+        ${pickBtn('dest',shopTipoIcon(a0.tipo),lbl,`loteGroupDest(${i})`)}${endCells(i,editingLote.alocs[i])}
+      </div>`).join('');
     return `<div class="lote-dest">
       <div class="lote-dest-h">
-        <button class="lote-dest-name" ${canEdit?'':'disabled'} onclick="loteGroupDest(${idx[0]})">${shopTipoIcon(a0.tipo)} ${escHtml(lbl)}${canEdit?' <i class="lote-dest-ed">▾</i>':''}</button>
-        ${need>0.0005?`<span class="lote-dest-need">precisa ${escHtml(fmtQty(need,editingLote.u))}</span>`:''}
+        ${pickBtn('hd',shopTipoIcon(a0.tipo),lbl,`loteGroupDest(${idx[0]})`)}${needTag(k)}
       </div>
-      ${rows}
-      ${canEdit&&editingLote.multi?`<button class="lote-addmarca" onclick="loteAddToGroup(${idx[0]})">＋ marca</button>`:''}
+      ${idx.map(i=>{const a=editingLote.alocs[i];
+        return `<div class="lote-al">${pickBtn('marca','',a.marca||'qualquer marca',`loteMarcaPicker(${i})`)}${endCells(i,a)}</div>`;}).join('')}
+      ${canEdit?`<button class="lote-addmarca" onclick="loteAddToGroup(${idx[0]})">＋ marca</button>`:''}
     </div>`;
-  }).join('')||'<div class="empty sf" style="margin-top:8px">Sem alocações — está tudo na bolsa comum.</div>';
+  }).join('');
+  document.getElementById('lote-alocs').innerHTML=
+    (html?(solo?`<div class="lote-solos">${html}</div>`:html):'<div class="empty sf" style="margin-top:8px">Sem alocações — está tudo na bolsa comum.</div>');
   const tot=editingLote.alocs.reduce((s,a)=>s+(+a.qtd||0),0);
   const livre=rnd(editingLote.totQ-tot,3);
   document.getElementById('lote-resto').innerHTML=livre>0
@@ -5745,9 +5747,26 @@ function loteRenderAlocs(){
     :livre<0?`⚠️ Alocaste ${escHtml(fmtQty(rnd(tot,3),editingLote.u))} — mais do que há em stock (${escHtml(fmtQty(editingLote.totQ,editingLote.u))}).`
     :'Stock totalmente alocado.';
 }
+/* Escolher a marca de uma linha — bottom-sheet igual ao do destino (o <select>
+   nativo não cabia na linha sem cortar nomes como "Snack Batata Ondulada…"). */
+function loteMarcaPicker(i){
+  if(!isAdmin()||contasFechadas()||!editingLote)return;
+  const a=editingLote.alocs[i];if(!a)return;
+  const cur=a.marca||'';
+  const items=[{value:'',label:'Qualquer marca',icon:'🛒',sub:'a app escolhe pela ordem das compras (FIFO)'}]
+    .concat(editingLote.brands.map(b=>({value:b,label:b,icon:'🧺',sub:''})));
+  _dpick={items,cb:v=>loteAlocField(i,'marca',v)};
+  document.getElementById('dpick-title').textContent='Marca';
+  document.getElementById('dpick-list').innerHTML=items.map((it,ix)=>{
+    const on=it.value===cur;
+    return `<button type="button" class="dsheet-opt${on?' on':''}" onclick="pickDest(${ix})">
+      <span class="dsheet-ic">${it.icon}</span><span class="dsheet-lbl">${escHtml(it.label)}${it.sub?`<small class="dsheet-sub">${escHtml(it.sub)}</small>`:''}</span>${on?'<span class="dsheet-chk">✓</span>':''}</button>`;
+  }).join('');
+  document.getElementById('dpick-bg').classList.add('show');
+}
 function loteAlocField(i,f,v){
   const a=editingLote&&editingLote.alocs[i];if(!a)return;
-  if(f==='marca'){a.marca=v||'';return;}   // sem re-render: não muda nada visível
+  if(f==='marca'){a.marca=v||'';loteRenderAlocs();return;}
   if(f==='qtd')a.qtd=parseFloat(String(v).replace(',','.'))||0;
   else{const d=destinoAloc(v,0);a.tipo=d?d.tipo:v;a.data=d?d.data:null;}
   loteRenderAlocs();

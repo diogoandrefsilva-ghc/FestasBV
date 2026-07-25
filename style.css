@@ -871,29 +871,37 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .lote-ln input{flex:0 0 74px;margin:0;text-align:right}
 /* Container por refeição no detalhe do stock: fica claro a que refeição vai
    cada quantidade; com várias marcas, uma linha por marca lá dentro */
-.lote-dest{border:1px solid var(--line);border-radius:12px;padding:9px 11px 11px;margin-top:8px;background:var(--panel2)}
-.lote-dest-h{display:flex;align-items:center;gap:8px;min-height:26px}
-.lote-dest-name{flex:1;min-width:0;display:flex;align-items:center;gap:6px;text-align:left;background:transparent;border:none;font-size:14px;font-weight:700;color:var(--ink);padding:2px 0;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.lote-dest-name:disabled{cursor:default}
-.lote-dest-ed{font-style:normal;color:var(--faint);font-size:12px;font-weight:400}
-.lote-dest-need{flex:0 0 auto;font-size:11px;font-weight:700;color:var(--gold);background:rgba(168,123,20,.14);border-radius:20px;padding:2px 9px;white-space:nowrap}
-/* Uma marca por bloco: sem cartão dentro de cartão — só um traço a separar */
-.lote-aloc-row{margin-top:8px}
-.lote-aloc-row.multi+.lote-aloc-row.multi{margin-top:10px;padding-top:10px;border-top:1px dashed var(--line)}
-.lote-aloc-line{display:flex;align-items:center;gap:8px}
+/* Uma alocação = UMA linha: refeição/marca · qtd · € · ✕.
+   Marca única → lista corrida num cartão só (sem cartão por refeição).
+   Várias marcas → um cartão por refeição, com uma linha por marca. */
+.lote-solos{border:1px solid var(--line);border-radius:12px;background:var(--panel2);padding:0 9px;margin-top:8px}
+.lote-solos .lote-al{padding:7px 0}
+.lote-solos .lote-al+.lote-al{border-top:1px solid var(--line)}
+.lote-al{display:flex;align-items:center;gap:5px;min-width:0}
+.lote-dest{border:1px solid var(--line);border-radius:12px;padding:8px 10px 10px;margin-top:8px;background:var(--panel2)}
+.lote-dest .lote-al{margin-top:7px}
+.lote-dest-h{display:flex;align-items:center;gap:8px;min-height:24px}
+.lote-dest-need{flex:0 0 auto;font-size:10.5px;font-weight:700;color:var(--gold);background:rgba(168,123,20,.14);border-radius:20px;padding:2px 8px;white-space:nowrap}
+/* Botão-texto que abre o bottom-sheet (refeição ou marca). É botão e não
+   <select> de propósito: corta com "…" em vez de deixar o nome espetado. */
+.lote-pick{flex:1;min-width:0;display:flex;align-items:center;gap:5px;text-align:left;background:transparent;border:none;font-size:13px;font-weight:700;color:var(--ink);padding:3px 0;cursor:pointer}
+.lote-pick:disabled{cursor:default}
+.lote-pick .lp-ic{flex:0 0 auto;font-size:14px}
+.lote-pick .lp-lbl{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lote-pick .lp-ed{flex:0 0 auto;font-style:normal;color:var(--faint);font-size:11px;font-weight:400}
+.lote-pick:active .lp-lbl{opacity:.55}
+.lote-pick.hd{font-size:14px}
+.lote-pick.marca{font-size:12.5px;font-weight:600;color:var(--muted)}
 /* Campo da qtd com a unidade lá dentro ("0,5 kg") — sem unidade não se percebe */
-.lote-qty-w{position:relative;flex:0 0 96px;display:flex}
-.lote-qty-w.nou{flex:0 0 74px}
-.lote-aloc-line input[type=number]{width:100%;flex:1 1 auto;height:40px;margin:0;text-align:right;padding:0 30px 0 9px;font-size:14px;font-weight:600;border:1px solid var(--line);border-radius:9px;background:#FFFDF6;color:var(--ink)}
-.lote-qty-w.nou input[type=number]{padding-right:9px}
+.lote-qty-w{position:relative;flex:0 0 72px;display:flex}
+.lote-qty-w.nou{flex:0 0 54px}
+.lote-al input[type=number]{width:100%;flex:1 1 auto;height:34px;margin:0;text-align:right;padding:0 23px 0 6px;font-size:13px;font-weight:700;border:1px solid var(--line);border-radius:8px;background:#FFFDF6;color:var(--ink)}
+.lote-qty-w.nou input[type=number]{padding-right:7px}
 .lote-qty-w input[type=number]::-webkit-inner-spin-button,.lote-qty-w input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;appearance:none;margin:0}
-.lote-qty-w i{position:absolute;right:9px;top:50%;transform:translateY(-50%);font-style:normal;font-size:11.5px;font-weight:600;color:var(--faint);pointer-events:none}
-.lote-aloc-line .lote-val{margin-left:auto;font-size:13px;color:var(--muted);font-weight:700;white-space:nowrap;font-variant-numeric:tabular-nums}
-/* Marca em linha própria (largura toda) para não cortar nomes compridos.
-   Tem de ganhar a `.modal select` (senão herda 15px/padding 12px e corta o
-   texto ao meio) — daí o seletor com o .modal à frente. */
-.modal select.lote-marca{display:block;width:100%;box-sizing:border-box;height:36px;line-height:34px;margin:0 0 7px;font-size:12.5px;font-weight:600;border:1px solid var(--line);border-radius:9px;background-color:var(--panel);background-position:right 9px center;color:var(--ink);padding:0 28px 0 9px;text-overflow:ellipsis}
-.lote-addmarca{display:block;width:100%;margin-top:10px;background:transparent;border:1px dashed var(--line);border-radius:9px;color:var(--faint);font-size:11.5px;font-weight:700;letter-spacing:.02em;padding:7px 11px;cursor:pointer}
+.lote-qty-w i{position:absolute;right:6px;top:50%;transform:translateY(-50%);font-style:normal;font-size:10px;font-weight:700;color:var(--faint);pointer-events:none}
+.lote-al .lote-val{flex:0 0 auto;min-width:52px;text-align:right;font-size:12px;color:var(--muted);font-weight:700;white-space:nowrap;font-variant-numeric:tabular-nums}
+.lote-al .cmp-ln-del{padding:4px 0 4px 4px}
+.lote-addmarca{display:inline-flex;margin-top:8px;background:transparent;border:1px dashed var(--line);border-radius:20px;color:var(--faint);font-size:11px;font-weight:700;letter-spacing:.02em;padding:4px 11px;cursor:pointer}
 .lote-addmarca:active{transform:scale(.99);background:rgba(120,90,40,.05)}
 /* Marcas listadas no cartão de stock (Ruffles · Lays) */
 .stk-marcas{font-size:11.5px;color:var(--muted);margin:1px 0 5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -1016,6 +1024,10 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 /* Título do detalhe: nomes longos quebram em vez de encostar ao ✕ */
 #lote-title{font-size:18px;line-height:1.15;flex:1;min-width:0;overflow-wrap:anywhere}
 #lote-req{text-overflow:ellipsis}
+/* Modal do detalhe mais cerrado: menos ar entre blocos */
+#lote-modal label{margin-top:12px}
+#lote-addline{padding:9px 12px;font-size:13.5px;margin-top:8px}
+#lote-modal .mbtns{margin-top:14px}
 
 /* ═══ CASH-FLOWS — "Mista" (versão C: cabeçalho extrato + cronologia) ═══ */
 .cfc-net{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 16px;margin:0 0 10px}
