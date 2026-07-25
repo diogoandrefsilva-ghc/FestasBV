@@ -7,7 +7,7 @@
 -- Ordem: schema.sql -> functions.sql -> policies.sql -> shoplist.sql ->
 --        stock.sql -> ESTE.
 --
--- O QUE É: tipologias de produto ("Sumos", "Talho", …) que agrupam artigos
+-- O QUE É: Tipologias de produto ("Sumos", "Talho", …) que agrupam artigos
 -- diferentes da mesma família no separador 🧺 Stock e na Lista de Compras.
 -- São duas tabelas GLOBAIS (sem evento_id — um produto é o mesmo em todos
 -- os anos, a memória transita de festa para festa):
