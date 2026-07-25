@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v89 · 2026-07-25 · Polish 2: stock — marca em linha própria (não corta) · Shop List — artigos repetidos agrupados com barra + total (Por artigo e Por categoria)';
+const APP_BUILD = 'v90 · 2026-07-25 · Detalhe do stock arrumado: marca já não corta o texto, compras/pedidos quebram em vez de truncar, unidade no campo da qtd e menos caixas dentro de caixas';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -5600,11 +5600,12 @@ function openLoteModal(id){
   const comprasRows=lotes.map(l=>{
     const dsp=(DATA.despesas||[]).find(d=>d.compraId===l.compraId);
     const parts=[];
-    if(multi)parts.push('<b>'+escHtml(l.artigo)+'</b>');
     if(dsp&&dsp.dataDesp)parts.push(fmtDiaMes(dsp.dataDesp));
     parts.push(escHtml(fmtQty(l.qtd,l.unidade)),eur(l.valor));
     if(dsp&&dsp.desc&&dsp.desc!=='Compras')parts.push(escHtml(dsp.desc));
-    return `<div class="lote-cmp-row">${parts.join(' · ')}</div>`;
+    // Marca em cima (quebra à vontade), detalhes por baixo — assim os nomes
+    // compridos deixam de sair cortados a meio.
+    return `<div class="lote-cmp-row">${multi?`<span class="n">${escHtml(l.artigo)}</span>`:''}<span class="d">${parts.join(' · ')}</span></div>`;
   }).join('');
   // As necessidades (direita) — refeições que pedem este artigo na lista de
   // compras, por ordem de data. Casa pelo nome do PEDIDO (batatas fritas), que
@@ -5616,10 +5617,11 @@ function openLoteModal(id){
     return `<div class="lote-need-row">${ic} ${escHtml(diaAbrev(a.data)+' '+fmtDiaMes(a.data))} · <b>${escHtml(fmtQty(dem[k],editingLote.u))}</b></div>`;
   }).join(''):`<div class="lote-need-row empty">— sem pedidos na lista —</div>`;
   document.getElementById('lote-info').innerHTML=
-    `Em stock: <b>${escHtml(fmtQty(totQ,editingLote.u))}</b> por <b>${eur(totV)}</b>${lotes.length>1?` · ${lotes.length} compras — a distribuição pelas compras é automática (FIFO)`:''}`+
+    `<div class="lote-sum">Em stock: <b>${escHtml(fmtQty(totQ,editingLote.u))}</b> · <b>${eur(totV)}</b></div>`+
+    (lotes.length>1?`<div class="lote-sum-sub">${lotes.length} compras — a distribuição por elas é automática (FIFO)</div>`:'')+
     `<div class="lote-cols">
-      <div class="lote-col"><div class="lote-col-h">🛒 Compras</div>${comprasRows}</div>
-      <div class="lote-col"><div class="lote-col-h">📋 Pedidos na lista</div>${needRows}</div>
+      <div class="lote-col"><div class="lote-col-h"><span>🛒</span>Compras</div>${comprasRows}</div>
+      <div class="lote-col"><div class="lote-col-h"><span>📋</span>Pedidos na lista</div>${needRows}</div>
     </div>`;
   const canEdit=isAdmin()&&!contasFechadas();
   ['lote-save','lote-addline'].forEach(i=>{document.getElementById(i).style.display=canEdit?'':'none';});
@@ -5662,7 +5664,9 @@ function loteReqFill(){
   inp.value=editingLote.reqLink||'';
   inp.disabled=!isAdmin();
   inp.style.opacity=inp.disabled?'.75':'';
-  inp.placeholder=`ex.: outro nome (o produto é "${editingLote.product}")`;
+  inp.placeholder='ex.: batatas fritas';   // curto: o nome do produto vai na nota abaixo
+  const nota=document.getElementById('lote-req-note');
+  if(nota)nota.innerHTML=`Só se na lista foi pedido com outro nome (ex.: Lays → batatas fritas). Produto: <b>${escHtml(editingLote.product)}</b>.`;
   // Sugestões: nomes distintos dos pedidos de refeição na lista (exceto o próprio)
   const nomes=[...new Set(shopArr().filter(it=>shopIsMeal(it.tipo)&&it.dataValor&&!shopIsRemoved(it)).map(it=>it.artigo))]
     .filter(n=>!shopSameArtigo(n,editingLote.product)).sort((a,b)=>a.localeCompare(b,'pt'));
@@ -5693,6 +5697,9 @@ function loteRenderAlocs(){
   if(!editingLote)return;
   const canEdit=isAdmin()&&!contasFechadas();
   const unit=editingLote.totQ>0?editingLote.totV/editingLote.totQ:0;
+  // Sufixo da unidade dentro do campo da qtd ("0,5 kg") — sem ele não se
+  // percebe se o 0,5 são quilos, litros ou unidades. Vazio = à unidade.
+  const uLbl=fmtQty(0,editingLote.u).split(' ')[1]||'';
   const dem=stockDemandFor(editingLote.reqName||editingLote.artigo,editingLote.u);
   // Um container por REFEIÇÃO/destino: fica claro a que refeição vai cada
   // quantidade. Com várias marcas, cada linha dentro fixa uma marca (ou
@@ -5714,7 +5721,10 @@ function loteRenderAlocs(){
       return `<div class="lote-aloc-row${bs?' multi':''}">
         ${bs}
         <div class="lote-aloc-line">
-          <input type="number" step="any" min="0" inputmode="decimal" ${canEdit?'':'disabled'} value="${a.qtd||''}" placeholder="qtd" onchange="loteAlocField(${i},'qtd',this.value)">
+          <div class="lote-qty-w${uLbl?'':' nou'}">
+            <input type="number" step="any" min="0" inputmode="decimal" ${canEdit?'':'disabled'} value="${a.qtd||''}" placeholder="qtd" onchange="loteAlocField(${i},'qtd',this.value)">
+            ${uLbl?`<i>${escHtml(uLbl)}</i>`:''}
+          </div>
           <span class="lote-val">${eur(rnd(unit*(+a.qtd||0),2))}</span>
           ${canEdit?`<button class="cmp-ln-del" title="Remover" onclick="loteDelAloc(${i})">✕</button>`:''}
         </div>
