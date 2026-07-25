@@ -159,6 +159,34 @@ Regras:
 - "categoria": EXATAMENTE um dos nomes da lista (copia tal e qual), ou null
   se nenhum encaixar com confiança. Não inventes categorias novas.`;
 
+// Modo só-texto: NORMALIZAR grafias (sem imagem). Pessoas diferentes escrevem o
+// mesmo produto de formas diferentes — este modo agrupa os nomes que são o
+// mesmo produto e sugere um nome final por grupo. A app mostra as sugestões
+// para o admin rever e aprovar antes de gravar.
+const promptNormalizar = (artigos: string[]) => `Tens nomes de artigos de compras
+(Portugal), escritos por pessoas diferentes. Alguns referem-se AO MESMO produto
+mas estão escritos de forma diferente: singular/plural ("chouriço"/"chouriços"),
+unidades equivalentes (1000ml = 1L, 500gr = 500g), abreviaturas, acentos,
+pontuação, ou marca vs genérico (ex.: "Lay's Forno" ≈ "batatas fritas").
+
+Agrupa APENAS os nomes que são REALMENTE o mesmo produto e sugere, por grupo, um
+nome final limpo em português (singular quando fizer sentido, unidade
+normalizada). NÃO juntes produtos diferentes: "batata palha" ≠ "batata frita";
+"vinho tinto" ≠ "vinho branco"; "coca-cola" ≠ "coca-cola zero"; sabores/variantes
+diferentes ficam separados. Na dúvida, deixa separado.
+
+Nomes:
+${artigos.map((a) => `  - ${a}`).join("\n")}
+
+Responde APENAS com um objeto JSON com esta forma exata:
+{"grupos": [{"nome": string, "variantes": [string, string, ...]}]}
+
+Regras:
+- Inclui só grupos com 2 OU MAIS variantes distintas. Se não houver nada para
+  juntar, devolve {"grupos": []}.
+- "variantes": os nomes EXATAMENTE como aparecem na lista (copia tal e qual).
+- "nome": o nome final sugerido para todo o grupo.`;
+
 async function emailAutorizado(auth: string): Promise<boolean> {
   // 1) quem é o utilizador deste token?
   const u = await fetch(`${SB_URL}/auth/v1/user`, {
@@ -197,18 +225,25 @@ Deno.serve(async (req) => {
       return json({ error: "não autorizado" }, 403);
     }
 
-    const { image, mime, categorias, artigos } = await req.json();
+    const { image, mime, categorias, artigos, normalizar } = await req.json();
     const cats = lerCategorias(categorias);
-
-    // Duas utilizações: OCR de fatura (image) ou classificação só-texto
-    // (artigos, sem image) — o botão "✨ Categorias" da app.
-    const soTexto = !image && Array.isArray(artigos);
-    let parts: unknown[];
-    if (soTexto) {
-      const nomes = (artigos as unknown[])
-        .filter((a) => typeof a === "string" && a.trim())
+    const limparNomes = (arr: unknown[]) =>
+      arr
+        .filter((a) => typeof a === "string" && (a as string).trim())
         .slice(0, 200)
         .map((a) => String(a).replace(/\s+/g, " ").trim().slice(0, 60));
+
+    // Três utilizações: OCR de fatura (image), classificação só-texto
+    // (artigos + categorias — o "✨ Categorias") e normalização de grafias
+    // (normalizar — o "🔤 Normalizar" da Shop List). As duas de texto não levam
+    // imagem.
+    let parts: unknown[];
+    if (!image && Array.isArray(normalizar)) {
+      const nomes = limparNomes(normalizar as unknown[]);
+      if (nomes.length < 2) return json({ error: "poucos artigos para normalizar" }, 400);
+      parts = [{ text: promptNormalizar(nomes) }];
+    } else if (!image && Array.isArray(artigos)) {
+      const nomes = limparNomes(artigos as unknown[]);
       if (!nomes.length || !cats.length) {
         return json({ error: "artigos ou categorias em falta" }, 400);
       }
@@ -261,7 +296,7 @@ Deno.serve(async (req) => {
     const candidatos = await candidatosModelo();
     // Marcador de versão + lista de candidatos: se este log não aparecer, é a
     // versão ANTIGA que está a correr (o deploy não pegou).
-    console.log("FATURA-OCR build=categorias-v1 candidatos:", candidatos.join(", "));
+    console.log("FATURA-OCR build=normalizar-v2 candidatos:", candidatos.join(", "));
     let model = candidatos[0] ?? "gemini-flash-latest";
     let g: Response | null = null;
 
@@ -270,10 +305,15 @@ Deno.serve(async (req) => {
       for (let tent = 0; tent < 2 && !ctrl.signal.aborted; tent++) {
         g = await chamarGemini(model);
         console.log("FATURA-OCR tentativa:", model, "->", g.status);
-        // Modelo não aceita o campo thinkingConfig (400)? Repete já sem ele.
+        // 400 = "invalid argument". O campo mais frágil é o thinkingConfig
+        // (vários modelos atuais recusam thinkingBudget:0, às vezes com a
+        // mensagem genérica "Request contains an invalid argument" sem dizer
+        // qual). Em QUALQUER 400 repete-se uma vez sem esse campo — se o
+        // problema era esse, passa; se não, cai no tratamento de erro normal.
         if (g.status === 400) {
-          const d = await g.clone().text();
-          if (/think/i.test(d)) g = await chamarGemini(model, false);
+          console.log("FATURA-OCR 400:", (await g.clone().text()).slice(0, 300));
+          g = await chamarGemini(model, false);
+          console.log("FATURA-OCR 400 retry s/thinking:", model, "->", g.status);
         }
         // Nome saiu do catálogo (404) → força redescoberta e salta de modelo.
         if (g.status === 404) { _models = null; break; }
@@ -298,8 +338,17 @@ Deno.serve(async (req) => {
         }, 503);
       }
       let msg = "";
-      try { msg = JSON.parse(detail)?.error?.message ?? ""; } catch (_) { /**/ }
-      return json({ error: `gemini ${status} (${model})${msg ? ": " + msg.slice(0, 180) : ""}` }, 502);
+      try {
+        const j = JSON.parse(detail);
+        msg = j?.error?.message ?? "";
+        // Campo(s) ofensivo(s), quando a mensagem é genérica — ajuda a diagnosticar
+        const fv = (j?.error?.details ?? [])
+          .flatMap((x: any) => x?.fieldViolations ?? [])
+          .map((v: any) => v?.field)
+          .filter(Boolean);
+        if (fv.length) msg += ` [${fv.join(", ")}]`;
+      } catch (_) { /**/ }
+      return json({ error: `gemini ${status} (${model})${msg ? ": " + msg.slice(0, 200) : ""}` }, 502);
     }
     const gd = await g.json();
     const text = gd?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";

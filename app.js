@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v85 · 2026-07-25 · Shop List: botão 🔤 Normalizar (admin) junta grafias do mesmo artigo (chouriço/chouriços, 1000ml/1L) na lista e no stock';
+const APP_BUILD = 'v86 · 2026-07-25 · Shop List: 🔤 Normalizar agora usa AI (agrupa por significado; heurística como fallback offline) + fix do erro 400 nas sugestões de categorias';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -3322,7 +3322,8 @@ async function catSugApply(){
    reescreve o nome em todos os pedidos da lista e nos lotes de stock (artigo e
    lista_artigo) — a partir daí somam e casam como um só. É puro cliente (offline,
    sem AI e sem redeploy) — a revisão do admin é a rede de segurança. */
-let _normGroups=null;   // [{lk,variants:[{name,count}],canon,apply}]
+let _normGroups=null;   // [{variants:[{name,count}],canon,apply}]
+let _normViaAI=false;   // sugestões vieram da AI (true) ou da heurística local (false)
 // Chave "solta" para agrupar grafias do mesmo produto: sem acentos/maiúsculas,
 // unidades embutidas em forma canónica (1000ml→1l, 500gr→500g), sem pontuação e
 // com plurais simples reduzidos ao singular (batatas→batata, chouriços→chouriço).
@@ -3367,11 +3368,73 @@ function shopNormGroups(){
   groups.sort((a,b)=>b.variants.length-a.variants.length||b.variants.reduce((s,v)=>s+v.count,0)-a.variants.reduce((s,v)=>s+v.count,0));
   return groups;
 }
-function shopNormOpen(){
+// Nomes distintos em uso (lista + stock) com a contagem e a grafia mais completa
+// — base tanto para a heurística como para o mapeamento das sugestões da AI.
+function shopNormNameStats(){
+  const stats={};   // ak → {name,count}
+  const add=nome=>{
+    const nm=(nome||'').trim();if(!nm)return;
+    const k=shopArtKey(nm);
+    if(!stats[k])stats[k]={name:nm,count:0};
+    stats[k].count++;
+    if(nm.length>stats[k].name.length)stats[k].name=nm;
+  };
+  shopArr().forEach(it=>{if(!shopIsRemoved(it))add(it.artigo);});
+  stockArr().forEach(l=>{if(stockBacked(l))add(l.artigo);});
+  return stats;
+}
+// Converte as sugestões da AI ({grupos:[{nome,variantes[]}]}) em _normGroups,
+// casando cada variante com um nome real em uso (ignora o que a AI invente) e
+// contando pelos dados. Só grupos com ≥2 grafias distintas sobrevivem.
+function shopNormFromAI(grupos,stats){
+  const out=[];
+  (Array.isArray(grupos)?grupos:[]).forEach(g=>{
+    const seen=new Set(),variants=[];
+    (Array.isArray(g&&g.variantes)?g.variantes:[]).forEach(vn=>{
+      const k=shopArtKey(vn);const st=stats[k];
+      if(st&&!seen.has(k)){seen.add(k);variants.push({name:st.name,count:st.count});}
+    });
+    if(variants.length<2)return;
+    variants.sort((a,b)=>b.count-a.count||b.name.length-a.name.length);
+    const nome=(g&&g.nome||'').trim();
+    out.push({variants,canon:nome||variants[0].name,apply:true});
+  });
+  out.sort((a,b)=>b.variants.length-a.variants.length);
+  return out;
+}
+async function shopNormOpen(){
   if(!isAdmin()){toast('Só o admin normaliza artigos','bad');return;}
   if(contasFechadas()){toast('Contas fechadas','bad');return;}
-  _normGroups=shopNormGroups();
-  if(!_normGroups.length){toast('Nada a normalizar — as grafias já batem certo 🎉','ok');_normGroups=null;return;}
+  const stats=shopNormNameStats();
+  const nomes=Object.values(stats).map(s=>s.name);
+  if(nomes.length<2){toast('Poucos artigos para normalizar','ok');return;}
+  const btn=document.getElementById('shop-norm-btn');
+  if(btn){btn.disabled=true;btn.textContent='⏳ A analisar…';}
+  let groups=null,viaAI=false,aiErr='';
+  try{
+    // AI primeiro: agrupa por significado (marca vs genérico, sinónimos…)
+    const r=await sbFetch(`${SB_URL}/functions/v1/fatura-ocr`,{
+      method:'POST',
+      headers:{'Content-Type':'application/json','apikey':SB_KEY},
+      body:JSON.stringify({normalizar:nomes.slice(0,200)})
+    });
+    if(!r.ok){const e=await r.json().catch(()=>({}));throw new Error(e.error||('HTTP '+r.status));}
+    const d=await r.json();
+    groups=shopNormFromAI(d&&d.grupos,stats);
+    viaAI=true;
+  }catch(e){
+    // Sem AI (offline/erro) → heurística local (plurais, unidades, pontuação)
+    aiErr=e.message||String(e);
+    groups=shopNormGroups();
+  }
+  if(btn){btn.disabled=false;btn.textContent='🔤 Normalizar';}
+  if(!groups||!groups.length){
+    toast(viaAI?'Nada a normalizar — as grafias já batem certo 🎉'
+      :('Sugestões AI falharam ('+aiErr+') e nada básico a juntar'),viaAI?'ok':'bad');
+    _normGroups=null;return;
+  }
+  _normGroups=groups;_normViaAI=viaAI;
+  if(!viaAI)toast('AI indisponível — sugestões básicas (offline)','bad');
   shopNormRender();
   document.getElementById('shopnorm-bg').classList.add('show');
   document.body.classList.add('no-scroll');
@@ -3380,7 +3443,7 @@ function shopNormRender(){
   if(!_normGroups)return;
   const nOn=_normGroups.filter(g=>g.apply).length;
   document.getElementById('shopnorm-info').textContent=
-    `${_normGroups.length} grupo(s) de grafias parecidas. Escolhe o nome final de cada um (toca numa grafia ou escreve), tira o visto para deixar como está, e grava.`;
+    `${_normViaAI?'✨ ':''}${_normGroups.length} grupo(s) de grafias parecidas${_normViaAI?' (sugeridos pela AI)':' (deteção básica)'}. Escolhe o nome final de cada um (toca numa grafia ou escreve), tira o visto para deixar como está, e grava.`;
   document.getElementById('shopnorm-list').innerHTML=_normGroups.map((g,i)=>{
     const canK=shopArtKey(g.canon);
     const chips=g.variants.map(v=>`<button type="button" class="norm-chip${shopArtKey(v.name)===canK?' on':''}" onclick="shopNormPick(${i},this.dataset.n)" data-n="${escHtml(v.name)}">${escHtml(v.name)}${v.count>1?` ·${v.count}`:''}</button>`).join('');
