@@ -916,6 +916,24 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .lote-al .cmp-ln-del{padding:4px 0 4px 4px}
 .lote-addmarca{display:inline-flex;margin-top:8px;background:transparent;border:1px dashed var(--line);border-radius:20px;color:var(--faint);font-size:11px;font-weight:700;letter-spacing:.02em;padding:4px 11px;cursor:pointer}
 .lote-addmarca:active{transform:scale(.99);background:rgba(120,90,40,.05)}
+/* ── Stock sem compra: ofertas e sobras do ano anterior ──
+   Selo discreto no cartão (só o emoji: 🎁 / 📦) e, no modal de adicionar, as
+   duas origens como cartões-chip a toda a largura. */
+.stk-org{flex:0 0 auto;font-size:12px;line-height:1;opacity:.9}
+/* Botão de adicionar no cabeçalho do Stock: compacto, para o título "Gestão de
+   Stock" continuar numa linha só em ecrãs estreitos */
+#view-stock .cmp-hdr .btn.stk-add{padding:8px 11px;font-size:12.5px;white-space:nowrap}
+.stk-org-pick{display:flex;gap:8px;margin-top:6px}
+.stk-org-pick .sd-chip{flex:1 1 0;min-width:0;flex-direction:column;align-items:flex-start;gap:3px;padding:9px 11px;border-radius:13px;text-align:left}
+.stk-org-pick .sd-chip b{font-size:13px;font-weight:700;color:var(--ink)}
+.stk-org-pick .sd-chip small{font-size:10.5px;font-weight:600;line-height:1.3;color:var(--faint);white-space:normal}
+.stkadd-qtd{display:flex;gap:8px}
+.stkadd-qtd input{flex:1 1 0;min-width:0;margin:0}
+.stkadd-qtd select{flex:0 0 44%;margin:0}
+/* Linha de origem apagável no detalhe do artigo (o ✕ do lote sem compra) */
+.lote-cmp-row.org{display:flex;align-items:center;gap:6px}
+.lote-cmp-row .t{display:block;min-width:0;flex:1}
+.lote-cmp-row.org .cmp-ln-del{flex:0 0 auto;padding:2px 0 2px 4px}
 /* Marcas listadas no cartão de stock (Ruffles · Lays) */
 .stk-marcas{font-size:11.5px;color:var(--muted);margin:1px 0 5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 /* Ligação manual "pertence a" no registo da compra (lotes livres) */

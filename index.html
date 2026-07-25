@@ -273,6 +273,31 @@ setTimeout(function(){ if (window.fbvEsconderSplash) window.fbvEsconderSplash();
   </div>
 </div>
 
+<!-- ➕ Stock que não veio de compras: ofertas e sobras do ano anterior -->
+<div class="modal-bg" id="stkadd-bg">
+  <div class="modal" id="stkadd-modal">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:10px">
+      <h3 style="margin-bottom:0">➕ Stock sem compra</h3>
+      <button onclick="stkAddClose()" style="background:var(--panel2);border:1px solid var(--line);color:var(--muted);border-radius:9px;width:32px;height:32px;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0">✕</button>
+    </div>
+    <div class="note" style="margin-top:0">Para o que entrou sem ser comprado. Fica no stock e aloca-se às refeições como qualquer artigo, mas <b>custa 0 €</b> — não mexe nas contas nem em quem pagou o quê.</div>
+    <label>De onde vem</label>
+    <div class="stk-org-pick" id="stkadd-org"></div>
+    <label>Artigo</label>
+    <input id="stkadd-art" list="stkadd-list" placeholder="ex.: Ovos" autocomplete="off">
+    <datalist id="stkadd-list"></datalist>
+    <label>Quantidade</label>
+    <div class="stkadd-qtd">
+      <input id="stkadd-qtd" type="number" step="any" min="0" inputmode="decimal" placeholder="ex.: 6">
+      <select id="stkadd-un"></select>
+    </div>
+    <div class="mbtns">
+      <button class="btn ghost" onclick="stkAddClose()">Cancelar</button>
+      <button class="btn prim" id="stkadd-save" onclick="stkAddSave()">Adicionar</button>
+    </div>
+  </div>
+</div>
+
 <!-- ✨ Sugestões de categorias da AI (rever antes de gravar) -->
 <div class="modal-bg" id="catsug-bg">
   <div class="modal" id="catsug-modal">

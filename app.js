@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v95 · 2026-07-25 · Stock: filtros com o ícone antes da palavra, tudo na mesma linha; contador cai em ecrãs estreitos e a frase da legenda saiu';
+const APP_BUILD = 'v96 · 2026-07-25 · Stock sem compra: ➕ Stock para ofertas e sobras do ano anterior (custo 0 €, sem tocar nas contas); € por alocação passa a seguir o FIFO real dos lotes';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -927,7 +927,9 @@ function renderAll(){
         </details>`;
         const dirItems=(DATA.despesas||[]).filter(x=>x.tipo===rd.ref&&x.dataValor===rd.data).slice();
         // Alocações de stock a esta refeição contam como custo direto — entram no detalhe
-        stockArr().forEach(l=>{if(!stockBacked(l)||!(l.qtd>0))return;(l.alocacoes||[]).forEach(a=>{if(a.tipo===rd.ref&&a.data===rd.data&&+a.qtd>0)dirItems.push({desc:'🧺 '+l.artigo+' ('+fmtQty(+a.qtd,l.unidade)+')',quem:'',valor:rnd(l.valor/l.qtd*a.qtd,2)});});});
+        // (o que veio de oferta/ano anterior entra na mesma, mas a 0 € — leva o
+        // ícone da origem em vez do 🧺 para se perceber porque não custa nada)
+        stockArr().forEach(l=>{if(!stockBacked(l)||!(l.qtd>0))return;const om=origemMeta(l);(l.alocacoes||[]).forEach(a=>{if(a.tipo===rd.ref&&a.data===rd.data&&+a.qtd>0)dirItems.push({desc:(om?om.ic:'🧺')+' '+l.artigo+' ('+fmtQty(+a.qtd,l.unidade)+')',quem:om?om.lbl:'',valor:rnd(l.valor/l.qtd*a.qtd,2)});});});
         const dirDetBody=dirItems.length?`<div class="rdc-det-body">${dirItems.map(it=>`<div class="rdc-det-it"><span class="k">${escHtml(it.desc||'(sem descrição)')}${it.quem?`<small> · ${escHtml(it.quem)}</small>`:''}</span><span class="v">${eur(it.valor||0)}</span></div>`).join('')}</div>`:'';
         let dirChipsRow='';
         if(dirTot>0){
@@ -3637,8 +3639,27 @@ function shopCanEditItem(it){return isAdmin()||(it.criadoPor&&myClaimNames().has
    no detalhe do lote. Reservado vs consumido é derivado da data da refeição. */
 const STOCK_OBS='🧺 Stock';
 function stockArr(){if(DATA&&!DATA.stockLotes)DATA.stockLotes=[];return (DATA&&DATA.stockLotes)||[];}
-// Lote órfão (compra apagada/limpa): sai das contas e das vistas
-function stockBacked(l){return (DATA.despesas||[]).some(d=>d.compraId===l.compraId);}
+
+/* ── Stock SEM compra: ofertas e sobras de anos anteriores ──
+   Nem tudo o que está em stock foi comprado este ano: há o que alguém oferece e
+   o que sobrou do ano passado. Esses lotes vivem na MESMA tabela (stock_lotes),
+   com valor 0 e um compra_id próprio ('x-oferta-…' / 'x-anterior-…') que NÃO
+   existe nas despesas — é só isso que os distingue (zero migração de BD).
+   Consequências, todas de propósito:
+   · sem despesa para abater, o aplicarStock ignora-os → as contas ficam
+     exatamente na mesma e a refeição a que forem alocados recebe custo 0;
+   · fora isso são lotes normais: agrupam, alocam-se e cobrem pedidos da lista;
+   · como não há compra para apagar, apagam-se no próprio detalhe do artigo. */
+const STOCK_ORIGENS={
+  oferta  :{ic:'🎁',lbl:'Oferta',      sub:'alguém ofereceu — não custa nada às contas'},
+  anterior:{ic:'📦',lbl:'Ano anterior',sub:'sobrou do ano passado — já foi pago nessas contas'}
+};
+function loteOrigem(l){const m=/^x-(oferta|anterior)-/.exec((l&&l.compraId)||'');return m?m[1]:null;}
+function loteSemCompra(l){return !!loteOrigem(l);}
+function origemMeta(l){return STOCK_ORIGENS[loteOrigem(l)]||null;}
+// Lote órfão (compra apagada/limpa): sai das contas e das vistas.
+// O stock sem compra não depende de despesa nenhuma — está sempre de pé.
+function stockBacked(l){return loteSemCompra(l)||(DATA.despesas||[]).some(d=>d.compraId===l.compraId);}
 function hojeISO(){return new Date().toISOString().slice(0,10);}
 
 // Interpreta quantidade em texto ("5 pacotes", "2,5 kg") → {n,u} com unidade
@@ -4106,7 +4127,7 @@ function mealShopSection(rd){
     (l.alocacoes||[]).forEach(a=>{
       if(a.tipo!==rd.ref||a.data!==rd.data||!(+a.qtd>0))return;
       const unit=l.qtd>0?l.valor/l.qtd:0;
-      alocs.push({l,qtd:+a.qtd,val:rnd(unit*a.qtd,2)});
+      alocs.push({l,qtd:+a.qtd,val:rnd(unit*a.qtd,2),org:origemMeta(l)});
     });
   });
   alocs.sort((a,b)=>a.l.artigo.localeCompare(b.l.artigo,'pt'));
@@ -4115,7 +4136,7 @@ function mealShopSection(rd){
   if(!items.length&&!alocs.length&&!canAdd)return '';
   const key=rd.data+'|'+rd.ref;
   const alocLines=alocs.map(x=>`<div class="msl-it stk" onclick="openLoteModal(${x.l._id})">
-      <span class="msl-art">${escHtml(x.l.artigo)} <i>${escHtml(fmtQty(x.qtd,x.l.unidade))}</i></span><span class="msl-st ok">${eur(x.val)}</span></div>`).join('');
+      <span class="msl-art">${escHtml(x.l.artigo)} <i>${escHtml(fmtQty(x.qtd,x.l.unidade))}</i></span><span class="msl-st ok">${x.org?x.org.ic+' '+escHtml(x.org.lbl):eur(x.val)}</span></div>`).join('');
   const lineOf=(it,dim)=>{
     const done=shopIsBought(it);
     const qtdTxt=shopQtyLabel(it);
@@ -4346,10 +4367,13 @@ function stockArticleCard(g){
     +((ag.freeQ>0&&(st==='all'||st==='disponivel'))?`<span class="stk-chip livre">🧺 disponível · ${escHtml(fmtQty(ag.freeQ,ag.u))}</span>`:'');
   // Marcas debaixo do guarda-chuva (Ruffles · Lays) — só quando diferem do nome
   const marcas=(g.marcas&&g.marcas.length)?`<div class="stk-marcas">${g.marcas.map(m=>escHtml(m)).join(' · ')}</div>`:'';
+  // Selo de origem: parte (ou tudo) deste artigo não veio de uma compra
+  const origs=[...new Set(g.lotes.map(loteOrigem).filter(Boolean))];
+  const orgTag=origs.length?`<span class="stk-org" title="${escHtml(origs.map(o=>STOCK_ORIGENS[o].lbl).join(' · '))}">${origs.map(o=>STOCK_ORIGENS[o].ic).join('')}</span>`:'';
   // Com filtro de estado abre o lote que tem essa parte (não o primeiro do grupo)
   const tgt=(st==='all'?null:g.lotes.find(l=>stockGroupEstados(stockAggAlocs([l])).has(st)))||g.lotes[0];
   return `<div class="stk-card stk-tap" onclick="openLoteModal(${tgt._id})">
-    <div class="stk-card-top"><b>${escHtml(g.artigo)}</b><span class="stk-chev">›</span></div>
+    <div class="stk-card-top"><b>${escHtml(g.artigo)}</b>${orgTag}<span class="stk-chev">›</span></div>
     ${marcas}
     <div class="stk-chips">${chips}</div>
   </div>`;
@@ -4400,9 +4424,11 @@ function renderStock(){
   // ✨: pedir à AI categorias para o que ainda não tem (só admin, com migração)
   const aiBtn=(CATS_TABLE&&canEdit&&catNamesPorCategorizar().length)
     ?`<button class="btn write-action" id="stk-catsug-btn" onclick="catSugerir()">✨ Categorias</button>`:'';
-  let h=`<div class="cmp-hdr"><div class="cmp-hdr-title sf">🧺 Gestão de Stock</div>${aiBtn}</div>`;
+  // Stock que não veio de compras (ofertas, sobras do ano anterior)
+  const addBtn=canEdit?`<button class="btn ghost write-action stk-add" id="stk-add-btn" onclick="stkAddOpen()" title="Stock que não veio de compras (ofertas, ano anterior)">＋ Stock</button>`:'';
+  let h=`<div class="cmp-hdr"><div class="cmp-hdr-title sf">🧺 Gestão de Stock</div><div class="cmp-hdr-acts">${addBtn}${aiBtn}</div></div>`;
   h+=`<div class="note" style="margin-top:2px;margin-bottom:8px">${canEdit?'Toca num artigo para o alocar às refeições e categorias — as contas recalculam sozinhas.':'Toca num artigo para ver como está alocado às refeições e categorias.'}</div>`;
-  if(!arr.length){el.innerHTML=h+'<div class="empty sf">Ainda não há stock. Regista uma compra itemizada ou importa uma fatura.</div>';return;}
+  if(!arr.length){el.innerHTML=h+`<div class="empty sf">Ainda não há stock. Regista uma compra itemizada, importa uma fatura${canEdit?' ou usa <b>＋ Stock</b> para o que não foi comprado (ofertas, sobras do ano anterior)':''}.</div>`;return;}
   // Chips de filtro por estado: os três aparecem SEMPRE (com a contagem de
   // artigos), mesmo a zero — são a chave de leitura do separador, não podem
   // sumir só porque o stock está todo no mesmo estado
@@ -5585,16 +5611,23 @@ const _ALOC_SEP='␟';   // separador interno marca␟destino (não aparece em n
 /* Distribui as alocações do guarda-chuva pelos lotes físicos:
    1.º as fixadas a uma marca (só pelos lotes dessa marca, FIFO),
    2.º as genéricas (marca='') por qualquer lote, FIFO global.
-   Devolve {loteId → [{tipo,data,qtd}]}. Pura (testável). */
-function resolveUmbrella(lotesFifo,alocs){
-  const cap={},out={};
-  lotesFifo.forEach(l=>{cap[l._id]=l.qtd;out[l._id]=[];});
-  const put=(l,a,take)=>{const ex=out[l._id].find(x=>x.tipo===a.tipo&&x.data===a.data);if(ex)ex.qtd=rnd(ex.qtd+take,3);else out[l._id].push({tipo:a.tipo,data:a.data,qtd:rnd(take,3)});};
+   Devolve {loteId → [{tipo,data,qtd}]}. Pura (testável).
+   `lineVal` (opcional): array onde se acumula o € que cada linha de alocação
+   custa DE FACTO, lote a lote (a linha traz o seu índice em `_i`). Sem isto o
+   modal mostrava o preço médio do guarda-chuva por unidade, que mente quando os
+   lotes têm preços diferentes — ou quando um deles foi oferta (custo 0). */
+function resolveUmbrella(lotesFifo,alocs,lineVal){
+  const cap={},out={},unit={};
+  lotesFifo.forEach(l=>{cap[l._id]=l.qtd;out[l._id]=[];unit[l._id]=l.qtd>0?(+l.valor||0)/l.qtd:0;});
+  const put=(l,a,take)=>{const ex=out[l._id].find(x=>x.tipo===a.tipo&&x.data===a.data);if(ex)ex.qtd=rnd(ex.qtd+take,3);else out[l._id].push({tipo:a.tipo,data:a.data,qtd:rnd(take,3)});
+    if(lineVal&&a._i!=null)lineVal[a._i]=rnd((lineVal[a._i]||0)+unit[l._id]*take,2);};
   const fill=(a,lots)=>{let rest=a.qtd;for(const l of lots){if(rest<=0.0005)break;const c=cap[l._id];if(c<=0.0005)continue;const take=Math.min(c,rest);put(l,a,take);cap[l._id]=rnd(c-take,3);rest=rnd(rest-take,3);}return rest;};
   alocs.filter(a=>a.marca).forEach(a=>fill(a,lotesFifo.filter(l=>shopSameArtigo(l.artigo,a.marca))));
   alocs.filter(a=>!a.marca).forEach(a=>fill(a,lotesFifo));
   return out;
 }
+// Data da compra que trouxe o lote — a chave FIFO. Stock sem compra (ofertas /
+// ano anterior) não tem data: fica '' e gasta-se primeiro, que é o que se quer.
 function loteCompraDate(l){return ((DATA.despesas||[]).find(d=>d.compraId===l.compraId)||{}).dataDesp||'';}
 // Lotes do mesmo PEDIDO genérico (loteReqArtigo) e unidade, por ordem FIFO da
 // data da compra — podem ser de marcas diferentes.
@@ -5621,19 +5654,26 @@ function openLoteModal(id){
   // Ligação atual a um pedido da lista (batatas fritas ↔ Lays) — do 1.º lote
   const reqLink=(lotes.find(l=>l._listArt&&String(l._listArt).trim())||{})._listArt||'';
   editingLote={reqName,artigo:reqName,product:(multi?reqName:brands[0]||reqName),u,
-    allIds:lotes.map(l=>l._id),lotesFifo:lotes.map(l=>({_id:l._id,artigo:l.artigo,qtd:+l.qtd||0})),
+    allIds:lotes.map(l=>l._id),lotesFifo:lotes.map(l=>({_id:l._id,artigo:l.artigo,qtd:+l.qtd||0,valor:+l.valor||0})),
     totQ,totV,brands,multi,reqLink,alocs};
   document.getElementById('lote-title').textContent='🧺 '+reqName;
-  // As compras de origem (esquerda) — saíram do cartão do ecrã principal
+  // A origem (esquerda) — saiu do cartão do ecrã principal. Normalmente são as
+  // compras; um lote sem compra (oferta / ano anterior) diz-se pelo nome e é
+  // aqui que se apaga, já que não há compra para apagar.
+  const anyOrg=lotes.some(loteSemCompra);
+  const podeApagar=isAdmin()&&!contasFechadas();
   const comprasRows=lotes.map(l=>{
-    const dsp=(DATA.despesas||[]).find(d=>d.compraId===l.compraId);
+    const org=origemMeta(l);
+    const dsp=org?null:(DATA.despesas||[]).find(d=>d.compraId===l.compraId);
     const parts=[];
-    if(dsp&&dsp.dataDesp)parts.push(fmtDiaMes(dsp.dataDesp));
-    parts.push(escHtml(fmtQty(l.qtd,l.unidade)),eur(l.valor));
+    if(org)parts.push(org.ic+' '+escHtml(org.lbl));
+    else if(dsp&&dsp.dataDesp)parts.push(fmtDiaMes(dsp.dataDesp));
+    parts.push(escHtml(fmtQty(l.qtd,l.unidade)),org?'sem custo':eur(l.valor));
     if(dsp&&dsp.desc&&dsp.desc!=='Compras')parts.push(escHtml(dsp.desc));
     // Marca em cima (quebra à vontade), detalhes por baixo — assim os nomes
     // compridos deixam de sair cortados a meio.
-    return `<div class="lote-cmp-row">${multi?`<span class="n">${escHtml(l.artigo)}</span>`:''}<span class="d">${parts.join(' · ')}</span></div>`;
+    const del=(org&&podeApagar&&l._id!=null)?`<button class="cmp-ln-del" title="Apagar este stock" onclick="stkDelLote(${l._id})">✕</button>`:'';
+    return `<div class="lote-cmp-row${org?' org':''}"><span class="t">${multi?`<span class="n">${escHtml(l.artigo)}</span>`:''}<span class="d">${parts.join(' · ')}</span></span>${del}</div>`;
   }).join('');
   // As necessidades (direita) — refeições que pedem este artigo na lista de
   // compras, por ordem de data. Casa pelo nome do PEDIDO (batatas fritas), que
@@ -5644,11 +5684,12 @@ function openLoteModal(id){
     const a=destinoAloc(k,0);const ic=shopTipoIcon(a.tipo);
     return `<div class="lote-need-row">${ic} ${escHtml(diaAbrev(a.data)+' '+fmtDiaMes(a.data))} · <b>${escHtml(fmtQty(dem[k],editingLote.u))}</b></div>`;
   }).join(''):`<div class="lote-need-row empty">— sem pedidos na lista —</div>`;
+  const semCusto=lotes.length>0&&lotes.every(loteSemCompra);
   document.getElementById('lote-info').innerHTML=
-    `<div class="lote-sum">Em stock: <b>${escHtml(fmtQty(totQ,editingLote.u))}</b> · <b>${eur(totV)}</b></div>`+
-    (lotes.length>1?`<div class="lote-sum-sub">${lotes.length} compras — a distribuição por elas é automática (FIFO)</div>`:'')+
+    `<div class="lote-sum">Em stock: <b>${escHtml(fmtQty(totQ,editingLote.u))}</b> · <b>${semCusto?'sem custo':eur(totV)}</b></div>`+
+    (lotes.length>1?`<div class="lote-sum-sub">${lotes.length} ${anyOrg?'origens':'compras'} — a distribuição por elas é automática (FIFO)</div>`:'')+
     `<div class="lote-cols">
-      <div class="lote-col"><div class="lote-col-h"><span>🛒</span>Compras</div>${comprasRows}</div>
+      <div class="lote-col"><div class="lote-col-h"><span>${anyOrg?'📦':'🛒'}</span>${anyOrg?'Origem':'Compras'}</div>${comprasRows}</div>
       <div class="lote-col"><div class="lote-col-h"><span>📋</span>Pedidos na lista</div>${needRows}</div>
     </div>`;
   const canEdit=isAdmin()&&!contasFechadas();
@@ -5724,7 +5765,12 @@ function loteMeals(){return (DATA.refeicoesDef||[]).filter(r=>shopIsMeal(r.ref))
 function loteRenderAlocs(){
   if(!editingLote)return;
   const canEdit=isAdmin()&&!contasFechadas();
-  const unit=editingLote.totQ>0?editingLote.totV/editingLote.totQ:0;
+  // € de cada linha pelo MESMO plano FIFO que o guardar aplica — assim o que se
+  // vê é o que vai para as contas (uma alocação servida por stock oferecido
+  // aparece a 0 €, não ao preço médio do artigo)
+  const lineVal=[];
+  resolveUmbrella(editingLote.lotesFifo,editingLote.alocs.map((a,i)=>({tipo:a.tipo,data:a.data,qtd:+a.qtd||0,marca:a.marca||'',_i:i})),lineVal);
+  const lv=i=>rnd(lineVal[i]||0,2);
   // Sufixo da unidade dentro do campo da qtd ("0,5 kg") — sem ele não se
   // percebe se o 0,5 são quilos, litros ou unidades. Vazio = à unidade.
   const uLbl=fmtQty(0,editingLote.u).split(' ')[1]||'';
@@ -5742,7 +5788,7 @@ function loteRenderAlocs(){
       <input type="number" step="any" min="0" inputmode="decimal" ${canEdit?'':'disabled'} value="${a.qtd||''}" placeholder="qtd" onchange="loteAlocField(${i},'qtd',this.value)">
       ${uLbl?`<i>${escHtml(uLbl)}</i>`:''}
     </div>`;
-  const endCells=(i,a)=>qtyCell(i,a)+`<span class="lote-val">${eur(rnd(unit*(+a.qtd||0),2))}</span>`+
+  const endCells=(i,a)=>qtyCell(i,a)+`<span class="lote-val">${eur(lv(i))}</span>`+
     (canEdit?`<button class="cmp-ln-del" title="Remover" onclick="loteDelAloc(${i})">✕</button>`:'');
   // Botão-texto que abre um bottom-sheet (o mesmo padrão do destino): ao
   // contrário de um <select>, corta com "…" e cabe na linha.
@@ -5770,8 +5816,11 @@ function loteRenderAlocs(){
     (html?(solo?`<div class="lote-solos">${html}</div>`:html):'<div class="empty sf" style="margin-top:8px">Sem alocações — está tudo na bolsa comum.</div>');
   const tot=editingLote.alocs.reduce((s,a)=>s+(+a.qtd||0),0);
   const livre=rnd(editingLote.totQ-tot,3);
+  // O que sobra na bolsa comum é o que o alocado não levou (0 € se o que sobra
+  // for stock oferecido / do ano anterior)
+  const restoVal=Math.max(0,rnd(editingLote.totV-lineVal.reduce((s,v)=>s+(+v||0),0),2));
   document.getElementById('lote-resto').innerHTML=livre>0
-    ?`Alocado ${escHtml(fmtQty(rnd(tot,3),editingLote.u))} de ${escHtml(fmtQty(editingLote.totQ,editingLote.u))} — <b>${escHtml(fmtQty(livre,editingLote.u))}</b> (${eur(rnd(unit*livre,2))}) fica na bolsa comum.`
+    ?`Alocado ${escHtml(fmtQty(rnd(tot,3),editingLote.u))} de ${escHtml(fmtQty(editingLote.totQ,editingLote.u))} — <b>${escHtml(fmtQty(livre,editingLote.u))}</b> (${eur(restoVal)}) fica na bolsa comum.`
     :livre<0?`⚠️ Alocaste ${escHtml(fmtQty(rnd(tot,3),editingLote.u))} — mais do que há em stock (${escHtml(fmtQty(editingLote.totQ,editingLote.u))}).`
     :'Stock totalmente alocado.';
 }
@@ -5885,6 +5934,89 @@ async function saveLote(){
     if(STOCK_TABLE&&TAB!=='stock')renderStock();
     toast('Alocação atualizada ✓','ok');
   }catch(e){setSync('err','erro ao guardar');btn.disabled=false;toast(permErrorMsg(e),'bad');}
+}
+
+/* ── Adicionar stock sem compra (ofertas / ano anterior) ──
+   Um lote novo com valor 0 e um compra_id de origem. Depois de gravar abre-se
+   logo o detalhe do artigo, que é onde se aloca às refeições. */
+const STK_UNITS=[['un','un'],['kg','kg'],['l','L'],['duzia','dúzia'],['pacote','pacote'],
+                 ['caixa','caixa'],['garrafa','garrafa'],['lata','lata'],['grade','grade'],
+                 ['saco','saco'],['fatia','fatia'],['molho','molho'],['','sem unidade']];
+let stkAdd=null;   // {origem} enquanto o modal está aberto
+// Nomes já conhecidos (stock + lista de compras) para o datalist do artigo
+function stkAddNomes(){
+  const s=new Set();
+  stockArr().forEach(l=>{if(l.artigo)s.add(l.artigo);});
+  shopArr().forEach(it=>{if(it.artigo&&!shopIsRemoved(it))s.add(it.artigo);});
+  return [...s].sort((a,b)=>a.localeCompare(b,'pt'));
+}
+function stkAddOpen(){
+  if(!STOCK_TABLE)return;
+  if(!isAdmin()){toast('Só o admin mexe no stock','bad');return;}
+  if(contasFechadas()){toast('Contas fechadas — o stock já não se mexe','bad');return;}
+  stkAdd={origem:'oferta'};
+  document.getElementById('stkadd-art').value='';
+  document.getElementById('stkadd-qtd').value='';
+  document.getElementById('stkadd-list').innerHTML=stkAddNomes().map(n=>`<option value="${escHtml(n)}">`).join('');
+  document.getElementById('stkadd-un').innerHTML=STK_UNITS.map(([v,l])=>`<option value="${v}"${v==='un'?' selected':''}>${escHtml(l)}</option>`).join('');
+  stkAddRenderOrigem();
+  document.getElementById('stkadd-bg').classList.add('show');
+  document.body.classList.add('no-scroll');
+}
+function stkAddClose(){document.getElementById('stkadd-bg').classList.remove('show');document.body.classList.remove('no-scroll');stkAdd=null;}
+function stkAddOrigem(o){if(!stkAdd||!STOCK_ORIGENS[o])return;stkAdd.origem=o;stkAddRenderOrigem();}
+function stkAddRenderOrigem(){
+  const el=document.getElementById('stkadd-org');if(!el||!stkAdd)return;
+  el.innerHTML=Object.keys(STOCK_ORIGENS).map(o=>{
+    const m=STOCK_ORIGENS[o];
+    return `<span class="sd-chip${stkAdd.origem===o?' on':''}" onclick="stkAddOrigem('${o}')"><b>${m.ic} ${escHtml(m.lbl)}</b><small>${escHtml(m.sub)}</small></span>`;
+  }).join('');
+}
+async function stkAddSave(){
+  if(!stkAdd||!isAdmin()||contasFechadas())return;
+  const artigo=(document.getElementById('stkadd-art').value||'').trim();
+  const qtd=rnd(parseFloat(String(document.getElementById('stkadd-qtd').value||'').replace(',','.'))||0,3);
+  const unidade=document.getElementById('stkadd-un').value||'';
+  if(!artigo){toast('Falta o nome do artigo','bad');return;}
+  if(!(qtd>0)){toast('Falta a quantidade','bad');return;}
+  const origem=stkAdd.origem;
+  const compraId='x-'+origem+'-'+Date.now();
+  const btn=document.getElementById('stkadd-save');btn.disabled=true;
+  setSync('load','a guardar…');
+  try{
+    const ins=await queueWrite(()=>sbReq('POST','stock_lotes',[{evento_id:DATA._sbId,compra_id:compraId,artigo,qtd,unidade,valor:0,alocacoes:[]}],{Prefer:'return=representation'}));
+    const id=ins&&ins[0]?ins[0].id:null;
+    stockArr().push({_id:id,compraId,artigo,qtd,unidade,valor:0,alocacoes:[],_listArt:null,criadoEm:new Date().toISOString()});
+    syncMirror();marcaGuardado();
+    btn.disabled=false;stkAddClose();
+    CALC=calcular(JSON.parse(JSON.stringify(DATA)));
+    renderAll();renderStock();renderCompras();
+    toast(`${STOCK_ORIGENS[origem].ic} ${artigo} em stock ✓`,'ok');
+    if(id!=null)openLoteModal(id);   // segue logo para a alocação às refeições
+  }catch(e){setSync('err','erro ao guardar');btn.disabled=false;toast(permErrorMsg(e),'bad');}
+}
+/* Apagar um lote sem compra — a partir do detalhe do artigo (não há compra
+   para apagar). Só ele: os lotes comprados do mesmo guarda-chuva ficam. */
+async function stkDelLote(id){
+  if(!isAdmin()||contasFechadas())return;
+  const l=stockArr().find(x=>x._id===id);
+  const m=l?origemMeta(l):null;
+  if(!l||!m)return;
+  if(!confirm(`Apagar ${l.artigo} (${fmtQty(l.qtd,l.unidade)}) — ${m.lbl.toLowerCase()}? As alocações deste lote desaparecem com ele.`))return;
+  const reabrir=editingLote?{req:editingLote.reqName,u:editingLote.u}:null;
+  setSync('load','a guardar…');
+  try{
+    await queueWrite(()=>sbReq('DELETE',`stock_lotes?id=eq.${id}`));
+    DATA.stockLotes=stockArr().filter(x=>x._id!==id);
+    syncMirror();marcaGuardado();
+    closeLoteModal();
+    CALC=calcular(JSON.parse(JSON.stringify(DATA)));
+    renderAll();renderStock();renderCompras();
+    // Ainda sobra stock deste artigo? Volta ao detalhe; senão fica na lista.
+    const resto=reabrir?umbrellaLotes(reabrir.req,reabrir.u):[];
+    if(resto.length)openLoteModal(resto[0]._id);
+    toast('Stock apagado','ok');
+  }catch(e){setSync('err','erro ao guardar');toast(permErrorMsg(e),'bad');}
 }
 
 async function deleteCompra(){
