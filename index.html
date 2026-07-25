@@ -250,7 +250,19 @@ setTimeout(function(){ if (window.fbvEsconderSplash) window.fbvEsconderSplash();
   <div class="modal" id="lote-modal">
     <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:10px">
       <h3 style="margin-bottom:0" id="lote-title">Lote</h3>
-      <button onclick="closeLoteModal()" style="background:var(--panel2);border:1px solid var(--line);color:var(--muted);border-radius:9px;width:32px;height:32px;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0">✕</button>
+      <div class="lote-hdr-acts">
+        <button class="lote-hdr-btn write-action" id="lote-ren-btn" title="Mudar o nome do artigo" onclick="loteRenameOpen()">✏️</button>
+        <button onclick="closeLoteModal()" style="background:var(--panel2);border:1px solid var(--line);color:var(--muted);border-radius:9px;width:32px;height:32px;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0">✕</button>
+      </div>
+    </div>
+    <div id="lote-ren-wrap" style="display:none">
+      <label>✏️ Nome do artigo</label>
+      <input id="lote-ren" placeholder="ex.: Bifes do acém">
+      <div class="note" id="lote-ren-note" style="margin-top:2px"></div>
+      <div class="lote-ren-btns">
+        <button class="btn ghost" onclick="loteRenameCancel()">Cancelar</button>
+        <button class="btn prim" id="lote-ren-save" onclick="loteRenameSave()">Mudar nome</button>
+      </div>
     </div>
     <div class="note" id="lote-info" style="margin-top:0"></div>
     <div id="lote-cat-wrap" style="display:none">
