@@ -859,6 +859,15 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .lote-ln{display:flex;align-items:center;gap:7px;margin-top:8px}
 .lote-ln select{flex:1;min-width:0;margin:0}
 .lote-ln input{flex:0 0 74px;margin:0;text-align:right}
+/* Seletor de marca por linha de alocação (guarda-chuva com várias marcas) —
+   desce para uma 2.ª linha da própria alocação */
+.lote-ln.has-marca{flex-wrap:wrap}
+.lote-marca{flex:1 1 100%!important;order:5;margin:2px 0 0!important;height:34px;font-size:12.5px;border:1px solid var(--line);border-radius:8px;background:#FFFDF6;color:var(--muted);padding:0 8px}
+/* Marcas listadas no cartão de stock (Ruffles · Lays) */
+.stk-marcas{font-size:11.5px;color:var(--muted);margin:1px 0 5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* Ligação manual "pertence a" no registo da compra (lotes livres) */
+.lote-req-inline{display:flex;align-items:center;gap:6px;margin-top:8px;font-size:12.5px;color:var(--muted)}
+.lote-req-inline select{flex:1;min-width:0;height:36px;border:1px solid var(--line);border-radius:8px;background:#FFFDF6;color:var(--ink);padding:0 8px;font-size:13px}
 .lote-val{flex:0 0 auto;font-size:12px;font-weight:700;color:var(--muted);font-variant-numeric:tabular-nums;min-width:52px;text-align:right}
 
 /* ── Itemização da fatura: cartão por artigo (registo da compra) ── */

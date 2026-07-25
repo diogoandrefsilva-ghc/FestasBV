@@ -119,11 +119,11 @@ function lerCategorias(raw: unknown): Cat[] {
 const catsLista = (cats: Cat[]) =>
   cats.map((c) => `  · ${c.nome}${c.descritivo ? ` — ${c.descritivo}` : ""}`).join("\n");
 
-const promptFatura = (cats: Cat[]) => `Isto é um talão ou fatura de compras (Portugal) — fotografia ou
+const promptFatura = (cats: Cat[], pedidos: string[]) => `Isto é um talão ou fatura de compras (Portugal) — fotografia ou
 PDF (pode ter várias páginas; considera todas).
 Extrai APENAS um objeto JSON com esta forma exata:
 {"loja": string|null, "data": "YYYY-MM-DD"|null, "total": number|null,
- "linhas": [{"artigo": string, "qtd": string|null, "preco": number${cats.length ? ', "categoria": string|null' : ""}}]}
+ "linhas": [{"artigo": string, "qtd": string|null, "preco": number${cats.length ? ', "categoria": string|null' : ""}${pedidos.length ? ', "pedido": string|null' : ""}}]}
 
 Regras:
 - "linhas": só produtos comprados. Ignora subtotais, IVA, troco, pontos de
@@ -137,7 +137,14 @@ Regras:
 - "loja": nome da cadeia/loja (ex. "Continente"), sem morada.${cats.length ? `
 - "categoria": a categoria que melhor descreve o artigo, EXATAMENTE um destes
   nomes (copia o nome tal e qual), ou null se nenhum encaixar com confiança:
-${catsLista(cats)}` : ""}
+${catsLista(cats)}` : ""}${pedidos.length ? `
+- "pedido": a lista de compras tem pedidos genéricos e o talão traz o produto
+  concreto (marca/variedade). Se o artigo desta linha for um EXEMPLO de um
+  destes pedidos, devolve EXATAMENTE esse nome (copia tal e qual); senão null.
+  Ex.: "Lay's Forno" e "Ruffles" -> "Batatas Fritas"; "Castelões" e
+  "Terra Nostra" -> "Queijos". Não forces: variedade diferente do pedido -> null.
+  Pedidos:
+${pedidos.map((p) => `  · ${p}`).join("\n")}` : ""}
 - Se algo não se ler com confiança, usa null nesse campo em vez de adivinhar.
 Responde só com o JSON.`;
 
@@ -225,8 +232,13 @@ Deno.serve(async (req) => {
       return json({ error: "não autorizado" }, 403);
     }
 
-    const { image, mime, categorias, artigos, normalizar } = await req.json();
+    const { image, mime, categorias, artigos, normalizar, pedidos } = await req.json();
     const cats = lerCategorias(categorias);
+    // Pedidos genéricos da lista (para a fatura ligar marca -> pedido)
+    const pedidosLista = (Array.isArray(pedidos) ? pedidos : [])
+      .filter((p) => typeof p === "string" && p.trim())
+      .slice(0, 80)
+      .map((p) => String(p).replace(/\s+/g, " ").trim().slice(0, 60));
     const limparNomes = (arr: unknown[]) =>
       arr
         .filter((a) => typeof a === "string" && (a as string).trim())
@@ -254,7 +266,7 @@ Deno.serve(async (req) => {
       }
       parts = [
         { inline_data: { mime_type: mime || "image/jpeg", data: image } },
-        { text: promptFatura(cats) },
+        { text: promptFatura(cats, pedidosLista) },
       ];
     }
 
@@ -296,7 +308,7 @@ Deno.serve(async (req) => {
     const candidatos = await candidatosModelo();
     // Marcador de versão + lista de candidatos: se este log não aparecer, é a
     // versão ANTIGA que está a correr (o deploy não pegou).
-    console.log("FATURA-OCR build=normalizar-v2 candidatos:", candidatos.join(", "));
+    console.log("FATURA-OCR build=pedidos-v3 candidatos:", candidatos.join(", "));
     let model = candidatos[0] ?? "gemini-flash-latest";
     let g: Response | null = null;
 
