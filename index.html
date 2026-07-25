@@ -163,7 +163,8 @@ setTimeout(function(){ if (window.fbvEsconderSplash) window.fbvEsconderSplash();
       <button onclick="closeShopItemModal()" style="background:var(--panel2);border:1px solid var(--line);color:var(--muted);border-radius:9px;width:32px;height:32px;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0">✕</button>
     </div>
     <label>Artigo</label>
-    <input type="text" id="shop-artigo" maxlength="60" placeholder="Ex: Feijão" onchange="shopCatSync()">
+    <input type="text" id="shop-artigo" maxlength="60" placeholder="Ex: Feijão" list="shop-artigo-list" autocomplete="off" onchange="this.value=shopCapArtigo(this.value);shopCatSync()">
+    <datalist id="shop-artigo-list"></datalist>
     <div class="inline-row">
       <div style="flex:3"><label>Tamanho / embalagem</label><input type="text" id="shop-tam" maxlength="20" placeholder="Ex: lata 250 ml" onblur="this.value=normalizeQty(this.value)"></div>
       <div style="flex:2"><label>Qtd.</label><input type="text" id="shop-qtd" maxlength="20" placeholder="Ex: 4" onblur="this.value=normalizeQty(this.value)"></div>
