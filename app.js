@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v84 · 2026-07-24 · Shop List sem separador "Cobertos pelo stock": o que está coberto sai da lista de compras (vê-se na refeição/stock)';
+const APP_BUILD = 'v87 · 2026-07-25 · Stock por pedido genérico: marcas (Ruffles/Castelões) agrupam sob "Batatas Fritas"/"Queijos" — AI liga na fatura, aloca-se por marca ou fixa-se marca à refeição';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -3311,6 +3311,209 @@ async function catSugApply(){
   btn.disabled=false;
 }
 
+/* ═══ NORMALIZAR ARTIGOS (Shop List, só admin) ═══
+   Diferentes pessoas escrevem o mesmo produto de formas diferentes
+   ("Chouriço"/"Chouriços", "Polpa Tomate 1000ml"/"Polpa Tomate 1L"). A app já
+   trata maiúsculas/acentos como iguais (shopArtKey), mas plurais, unidades e
+   pontuação continuam a contar como artigos distintos — o que parte a soma da
+   procura por refeição e a cobertura pelo stock. Este botão agrupa por uma
+   chave "solta" (singular + unidades canónicas + sem pontuação), mostra os
+   grupos com >1 grafia e deixa o admin escolher o nome final; ao aplicar,
+   reescreve o nome em todos os pedidos da lista e nos lotes de stock (artigo e
+   lista_artigo) — a partir daí somam e casam como um só. É puro cliente (offline,
+   sem AI e sem redeploy) — a revisão do admin é a rede de segurança. */
+let _normGroups=null;   // [{variants:[{name,count}],canon,apply}]
+let _normViaAI=false;   // sugestões vieram da AI (true) ou da heurística local (false)
+// Chave "solta" para agrupar grafias do mesmo produto: sem acentos/maiúsculas,
+// unidades embutidas em forma canónica (1000ml→1l, 500gr→500g), sem pontuação e
+// com plurais simples reduzidos ao singular (batatas→batata, chouriços→chouriço).
+function shopNormLoose(s){
+  let t=(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  t=t.replace(/(\d+(?:[.,]\d+)?)\s*(mililitros?|litros?|gramas?|ml|cl|kg|lts?|grs?|l|g)\b/g,(m,num,u)=>{
+    let n=parseFloat(num.replace(',','.'));
+    if(/^(ml|mililitro)/.test(u)){if(n>=1000){n/=1000;u='l';}else u='ml';}
+    else if(u==='cl'){n=n*10;if(n>=1000){n/=1000;u='l';}else u='ml';}
+    else if(/^(l|lt|litro)/.test(u))u='l';
+    else if(/^(g|gr|grama)/.test(u)){if(n>=1000){n/=1000;u='kg';}else u='g';}
+    else if(u==='kg')u='kg';
+    return String(Math.round(n*1000)/1000)+u;
+  });
+  return t.replace(/[^a-z0-9]+/g,' ').trim()
+    .split(' ').map(w=>w.length>3&&w.endsWith('s')?w.slice(0,-1):w).join(' ');
+}
+// Agrupa os nomes usados (lista + stock) pela chave solta. Uma "grafia" =
+// nome distinto para a app (shopArtKey); só interessam grupos com ≥2 grafias.
+function shopNormGroups(){
+  const map={};   // lk → { ak → {name,count} }
+  const push=nome=>{
+    const nm=(nome||'').trim();if(!nm)return;
+    const lk=shopNormLoose(nm);if(!lk)return;
+    const ak=shopArtKey(nm);
+    const g=(map[lk]=map[lk]||{});
+    if(!g[ak])g[ak]={name:nm,count:0};
+    g[ak].count++;
+    // Mostra a grafia mais "completa" (mais longa) como representante da variante
+    if(nm.length>g[ak].name.length)g[ak].name=nm;
+  };
+  shopArr().forEach(it=>{if(!shopIsRemoved(it))push(it.artigo);});
+  stockArr().forEach(l=>{if(stockBacked(l))push(l.artigo);});
+  const groups=[];
+  Object.keys(map).forEach(lk=>{
+    const vs=Object.values(map[lk]);
+    if(vs.length<2)return;
+    vs.sort((a,b)=>b.count-a.count||b.name.length-a.name.length);
+    groups.push({lk,variants:vs,canon:vs[0].name,apply:true});
+  });
+  // Mais grafias primeiro (os mais "sujos" ao cimo)
+  groups.sort((a,b)=>b.variants.length-a.variants.length||b.variants.reduce((s,v)=>s+v.count,0)-a.variants.reduce((s,v)=>s+v.count,0));
+  return groups;
+}
+// Nomes distintos em uso (lista + stock) com a contagem e a grafia mais completa
+// — base tanto para a heurística como para o mapeamento das sugestões da AI.
+function shopNormNameStats(){
+  const stats={};   // ak → {name,count}
+  const add=nome=>{
+    const nm=(nome||'').trim();if(!nm)return;
+    const k=shopArtKey(nm);
+    if(!stats[k])stats[k]={name:nm,count:0};
+    stats[k].count++;
+    if(nm.length>stats[k].name.length)stats[k].name=nm;
+  };
+  shopArr().forEach(it=>{if(!shopIsRemoved(it))add(it.artigo);});
+  stockArr().forEach(l=>{if(stockBacked(l))add(l.artigo);});
+  return stats;
+}
+// Converte as sugestões da AI ({grupos:[{nome,variantes[]}]}) em _normGroups,
+// casando cada variante com um nome real em uso (ignora o que a AI invente) e
+// contando pelos dados. Só grupos com ≥2 grafias distintas sobrevivem.
+function shopNormFromAI(grupos,stats){
+  const out=[];
+  (Array.isArray(grupos)?grupos:[]).forEach(g=>{
+    const seen=new Set(),variants=[];
+    (Array.isArray(g&&g.variantes)?g.variantes:[]).forEach(vn=>{
+      const k=shopArtKey(vn);const st=stats[k];
+      if(st&&!seen.has(k)){seen.add(k);variants.push({name:st.name,count:st.count});}
+    });
+    if(variants.length<2)return;
+    variants.sort((a,b)=>b.count-a.count||b.name.length-a.name.length);
+    const nome=(g&&g.nome||'').trim();
+    out.push({variants,canon:nome||variants[0].name,apply:true});
+  });
+  out.sort((a,b)=>b.variants.length-a.variants.length);
+  return out;
+}
+async function shopNormOpen(){
+  if(!isAdmin()){toast('Só o admin normaliza artigos','bad');return;}
+  if(contasFechadas()){toast('Contas fechadas','bad');return;}
+  const stats=shopNormNameStats();
+  const nomes=Object.values(stats).map(s=>s.name);
+  if(nomes.length<2){toast('Poucos artigos para normalizar','ok');return;}
+  const btn=document.getElementById('shop-norm-btn');
+  if(btn){btn.disabled=true;btn.textContent='⏳ A analisar…';}
+  let groups=null,viaAI=false,aiErr='';
+  try{
+    // AI primeiro: agrupa por significado (marca vs genérico, sinónimos…)
+    const r=await sbFetch(`${SB_URL}/functions/v1/fatura-ocr`,{
+      method:'POST',
+      headers:{'Content-Type':'application/json','apikey':SB_KEY},
+      body:JSON.stringify({normalizar:nomes.slice(0,200)})
+    });
+    if(!r.ok){const e=await r.json().catch(()=>({}));throw new Error(e.error||('HTTP '+r.status));}
+    const d=await r.json();
+    groups=shopNormFromAI(d&&d.grupos,stats);
+    viaAI=true;
+  }catch(e){
+    // Sem AI (offline/erro) → heurística local (plurais, unidades, pontuação)
+    aiErr=e.message||String(e);
+    groups=shopNormGroups();
+  }
+  if(btn){btn.disabled=false;btn.textContent='🔤 Normalizar';}
+  if(!groups||!groups.length){
+    toast(viaAI?'Nada a normalizar — as grafias já batem certo 🎉'
+      :('Sugestões AI falharam ('+aiErr+') e nada básico a juntar'),viaAI?'ok':'bad');
+    _normGroups=null;return;
+  }
+  _normGroups=groups;_normViaAI=viaAI;
+  if(!viaAI)toast('AI indisponível — sugestões básicas (offline)','bad');
+  shopNormRender();
+  document.getElementById('shopnorm-bg').classList.add('show');
+  document.body.classList.add('no-scroll');
+}
+function shopNormRender(){
+  if(!_normGroups)return;
+  const nOn=_normGroups.filter(g=>g.apply).length;
+  document.getElementById('shopnorm-info').textContent=
+    `${_normViaAI?'✨ ':''}${_normGroups.length} grupo(s) de grafias parecidas${_normViaAI?' (sugeridos pela AI)':' (deteção básica)'}. Escolhe o nome final de cada um (toca numa grafia ou escreve), tira o visto para deixar como está, e grava.`;
+  document.getElementById('shopnorm-list').innerHTML=_normGroups.map((g,i)=>{
+    const canK=shopArtKey(g.canon);
+    const chips=g.variants.map(v=>`<button type="button" class="norm-chip${shopArtKey(v.name)===canK?' on':''}" onclick="shopNormPick(${i},this.dataset.n)" data-n="${escHtml(v.name)}">${escHtml(v.name)}${v.count>1?` ·${v.count}`:''}</button>`).join('');
+    return `<div class="norm-row${g.apply?'':' off'}">
+      <label class="norm-head"><input type="checkbox" ${g.apply?'checked':''} onchange="_normGroups[${i}].apply=this.checked;shopNormRender()"><span>${g.variants.length} grafias</span></label>
+      <div class="norm-vars">${chips}</div>
+      <input class="norm-canon" value="${escHtml(g.canon)}" oninput="_normGroups[${i}].canon=this.value" placeholder="nome final" ${g.apply?'':'disabled'}>
+    </div>`;
+  }).join('');
+  const save=document.getElementById('shopnorm-save');
+  if(save){save.disabled=!nOn;save.textContent=nOn?`Normalizar ${nOn} grupo(s)`:'Normalizar';}
+}
+function shopNormPick(i,name){
+  if(!_normGroups||!_normGroups[i])return;
+  _normGroups[i].canon=name;
+  shopNormRender();
+}
+function shopNormClose(){
+  document.getElementById('shopnorm-bg').classList.remove('show');
+  document.body.classList.remove('no-scroll');
+  _normGroups=null;
+}
+async function shopNormApply(){
+  if(!_normGroups)return;
+  if(!isAdmin()){toast('Só o admin normaliza artigos','bad');return;}
+  if(contasFechadas()){toast('Contas fechadas','bad');return;}
+  const shopTo={};                 // shoplist _id → nome final
+  const loteArt=[],loteList=[];    // {id,l,canon}
+  let nGroups=0;
+  _normGroups.forEach(g=>{
+    const canon=(g.canon||'').trim();
+    if(!g.apply||!canon)return;
+    const aks=new Set(g.variants.map(v=>shopArtKey(v.name)));
+    let touched=false;
+    shopArr().forEach(it=>{
+      if(it._id==null||shopIsRemoved(it))return;
+      if(aks.has(shopArtKey(it.artigo))&&it.artigo!==canon){shopTo[it._id]=canon;touched=true;}
+    });
+    stockArr().forEach(l=>{
+      if(l._id==null)return;
+      if(aks.has(shopArtKey(l.artigo))&&l.artigo!==canon){loteArt.push({id:l._id,l,canon});touched=true;}
+      if(l._listArt&&aks.has(shopArtKey(l._listArt))&&l._listArt!==canon){loteList.push({id:l._id,l,canon});touched=true;}
+    });
+    if(touched)nGroups++;
+  });
+  const ids=Object.keys(shopTo);
+  if(!ids.length&&!loteArt.length&&!loteList.length){toast('Nada mudou — os nomes finais já estavam aplicados','ok');shopNormClose();return;}
+  const btn=document.getElementById('shopnorm-save');if(btn)btn.disabled=true;
+  setSync('load','a guardar…');
+  try{
+    // Shoplist: um PATCH por nome final (agrupa os ids que vão para o mesmo nome)
+    const byName={};ids.forEach(id=>{(byName[shopTo[id]]=byName[shopTo[id]]||[]).push(id);});
+    let nItems=0;
+    for(const name in byName){
+      const grp=byName[name];
+      await queueWrite(()=>sbReq('PATCH',`shoplist?id=in.(${grp.join(',')})`,{artigo:name}));
+      grp.forEach(id=>{const it=shopArr().find(x=>x._id===+id);if(it)it.artigo=name;});
+      nItems+=grp.length;
+    }
+    for(const p of loteArt){await queueWrite(()=>sbReq('PATCH',`stock_lotes?id=eq.${p.id}`,{artigo:p.canon}));p.l.artigo=p.canon;}
+    for(const p of loteList){await queueWrite(()=>sbReq('PATCH',`stock_lotes?id=eq.${p.id}`,{lista_artigo:p.canon}));p.l._listArt=p.canon;}
+    syncMirror();marcaGuardado();
+    if(CALC)CALC=calcular(JSON.parse(JSON.stringify(DATA)));
+    shopNormClose();
+    toast(`${nItems} artigo(s) normalizados em ${nGroups} grupo(s) ✓`,'ok');
+    renderShopViews();
+    if(STOCK_TABLE&&TAB==='stock')renderStock();
+  }catch(e){setSync('err','erro ao guardar');toast(permErrorMsg(e),'bad');if(btn)btn.disabled=false;}
+}
+
 /* ═══ COMPRAS / SHOPLIST ═══
    Lista partilhada de artigos em falta. Fluxo:
    1) alguém adiciona artigos (artigo, qtd, tipo, e se Almoço/Jantar a refeição alvo)
@@ -3970,7 +4173,10 @@ function renderCompras(){
   let h='';
   h+=`<div class="cmp-hdr">
     <div class="cmp-hdr-title sf">🛒 Shop List</div>
-    <button class="btn prim write-action" onclick="openShopItemModal()" ${canW?'':'disabled'}>＋ Artigo</button>
+    <div class="cmp-hdr-acts">
+      ${isAdmin()?`<button class="btn write-action" id="shop-norm-btn" onclick="shopNormOpen()" title="Juntar grafias do mesmo artigo (chouriço/chouriços…)">🔤 Normalizar</button>`:''}
+      <button class="btn prim write-action" onclick="openShopItemModal()" ${canW?'':'disabled'}>＋ Artigo</button>
+    </div>
   </div>`;
 
   // ── Sub-separadores: Em falta · O Meu Carrinho · Histórico ──
@@ -4095,8 +4301,11 @@ function stockArticleCard(g){
   const dests=Object.keys(ag.dest).sort(destKeyCmp);
   const chips=dests.map(k=>stockDestChip(k,ag.dest[k].qtd,ag.u)).join('')
     +(ag.freeQ>0?`<span class="stk-chip livre">🧺 a sobrar · ${escHtml(fmtQty(ag.freeQ,ag.u))}</span>`:'');
+  // Marcas debaixo do guarda-chuva (Ruffles · Lays) — só quando diferem do nome
+  const marcas=(g.marcas&&g.marcas.length)?`<div class="stk-marcas">${g.marcas.map(m=>escHtml(m)).join(' · ')}</div>`:'';
   return `<div class="stk-card stk-tap" onclick="openLoteModal(${g.lotes[0]._id})">
     <div class="stk-card-top"><b>${escHtml(g.artigo)}</b><span class="stk-chev">›</span></div>
+    ${marcas}
     <div class="stk-chips">${chips}</div>
   </div>`;
 }
@@ -4119,9 +4328,11 @@ function renderStock(){
   if(!STOCK_TABLE){el.innerHTML='<div class="empty sf">Stock indisponível.</div>';return;}
   const lots=stockArr().filter(stockBacked);
   const groups={};
-  lots.forEach(l=>{const k=shopArtKey(l.artigo);(groups[k]=groups[k]||{artigo:l.artigo,lotes:[]}).lotes.push(l);});
+  // Agrupa pelo PEDIDO genérico (loteReqArtigo): Ruffles+Lays ligados a "Batatas
+  // Fritas" caem num só cartão; as marcas ficam listadas lá dentro.
+  lots.forEach(l=>{const rn=loteReqArtigo(l);const k=shopArtKey(rn);(groups[k]=groups[k]||{artigo:rn,lotes:[]}).lotes.push(l);});
   const arr=Object.values(groups).sort((a,b)=>a.artigo.localeCompare(b.artigo,'pt'))
-    .map(g=>Object.assign(g,{tipos:stockGroupTipos(stockAggAlocs(g.lotes))}));
+    .map(g=>Object.assign(g,{tipos:stockGroupTipos(stockAggAlocs(g.lotes)),marcas:[...new Set(g.lotes.map(l=>l.artigo))].filter(m=>!shopSameArtigo(m,g.artigo))}));
   const canEdit=isAdmin();
   // ✨: pedir à AI categorias para o que ainda não tem (só admin, com migração)
   const aiBtn=(CATS_TABLE&&canEdit&&catNamesPorCategorizar().length)
@@ -4791,7 +5002,8 @@ function compraSplitNote(l){
 }
 function compraLoteHtml(l,i){
   // Estado do matching com a fatura (só nos artigos do carrinho)
-  const tag=l._fat==='ok'?`<span class="lote-tag ok">✓ na fatura</span>`
+  const tag=l._byBrand?`<span class="lote-tag ok">✓ por marcas</span>`
+    :l._fat==='ok'?`<span class="lote-tag ok">✓ na fatura</span>`
     :l._fat==='miss'?`<span class="lote-tag miss">⚠ não encontrado</span>`
     :l._fat==='warn'?`<span class="lote-tag warn">⚠ qtd difere</span>`:'';
   // Se a fatura renomeou o artigo, o nome pedido na lista fica como nota
@@ -4831,9 +5043,21 @@ function compraLoteHtml(l,i){
   // Pediste X no carrinho mas o talão traz Y → o talão manda no stock
   const qtyHint=(!l.free&&l._fat==='warn'&&l._qtdPedida)
     ?`<div class="lote-hint">📝 Pediste <b>${escHtml(String(l._qtdPedida))}</b> no carrinho; o talão tem <b>${escHtml(l.qtd||'—')}</b> — é esta que entra em stock.</div>`:'';
-  const cls='lote-card'+(l._fat==='miss'?' is-miss':l._fat==='warn'?' is-warn':l._fat==='ok'?' is-ok':'');
-  return `<div class="${cls}">${head}${fields}${qtyHint}${destBlock}${fat}</div>`;
+  // Ligação manual ao pedido genérico (só nos lotes livres/extras): guarda o
+  // stock debaixo de "Batatas Fritas" mantendo a marca em `artigo`
+  const reqInline=(STOCK_TABLE&&l.free)?(()=>{
+    const nomes=[...new Set(shopArr().filter(it=>!shopIsRemoved(it)).map(it=>it.artigo))].sort((a,b)=>a.localeCompare(b,'pt'));
+    const cur=l._listArt||'';
+    const known=nomes.some(n=>shopSameArtigo(n,cur));
+    const opts=`<option value="">— pedido próprio —</option>`+
+      nomes.map(n=>`<option value="${escHtml(n)}"${shopSameArtigo(n,cur)?' selected':''}>${escHtml(n)}</option>`).join('')+
+      (cur&&!known?`<option value="${escHtml(cur)}" selected>${escHtml(cur)}</option>`:'');
+    return `<div class="lote-req-inline">🔗 pertence a <select onchange="compraLoteSetReq(${i},this.value)">${opts}</select></div>`;
+  })():'';
+  const cls='lote-card'+(l._fat==='miss'?' is-miss':l._fat==='warn'?' is-warn':(l._fat==='ok'||l._byBrand)?' is-ok':'');
+  return `<div class="${cls}">${head}${fields}${qtyHint}${destBlock}${reqInline}${fat}</div>`;
 }
+function compraLoteSetReq(i,v){const l=(compraEdit.lotes||[])[i];if(!l)return;l._listArt=(v||'').trim()||null;}
 function compraRenderLotes(){
   const cont=document.getElementById('shop-buy-lotes');if(!cont)return;
   const ls=compraEdit.lotes||[];
@@ -4916,6 +5140,10 @@ async function faturaChosen(inp){
     // no pedido — o Gemini devolve também a categoria de cada linha
     const body={image:b64,mime};
     if(CATS_TABLE&&CATEGORIAS.length)body.categorias=catPromptList();
+    // Pedidos genéricos da lista → a AI liga a marca do talão ao pedido
+    // ("Ruffles" → "Batatas Fritas"), devolvendo "pedido" por linha
+    const peds=[...new Set(shopArr().filter(x=>!shopIsRemoved(x)).map(x=>x.artigo))].filter(Boolean);
+    if(peds.length)body.pedidos=peds.slice(0,80);
     const r=await sbFetch(`${SB_URL}/functions/v1/fatura-ocr`,{
       method:'POST',
       headers:{'Content-Type':'application/json','apikey':SB_KEY},
@@ -4989,13 +5217,14 @@ function faturaAplicar(d){
   //   2.ª linha a 1.0 no MESMO artigo (várias marcas, ex. Lays+Ruffles)
   //     → sub-artigo por confirmar, que herda o destino do genérico
   const linhas=d.linhas.filter(l=>l&&l.artigo&&typeof l.preco==='number'&&l.preco>=0)
-    .map(ln=>({artigo:String(ln.artigo).slice(0,60),qtd:ln.qtd?normalizeQty(String(ln.qtd)):'',valor:rnd(ln.preco,2),categoria:ln.categoria?String(ln.categoria).slice(0,40):null}));
+    .map(ln=>({artigo:String(ln.artigo).slice(0,60),qtd:ln.qtd?normalizeQty(String(ln.qtd)):'',valor:rnd(ln.preco,2),categoria:ln.categoria?String(ln.categoria).slice(0,40):null,pedido:ln.pedido?String(ln.pedido).slice(0,60):null}));
   // Categorias sugeridas pela AI: gravam-se já (só onde não havia — a memória
   // artigo→categoria é global e vale mesmo que a compra não chegue a registar-se)
   catAIMappings(linhas.filter(l=>l.categoria)).then(n=>{if(n&&TAB==='stock')renderStock();});
   const lotes=compraEdit.lotes||[];
   // Reset (re-importação): volta ao nome da lista para refazer o matching do zero
-  lotes.forEach(l=>{delete l._fat;delete l._sug;delete l._subs;delete l._impQtds;delete l._qtdPedida;if(l._listArt){l.artigo=l._listArt;delete l._listArt;}});
+  // (só nos do carrinho — num lote livre o _listArt é a ligação manual, não se pisa)
+  lotes.forEach(l=>{delete l._fat;delete l._sug;delete l._subs;delete l._byBrand;delete l._impQtds;delete l._qtdPedida;if(!l.free&&l._listArt){l.artigo=l._listArt;delete l._listArt;}});
   const pares=[];
   lotes.forEach((l,i)=>{if(l.free)return;l._qtdPedida=l.qtd||'';linhas.forEach((ln,j)=>{const s=faturaScore(l.artigo,ln.artigo);if(s>=0.5)pares.push({i,j,s});});});
   pares.sort((a,b)=>b.s-a.s);
@@ -5033,9 +5262,24 @@ function faturaAplicar(d){
       if(faturaScore(l._listArt||l.artigo,ln.artigo)===1){linhaUsada.add(j);(l._subs=l._subs||[]).push(ln);subs++;}
     });
   });
-  // Artigos do carrinho SEM correspondência na fatura → alerta ⚠️ (fica € vazio)
+  // 3.ª passagem: ligação por "pedido" da AI — a marca do talão (Ruffles) cujo
+  // pedido nomeia um artigo do carrinho (Batatas Fritas) entra como marca desse
+  // pedido, MESMO sem bater por texto. Se o pedido não tinha linha própria na
+  // fatura, fica coberto SÓ pelas marcas (_byBrand): sem preço próprio nem alerta.
+  linhas.forEach((ln,j)=>{
+    if(linhaUsada.has(j)||!ln.pedido)return;
+    const i=lotes.findIndex(l=>!l.free&&shopSameArtigo(l._listArt||l.artigo,ln.pedido));
+    if(i<0)return;
+    const l=lotes[i];
+    linhaUsada.add(j);
+    (l._subs=l._subs||[]).push(ln);
+    if(l._fat!=='ok'){l._fat='ok';l._byBrand=true;}
+    subs++;
+  });
+  // Artigos do carrinho SEM correspondência na fatura → alerta ⚠️ (fica € vazio).
+  // Os cobertos por marcas (_byBrand, _fat='ok') não são "miss".
   let semMatch=0;
-  lotes.forEach((l,i)=>{if(!l.free&&!loteUsado.has(i)){l._fat='miss';semMatch++;}});
+  lotes.forEach((l,i)=>{if(!l.free&&!loteUsado.has(i)&&l._fat!=='ok'){l._fat='miss';semMatch++;}});
   // Linhas da fatura sem correspondência → EXTRAS, desmarcados por defeito
   compraEdit.faturaExtras=linhas.filter((ln,j)=>!linhaUsada.has(j));
   const extras=compraEdit.faturaExtras.length;
@@ -5099,7 +5343,8 @@ function faturaExtrasHtml(){
 function faturaExtraToggle(i){
   const e=(compraEdit.faturaExtras||[])[i];if(!e)return;
   compraEdit.faturaExtras.splice(i,1);
-  (compraEdit.lotes=compraEdit.lotes||[]).push({free:true,artigo:e.artigo,qtd:e.qtd,valor:e.valor,destino:'Gerais',keys:[]});
+  // Herda a ligação ao pedido genérico sugerida pela AI (Ruffles → Batatas Fritas)
+  (compraEdit.lotes=compraEdit.lotes||[]).push({free:true,artigo:e.artigo,qtd:e.qtd,valor:e.valor,destino:'Gerais',keys:[],_listArt:e.pedido||null});
   compraRenderLotes();
 }
 
@@ -5117,6 +5362,7 @@ async function saveCompra(){
   // diretas por tipo/refeição (tipoFix e artigos fora da lista com destino tipo)
   const det=!!compraEdit.det;
   const lotes=[];const tipoRows={};const naoDetetados=[];   // tipoRows: 'Tipo'|'Tipo|data' → artigos; naoDetetados: artigos do carrinho sem preço
+  const byBrandParents=[];   // pedidos cobertos por marcas (só ficam "comprados" se alguma marca for confirmada)
   // "Só totais" numa compra nova: o detalhe está escondido → não entra no registo
   for(const l of ((det||isEdit)?(compraEdit.lotes||[]):[])){
     const artigo=(l.artigo||'').trim();
@@ -5126,7 +5372,10 @@ async function saveCompra(){
       // fica na lista por tratar e avisa-se abaixo. Avulso em branco é ignorado.
       // Só em compras NOVAS: na edição um € vazio não solta artigos (podem
       // estar cobertos pelas linhas de repartição).
-      if(det&&!isEdit&&artigo&&!l.free)naoDetetados.push({artigo,qtd:l.qtd||''});
+      if(det&&!isEdit&&artigo&&!l.free){
+        if(l._byBrand)byBrandParents.push({artigo,qtd:l.qtd||''});
+        else naoDetetados.push({artigo,qtd:l.qtd||''});
+      }
       continue;
     }
     if(!artigo){toast('Indica o nome do artigo detalhado','bad');return;}
@@ -5136,7 +5385,9 @@ async function saveCompra(){
       // Sem quantidade legível assume-se 1 unidade (o € cobre o lote inteiro).
       let q=qtyParse(l.qtd);if(!q||!(q.n>0))q={n:1,u:''};
       const splits=(l.splits&&l.splits.length)?l.splits.filter(s=>s.destino&&(parseFloat(String(s.qtd).replace(',','.'))>0)):null;
-      lotes.push({artigo,qtd:q.n,unidade:q.u,valor:v,destino:(l.destino!=null?l.destino:''),splits:(splits&&splits.length?splits:null),keys:l.free?[]:(l.keys||[]),_listArt:l._listArt||null});
+      // Um lote livre ligado a um pedido (marca de "Batatas Fritas") mantém as
+      // refeições herdadas — assim conta como necessidade de stock desse pedido.
+      lotes.push({artigo,qtd:q.n,unidade:q.u,valor:v,destino:(l.destino!=null?l.destino:''),splits:(splits&&splits.length?splits:null),keys:(l.free&&!l._listArt)?[]:(l.keys||[]),_listArt:l._listArt||null});
       continue;
     }
     // Sem tabela de stock: item detalhado → despesa direta do tipo/refeição
@@ -5150,6 +5401,9 @@ async function saveCompra(){
     if(!q||!(q.n>0)){toast(`Indica a quantidade de "${artigo}" (ex: 10 pacotes)`,'bad');return;}
     lotes.push({artigo,qtd:q.n,unidade:q.u,valor:v,keys:l.free?(l.destino?[l.destino]:[]):(l.keys||[])});
   }
+  // Pedido coberto por marcas mas SEM nenhuma marca confirmada (sem lote ligado a
+  // ele) → volta a "por tratar", em vez de ficar comprado sem nada por baixo.
+  byBrandParents.forEach(p=>{if(!lotes.some(L=>L._listArt&&shopSameArtigo(L._listArt,p.artigo)))naoDetetados.push(p);});
   const rows=[];
   // Modo por totais: validar linhas (totalmente vazias são ignoradas se houver
   // mais alguma coisa). Na edição as linhas entram SEMPRE — o tabulador ativo
@@ -5255,31 +5509,59 @@ async function saveCompra(){
    artigo (sem se preocupar com as compras de origem) e, ao guardar, a app
    distribui as alocações pelos lotes por FIFO (compra mais antiga primeiro).
    O que não estiver alocado fica na bolsa comum. */
-let editingLote=null;   // {artigo,u,ids:[loteIds FIFO],totQ,totV,alocs:[{tipo,data,qtd}]}
-// Lotes do mesmo artigo (e unidade), por ordem FIFO da data da compra
-function stockLotesDoArtigo(artigo,u){
-  const dataDe=l=>((DATA.despesas||[]).find(d=>d.compraId===l.compraId)||{}).dataDesp||'';
-  return stockArr().filter(l=>stockBacked(l)&&shopSameArtigo(l.artigo,artigo)&&(l.unidade||'')===(u||''))
-    .sort((a,b)=>dataDe(a).localeCompare(dataDe(b))||(a.criadoEm||'').localeCompare(b.criadoEm||'')||((a._id||0)-(b._id||0)));
+// Umbrella: um "artigo" no stock é o PEDIDO genérico (loteReqArtigo). Debaixo
+// dele podem viver várias marcas (Ruffles+Lays → "Batatas Fritas"), cada uma com
+// os seus lotes. As alocações vivem por lote (marca); no modal escolhe-se o
+// destino e, opcionalmente, a marca (vazia = qualquer marca, FIFO).
+let editingLote=null;   // {reqName,product,u,allIds,lotesFifo,totQ,totV,brands,multi,reqLink,alocs:[{tipo,data,qtd,marca}]}
+const _ALOC_SEP='␟';   // separador interno marca␟destino (não aparece em nomes)
+/* Distribui as alocações do guarda-chuva pelos lotes físicos:
+   1.º as fixadas a uma marca (só pelos lotes dessa marca, FIFO),
+   2.º as genéricas (marca='') por qualquer lote, FIFO global.
+   Devolve {loteId → [{tipo,data,qtd}]}. Pura (testável). */
+function resolveUmbrella(lotesFifo,alocs){
+  const cap={},out={};
+  lotesFifo.forEach(l=>{cap[l._id]=l.qtd;out[l._id]=[];});
+  const put=(l,a,take)=>{const ex=out[l._id].find(x=>x.tipo===a.tipo&&x.data===a.data);if(ex)ex.qtd=rnd(ex.qtd+take,3);else out[l._id].push({tipo:a.tipo,data:a.data,qtd:rnd(take,3)});};
+  const fill=(a,lots)=>{let rest=a.qtd;for(const l of lots){if(rest<=0.0005)break;const c=cap[l._id];if(c<=0.0005)continue;const take=Math.min(c,rest);put(l,a,take);cap[l._id]=rnd(c-take,3);rest=rnd(rest-take,3);}return rest;};
+  alocs.filter(a=>a.marca).forEach(a=>fill(a,lotesFifo.filter(l=>shopSameArtigo(l.artigo,a.marca))));
+  alocs.filter(a=>!a.marca).forEach(a=>fill(a,lotesFifo));
+  return out;
+}
+function loteCompraDate(l){return ((DATA.despesas||[]).find(d=>d.compraId===l.compraId)||{}).dataDesp||'';}
+// Lotes do mesmo PEDIDO genérico (loteReqArtigo) e unidade, por ordem FIFO da
+// data da compra — podem ser de marcas diferentes.
+function umbrellaLotes(reqName,u){
+  return stockArr().filter(l=>stockBacked(l)&&shopSameArtigo(loteReqArtigo(l),reqName)&&(l.unidade||'')===(u||''))
+    .sort((a,b)=>loteCompraDate(a).localeCompare(loteCompraDate(b))||(a.criadoEm||'').localeCompare(b.criadoEm||'')||((a._id||0)-(b._id||0)));
 }
 function openLoteModal(id){
   const base=stockArr().find(x=>x._id===id);
   if(!base){toast('Artigo não encontrado','bad');return;}
-  const lotes=stockLotesDoArtigo(base.artigo,base.unidade);
+  const reqName=loteReqArtigo(base);
+  const u=base.unidade||'';
+  const lotes=umbrellaLotes(reqName,u);
   const totQ=rnd(lotes.reduce((s,l)=>s+(+l.qtd||0),0),3);
   const totV=rnd(lotes.reduce((s,l)=>s+(+l.valor||0),0),2);
-  // Alocações agregadas de todos os lotes, ordenadas cronologicamente
-  const by={};
-  lotes.forEach(l=>(l.alocacoes||[]).forEach(a=>{const q=+a.qtd||0;if(q<=0)return;const k=alocToDestino(a);if(k)by[k]=rnd((by[k]||0)+q,3);}));
+  const brands=[...new Set(lotes.map(l=>l.artigo))];
+  const multi=brands.length>1;
+  // Alocações existentes → linhas {destino,marca}. Cada alocação física vive num
+  // lote de uma marca (round-trip). Com uma só marca, marca='' (genérico).
+  const SEP=_ALOC_SEP,by={};
+  lotes.forEach(l=>(l.alocacoes||[]).forEach(a=>{const q=+a.qtd||0;if(q<=0)return;const dk=alocToDestino(a);if(!dk)return;const k=(multi?l.artigo:'')+SEP+dk;by[k]=rnd((by[k]||0)+q,3);}));
+  const alocs=Object.keys(by).map(k=>{const p=k.split(SEP);const a=destinoAloc(p[1],by[k]);a.marca=p[0]||'';return a;})
+    .sort((a,b)=>destKeyCmp(alocToDestino(a),alocToDestino(b))||(a.marca||'').localeCompare(b.marca||'','pt'));
   // Ligação atual a um pedido da lista (batatas fritas ↔ Lays) — do 1.º lote
   const reqLink=(lotes.find(l=>l._listArt&&String(l._listArt).trim())||{})._listArt||'';
-  editingLote={artigo:base.artigo,u:base.unidade||'',ids:lotes.map(l=>l._id),totQ,totV,reqLink,
-    alocs:Object.keys(by).sort(destKeyCmp).map(k=>destinoAloc(k,by[k]))};
-  document.getElementById('lote-title').textContent='🧺 '+base.artigo;
+  editingLote={reqName,artigo:reqName,product:(multi?reqName:brands[0]||reqName),u,
+    allIds:lotes.map(l=>l._id),lotesFifo:lotes.map(l=>({_id:l._id,artigo:l.artigo,qtd:+l.qtd||0})),
+    totQ,totV,brands,multi,reqLink,alocs};
+  document.getElementById('lote-title').textContent='🧺 '+reqName;
   // As compras de origem (esquerda) — saíram do cartão do ecrã principal
   const comprasRows=lotes.map(l=>{
     const dsp=(DATA.despesas||[]).find(d=>d.compraId===l.compraId);
     const parts=[];
+    if(multi)parts.push('<b>'+escHtml(l.artigo)+'</b>');
     if(dsp&&dsp.dataDesp)parts.push(fmtDiaMes(dsp.dataDesp));
     parts.push(escHtml(fmtQty(l.qtd,l.unidade)),eur(l.valor));
     if(dsp&&dsp.desc&&dsp.desc!=='Compras')parts.push(escHtml(dsp.desc));
@@ -5333,27 +5615,30 @@ async function loteCatChanged(v){
    existentes. Se o próprio nome do produto já bate com um pedido, não é preciso. */
 function loteReqFill(){
   const wrap=document.getElementById('lote-req-wrap');if(!wrap||!editingLote){wrap&&(wrap.style.display='none');return;}
-  if(!STOCK_TABLE){wrap.style.display='none';return;}
+  // Só faz sentido com UMA marca no guarda-chuva: ligar "Ruffles" ao pedido
+  // "Batatas Fritas". Com várias marcas já agrupadas, o pedido é o próprio
+  // guarda-chuva — esconde-se para não confundir.
+  if(!STOCK_TABLE||editingLote.multi){wrap.style.display='none';return;}
   const inp=document.getElementById('lote-req');
   inp.value=editingLote.reqLink||'';
   inp.disabled=!isAdmin();
   inp.style.opacity=inp.disabled?'.75':'';
-  inp.placeholder=`ex.: outro nome (o produto é "${editingLote.artigo}")`;
+  inp.placeholder=`ex.: outro nome (o produto é "${editingLote.product}")`;
   // Sugestões: nomes distintos dos pedidos de refeição na lista (exceto o próprio)
   const nomes=[...new Set(shopArr().filter(it=>shopIsMeal(it.tipo)&&it.dataValor&&!shopIsRemoved(it)).map(it=>it.artigo))]
-    .filter(n=>!shopSameArtigo(n,editingLote.artigo)).sort((a,b)=>a.localeCompare(b,'pt'));
+    .filter(n=>!shopSameArtigo(n,editingLote.product)).sort((a,b)=>a.localeCompare(b,'pt'));
   document.getElementById('lote-req-list').innerHTML=nomes.map(n=>`<option value="${escHtml(n)}">`).join('');
   wrap.style.display='';
 }
 async function loteReqChanged(v){
   if(!editingLote||!isAdmin())return;
   const val=(v||'').trim();
-  const novo=(val&&!shopSameArtigo(val,editingLote.artigo))?val:null;   // igual ao produto → sem ligação
+  const novo=(val&&!shopSameArtigo(val,editingLote.product))?val:null;   // igual ao produto → sem ligação
   if((novo||'')===(editingLote.reqLink||''))return;
-  const baseId=editingLote.ids[0];
+  const baseId=editingLote.allIds[0];
   setSync('load','a guardar…');
   try{
-    for(const id of editingLote.ids){
+    for(const id of editingLote.allIds){
       await queueWrite(()=>sbReq('PATCH',`stock_lotes?id=eq.${id}`,{lista_artigo:novo}));
       const l=stockArr().find(x=>x._id===id);if(l)l._listArt=novo;
     }
@@ -5369,12 +5654,20 @@ function loteRenderAlocs(){
   if(!editingLote)return;
   const canEdit=isAdmin()&&!contasFechadas();
   const unit=editingLote.totQ>0?editingLote.totV/editingLote.totQ:0;
+  // Com várias marcas no guarda-chuva, cada linha pode fixar uma marca (ou
+  // "qualquer marca" = a app escolhe por FIFO). Com uma só marca, não aparece.
+  const brandSel=(a,i)=>{
+    if(!editingLote.multi)return '';
+    const opts=`<option value="">qualquer marca</option>`+editingLote.brands.map(b=>`<option value="${escHtml(b)}"${a.marca===b?' selected':''}>${escHtml(b)}</option>`).join('');
+    return `<select class="lote-marca" ${canEdit?'':'disabled'} onchange="loteAlocField(${i},'marca',this.value)">${opts}</select>`;
+  };
   document.getElementById('lote-alocs').innerHTML=editingLote.alocs.map((a,i)=>{
-    return `<div class="lote-ln">
+    return `<div class="lote-ln${editingLote.multi?' has-marca':''}">
       ${destBtnHtml(alocToDestino(a),`loteDestPick(${i})`,!canEdit)}
       <input type="number" step="any" min="0" inputmode="decimal" ${canEdit?'':'disabled'} value="${a.qtd||''}" placeholder="qtd" onchange="loteAlocField(${i},'qtd',this.value)">
       <span class="lote-val">${eur(rnd(unit*(+a.qtd||0),2))}</span>
       ${canEdit?`<button class="cmp-ln-del" title="Remover" onclick="loteDelAloc(${i})">✕</button>`:''}
+      ${brandSel(a,i)}
     </div>`;
   }).join('')||'<div class="empty sf" style="margin-top:8px">Sem alocações — está tudo na bolsa comum.</div>';
   const tot=editingLote.alocs.reduce((s,a)=>s+(+a.qtd||0),0);
@@ -5386,6 +5679,7 @@ function loteRenderAlocs(){
 }
 function loteAlocField(i,f,v){
   const a=editingLote&&editingLote.alocs[i];if(!a)return;
+  if(f==='marca'){a.marca=v||'';return;}   // sem re-render: não muda nada visível
   if(f==='qtd')a.qtd=parseFloat(String(v).replace(',','.'))||0;
   else{const d=destinoAloc(v,0);a.tipo=d?d.tipo:v;a.data=d?d.data:null;}
   loteRenderAlocs();
@@ -5416,11 +5710,11 @@ function loteAddAloc(){
   // 1.ª escolha: sugerir logo a refeição que ainda precisa deste artigo, com a
   // qtd em falta pré-preenchida — poupa procurar a refeição e a quantidade.
   const sug=loteSuggestAloc();
-  if(sug){editingLote.alocs.push(sug);loteRenderAlocs();return;}
+  if(sug){sug.marca='';editingLote.alocs.push(sug);loteRenderAlocs();return;}
   // Sem procura em aberto: refeição livre por preencher, senão um tipo puro (Gerais)
   const used=new Set(editingLote.alocs.map(a=>alocToDestino(a)));
   const m=loteMeals().find(r=>!used.has(r.ref+'|'+r.data));
-  editingLote.alocs.push(m?{tipo:m.ref,data:m.data,qtd:0}:{tipo:'Gerais',data:null,qtd:0});
+  editingLote.alocs.push(m?{tipo:m.ref,data:m.data,qtd:0,marca:''}:{tipo:'Gerais',data:null,qtd:0,marca:''});
   loteRenderAlocs();
 }
 function loteDelAloc(i){if(!editingLote)return;editingLote.alocs.splice(i,1);loteRenderAlocs();}
@@ -5428,34 +5722,27 @@ async function saveLote(){
   if(!isAdmin()){toast('Só o admin ajusta alocações','bad');return;}
   if(contasFechadas()){toast('Contas fechadas — o stock já não se mexe','bad');return;}
   if(!editingLote)return;
-  // junta duplicados do mesmo destino (refeição ou tipo), ignora qtd 0 e valida
+  // Junta duplicados por (marca,destino), ignora qtd 0 e valida
   const by={};
-  editingLote.alocs.forEach(a=>{const q=+a.qtd||0;if(q<=0)return;const k=alocToDestino(a);if(!k)return;by[k]=rnd((by[k]||0)+q,3);});
-  const alocs=Object.keys(by).sort(destKeyCmp).map(k=>destinoAloc(k,by[k]));
+  editingLote.alocs.forEach(a=>{const q=+a.qtd||0;if(q<=0)return;const dk=alocToDestino(a);if(!dk)return;const k=(a.marca||'')+_ALOC_SEP+dk;by[k]=rnd((by[k]||0)+q,3);});
+  const alocs=Object.keys(by).map(k=>{const p=k.split(_ALOC_SEP);const a=destinoAloc(p[1],by[k]);a.marca=p[0]||'';return a;});
   const tot=alocs.reduce((s,a)=>s+a.qtd,0);
   if(tot-editingLote.totQ>0.0005){toast(`Alocaste ${fmtQty(rnd(tot,3),editingLote.u)} — só há ${fmtQty(editingLote.totQ,editingLote.u)} em stock`,'bad');return;}
-  // Distribui as alocações do ARTIGO pelos lotes por FIFO: enche a compra
-  // mais antiga primeiro; a sobra fica livre nos lotes mais recentes
-  const lotes=editingLote.ids.map(id=>stockArr().find(l=>l._id===id)).filter(Boolean);
-  const plan=lotes.map(l=>({l,cap:+l.qtd||0,alocs:[]}));
-  let pi=0;
-  for(const a of alocs){
-    let rest=a.qtd;
-    while(rest>0.0005){
-      while(pi<plan.length&&plan[pi].cap<=0.0005)pi++;
-      if(pi>=plan.length)break;
-      const take=Math.min(plan[pi].cap,rest);
-      plan[pi].alocs.push({tipo:a.tipo,data:a.data,qtd:rnd(take,3)});
-      plan[pi].cap=rnd(plan[pi].cap-take,3);
-      rest=rnd(rest-take,3);
-    }
-  }
+  // Fixaste mais de uma marca do que existe dessa marca?
+  const brandCap={};editingLote.lotesFifo.forEach(l=>{brandCap[l.artigo]=rnd((brandCap[l.artigo]||0)+l.qtd,3);});
+  const brandUse={};alocs.forEach(a=>{if(a.marca)brandUse[a.marca]=rnd((brandUse[a.marca]||0)+a.qtd,3);});
+  for(const b in brandUse){if(brandUse[b]-(brandCap[b]||0)>0.0005){toast(`Fixaste ${fmtQty(brandUse[b],editingLote.u)} de "${b}" — só há ${fmtQty(brandCap[b]||0,editingLote.u)}`,'bad');return;}}
+  // Distribui pelos lotes físicos: marca fixada primeiro, genérico por FIFO.
+  // Gravam-se TODOS os lotes do guarda-chuva (mesmo os que ficam a zero, para
+  // limpar alocações antigas).
+  const plan=resolveUmbrella(editingLote.lotesFifo,alocs);
   const btn=document.getElementById('lote-save');btn.disabled=true;
   setSync('load','a guardar…');
   try{
-    for(const p of plan){
-      await queueWrite(()=>sbReq('PATCH',`stock_lotes?id=eq.${p.l._id}`,{alocacoes:p.alocs}));
-      p.l.alocacoes=p.alocs;
+    for(const id of editingLote.allIds){
+      const nova=plan[id]||[];
+      await queueWrite(()=>sbReq('PATCH',`stock_lotes?id=eq.${id}`,{alocacoes:nova}));
+      const l=stockArr().find(x=>x._id===id);if(l)l.alocacoes=nova;
     }
     syncMirror();marcaGuardado();
     btn.disabled=false;closeLoteModal();

@@ -289,6 +289,23 @@ setTimeout(function(){ if (window.fbvEsconderSplash) window.fbvEsconderSplash();
   </div>
 </div>
 
+<!-- 🔤 Normalizar grafias de artigos (juntar chouriço/chouriços, 1000ml/1L, …) -->
+<div class="modal-bg" id="shopnorm-bg">
+  <div class="modal" id="shopnorm-modal">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <h3 style="margin-bottom:0">🔤 Normalizar Artigos</h3>
+      <button onclick="shopNormClose()" style="background:var(--panel2);border:1px solid var(--line);color:var(--muted);border-radius:9px;width:32px;height:32px;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0">✕</button>
+    </div>
+    <div class="note" id="shopnorm-info" style="margin-top:0"></div>
+    <div id="shopnorm-list"></div>
+    <div class="mbtns">
+      <button class="btn ghost" onclick="shopNormClose()">Cancelar</button>
+      <button class="btn prim" id="shopnorm-save" onclick="shopNormApply()">Normalizar</button>
+    </div>
+    <div class="note">Aplica-se aos pedidos da lista e aos lotes de stock — a partir daí somam e casam como um só artigo.</div>
+  </div>
+</div>
+
 <!-- Seletor de destino (bottom-sheet) — substitui o <select> nativo -->
 <div class="dsheet-bg" id="dpick-bg" onclick="closeDestPicker(event)">
   <div class="dsheet" id="dpick">
