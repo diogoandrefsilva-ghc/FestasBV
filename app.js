@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v92 · 2026-07-25 · Stock: filtros por estado (Disponível · Alocado · Consumido) em vez de tipologia — consumido = alocado a refeição já passada';
+const APP_BUILD = 'v93 · 2026-07-25 · Stock: os 3 filtros de estado aparecem sempre, com a contagem de artigos (antes sumiam com o stock todo no mesmo estado)';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -4403,12 +4403,14 @@ function renderStock(){
   let h=`<div class="cmp-hdr"><div class="cmp-hdr-title sf">🧺 Gestão de Stock</div>${aiBtn}</div>`;
   h+=`<div class="note" style="margin-top:2px;margin-bottom:8px">${canEdit?'Toca num artigo para o alocar às refeições e categorias — as contas recalculam sozinhas.':'Toca num artigo para ver como está alocado às refeições e categorias.'}</div>`;
   if(!arr.length){el.innerHTML=h+'<div class="empty sf">Ainda não há stock. Regista uma compra itemizada ou importa uma fatura.</div>';return;}
-  // Chips de filtro por estado: só os estados que têm artigos
-  const FILTROS=[['disponivel','🧺','Disponível'],['alocado','🗓️','Alocado'],['consumido','🍽️','Consumido']].filter(([s])=>arr.some(g=>g.estados.has(s)));
-  if(STOCK_FILTER!=='all'&&!FILTROS.some(([s])=>s===STOCK_FILTER))STOCK_FILTER='all';
-  if(FILTROS.length>1)h+=`<div class="cmp-sort stk-filter">
+  // Chips de filtro por estado: os três aparecem SEMPRE (com a contagem de
+  // artigos), mesmo a zero — são a chave de leitura do separador, não podem
+  // sumir só porque o stock está todo no mesmo estado
+  const FILTROS=[['disponivel','🧺','Disponível'],['alocado','🗓️','Alocado'],['consumido','🍽️','Consumido']]
+    .map(f=>f.concat(arr.filter(g=>g.estados.has(f[0])).length));
+  h+=`<div class="cmp-sort stk-filter">
     <span class="sd-chip txt${STOCK_FILTER==='all'?' on':''}" onclick="setStockFilter('all')">Tudo</span>
-    ${FILTROS.map(([s,ic,lbl])=>`<span class="sd-chip${STOCK_FILTER===s?' on':''}" onclick="setStockFilter('${s}')"><i>${ic}</i><small>${lbl}</small></span>`).join('')}
+    ${FILTROS.map(([s,ic,lbl,n])=>`<span class="sd-chip${STOCK_FILTER===s?' on':''}${n?'':' vazio'}" onclick="setStockFilter('${s}')"><i>${ic}</i><small>${lbl} ${n}</small></span>`).join('')}
   </div>
   <div class="note stk-legenda">🧺 por alocar · 🗓️ alocado a refeições de hoje ou dos próximos dias · 🍽️ consumido em refeições já passadas</div>`;
   const vis=STOCK_FILTER==='all'?arr:arr.filter(g=>g.estados.has(STOCK_FILTER));
