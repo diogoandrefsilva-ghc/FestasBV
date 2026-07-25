@@ -812,9 +812,16 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 /* Label do cabeçalho num span próprio: nunca parte para 2 linhas — encolhe com
    reticências se não couber (o essencial — refeição + data — fica no início) */
 .cmp-grp-label{flex:0 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-/* Total por artigo no cabeçalho da vista "Por artigo" (ex.: "3 kg") */
-.cmp-qtd-total{flex:0 0 auto;font-family:-apple-system,sans-serif;font-size:11.5px;font-weight:700;letter-spacing:0;text-transform:none;color:var(--green);background:rgba(30,122,77,.1);border:1px solid rgba(30,122,77,.28);border-radius:20px;padding:1px 9px;white-space:nowrap}
-#view-compras .cmp-grp-art .cmp-qtd-total{transform:rotate(-2deg)}
+/* Artigo agrupado (mesmo nome, várias refeições): cabeçalho com total + barra
+   à esquerda a ligar as linhas-refeição, para se ver que são o mesmo artigo */
+.cmp-artgrp{position:relative;margin:6px 0;padding-left:11px}
+.cmp-artgrp::before{content:'';position:absolute;left:2px;top:6px;bottom:6px;width:3px;border-radius:3px;background:rgba(30,122,77,.35)}
+.cmp-artgrp-h{display:flex;align-items:baseline;gap:8px;padding:4px 2px 2px}
+.cmp-artgrp-name{font-weight:800;font-size:15px;color:var(--ink);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cmp-artgrp-tot{margin-left:auto;flex:0 0 auto;font-family:-apple-system,sans-serif;font-size:11.5px;font-weight:700;color:var(--green);background:rgba(30,122,77,.1);border:1px solid rgba(30,122,77,.28);border-radius:20px;padding:1px 9px;white-space:nowrap}
+/* Linha-refeição dentro do grupo: rótulo principal é a refeição, um pouco recuada */
+.cmp-item.cmp-sub .cmp-artigo{font-weight:600;color:var(--muted)}
+.cmp-item.cmp-sub .cmp-artigo .cmp-qtd{color:var(--ink);font-weight:700}
 /* Lista de compras dentro do cartão da refeição (tab Refeições) */
 .msl{cursor:default}
 .msl-det{margin-top:0;border-top:none;padding-top:0}
@@ -870,10 +877,13 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .lote-dest-name:disabled{cursor:default}
 .lote-dest-ed{font-style:normal;color:var(--faint);font-size:12px;font-weight:400}
 .lote-dest-need{flex:0 0 auto;font-size:11px;font-weight:700;color:var(--gold);background:rgba(168,123,20,.14);border-radius:20px;padding:2px 9px;white-space:nowrap}
-.lote-aloc-row{display:flex;align-items:center;gap:7px;margin-top:6px}
-.lote-aloc-row input[type=number]{flex:0 0 82px;height:38px;margin:0;text-align:right;padding:0 8px;font-size:13px;border:1px solid var(--line);border-radius:8px;background:#FFFDF6;color:var(--ink)}
-.lote-aloc-row .lote-val{margin-left:auto;font-size:12.5px;color:var(--muted);font-weight:600;white-space:nowrap}
-.lote-marca{flex:1 1 auto;min-width:0;height:38px;margin:0;font-size:12.5px;border:1px solid var(--line);border-radius:8px;background:#FFFDF6;color:var(--ink);padding:0 8px}
+.lote-aloc-row{margin-top:6px}
+.lote-aloc-row.multi{border:1px solid var(--line);border-radius:9px;padding:7px 8px;background:var(--panel)}
+.lote-aloc-line{display:flex;align-items:center;gap:7px}
+.lote-aloc-line input[type=number]{flex:0 0 82px;height:38px;margin:0;text-align:right;padding:0 8px;font-size:13px;border:1px solid var(--line);border-radius:8px;background:#FFFDF6;color:var(--ink)}
+.lote-aloc-line .lote-val{margin-left:auto;font-size:12.5px;color:var(--muted);font-weight:600;white-space:nowrap}
+/* Marca em linha própria (largura toda) para não cortar nomes compridos */
+.lote-marca{display:block;width:100%;box-sizing:border-box;height:36px;margin:0 0 6px;font-size:11.5px;border:1px solid var(--line);border-radius:8px;background:#FFFDF6;color:var(--ink);padding:0 7px;text-overflow:ellipsis}
 .lote-addmarca{margin-top:7px;background:transparent;border:1px dashed var(--line);border-radius:8px;color:var(--muted);font-size:12px;font-weight:600;padding:6px 11px;cursor:pointer}
 .lote-addmarca:active{transform:scale(.97)}
 /* Marcas listadas no cartão de stock (Ruffles · Lays) */

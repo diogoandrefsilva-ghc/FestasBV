@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v88 · 2026-07-25 · Polish: stock aloca por container de refeição · "Por artigo" soma o total por artigo · modal Normalizar mais limpo';
+const APP_BUILD = 'v89 · 2026-07-25 · Polish 2: stock — marca em linha própria (não corta) · Shop List — artigos repetidos agrupados com barra + total (Por artigo e Por categoria)';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -3977,9 +3977,14 @@ function aplicarStock(data){
   }
 }
 
-function shopItemCard(it,mineView,noBadge){
+function shopItemCard(it,mineView,noBadge,grouped){
   const meal=shopIsMeal(it.tipo)&&it.dataValor;
-  const badge=noBadge?'':(meal?`<span class="cmp-badge meal">${shopTipoIcon(it.tipo)} ${fmtDiaMes(it.dataValor)}</span>`:`<span class="cmp-badge">${shopTipoIcon(it.tipo)} ${it.tipo}</span>`);
+  // Em modo "grouped" (dentro de um artigo agrupado), o rótulo principal passa a
+  // ser a REFEIÇÃO (não se repete o nome do artigo, que está no cabeçalho).
+  const primary=grouped
+    ?(meal?`${shopTipoIcon(it.tipo)} ${fmtDiaMes(it.dataValor)}`:`${shopTipoIcon(it.tipo)} ${escHtml(it.tipo)}`)
+    :escHtml(it.artigo);
+  const badge=(noBadge||grouped)?'':(meal?`<span class="cmp-badge meal">${shopTipoIcon(it.tipo)} ${fmtDiaMes(it.dataValor)}</span>`:`<span class="cmp-badge">${shopTipoIcon(it.tipo)} ${it.tipo}</span>`);
   const qtdTxt=shopQtyLabel(it);
   const qtd=qtdTxt?`<span class="cmp-qtd">${escHtml(qtdTxt)}</span>`:'';
   const removed=shopIsRemoved(it);
@@ -4011,11 +4016,24 @@ function shopItemCard(it,mineView,noBadge){
   // Dica de stock: no coberto o chip "em stock" já o diz (não se repete); nos
   // outros, a dica normal — incl. o botão de um toque para alocar o livre.
   const hint=covered?'':shopHintHtml(it,'cmp-hint');
-  return `<div class="cmp-item cmp-line cmp-tap${mineView&&it.noCarrinho?' incart':''}${removed?' removed':''}" onclick="openShopItemModal(${it._id})">
+  // Agrupado: mostra só o alerta (removido); o "pedido por" iria repetir-se
+  const subShow=(grouped&&!removed)?'':sub;
+  return `<div class="cmp-item cmp-line cmp-tap${grouped?' cmp-sub':''}${mineView&&it.noCarrinho?' incart':''}${removed?' removed':''}" onclick="openShopItemModal(${it._id})">
     ${check}
-    <div class="cmp-main"><div class="cmp-artigo">${escHtml(it.artigo)}${qtd}</div>${hint}${sub}</div>
+    <div class="cmp-main"><div class="cmp-artigo${grouped?' meal':''}">${primary}${qtd}</div>${hint}${subShow}</div>
     ${badge}${right}<span class="cmp-chev-r">›</span>
   </div>`;
+}
+/* Um artigo agrupado: um só pedido → cartão normal; vários pedidos (mesmo nome,
+   refeições diferentes) → cabeçalho com o TOTAL + uma linha por refeição, com
+   uma barra à esquerda a deixar claro que pertencem todos ao mesmo artigo. */
+function shopArtNestHtml(items,mineView){
+  if(items.length===1)return shopItemCard(items[0],mineView,false);
+  const tot=shopSumQtys(items);
+  const totTxt=tot?`total ${escHtml(tot)}`:`${items.length} refeições`;
+  let h=`<div class="cmp-artgrp"><div class="cmp-artgrp-h"><span class="cmp-artgrp-name">${escHtml(items[0].artigo)}</span><span class="cmp-artgrp-tot">${totTxt}</span></div>`;
+  items.forEach(it=>{h+=shopItemCard(it,mineView,false,true);});
+  return h+'</div>';
 }
 
 /* Lista agrupada por refeição/tipo: um cabeçalho por grupo (ex.: 🍳 Almoço 8/ago
@@ -4046,16 +4064,8 @@ function shopSumQtys(items){
    simples. Responde à dúvida "quanto preciso ao todo deste artigo". */
 function shopArtGroupedList(list,mineView){
   const groups={},order=[];
-  list.forEach(it=>{const k=shopArtKey(it.artigo);if(!groups[k]){groups[k]={artigo:it.artigo,items:[]};order.push(k);}groups[k].items.push(it);});
-  let h='';
-  order.forEach(k=>{
-    const g=groups[k];
-    if(g.items.length===1){h+=shopItemCard(g.items[0],mineView,false);return;}
-    const tot=shopSumQtys(g.items);
-    h+=`<div class="cmp-grp-hdr sf cmp-grp-art"><span class="cmp-grp-label">${escHtml(g.artigo)}</span>${tot?`<span class="cmp-qtd-total">${escHtml(tot)}</span>`:''}<span class="cmp-count">${g.items.length}</span></div>`;
-    g.items.forEach(it=>{h+=shopItemCard(it,mineView,false);});
-  });
-  return '<div class="cmp-list">'+h+'</div>';
+  list.forEach(it=>{const k=shopArtKey(it.artigo);if(!groups[k]){groups[k]={items:[]};order.push(k);}groups[k].items.push(it);});
+  return '<div class="cmp-list">'+order.map(k=>shopArtNestHtml(groups[k].items,mineView)).join('')+'</div>';
 }
 
 /* Lista agrupada por CATEGORIA de produto (Sumos, Talho, …): a vista para
@@ -4063,19 +4073,20 @@ function shopArtGroupedList(list,mineView){
    cartão — o cabeçalho diz o produto, não o destino. Sem categoria no fim. */
 function shopCatGroupedList(list,mineView){
   const keyOf=it=>{const c=artCat(it.artigo);return c?'c'+c.id:'none';};
-  // Sem categoria ("Outros") sempre no fim, independentemente do sort de quem chama
-  list=list.filter(it=>keyOf(it)!=='none').concat(list.filter(it=>keyOf(it)==='none'));
-  const counts={};list.forEach(it=>{const k=keyOf(it);counts[k]=(counts[k]||0)+1;});
-  let h='',last=null;
-  list.forEach(it=>{
-    const k=keyOf(it);
-    if(k!==last){
-      const c=artCat(it.artigo);
-      const nome=c?c.nome:'Outros';
-      h+=`<div class="cmp-grp-hdr sf"><span class="cmp-grp-label">${catEmoji(nome)} ${escHtml(nome)}</span><span class="cmp-count">${counts[k]}</span></div>`;
-      last=k;
-    }
-    h+=shopItemCard(it,mineView,false);
+  // Agrupa por categoria (Sem categoria ao fim) e, dentro de cada uma, junta os
+  // pedidos do mesmo artigo (mesma nidificação da vista "Por artigo").
+  const cats={},order=[];
+  list.forEach(it=>{const k=keyOf(it);if(!cats[k]){cats[k]={items:[]};order.push(k);}cats[k].items.push(it);});
+  order.sort((a,b)=>(a==='none'?1:0)-(b==='none'?1:0));
+  let h='';
+  order.forEach(k=>{
+    const items=cats[k].items;
+    const c=k==='none'?null:artCat(items[0].artigo);
+    const nome=c?c.nome:'Outros';
+    h+=`<div class="cmp-grp-hdr sf"><span class="cmp-grp-label">${catEmoji(nome)} ${escHtml(nome)}</span><span class="cmp-count">${items.length}</span></div>`;
+    const byArt={},aOrder=[];
+    items.forEach(it=>{const ak=shopArtKey(it.artigo);if(!byArt[ak]){byArt[ak]={items:[]};aOrder.push(ak);}byArt[ak].items.push(it);});
+    aOrder.forEach(ak=>{h+=shopArtNestHtml(byArt[ak].items,mineView);});
   });
   return '<div class="cmp-list">'+h+'</div>';
 }
@@ -5699,12 +5710,14 @@ function loteRenderAlocs(){
     const a0=destinoAloc(k,0);const meal=alocIsMeal(a0);
     const lbl=meal?`${diaAbrev(a0.data)} ${fmtDiaMes(a0.data)}`:a0.tipo;
     const need=dem[k];
-    const rows=idx.map(i=>{const a=editingLote.alocs[i];
-      return `<div class="lote-aloc-row">
-        ${brandSel(a,i)}
-        <input type="number" step="any" min="0" inputmode="decimal" ${canEdit?'':'disabled'} value="${a.qtd||''}" placeholder="qtd" onchange="loteAlocField(${i},'qtd',this.value)">
-        <span class="lote-val">${eur(rnd(unit*(+a.qtd||0),2))}</span>
-        ${canEdit?`<button class="cmp-ln-del" title="Remover" onclick="loteDelAloc(${i})">✕</button>`:''}
+    const rows=idx.map(i=>{const a=editingLote.alocs[i];const bs=brandSel(a,i);
+      return `<div class="lote-aloc-row${bs?' multi':''}">
+        ${bs}
+        <div class="lote-aloc-line">
+          <input type="number" step="any" min="0" inputmode="decimal" ${canEdit?'':'disabled'} value="${a.qtd||''}" placeholder="qtd" onchange="loteAlocField(${i},'qtd',this.value)">
+          <span class="lote-val">${eur(rnd(unit*(+a.qtd||0),2))}</span>
+          ${canEdit?`<button class="cmp-ln-del" title="Remover" onclick="loteDelAloc(${i})">✕</button>`:''}
+        </div>
       </div>`;}).join('');
     return `<div class="lote-dest">
       <div class="lote-dest-h">
