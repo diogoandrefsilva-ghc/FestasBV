@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v99 · 2026-07-26 · Normalizar artigos: só nomes da lista de compras (os nomes detalhados dos talões deixam de ser propostos) e modal refeito — um cartão por grupo, nome final em destaque, grafias tocáveis e interruptor para deixar como está';
+const APP_BUILD = 'v100 · 2026-07-26 · Shop List: a dica de stock passa para uma linha própria por baixo do cartão — deixa de colidir com o botão do carrinho e com o badge da refeição, e já não fica cortada';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -4111,10 +4111,14 @@ function shopItemCard(it,mineView,noBadge,grouped){
   const hint=covered?'':shopHintHtml(it,'cmp-hint');
   // Agrupado: mostra só o alerta (removido); o "pedido por" iria repetir-se
   const subShow=(grouped&&!removed)?'':sub;
+  // A dica sai da coluna do artigo e vai para uma linha própria, a toda a largura
+  // por baixo do cartão: assim não colide com o badge da refeição nem com o
+  // botão do carrinho (nem fica cortada com "…").
+  const hintRow=hint?`<div class="cmp-hint-row">${hint}</div>`:'';
   return `<div class="cmp-item cmp-line cmp-tap${grouped?' cmp-sub':''}${mineView&&it.noCarrinho?' incart':''}${removed?' removed':''}" onclick="openShopItemModal(${it._id})">
     ${check}
-    <div class="cmp-main"><div class="cmp-artigo${grouped?' meal':''}">${primary}${qtd}</div>${hint}${subShow}</div>
-    ${badge}${right}<span class="cmp-chev-r">›</span>
+    <div class="cmp-main"><div class="cmp-artigo${grouped?' meal':''}">${primary}${qtd}</div>${subShow}</div>
+    ${badge}${right}<span class="cmp-chev-r">›</span>${hintRow}
   </div>`;
 }
 /* Um artigo agrupado: um só pedido → cartão normal; vários pedidos (mesmo nome,

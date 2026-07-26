@@ -790,11 +790,14 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .cmp-chev-r{color:var(--faint);font-size:20px;line-height:1;font-weight:400;margin-left:2px}
 
 /* Compras — cartão compacto de uma linha, checklist e removidos (soft-delete) */
-.cmp-line{display:flex;align-items:center;gap:8px}
+.cmp-line{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .cmp-main{flex:1;min-width:0}
 .cmp-sub{font-size:11px;color:var(--faint);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .cmp-sub.alert{color:var(--red);font-weight:600}
-.cmp-hint{font-size:11px;color:#9A6E0E;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* Linha própria da dica de stock, por baixo do resto do cartão (largura toda,
+   sem colidir com o badge da refeição nem com o botão do carrinho) */
+.cmp-hint-row{flex:0 0 100%;width:100%;min-width:0;margin-top:1px}
+.cmp-hint{font-size:11px;color:#9A6E0E;white-space:normal}
 .cmp-hint.ok{color:var(--green)}
 .cmp-chip{background:var(--panel2);border:1px solid var(--line);color:var(--ink);font-size:11px;font-weight:600;border-radius:8px;padding:3px 7px;white-space:nowrap;flex:0 0 auto}
 .cmp-check{flex:0 0 auto;width:24px;height:24px;border-radius:50%;border:2px solid var(--line);background:var(--panel2);color:transparent;font-size:13px;font-weight:800;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0}
