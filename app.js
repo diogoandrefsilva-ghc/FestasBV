@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v100 · 2026-07-26 · Shop List: a dica de stock passa para uma linha própria por baixo do cartão — deixa de colidir com o botão do carrinho e com o badge da refeição, e já não fica cortada';
+const APP_BUILD = 'v101 · 2026-07-26 · Shop List (Por artigo): o artigo com pedidos em várias refeições passa a ler-se como um artigo só — nome e quantidade total na mesma coluna dos outros, refeições recuadas por baixo e o fio verde só a ligá-las (Alternativa A)';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -4117,20 +4117,22 @@ function shopItemCard(it,mineView,noBadge,grouped){
   const hintRow=hint?`<div class="cmp-hint-row">${hint}</div>`:'';
   return `<div class="cmp-item cmp-line cmp-tap${grouped?' cmp-sub':''}${mineView&&it.noCarrinho?' incart':''}${removed?' removed':''}" onclick="openShopItemModal(${it._id})">
     ${check}
-    <div class="cmp-main"><div class="cmp-artigo${grouped?' meal':''}">${primary}${qtd}</div>${subShow}</div>
+    <div class="cmp-main"><div class="cmp-artigo">${primary}${qtd}</div>${subShow}</div>
     ${badge}${right}<span class="cmp-chev-r">›</span>${hintRow}
   </div>`;
 }
 /* Um artigo agrupado: um só pedido → cartão normal; vários pedidos (mesmo nome,
-   refeições diferentes) → cabeçalho com o TOTAL + uma linha por refeição, com
-   uma barra à esquerda a deixar claro que pertencem todos ao mesmo artigo. */
+   refeições diferentes) → a MESMA linha de artigo (nome + quantidade total, na
+   mesma coluna e com o mesmo peso) e, recuadas por baixo, uma linha por
+   refeição ligadas pelo fio verde. O grupo conta como um artigo só: a lista
+   lê-se pelos nomes a negrito, não pelo número de linhas. */
 function shopArtNestHtml(items,mineView){
   if(items.length===1)return shopItemCard(items[0],mineView,false);
   const tot=shopSumQtys(items);
-  const totTxt=tot?`total ${escHtml(tot)}`:`${items.length} refeições`;
-  let h=`<div class="cmp-artgrp"><div class="cmp-artgrp-h"><span class="cmp-artgrp-name">${escHtml(items[0].artigo)}</span><span class="cmp-artgrp-tot">${totTxt}</span></div>`;
+  const qtd=tot?`<span class="cmp-qtd">${escHtml(tot)}</span>`:'';
+  let h=`<div class="cmp-artgrp"><div class="cmp-artgrp-h"><span class="cmp-artgrp-name">${escHtml(items[0].artigo)}${qtd}</span><span class="cmp-artgrp-n">${items.length} refeições</span></div><div class="cmp-artgrp-body">`;
   items.forEach(it=>{h+=shopItemCard(it,mineView,false,true);});
-  return h+'</div>';
+  return h+'</div></div>';
 }
 
 /* Lista agrupada por refeição/tipo: um cabeçalho por grupo (ex.: 🍳 Almoço 8/ago
