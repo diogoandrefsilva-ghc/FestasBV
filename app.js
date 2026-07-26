@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v101 · 2026-07-26 · Shop List (Por artigo): o artigo com pedidos em várias refeições passa a ler-se como um artigo só — nome e quantidade total na mesma coluna dos outros, refeições recuadas por baixo e o fio verde só a ligá-las (Alternativa A)';
+const APP_BUILD = 'v102 · 2026-07-26 · Cash-Flows: o detalhe da compra passa a dizer ONDE ENTRA o dinheiro — a linha técnica "Gerais · 🧺 Stock" abre na repartição real pelas refeições/tipos (e o que sobra por alocar diz-se por palavras); com um só destino não se repete o valor. Stock: o campo "Cobre o pedido de" deixa de aparecer a quem não é admin quando não há ligação feita.';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -1203,13 +1203,18 @@ function renderCashFlows(){
   // o valor fica na linha do título para o rótulo não criar espaçamento extra.
   const cardHtml=cf=>{
     if(cf.isCompra){
-      // Cartão de compra da lista: resumo + linhas por refeição/tipo. Toca → editor da compra.
-      const lines=cf.lines.map(l=>`<div class="cft-sub"><span>${shopTipoIcon(l.sub)} ${l.sub}${l.dia?' · '+l.dia:''}${l.obs?' · <i>'+escHtml(l.obs)+'</i>':''}</span><span>−${eur(l.valor)}</span></div>`).join('');
+      // Cartão de compra da lista: resumo + para onde foi o dinheiro (refeição/tipo).
+      // Toca → editor da compra.
+      const subs=cfCompraLines(cf);
+      // Com uma linha só, o valor é o da compra inteira — repeti-lo não acrescenta
+      // nada; fica só o destino.
+      const one=subs.length===1;
+      const lines=subs.map(l=>`<div class="cft-sub"><span>${shopTipoIcon(l.sub)} ${l.sub}${l.dia?' · '+l.dia:''}${l.obs?' · <i>'+escHtml(l.obs)+'</i>':''}</span>${one?'':`<span>−${eur(l.valor)}</span>`}</div>`).join('');
       return `<div class="card cft-card b-despesa" onclick="openCompra('${cf.compraId}')">
         <div class="cft-kind k-despesa sf">🛒 Compra · lista</div>
         <div class="cft-l1"><div class="cft-title">${escHtml(cf.line1)}</div><span class="cft-v neg">−${eur(cf.valor)}</span></div>
         ${cf.line2?`<div class="cft-meta">${truncRef(cf.line2)}</div>`:''}
-        <div class="cft-subs">${lines}</div>
+        ${subs.length?`<div class="cft-subs"><div class="cft-subs-h sf">onde entra</div>${lines}</div>`:''}
       </div>`;
     }
     const sgn=cf.sign==='neg'?'−':cf.sign==='pos'?'+':'';
@@ -1272,6 +1277,43 @@ function groupCompraCfs(list){
     }else out.push(cf);
   });
   out.forEach(g=>{if(g.isCompra){g.line1=g._desc||'Compra da lista';g.subN=g.lines.length;}});
+  return out;
+}
+
+/* Sub-linhas do cartão de uma compra = para onde entra o dinheiro dela.
+   A linha "🧺 Stock" é técnica (o valor dos lotes entra por Gerais e só depois
+   é repartido pelas alocações), por isso dizia "Gerais" numa compra que foi
+   toda para jantares. Aqui troca-se pela repartição REAL — a mesma que o
+   aplicarStock() aplica às contas. */
+function cfCompraLines(g){
+  const out=[];
+  (g.lines||[]).forEach(l=>{
+    if(l.sub==='Gerais'&&l.obs===STOCK_OBS)cfStockSplit(g.compraId,l.valor).forEach(s=>out.push(s));
+    else out.push(l);
+  });
+  return out;
+}
+/* Reparte o valor da linha "🧺 Stock" de uma compra pelos destinos dos seus
+   lotes (refeição ou tipo puro). O que ainda não está alocado fica numa linha
+   à parte, dito por palavras — é a única parte que de facto está em Gerais. */
+function cfStockSplit(compraId,total){
+  const by={};
+  stockArr().filter(l=>l.compraId===compraId&&+l.qtd>0).forEach(l=>{
+    const unit=l.valor/l.qtd;
+    (l.alocacoes||[]).forEach(a=>{
+      const k=alocToDestino(a);if(!k)return;
+      const v=rnd(unit*(+a.qtd||0),2);if(v<=0)return;
+      by[k]=rnd((by[k]||0)+v,2);
+    });
+  });
+  const out=[];let resto=rnd(total,2);
+  Object.keys(by).sort(destKeyCmp).forEach(k=>{
+    const d=destinoAloc(k,0);
+    const v=Math.min(by[k],resto);if(v<=0.004)return;
+    resto=rnd(resto-v,2);
+    out.push({sub:d.tipo,dia:d.data?`${dataToDia(d.data)} ${fmtDiaMes(d.data)}`:'',valor:v,obs:'via stock'});
+  });
+  if(resto>0.004)out.push({sub:'Gerais',dia:'',valor:resto,obs:'stock por alocar'});
   return out;
 }
 
@@ -5952,13 +5994,19 @@ function loteReqFill(){
   // "Batatas Fritas". Com várias marcas já agrupadas, o pedido é o próprio
   // guarda-chuva — esconde-se para não confundir.
   if(!STOCK_TABLE||editingLote.multi){wrap.style.display='none';return;}
+  // Quem não é admin não liga nada: sem ligação feita, o campo só mostraria uma
+  // caixa vazia que não se pode preencher — esconde-se.
+  if(!isAdmin()&&!String(editingLote.reqLink||'').trim()){wrap.style.display='none';return;}
   const inp=document.getElementById('lote-req');
   inp.value=editingLote.reqLink||'';
   inp.disabled=!isAdmin();
   inp.style.opacity=inp.disabled?'.75':'';
   inp.placeholder='ex.: batatas fritas';   // curto: o nome do produto vai na nota abaixo
   const nota=document.getElementById('lote-req-note');
-  if(nota)nota.innerHTML=`Só se na lista foi pedido com outro nome (ex.: Lays → batatas fritas). Produto: <b>${escHtml(editingLote.product)}</b>.`;
+  // Para quem não edita, a nota descreve o que está feito em vez de explicar como se faz.
+  if(nota)nota.innerHTML=inp.disabled
+    ?`<b>${escHtml(editingLote.product)}</b> cobre este pedido da lista.`
+    :`Só se na lista foi pedido com outro nome (ex.: Lays → batatas fritas). Produto: <b>${escHtml(editingLote.product)}</b>.`;
   // Sugestões: nomes distintos dos pedidos de refeição na lista (exceto o próprio)
   const nomes=[...new Set(shopArr().filter(it=>shopIsMeal(it.tipo)&&it.dataValor&&!shopIsRemoved(it)).map(it=>it.artigo))]
     .filter(n=>!shopSameArtigo(n,editingLote.product)).sort((a,b)=>a.localeCompare(b,'pt'));
