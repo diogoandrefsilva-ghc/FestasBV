@@ -788,6 +788,9 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .cmp-tap{cursor:pointer;transition:border-color .12s,background .12s}
 .cmp-tap:active{background:var(--panel2)}
 .cmp-chev-r{color:var(--faint);font-size:20px;line-height:1;font-weight:400;margin-left:2px}
+/* Só reserva o espaço do chevron: a linha do artigo agrupado não abre detalhe
+   (abrem as etiquetas das refeições), mas o botão fica alinhado com os outros */
+.cmp-chev-r.ghost{visibility:hidden}
 
 /* Compras — cartão compacto de uma linha, checklist e removidos (soft-delete) */
 .cmp-line{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
@@ -796,7 +799,7 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .cmp-sub.alert{color:var(--red);font-weight:600}
 /* Linha própria da dica de stock, por baixo do resto do cartão (largura toda,
    sem colidir com o badge da refeição nem com o botão do carrinho) */
-.cmp-hint-row{flex:0 0 100%;width:100%;min-width:0;margin-top:1px}
+.cmp-hint-row{flex:0 0 100%;width:100%;min-width:0;margin-top:1px;display:flex;align-items:baseline;gap:5px}
 .cmp-hint{font-size:11px;color:#9A6E0E;white-space:normal}
 .cmp-hint.ok{color:var(--green)}
 .cmp-chip{background:var(--panel2);border:1px solid var(--line);color:var(--ink);font-size:11px;font-weight:600;border-radius:8px;padding:3px 7px;white-space:nowrap;flex:0 0 auto}
@@ -815,16 +818,17 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 /* Label do cabeçalho num span próprio: nunca parte para 2 linhas — encolhe com
    reticências se não couber (o essencial — refeição + data — fica no início) */
 .cmp-grp-label{flex:0 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-/* Artigo agrupado (mesmo nome, várias refeições): cabeçalho com total + barra
-   à esquerda a ligar as linhas-refeição, para se ver que são o mesmo artigo */
-.cmp-artgrp{position:relative;margin:6px 0;padding-left:11px}
-.cmp-artgrp::before{content:'';position:absolute;left:2px;top:6px;bottom:6px;width:3px;border-radius:3px;background:rgba(30,122,77,.35)}
-.cmp-artgrp-h{display:flex;align-items:baseline;gap:8px;padding:4px 2px 2px}
-.cmp-artgrp-name{font-weight:800;font-size:15px;color:var(--ink);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.cmp-artgrp-tot{margin-left:auto;flex:0 0 auto;font-family:-apple-system,sans-serif;font-size:11.5px;font-weight:700;color:var(--green);background:rgba(30,122,77,.1);border:1px solid rgba(30,122,77,.28);border-radius:20px;padding:1px 9px;white-space:nowrap}
-/* Linha-refeição dentro do grupo: rótulo principal é a refeição, um pouco recuada */
-.cmp-item.cmp-sub .cmp-artigo{font-weight:600;color:var(--muted)}
-.cmp-item.cmp-sub .cmp-artigo .cmp-qtd{color:var(--ink);font-weight:700}
+/* Artigo com pedidos em várias refeições: é UMA linha como as outras (nome +
+   quantidade total) e as refeições passam a etiquetas tocáveis numa linha
+   própria por baixo — mesmo aspeto do badge de refeição de um artigo simples,
+   porque é a mesma informação. Uma linha = um artigo a comprar. */
+.cmp-meals-row{flex:0 0 100%;width:100%;min-width:0;display:flex;flex-wrap:wrap;gap:5px;margin-top:5px}
+.cmp-mchip{display:inline-flex;align-items:center;gap:5px;font-family:inherit;font-size:11px;font-weight:600;color:var(--ink);background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:3px 8px;white-space:nowrap;cursor:pointer}
+.cmp-mchip.meal{background:rgba(30,122,77,.12);border-color:rgba(30,122,77,.35);color:var(--green)}
+.cmp-mchip b{font-weight:800;color:var(--ink)}
+.cmp-mchip:active{filter:brightness(.94)}
+/* Dica de stock de uma refeição só: leva a data à frente para se saber de qual */
+.cmp-hint-w{flex:0 0 auto;font-size:11px;font-weight:700;color:var(--faint)}
 /* Lista de compras dentro do cartão da refeição (tab Refeições) */
 .msl{cursor:default}
 .msl-det{margin-top:0;border-top:none;padding-top:0}
@@ -1274,9 +1278,9 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 @keyframes stampA{0%{transform:scale(1.7) rotate(-15deg);opacity:.3}100%{transform:scale(1) rotate(0)}}
 
 /* ── Badges/chips dos artigos: mini-etiquetas kraft ── */
-#view-compras .cmp-badge,#view-compras .cmp-chip{background:#F3EAD2;border-radius:4px 9px 9px 4px;position:relative;padding-left:16px}
-#view-compras .cmp-badge::before,#view-compras .cmp-chip::before{content:"";position:absolute;left:5px;top:50%;width:4px;height:4px;margin-top:-2px;border-radius:50%;background:var(--sal);box-shadow:inset 0 0 0 1px rgba(110,75,25,.5)}
-#view-compras .cmp-badge.meal{background:rgba(30,122,77,.13)}
+#view-compras .cmp-badge,#view-compras .cmp-chip,#view-compras .cmp-mchip{background:#F3EAD2;border-radius:4px 9px 9px 4px;position:relative;padding-left:16px}
+#view-compras .cmp-badge::before,#view-compras .cmp-chip::before,#view-compras .cmp-mchip::before{content:"";position:absolute;left:5px;top:50%;width:4px;height:4px;margin-top:-2px;border-radius:50%;background:var(--sal);box-shadow:inset 0 0 0 1px rgba(110,75,25,.5)}
+#view-compras .cmp-badge.meal,#view-compras .cmp-mchip.meal{background:rgba(30,122,77,.13)}
 #view-compras .cmp-mini.cart{border-radius:18px}
 
 /* ── Estados vazios: recado pregado com pionés ── */

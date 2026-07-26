@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v100 · 2026-07-26 · Shop List: a dica de stock passa para uma linha própria por baixo do cartão — deixa de colidir com o botão do carrinho e com o badge da refeição, e já não fica cortada';
+const APP_BUILD = 'v101 · 2026-07-26 · Shop List (Por artigo): um artigo com pedidos em várias refeições passa a ser uma linha só, com as refeições em etiquetas por baixo e o botão Carrinho a tratar do artigo todo (Alternativa B)';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -4122,15 +4122,54 @@ function shopItemCard(it,mineView,noBadge,grouped){
   </div>`;
 }
 /* Um artigo agrupado: um só pedido → cartão normal; vários pedidos (mesmo nome,
-   refeições diferentes) → cabeçalho com o TOTAL + uma linha por refeição, com
-   uma barra à esquerda a deixar claro que pertencem todos ao mesmo artigo. */
+   refeições diferentes) → NA MESMA uma só linha, igual à dos outros artigos
+   (nome + quantidade total) e, por baixo, uma etiqueta por refeição. Cada
+   etiqueta abre o pedido dessa refeição; a ação (Carrinho / ✓ / ✕) trata do
+   artigo todo de uma vez, que é como se compra — vai-se uma vez ao talho e
+   trazem-se os chouriços das duas noites. Assim a lista tem tantas linhas
+   quantos os artigos: quatro linhas = quatro artigos a comprar. */
 function shopArtNestHtml(items,mineView){
   if(items.length===1)return shopItemCard(items[0],mineView,false);
+  // Estado misto (ex.: pedidos do mesmo artigo em carrinhos de pessoas
+  // diferentes) não tem uma ação única — aí cada pedido volta a ser uma linha.
+  const stKey=it=>`${shopIsRemoved(it)?'r':''}|${shopIsCovered(it)?'c':''}|${it.tratadoPor||''}`;
+  if(items.some(it=>stKey(it)!==stKey(items[0])))return items.map(it=>shopItemCard(it,mineView,false)).join('');
+  const ref=items[0],ids=items.map(it=>it._id),idsArg=ids.join(',');
   const tot=shopSumQtys(items);
-  const totTxt=tot?`total ${escHtml(tot)}`:`${items.length} refeições`;
-  let h=`<div class="cmp-artgrp"><div class="cmp-artgrp-h"><span class="cmp-artgrp-name">${escHtml(items[0].artigo)}</span><span class="cmp-artgrp-tot">${totTxt}</span></div>`;
-  items.forEach(it=>{h+=shopItemCard(it,mineView,false,true);});
-  return h+'</div>';
+  const qtd=`<span class="cmp-qtd">${tot?escHtml(tot):items.length+' refeições'}</span>`;
+  const covered=shopIsCovered(ref),removed=shopIsRemoved(ref);
+  const allCart=items.every(it=>it.noCarrinho);
+  let check='',right='',sub='';
+  if(covered){
+    right='<span class="cmp-chip stock">🧺 em stock</span>';
+  }else if(mineView){
+    check=`<button class="cmp-check write-action ${allCart?'on':''}" onclick="event.stopPropagation();toggleCartArtigo('${idsArg}')" aria-label="Já no carrinho">✓</button>`;
+    right=`<button class="cmp-x write-action" aria-label="Tirar do carrinho" onclick="event.stopPropagation();unclaimArtigo('${idsArg}')">✕</button>`;
+  }else if(ref.tratadoPor){
+    right=`<span class="cmp-chip">🛒 ${escHtml(ref.tratadoPor)}</span>`;
+  }else{
+    right=`<button class="cmp-mini cart write-action" onclick="event.stopPropagation();claimArtigo('${idsArg}')"><i class="cmp-plus">＋</i>🛒 Carrinho</button>`;
+  }
+  if(removed)sub=`<div class="cmp-sub alert">⚠️ removido por ${escHtml(ref.cfDesc||'?')}${mineView?' — abre para largar':''}</div>`;
+  // Etiquetas das refeições: mesmo aspeto do badge de refeição de um artigo
+  // simples (é a mesma informação), mas tocáveis e com a quantidade de cada uma
+  const chips=items.map(it=>{
+    const meal=shopIsMeal(it.tipo)&&it.dataValor;
+    const lbl=meal?`${shopTipoIcon(it.tipo)} ${fmtDiaMes(it.dataValor)}`:`${shopTipoIcon(it.tipo)} ${escHtml(it.tipo)}`;
+    const q=shopQtyLabel(it);
+    return `<button class="cmp-mchip${meal?' meal':''}" onclick="event.stopPropagation();openShopItemModal(${it._id})">${lbl}${q?`<b>${escHtml(q)}</b>`:''}</button>`;
+  }).join('');
+  // Dicas de stock: são por refeição, por isso levam a data à frente
+  const hints=covered?'':items.map(it=>{
+    const h=shopHintHtml(it,'cmp-hint');if(!h)return '';
+    const meal=shopIsMeal(it.tipo)&&it.dataValor?`<span class="cmp-hint-w">${fmtDiaMes(it.dataValor)}</span>`:'';
+    return `<div class="cmp-hint-row">${meal}${h}</div>`;
+  }).join('');
+  return `<div class="cmp-item cmp-line cmp-multi${mineView&&allCart?' incart':''}${removed?' removed':''}">
+    ${check}
+    <div class="cmp-main"><div class="cmp-artigo">${escHtml(ref.artigo)}${qtd}</div>${sub}</div>
+    ${right}<span class="cmp-chev-r ghost">›</span><div class="cmp-meals-row">${chips}</div>${hints}
+  </div>`;
 }
 
 /* Lista agrupada por refeição/tipo: um cabeçalho por grupo (ex.: 🍳 Almoço 8/ago
@@ -4837,6 +4876,49 @@ function toggleCart(id){
   const it=shopArr().find(x=>x._id===id);if(!it)return;
   if(!shopMine(it)&&!isAdmin())return;   // o carrinho é pessoal de quem trata
   const v=!it.noCarrinho;_shopUpdate(id,{no_carrinho:v},{noCarrinho:v});
+}
+/* ── Ações em bloco do artigo agrupado (vista "Por artigo"/"Por categoria") ──
+   O artigo compra-se de uma vez, por isso o botão da linha trata de todos os
+   pedidos daquele artigo. São os mesmos PATCH do artigo isolado, só que num
+   `id=in.(…)` — incluindo a guarda anti-corrida do claim (só leva os que ainda
+   estiverem livres no servidor). */
+function _shopIds(csv){return String(csv).split(',').map(Number).filter(n=>n);}
+async function _shopUpdateMany(ids,patch,local){
+  const its=ids.map(id=>shopArr().find(x=>x._id===id)).filter(Boolean);
+  if(!its.length)return;
+  setSync('load','a guardar…');
+  try{
+    await queueWrite(()=>sbReq('PATCH',`shoplist?id=in.(${ids.join(',')})`,patch));
+    its.forEach(it=>Object.assign(it,local));syncMirror();marcaGuardado();renderShopViews();
+  }catch(e){setSync('err','erro ao guardar');toast(permErrorMsg(e),'bad');}
+}
+async function claimArtigo(csv){
+  const ids=_shopIds(csv),its=ids.map(id=>shopArr().find(x=>x._id===id)).filter(Boolean);
+  if(!its.length)return;
+  const busy=its.find(it=>it.tratadoPor&&!shopMine(it));
+  if(busy){toast(`Já está a ser tratado por ${busy.tratadoPor}`,'bad');return;}
+  const nome=myPrimaryName()||(isAdmin()?'Admin':'');
+  setSync('load','a guardar…');
+  try{
+    const res=await queueWrite(()=>sbReq('PATCH',`shoplist?id=in.(${ids.join(',')})&tratado_por=is.null`,{tratado_por:nome},{Prefer:'return=representation'}));
+    const got=new Set((res||[]).map(r=>r.id));
+    its.forEach(it=>{if(got.has(it._id))it.tratadoPor=nome;});
+    if(got.size<its.length)toast('Alguns pedidos já tinham ficado com outra pessoa','bad');
+    syncMirror();marcaGuardado();renderShopViews();
+  }catch(e){setSync('err','erro ao guardar');toast(permErrorMsg(e),'bad');}
+}
+function unclaimArtigo(csv){
+  const ids=_shopIds(csv),its=ids.map(id=>shopArr().find(x=>x._id===id)).filter(Boolean);
+  if(!its.length)return;
+  if(its.some(it=>!shopMine(it))&&!isAdmin()){toast('Só quem está a tratar pode largar o artigo','bad');return;}
+  _shopUpdateMany(ids,{tratado_por:null,no_carrinho:false},{tratadoPor:null,noCarrinho:false});
+}
+function toggleCartArtigo(csv){
+  const ids=_shopIds(csv),its=ids.map(id=>shopArr().find(x=>x._id===id)).filter(Boolean);
+  if(!its.length)return;
+  if(its.some(it=>!shopMine(it))&&!isAdmin())return;   // o carrinho é pessoal de quem trata
+  const v=!its.every(it=>it.noCarrinho);               // ✓ liga tudo; só desliga quando já estava tudo ligado
+  _shopUpdateMany(ids,{no_carrinho:v},{noCarrinho:v});
 }
 async function deleteShopItem(id){
   const it=shopArr().find(x=>x._id===id);if(!it)return;
