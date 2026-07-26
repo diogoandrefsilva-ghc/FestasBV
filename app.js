@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v105 · 2026-07-26 · Stock: letra dos filtros mais pequena em ecrãs estreitos — "Disponível" deixa de cortar no iPhone normal';
+const APP_BUILD = 'v106 · 2026-07-26 · Modo consulta mais limpo: sem "cobre o pedido" redundante, sem observações vazias e só os artigos da compra';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -2431,8 +2431,9 @@ function editCfEntry(source,idx){
       </div>
       <label>Descritivo <span class="cf-desc-count" id="ecf-desc-count"></span></label>
       <input type="text" id="ecf-desc" maxlength="30" value="${escHtml((d.desc||'').slice(0,30))}" oninput="updDescCount('ecf')">
-      <label>Observações</label>
-      <textarea id="ecf-obs" rows="2" placeholder="Detalhe adicional (opcional)">${escHtml(d.obs||'')}</textarea>`;
+      ${(!isAdmin()&&!String(d.obs||'').trim())?''   /* consulta: caixa vazia que não se pode preencher não acrescenta nada */
+        :`<label>Observações</label>
+      <textarea id="ecf-obs" rows="2" placeholder="Detalhe adicional (opcional)">${escHtml(d.obs||'')}</textarea>`}`;
     setTimeout(()=>{ecfTipoChanged();updDescCount('ecf');},10);
   } else if(editType==='mealheiro'){
     const m=DATA.mealheiros[idx];
@@ -2583,7 +2584,8 @@ async function saveEditCf(){
     d.tipo=document.getElementById('ecf-tipo').value;
     d.valor=parseFloat(document.getElementById('ecf-val').value)||d.valor;
     d.desc=(document.getElementById('ecf-desc')?.value||'').trim().slice(0,30);
-    d.obs=(document.getElementById('ecf-obs')?.value||'').trim();
+    const obsEl=document.getElementById('ecf-obs');
+    if(obsEl)d.obs=obsEl.value.trim();   // campo omitido (consulta) → não apaga o que lá está
   } else if(source==='mealheiros'){
     const m=DATA.mealheiros[idx];
     m.quem=document.getElementById('ecf-who').value;
@@ -4972,7 +4974,9 @@ function openCompra(compraId){
 
   // Picker de artigos (pendentes + removidos que eu ainda reclamo)
   const pend=shopArr().filter(x=>shopIsPending(x)||(shopIsRemoved(x)&&shopMine(x)));
-  const pickItems=isEdit?linked.concat(pend.filter(x=>x.compraId!==compraId)):pend;
+  // Em consulta o picker não se mexe: mostrar os pendentes só encheria a lista
+  // de artigos que nada têm a ver com esta compra — ficam os que lhe ficaram ligados.
+  const pickItems=ro?linked:(isEdit?linked.concat(pend.filter(x=>x.compraId!==compraId)):pend);
   // O picker vive num bloco recolhível DEPOIS do detalhe por artigo (junto ao
   // "＋ Artigo fora da lista") — abre sozinho quando ainda nada está marcado.
   let pl='';
@@ -4994,10 +4998,10 @@ function openCompra(compraId){
         <span>${escHtml(it.artigo)}${ql?' <i>('+escHtml(ql)+')</i>':''}${shopIsRemoved(it)?' ⚠️':''}</span>
         <span class="cmp-badge">${shopTipoIcon(it.tipo)}${shopIsMeal(it.tipo)&&it.dataValor?' '+fmtDiaMes(it.dataValor):' '+it.tipo}</span></label>`;
     });
-    pl=`<details class="pick-det"${nOn?'':' open'}>
-      <summary>🛒 Artigos da lista <span class="cmp-count" id="shop-pick-count">${nOn}/${pickItems.length}</span><span class="pick-chev">›</span></summary>
+    pl=`<details class="pick-det"${(nOn&&!ro)?'':' open'}>
+      <summary>🛒 Artigos da lista <span class="cmp-count" id="shop-pick-count">${ro?pickItems.length:nOn+'/'+pickItems.length}</span><span class="pick-chev">›</span></summary>
       ${rows}
-      <div class="note" style="margin:6px 0 12px">Os artigos marcados saem da lista e ficam ligados a esta compra.</div>
+      ${ro?'':'<div class="note" style="margin:6px 0 12px">Os artigos marcados saem da lista e ficam ligados a esta compra.</div>'}
     </details>`;
   }
   document.getElementById('shop-buy-body').innerHTML=(ro?'<div class="note" style="margin-bottom:10px">🔒 Só o administrador pode editar uma compra já registada.</div>':'')+
@@ -5998,8 +6002,13 @@ function loteReqFill(){
   // guarda-chuva — esconde-se para não confundir.
   if(!STOCK_TABLE||editingLote.multi){wrap.style.display='none';return;}
   // Quem não é admin não liga nada: sem ligação feita, o campo só mostraria uma
-  // caixa vazia que não se pode preencher — esconde-se.
-  if(!isAdmin()&&!String(editingLote.reqLink||'').trim()){wrap.style.display='none';return;}
+  // caixa vazia que não se pode preencher — esconde-se. E mesmo com ligação, só
+  // interessa quando é uma EXCEÇÃO (nome diferente do pedido): "Arroz cobre o
+  // pedido de Arroz" não diz nada a quem só consulta.
+  if(!isAdmin()){
+    const lnk=String(editingLote.reqLink||'').trim();
+    if(!lnk||shopSameArtigo(lnk,editingLote.product)||shopSameArtigo(lnk,editingLote.reqName)){wrap.style.display='none';return;}
+  }
   const inp=document.getElementById('lote-req');
   inp.value=editingLote.reqLink||'';
   inp.disabled=!isAdmin();
