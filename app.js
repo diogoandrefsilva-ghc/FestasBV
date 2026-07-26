@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v114 · 2026-07-26 · Detalhe do artigo em stock: a quem não é admin a categoria só aparece enquanto está por preencher — trancada não dizia nada que o separador já não mostre';
+const APP_BUILD = 'v115 · 2026-07-26 · Cash-flows: o destino de uma compra de uma só refeição deixa de sair a bold; Shop List: o botão do carrinho encolhe para ＋🛒 e devolve a largura ao nome do artigo';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -4150,7 +4150,9 @@ function shopItemCard(it,mineView,noBadge,grouped){
     right=`<span class="cmp-chip">🛒 ${escHtml(it.tratadoPor)}</span>`;
   }else{
     if(it.criadoPor)sub=`<div class="cmp-sub">pedido por ${escHtml(it.criadoPor)}</div>`;
-    right=`<button class="cmp-mini cart write-action" onclick="event.stopPropagation();claimItem(${it._id})"><i class="cmp-plus">＋</i>🛒 Carrinho</button>`;
+    // Só ＋🛒 (sem a palavra "Carrinho"): o nome do artigo é o que interessa ler
+    // e num ecrã estreito era o botão que lhe comia a largura.
+    right=`<button class="cmp-mini cart write-action" title="Pôr no carrinho" aria-label="Pôr no carrinho" onclick="event.stopPropagation();claimItem(${it._id})"><i class="cmp-plus">＋</i>🛒</button>`;
   }
   if(removed)sub=`<div class="cmp-sub alert">⚠️ removido por ${escHtml(it.cfDesc||'?')}${mineView?' — abre para largar':''}</div>`;
   // Dica de stock: no coberto o chip "em stock" já o diz (não se repete); nos
@@ -4411,7 +4413,7 @@ function renderCompras(){
   }else if(SHOP_TAB==='carrinho'){
     // ── O meu carrinho (artigos que disse que tratava) ──
     if(!mine.length){
-      h+='<div class="cmp-empty sf"><span class="cmp-empty-ico">🛒</span>O teu carrinho está vazio.<br>Passa por <b>📝 Em falta</b> e toca em <b>Carrinho</b> nos artigos que fores buscar.</div>';
+      h+='<div class="cmp-empty sf"><span class="cmp-empty-ico">🛒</span>O teu carrinho está vazio.<br>Passa por <b>📝 Em falta</b> e toca no <b>＋🛒</b> dos artigos que fores buscar.</div>';
     }else{
       h+=listOf(mine,true);
     }
