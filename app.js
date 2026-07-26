@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v111 · 2026-07-26 · Mudar nome: o nome genérico ganha destaque e os dos lotes recuam por baixo dele; sem lápis repetido nas compras e sem teclado a saltar ao abrir';
+const APP_BUILD = 'v112 · 2026-07-26 · Alocação: o ＋ das refeições passa a "adicionar" e desaparece quando a refeição já tem todos os artigos detalhados do stock';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -6153,6 +6153,12 @@ function loteRenderAlocs(){
   // contrário de um <select>, corta com "…" e cabe na linha.
   const pickBtn=(cls,ic,txt,fn)=>`<button class="lote-pick ${cls}" ${canEdit?'':'disabled'} onclick="${fn}">${ic?`<span class="lp-ic">${ic}</span>`:''}<span class="lp-lbl">${escHtml(txt)}</span>${canEdit?'<i class="lp-ed">▾</i>':''}</button>`;
   const needTag=k=>dem[k]>0.0005?`<span class="lote-dest-need">precisa ${escHtml(fmtQty(dem[k],editingLote.u))}</span>`:'';
+  /* Uma refeição só tem tantas linhas úteis quantos os nomes que este artigo tem
+     em stock: com todos já lá, uma linha nova só podia repetir um deles (as qtds
+     somavam-se na mesma) ou ficar em branco. Nesse caso o ＋ desaparece. */
+  const nBrands=(editingLote.brands||[]).length;
+  const podeAdd=idx=>idx.length<nBrands
+    &&new Set(idx.map(i=>(editingLote.alocs[i]||{}).marca).filter(Boolean)).size<nBrands;
   const html=order.map(k=>{
     const idx=groups[k].idx;
     const a0=destinoAloc(k,0);const meal=alocIsMeal(a0);
@@ -6168,7 +6174,7 @@ function loteRenderAlocs(){
       </div>
       ${idx.map(i=>{const a=editingLote.alocs[i];
         return `<div class="lote-al">${pickBtn('marca','',a.marca||'qualquer marca',`loteMarcaPicker(${i})`)}${endCells(i,a)}</div>`;}).join('')}
-      ${canEdit?`<button class="lote-addmarca" onclick="loteAddToGroup(${idx[0]})">＋ marca</button>`:''}
+      ${(canEdit&&podeAdd(idx))?`<button class="lote-addmarca" onclick="loteAddToGroup(${idx[0]})">＋ adicionar</button>`:''}
     </div>`;
   }).join('');
   document.getElementById('lote-alocs').innerHTML=
