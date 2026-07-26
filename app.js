@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v104 · 2026-07-26 · Cash-Flows: o detalhe da compra diz só ONDE ENTRA o dinheiro (refeição/tipo, com o que não está alocado em Gerais) — sem falar em stock, que é matéria da lista de compras.';
+const APP_BUILD = 'v105 · 2026-07-26 · Stock: letra dos filtros mais pequena em ecrãs estreitos — "Disponível" deixa de cortar no iPhone normal';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
