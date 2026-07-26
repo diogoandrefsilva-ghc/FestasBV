@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v115 · 2026-07-26 · Cash-flows: o destino de uma compra de uma só refeição deixa de sair a bold; Shop List: o botão do carrinho encolhe para ＋🛒 e devolve a largura ao nome do artigo';
+const APP_BUILD = 'v115a · 2026-07-26 · [Opção A] Alocação de stock: Compras e Pedidos deixam de ser lado a lado — empilhados e fechados, com o resumo no cabeçalho. Mais: destino sem bold nos cash-flows e botão ＋🛒 na Shop List';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -5792,6 +5792,29 @@ function umbrellaLotes(reqName,u){
   return stockArr().filter(l=>stockBacked(l)&&shopSameArtigo(loteReqArtigo(l),reqName)&&(l.unidade||'')===(u||''))
     .sort((a,b)=>loteCompraDate(a).localeCompare(loteCompraDate(b))||(a.criadoEm||'').localeCompare(b.criadoEm||'')||((a._id||0)-(b._id||0)));
 }
+/* ── Compras / Pedidos: duas secções empilhadas e fechadas ───────────────
+   O estado (aberto/fechado) de cada uma fica guardado no aparelho: quem anda a
+   alocar artigo atrás de artigo abre a secção uma vez e não a volta a abrir em
+   cada modal. */
+let _LOTE_ACC=(function(){try{return JSON.parse(localStorage.getItem('festasbv_lote_acc'))||{};}catch(e){return{};}})();
+function loteAccSec(key,ic,lbl,sum,body){
+  const open=!!_LOTE_ACC[key];
+  return `<div class="lote-acc-sec${open?' open':''}">
+    <button type="button" class="lote-acc-h" aria-expanded="${open?'true':'false'}" onclick="loteAccToggle('${key}',this)">
+      <span class="lote-acc-ic">${ic}</span><span class="lote-acc-lbl">${lbl}</span>
+      <span class="lote-acc-sum">${sum}</span><i class="lote-acc-chev">▾</i>
+    </button>
+    <div class="lote-acc-b">${body}</div>
+  </div>`;
+}
+function loteAccToggle(key,btn){
+  const open=!_LOTE_ACC[key];
+  _LOTE_ACC[key]=open;
+  try{localStorage.setItem('festasbv_lote_acc',JSON.stringify(_LOTE_ACC));}catch(e){}
+  const sec=btn&&btn.parentNode;
+  if(sec){sec.classList.toggle('open',open);btn.setAttribute('aria-expanded',open?'true':'false');}
+}
+
 function openLoteModal(id){
   const base=stockArr().find(x=>x._id===id);
   if(!base){toast('Artigo não encontrado','bad');return;}
@@ -5853,12 +5876,23 @@ function openLoteModal(id){
     return `<div class="lote-need-row">${ic} ${escHtml(diaAbrev(a.data)+' '+fmtDiaMes(a.data))} · <b>${escHtml(fmtQty(dem[k],editingLote.u))}</b></div>`;
   }).join(''):`<div class="lote-need-row empty">— sem pedidos na lista —</div>`;
   const semCusto=lotes.length>0&&lotes.every(loteSemCompra);
+  // Compras e Pedidos deixam de disputar meia largura cada: empilham-se e abrem
+  // um de cada vez. Fechados, o cabeçalho leva já o número que interessa
+  // (quantas compras · quantas refeições pedem e quanto), e o detalhe — nomes
+  // compridos de faturas, uma linha por refeição — só ocupa ecrã quando o
+  // pedimos. Assim o modal abre logo no que se vem cá fazer: alocar.
+  const demTot=rnd(needKeys.reduce((s,k)=>s+dem[k],0),3);
+  const nL=lotes.length;
+  const cmpSum=nL?`${nL} ${anyOrg?(nL===1?'origem':'origens'):(nL===1?'compra':'compras')}`:'—';
+  const needSum=needKeys.length
+    ?`${needKeys.length} ${needKeys.length===1?'refeição':'refeições'} · ${escHtml(fmtQty(demTot,editingLote.u))}`
+    :'sem pedidos';
   document.getElementById('lote-info').innerHTML=
     `<div class="lote-sum">Em stock: <b>${escHtml(fmtQty(totQ,editingLote.u))}</b> · <b>${semCusto?'sem custo':eur(totV)}</b></div>`+
     (lotes.length>1?`<div class="lote-sum-sub">${lotes.length} ${anyOrg?'origens':'compras'} — a distribuição por elas é automática (FIFO)</div>`:'')+
-    `<div class="lote-cols">
-      <div class="lote-col"><div class="lote-col-h"><span>${anyOrg?'📦':'🛒'}</span>${anyOrg?'Origem':'Compras'}</div>${comprasRows}</div>
-      <div class="lote-col"><div class="lote-col-h"><span>📋</span>Pedidos na lista</div>${needRows}</div>
+    `<div class="lote-acc">
+      ${loteAccSec('cmp',anyOrg?'📦':'🛒',anyOrg?'Origem':'Compras',cmpSum,comprasRows)}
+      ${loteAccSec('need','📋','Pedidos na lista',needSum,needRows)}
     </div>`;
   const canEdit=isAdmin()&&!contasFechadas();
   // A categoria e a ligação ao pedido são edição do artigo: vivem no painel ✏️.
