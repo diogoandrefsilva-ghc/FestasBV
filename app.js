@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v103 · 2026-07-26 · Cash-Flows: o detalhe da compra passa a dizer ONDE ENTRA o dinheiro — a linha técnica "Gerais · 🧺 Stock" abre na repartição real pelas refeições/tipos (e o que sobra por alocar diz-se por palavras); com um só destino não se repete o valor. Stock: o campo "Cobre o pedido de" deixa de aparecer a quem não é admin quando não há ligação feita.';
+const APP_BUILD = 'v104 · 2026-07-26 · Cash-Flows: o detalhe da compra diz só ONDE ENTRA o dinheiro (refeição/tipo, com o que não está alocado em Gerais) — sem falar em stock, que é matéria da lista de compras.';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -1284,18 +1284,21 @@ function groupCompraCfs(list){
    A linha "🧺 Stock" é técnica (o valor dos lotes entra por Gerais e só depois
    é repartido pelas alocações), por isso dizia "Gerais" numa compra que foi
    toda para jantares. Aqui troca-se pela repartição REAL — a mesma que o
-   aplicarStock() aplica às contas. */
+   aplicarStock() aplica às contas. Nos cash-flows não se fala em stock: isto é
+   a conta do dinheiro, o stock é matéria da lista de compras. */
 function cfCompraLines(g){
   const out=[];
   (g.lines||[]).forEach(l=>{
-    if(l.sub==='Gerais'&&l.obs===STOCK_OBS)cfStockSplit(g.compraId,l.valor).forEach(s=>out.push(s));
-    else out.push(l);
+    if(l.obs===STOCK_OBS){
+      if(l.sub==='Gerais')cfStockSplit(g.compraId,l.valor).forEach(s=>out.push(s));
+      else out.push({...l,obs:''});   // linha antiga já com destino — só cai a nota
+    }else out.push(l);
   });
   return out;
 }
 /* Reparte o valor da linha "🧺 Stock" de uma compra pelos destinos dos seus
-   lotes (refeição ou tipo puro). O que ainda não está alocado fica numa linha
-   à parte, dito por palavras — é a única parte que de facto está em Gerais. */
+   lotes (refeição ou tipo puro). O que ainda não está alocado fica em Gerais —
+   e é mesmo isso que é, a bolsa comum, sem precisar de explicação. */
 function cfStockSplit(compraId,total){
   const by={};
   stockArr().filter(l=>l.compraId===compraId&&+l.qtd>0).forEach(l=>{
@@ -1313,7 +1316,7 @@ function cfStockSplit(compraId,total){
     resto=rnd(resto-v,2);
     out.push({sub:d.tipo,dia:d.data?`${dataToDia(d.data)} ${fmtDiaMes(d.data)}`:'',valor:v,obs:''});
   });
-  if(resto>0.004)out.push({sub:'Gerais',dia:'',valor:resto,obs:'stock por alocar'});
+  if(resto>0.004)out.push({sub:'Gerais',dia:'',valor:resto,obs:''});
   return out;
 }
 
