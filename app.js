@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v108 · 2026-07-26 · Registar compra: linha única mais apertada — destino sem Almoço/Jantar, qtd e preço ao tamanho do conteúdo (e o € deixa de comer o valor)';
+const APP_BUILD = 'v109 · 2026-07-26 · Stock: o nome detalhado de cada lote (Lays, Ruffles…) toca-se para o mudar — abre o painel ✏️ já nesse campo, e a mudança propaga a todo o lado';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -5826,9 +5826,15 @@ function openLoteModal(id){
     parts.push(escHtml(fmtQty(l.qtd,l.unidade)),org?'sem custo':eur(l.valor));
     if(dsp&&dsp.desc&&dsp.desc!=='Compras')parts.push(escHtml(dsp.desc));
     // Marca em cima (quebra à vontade), detalhes por baixo — assim os nomes
-    // compridos deixam de sair cortados a meio.
+    // compridos deixam de sair cortados a meio. O nome detalhado do lote mostra-se
+    // sempre que diga algo mais que o do guarda-chuva; para o admin é o próprio
+    // atalho para o corrigir (abre o painel ✏️ já naquele campo).
+    const showN=multi||!shopSameArtigo(l.artigo,reqName);
+    const nome=!showN?''
+      :podeApagar?`<button type="button" class="lote-cmp-ren" title="Mudar este nome" onclick="loteRenameOpen(${l._id})">${escHtml(l.artigo)}<span class="pen">✏️</span></button>`
+      :`<span class="n">${escHtml(l.artigo)}</span>`;
     const del=(org&&podeApagar&&l._id!=null)?`<button class="cmp-ln-del" title="Apagar este stock" onclick="stkDelLote(${l._id})">✕</button>`:'';
-    return `<div class="lote-cmp-row${org?' org':''}"><span class="t">${multi?`<span class="n">${escHtml(l.artigo)}</span>`:''}<span class="d">${parts.join(' · ')}</span></span>${del}</div>`;
+    return `<div class="lote-cmp-row${org?' org':''}"><span class="t">${nome}<span class="d">${parts.join(' · ')}</span></span>${del}</div>`;
   }).join('');
   // As necessidades (direita) — refeições que pedem este artigo na lista de
   // compras, por ordem de data. Casa pelo nome do PEDIDO (batatas fritas), que
@@ -5872,7 +5878,9 @@ function closeLoteModal(){document.getElementById('lote-bg').classList.remove('s
    O painel dá um campo a cada um — os detalhados só aparecem quando existem, para
    o modal não crescer à toa em quem só tem um nome (o caso normal). */
 let _loteRen=[];   // [{antigo,marca}] — o que cada campo do painel renomeia
-function loteRenameOpen(){
+// loteId (opcional): veio-se do nome de um lote na coluna das compras — abre já
+// com o cursor NESSE campo, em vez do nome do guarda-chuva.
+function loteRenameOpen(loteId){
   if(!editingLote)return;
   if(!isAdmin()){toast('Só o admin muda nomes de artigos','bad');return;}
   if(contasFechadas()){toast('Contas fechadas — o stock já não se mexe','bad');return;}
@@ -5889,8 +5897,10 @@ function loteRenameOpen(){
   const nota=document.getElementById('lote-ren-note');
   if(nota)nota.textContent='Muda o nome em todo o lado: nos lotes de stock e nos pedidos da lista de compras.';
   wrap.style.display='';
-  const inp=document.getElementById('lote-ren-0');
-  if(inp){inp.focus();inp.select();}
+  const lt=loteId!=null?(editingLote.lotesFifo||[]).find(x=>x._id===loteId):null;
+  const j=lt?_loteRen.findIndex(r=>shopSameArtigo(r.antigo,lt.artigo)):-1;
+  const inp=document.getElementById('lote-ren-'+(j>0?j:0));
+  if(inp){inp.focus();inp.select();inp.scrollIntoView({block:'nearest'});}
 }
 function loteRenameCancel(){
   const wrap=document.getElementById('lote-ren-wrap');if(wrap)wrap.style.display='none';
