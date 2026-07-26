@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v106 · 2026-07-26 · Modo consulta mais limpo: sem "cobre o pedido" redundante, sem observações vazias e só os artigos da compra';
+const APP_BUILD = 'v107 · 2026-07-26 · Registar compra: destino sem a palavra Almoço/Jantar (o ☀️🌙 já diz) e em linha própria nos telemóveis — deixa de cortar';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -5178,22 +5178,26 @@ function destPickList(){
   ['Gerais','Bebidas','Cerveja'].forEach(t=>out.push({value:t,icon:shopTipoIcon(t),label:t,group:'Tipo'}));
   // Rótulo com o dia da semana (mais útil que o prato); o prato fica como
   // sublinha no bottom-sheet (sub) — no botão só aparece o rótulo curto
-  (DATA.refeicoesDef||[]).filter(r=>shopIsMeal(r.ref)).forEach(r=>out.push({value:r.ref+'|'+r.data,icon:shopTipoIcon(r.ref),label:`${r.ref} ${diaCurto(r.data)}, ${fmtDiaMes(r.data)}`,sub:r.prato||'',group:'Refeição'}));
+  // short: versão sem a palavra Almoço/Jantar, para o botão do seletor — lá o
+  // ☀️/🌙 já diz qual é e o espaço é curto. No bottom-sheet fica o label longo.
+  (DATA.refeicoesDef||[]).filter(r=>shopIsMeal(r.ref)).forEach(r=>out.push({value:r.ref+'|'+r.data,icon:shopTipoIcon(r.ref),label:`${r.ref} ${diaCurto(r.data)}, ${fmtDiaMes(r.data)}`,short:`${diaCurto(r.data)}, ${fmtDiaMes(r.data)}`,sub:r.prato||'',group:'Refeição'}));
   return out;
 }
 // Rótulo (ícone + texto) de um valor de destino, para o botão do seletor
 function destLabel(value){
   const it=value?destPickList().find(x=>x.value===value):null;
-  if(it)return{icon:it.icon,label:it.label};
+  if(it)return{icon:it.icon,label:it.label,short:it.short||it.label};
   const a=value?destinoAloc(value,0):null;
-  if(a)return{icon:shopTipoIcon(a.tipo),label:alocIsMeal(a)?`${a.tipo} ${diaCurto(a.data)}, ${fmtDiaMes(a.data)}`:a.tipo};
-  return{icon:'🧺',label:'Escolher destino'};
+  if(a)return alocIsMeal(a)
+    ?{icon:shopTipoIcon(a.tipo),label:`${a.tipo} ${diaCurto(a.data)}, ${fmtDiaMes(a.data)}`,short:`${diaCurto(a.data)}, ${fmtDiaMes(a.data)}`}
+    :{icon:shopTipoIcon(a.tipo),label:a.tipo,short:a.tipo};
+  return{icon:'🧺',label:'Escolher destino',short:'Escolher destino'};
 }
 // Botão que abre o seletor (parece um campo, mas é bonito e controlável)
 function destBtnHtml(value,onclick,dis){
   const d=destLabel(value);
   return `<button type="button" class="dest-btn${dis?' dis':''}" ${dis?'disabled':`onclick="${onclick}"`}>
-    <span class="dest-ic">${d.icon}</span><span class="dest-lbl">${escHtml(d.label)}</span>${dis?'':'<span class="dest-chev">▾</span>'}</button>`;
+    <span class="dest-ic">${d.icon}</span><span class="dest-lbl" title="${escHtml(d.label)}">${escHtml(d.short)}</span>${dis?'':'<span class="dest-chev">▾</span>'}</button>`;
 }
 let _dpick=null;   // {items, cb}
 function openDestPicker(current,cb,title){

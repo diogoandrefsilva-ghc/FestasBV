@@ -973,13 +973,20 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .lote-x:active{color:var(--red);background:rgba(179,64,47,.1)}
 /* Uma só linha por artigo: qtd + € + destino (+ ⇄ dividir) — tudo à mesma
    altura (40px) e com letra mais pequena para "1,124 kg" não ficar cortado */
-.lote-row{display:flex;align-items:center;gap:7px}
+.lote-row{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
 .lote-row .lote-qty{flex:0 0 72px;min-width:0;margin:0;text-align:center;padding:0 5px;height:40px;font-size:13px}
 .lote-row .price-in{flex:0 0 86px;min-width:0}
 .lote-row .price-in input{margin:0;height:40px;padding-top:0;padding-bottom:0;font-size:13px}
 .lote-row .price-in i{font-size:12.5px}
 .lote-row .dest-btn{padding:0 8px;height:40px;font-size:12.5px;gap:5px}
 .lote-row .lote-split-btn{height:40px}
+/* Ecrãs estreitos: qtd + preço deixam ao destino uns magros ~50px, e nenhum
+   rótulo de refeição cabe aí (medido: nem "Qui, 13/ago"). O destino passa a
+   ter a linha só para ele — continua o mesmo botão, só que legível. A base
+   é 100% menos o ⇄, para o ⇄ o acompanhar em vez de descer outra vez. */
+@media (max-width:479px){
+  .lote-row .dest-btn{flex:1 1 calc(100% - 30px)}
+}
 /* Mesma altura nas linhas de split e no detalhe do lote (qtd vs seletor) */
 .split-row .split-qty{height:40px;padding-top:0;padding-bottom:0;font-size:13px}
 .split-row .dest-btn,.lote-ln .dest-btn{height:40px;padding-top:0;padding-bottom:0}
