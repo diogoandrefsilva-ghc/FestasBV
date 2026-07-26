@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v112 · 2026-07-26 · Alocação: o ＋ das refeições passa a "adicionar" e desaparece quando a refeição já tem todos os artigos detalhados do stock';
+const APP_BUILD = 'v113 · 2026-07-26 · O ✏️ do stock passa a editar o artigo todo: nomes, categoria e pedido que cobre, com um Guardar só — o corpo do modal fica para alocar às refeições';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -5859,7 +5859,13 @@ function openLoteModal(id){
       <div class="lote-col"><div class="lote-col-h"><span>📋</span>Pedidos na lista</div>${needRows}</div>
     </div>`;
   const canEdit=isAdmin()&&!contasFechadas();
-  loteRenameCancel();   // o painel de mudar o nome abre sempre fechado…
+  // A categoria e a ligação ao pedido são edição do artigo: vivem no painel ✏️.
+  // Quem não o tem (não-admin, contas fechadas) continua a vê-las no corpo — é o
+  // mesmo campo, só muda de sítio, para o membro poder preencher a categoria que
+  // falta e o modo consulta ver a ligação já feita.
+  const pai=document.getElementById(canEdit?'lote-ren-fields':'lote-body-fields');
+  if(pai)['lote-cat-wrap','lote-req-wrap'].forEach(id=>{const el=document.getElementById(id);if(el&&el.parentNode!==pai)pai.appendChild(el);});
+  loteEditCancel();   // o painel de edição abre sempre fechado…
   ['lote-save','lote-addline','lote-ren-btn'].forEach(i=>{document.getElementById(i).style.display=canEdit?'':'none';});   // …e só depois se decide quem vê o quê
   loteCatFill();
   loteReqFill();
@@ -5867,17 +5873,23 @@ function openLoteModal(id){
   document.getElementById('lote-bg').classList.add('show');
   document.body.classList.add('no-scroll');
 }
-// O reset do modo "mudar nome" fica para depois da animação de fecho — senão o
+// O reset do modo de edição fica para depois da animação de fecho — senão o
 // corpo do modal reaparece a meio do slide para baixo
-function closeLoteModal(){document.getElementById('lote-bg').classList.remove('show');document.body.classList.remove('no-scroll');editingLote=null;setTimeout(loteRenameCancel,320);}
-// ✕ do cabeçalho: em modo "mudar nome" volta atrás (o modal por baixo ainda é o
+function closeLoteModal(){document.getElementById('lote-bg').classList.remove('show');document.body.classList.remove('no-scroll');editingLote=null;setTimeout(loteEditCancel,320);}
+// ✕ do cabeçalho: em modo de edição volta atrás (o modal por baixo ainda é o
 // assunto); fora dele fecha, como sempre
 function loteHdrClose(){
   const w=document.getElementById('lote-ren-wrap');
-  if(w&&w.style.display!=='none'){loteRenameCancel();return;}
+  if(w&&w.style.display!=='none'){loteEditCancel();return;}
   closeLoteModal();
 }
-/* ── ✏️ Mudar o nome do artigo ──────────────────────────────────────
+/* ── ✏️ Editar o artigo (nomes + categoria + ligação ao pedido) ─────
+   Um modo do próprio modal: o corpo colapsa e fica só o formulário do artigo —
+   o que ele É (nomes, categoria, que pedido cobre), separado do que se lhe FAZ
+   (alocar às refeições, no corpo). Nada se grava a meio: escreve-se tudo e o
+   Guardar aplica de uma vez; o Cancelar deita fora.
+
+   Sobre os NOMES:
    Não há tabela de produtos: o nome de um artigo está ESCRITO em cada sítio
    que fala dele — nos lotes de stock (`artigo` = marca/produto, `lista_artigo`
    = pedido que ele cobre) e em cada pedido da lista de compras. Corrigir o
@@ -5900,9 +5912,13 @@ function loteHdrClose(){
    Os campos detalhados só aparecem quando dizem algo — um artigo de um só lote
    com o nome do pedido não faz o modal crescer à toa (o caso normal). */
 let _loteRen=[];   // [{antigo,marca,meta}] — o que cada campo do painel renomeia
-function loteRenameOpen(){
+/* Alterações por aplicar enquanto o painel está aberto: {cat,req} (ausente = não
+   se lhe tocou). É também o sinal de que o painel manda — com ele a null, os
+   mesmos campos no corpo do modal voltam a gravar logo, como sempre fizeram. */
+let _loteEdit=null;
+function loteEditOpen(){
   if(!editingLote)return;
-  if(!isAdmin()){toast('Só o admin muda nomes de artigos','bad');return;}
+  if(!isAdmin()){toast('Só o admin edita artigos','bad');return;}
   if(contasFechadas()){toast('Contas fechadas — o stock já não se mexe','bad');return;}
   const wrap=document.getElementById('lote-ren-wrap');if(!wrap)return;
   const req=editingLote.reqName||'';
@@ -5927,30 +5943,34 @@ function loteRenameOpen(){
   if(nota)nota.textContent=mostrarDets
     ?'O nome genérico muda em todo o lado (lotes e pedidos da lista). Os de baixo são o nome de cada lote no stock — os pedidos ficam como estão.'
     :'Muda o nome em todo o lado: nos lotes de stock e nos pedidos da lista de compras.';
+  _loteEdit={};          // a partir daqui a categoria e a ligação só se guardam no fim
+  loteCatFill();loteReqFill();
   wrap.style.display='';
   loteBodyShow(false);   // o resto do modal colapsa: é o mesmo pop-up, outro assunto
   // Sem focar nada: focar abria o teclado por cima do painel mal se tocava no ✏️,
   // e o que se quer primeiro é LER os nomes para decidir qual se muda.
 }
-// Colapsa/repõe o corpo do modal (tudo o que não é o painel de mudar o nome)
+// Colapsa/repõe o corpo do modal (tudo o que não é o painel de edição)
 function loteBodyShow(on){
   const b=document.getElementById('lote-body');if(b)b.style.display=on?'':'none';
   const r=document.getElementById('lote-ren-btn');if(r)r.style.display=(on&&isAdmin()&&!contasFechadas())?'':'none';
   const m=document.getElementById('lote-modal');if(m)m.scrollTop=0;
 }
-function loteRenameCancel(){
+function loteEditCancel(){
   const wrap=document.getElementById('lote-ren-wrap');if(wrap)wrap.style.display='none';
   loteBodyShow(true);
-  _loteRen=[];
+  const aberto=!!_loteEdit;
+  _loteRen=[];_loteEdit=null;
+  if(aberto&&editingLote){loteCatFill();loteReqFill();}   // deita fora o que se escreveu
 }
 // Nome já usado por algum artigo (stock ou lista)? — base do aviso de fusão
 function artigoNomeEmUso(nk){
   return stockArr().some(l=>stockBacked(l)&&(shopArtKey(l.artigo)===nk||shopArtKey(l._listArt||'')===nk))
     ||shopArr().some(it=>!shopIsRemoved(it)&&shopArtKey(it.artigo)===nk);
 }
-async function loteRenameSave(){
+async function loteEditSave(){
   if(!editingLote)return;
-  if(!isAdmin()){toast('Só o admin muda nomes de artigos','bad');return;}
+  if(!isAdmin()){toast('Só o admin edita artigos','bad');return;}
   if(contasFechadas()){toast('Contas fechadas — o stock já não se mexe','bad');return;}
   const umb=[],dets=[];let vazio=false;
   _loteRen.forEach((r,i)=>{
@@ -5961,7 +5981,9 @@ async function loteRenameSave(){
   });
   if(vazio){toast('Os nomes não podem ficar em branco','bad');return;}
   const alvos=dets.concat(umb);
-  if(!alvos.length){loteRenameCancel();return;}
+  const ed=_loteEdit||{};
+  const extra=ed.cat!==undefined||ed.req!==undefined;
+  if(!alvos.length&&!extra){loteEditCancel();return;}
   // Fusão só se põe ao nível do guarda-chuva: é esse nome que faz dois artigos
   // passarem a ser um só. Um nome de lote fica preso ao pedido deste artigo, logo
   // não arrasta nada consigo por muito que se repita noutro sítio.
@@ -5986,13 +6008,32 @@ async function loteRenameSave(){
     let n=0;
     for(const j of jobs)n+=await loteDetalheRename(j.lotes,j.novo,req);
     for(const a of umb)n+=await artigoRenameGlobal(a.antigo,a.novo);
+    // Categoria e ligação vão DEPOIS dos nomes, e pelos nomes NOVOS: a associação
+    // à categoria é por nome (o rename já a mudou de chave) e a ligação compara-se
+    // com o nome do produto para decidir se é mesmo uma exceção.
+    if(ed.cat!==undefined){
+      const nome=umb.length?umb[0].novo:editingLote.artigo;
+      if(await catUserSetMapping(nome,ed.cat))n++;
+    }
+    if(ed.req!==undefined){
+      const prod=(dets.find(d=>shopSameArtigo(d.antigo,editingLote.product))||{}).novo||editingLote.product;
+      const val=String(ed.req||'').trim();
+      const link=(val&&!shopSameArtigo(val,prod))?val:null;   // igual ao produto → sem ligação
+      if((link||'')!==(editingLote.reqLink||''))for(const id of editingLote.allIds){
+        await queueWrite(()=>sbReq('PATCH',`stock_lotes?id=eq.${id}`,{lista_artigo:link}));
+        const l=stockArr().find(x=>x._id===id);if(l)l._listArt=link;
+        n++;
+      }
+    }
     syncMirror();marcaGuardado();
     CALC=calcular(JSON.parse(JSON.stringify(DATA)));
-    loteRenameCancel();
+    loteEditCancel();
     if(baseId!=null)openLoteModal(baseId);   // reabre com os nomes novos em todo o lado
     renderShopViews();
     if(STOCK_TABLE&&TAB==='stock')renderStock();
-    toast(`${alvos.length>1?'Nomes mudados':`Agora é "${alvos[0].novo}"`} — ${n} registo(s) atualizados ✓`,'ok');
+    toast(alvos.length
+      ?`${alvos.length>1?'Nomes mudados':`Agora é "${alvos[0].novo}"`} — ${n} registo(s) atualizados ✓`
+      :'Artigo atualizado ✓','ok');
   }catch(e){setSync('err','erro ao guardar');toast(permErrorMsg(e),'bad');}
   if(btn)btn.disabled=false;
 }
@@ -6064,6 +6105,7 @@ function loteCatFill(){
 }
 async function loteCatChanged(v){
   if(!editingLote)return;
+  if(_loteEdit){_loteEdit.cat=parseInt(v)||null;return;}   // painel aberto: só ao Guardar
   const ok=await catUserSetMapping(editingLote.artigo,parseInt(v)||null);
   if(ok){marcaGuardado();toast('Categoria guardada ✓','ok');}
   loteCatFill();   // repõe o select se a escrita falhou/foi bloqueada
@@ -6103,6 +6145,7 @@ function loteReqFill(){
 }
 async function loteReqChanged(v){
   if(!editingLote||!isAdmin())return;
+  if(_loteEdit){_loteEdit.req=(v||'').trim();return;}   // painel aberto: só ao Guardar
   const val=(v||'').trim();
   const novo=(val&&!shopSameArtigo(val,editingLote.product))?val:null;   // igual ao produto → sem ligação
   if((novo||'')===(editingLote.reqLink||''))return;

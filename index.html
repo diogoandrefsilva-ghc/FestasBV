@@ -251,7 +251,7 @@ setTimeout(function(){ if (window.fbvEsconderSplash) window.fbvEsconderSplash();
     <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:10px">
       <h3 style="margin-bottom:0" id="lote-title">Lote</h3>
       <div class="lote-hdr-acts">
-        <button class="lote-hdr-btn write-action" id="lote-ren-btn" title="Mudar o nome do artigo" onclick="loteRenameOpen()">✏️</button>
+        <button class="lote-hdr-btn write-action" id="lote-ren-btn" title="Editar o artigo" onclick="loteEditOpen()">✏️</button>
         <button onclick="loteHdrClose()" style="background:var(--panel2);border:1px solid var(--line);color:var(--muted);border-radius:9px;width:32px;height:32px;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0">✕</button>
       </div>
     </div>
@@ -261,22 +261,27 @@ setTimeout(function(){ if (window.fbvEsconderSplash) window.fbvEsconderSplash();
       <label id="lote-ren-lbl">✏️ Nome do artigo</label>
       <div id="lote-ren-list"></div>
       <div class="note" id="lote-ren-note" style="margin-top:2px"></div>
+      <!-- A categoria e a ligação ao pedido entram aqui (movidas por JS); quem
+           não tem o painel continua a vê-las no corpo, em #lote-body-fields -->
+      <div id="lote-ren-fields"></div>
       <div class="lote-ren-btns">
-        <button class="btn ghost" onclick="loteRenameCancel()">Cancelar</button>
-        <button class="btn prim" id="lote-ren-save" onclick="loteRenameSave()">Mudar nome</button>
+        <button class="btn ghost" onclick="loteEditCancel()">Cancelar</button>
+        <button class="btn prim" id="lote-ren-save" onclick="loteEditSave()">Guardar</button>
       </div>
     </div>
     <div id="lote-body">
     <div class="note" id="lote-info" style="margin-top:0"></div>
-    <div id="lote-cat-wrap" style="display:none">
-      <label>Categoria 🏷️</label>
-      <select id="lote-cat" onchange="loteCatChanged(this.value)"></select>
-    </div>
-    <div id="lote-req-wrap" style="display:none">
-      <label>🔗 Cobre o pedido de</label>
-      <input id="lote-req" list="lote-req-list" placeholder="ex.: batatas fritas" onchange="loteReqChanged(this.value)">
-      <datalist id="lote-req-list"></datalist>
-      <div class="note" id="lote-req-note" style="margin-top:2px">Liga este stock a um pedido da lista com outro nome (ex.: Lays → batatas fritas), para o dar por coberto.</div>
+    <div id="lote-body-fields">
+      <div id="lote-cat-wrap" style="display:none">
+        <label>Categoria 🏷️</label>
+        <select id="lote-cat" onchange="loteCatChanged(this.value)"></select>
+      </div>
+      <div id="lote-req-wrap" style="display:none">
+        <label>🔗 Cobre o pedido de</label>
+        <input id="lote-req" list="lote-req-list" placeholder="ex.: batatas fritas" onchange="loteReqChanged(this.value)">
+        <datalist id="lote-req-list"></datalist>
+        <div class="note" id="lote-req-note" style="margin-top:2px">Liga este stock a um pedido da lista com outro nome (ex.: Lays → batatas fritas), para o dar por coberto.</div>
+      </div>
     </div>
     <label>🍽️ Alocado a</label>
     <div id="lote-alocs"></div>
