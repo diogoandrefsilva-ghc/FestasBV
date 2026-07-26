@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v113 · 2026-07-26 · O ✏️ do stock passa a editar o artigo todo: nomes, categoria e pedido que cobre, com um Guardar só — o corpo do modal fica para alocar às refeições';
+const APP_BUILD = 'v114 · 2026-07-26 · Detalhe do artigo em stock: a quem não é admin a categoria só aparece enquanto está por preencher — trancada não dizia nada que o separador já não mostre';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -6090,17 +6090,22 @@ async function artigoRenameGlobal(antigo,novo){
   }
   return shopIds.length+loteArt.length+loteList.length;
 }
-/* Categoria do artigo no detalhe do lote — grava logo ao mudar (é uma
-   associação global por nome, independente das alocações deste artigo).
-   Preencher um buraco pode qualquer membro; mudar é só do admin. */
+/* Categoria do artigo no detalhe do lote. Para o admin vive no painel ✏️ e
+   guarda-se com o resto; para os outros fica no corpo e grava logo ao mudar (é
+   uma associação global por nome, independente das alocações deste artigo).
+   Preencher um buraco pode qualquer membro; mudar é só do admin — e por isso a
+   quem não é admin o campo só aparece enquanto HÁ buraco. Com a categoria já
+   posta seria uma caixa trancada a ocupar espaço, e a classificação continua à
+   vista no container do separador Stock. */
 function loteCatFill(){
   const wrap=document.getElementById('lote-cat-wrap');if(!wrap)return;
   if(!CATS_TABLE||!editingLote){wrap.style.display='none';return;}
   const m=ART_CATS[shopArtKey(editingLote.artigo)];
+  if(m&&!isAdmin()){wrap.style.display='none';return;}
   const sel=document.getElementById('lote-cat');
   sel.innerHTML=catOptionsHtml(m?m.catId:null);
-  sel.disabled=!!(m&&!isAdmin());
-  sel.style.opacity=sel.disabled?'.75':'';
+  sel.disabled=false;
+  sel.style.opacity='';
   wrap.style.display='';
 }
 async function loteCatChanged(v){
