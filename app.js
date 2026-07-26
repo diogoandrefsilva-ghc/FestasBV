@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v109 · 2026-07-26 · Stock: o nome detalhado de cada lote (Lays, Ruffles…) toca-se para o mudar — abre o painel ✏️ já nesse campo, e a mudança propaga a todo o lado';
+const APP_BUILD = 'v110 · 2026-07-26 · Stock: mudar nome é um modo do próprio modal (o resto colapsa) e cada lote tem o seu campo — dá para encurtar o nome que veio da fatura e detalhar o que entrou genérico';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -5817,6 +5817,9 @@ function openLoteModal(id){
   // aqui que se apaga, já que não há compra para apagar.
   const anyOrg=lotes.some(loteSemCompra);
   const podeApagar=isAdmin()&&!contasFechadas();
+  // De onde veio cada nome detalhado (data · loja) — é o que distingue os campos
+  // no painel de mudar o nome quando o artigo tem lotes de origens diferentes
+  const detMeta={};
   const comprasRows=lotes.map(l=>{
     const org=origemMeta(l);
     const dsp=org?null:(DATA.despesas||[]).find(d=>d.compraId===l.compraId);
@@ -5825,6 +5828,8 @@ function openLoteModal(id){
     else if(dsp&&dsp.dataDesp)parts.push(fmtDiaMes(dsp.dataDesp));
     parts.push(escHtml(fmtQty(l.qtd,l.unidade)),org?'sem custo':eur(l.valor));
     if(dsp&&dsp.desc&&dsp.desc!=='Compras')parts.push(escHtml(dsp.desc));
+    const src=[org?org.lbl:(dsp&&dsp.dataDesp?fmtDiaMes(dsp.dataDesp):''),(dsp&&dsp.desc&&dsp.desc!=='Compras')?dsp.desc:''].filter(Boolean).join(' · ');
+    (detMeta[l.artigo]=detMeta[l.artigo]||[]).push(src);
     // Marca em cima (quebra à vontade), detalhes por baixo — assim os nomes
     // compridos deixam de sair cortados a meio. O nome detalhado do lote mostra-se
     // sempre que diga algo mais que o do guarda-chuva; para o admin é o próprio
@@ -5836,6 +5841,8 @@ function openLoteModal(id){
     const del=(org&&podeApagar&&l._id!=null)?`<button class="cmp-ln-del" title="Apagar este stock" onclick="stkDelLote(${l._id})">✕</button>`:'';
     return `<div class="lote-cmp-row${org?' org':''}"><span class="t">${nome}<span class="d">${parts.join(' · ')}</span></span>${del}</div>`;
   }).join('');
+  // Um campo por nome detalhado (na ordem FIFO dos lotes), com a origem à frente
+  editingLote.detalhes=brands.map(b=>({nome:b,meta:[...new Set(detMeta[b]||[])].filter(Boolean).join(' · ')}));
   // As necessidades (direita) — refeições que pedem este artigo na lista de
   // compras, por ordem de data. Casa pelo nome do PEDIDO (batatas fritas), que
   // pode diferir do produto (Lays). Dá contexto para alocar: compras ↔ pedidos.
@@ -5854,15 +5861,24 @@ function openLoteModal(id){
       <div class="lote-col"><div class="lote-col-h"><span>📋</span>Pedidos na lista</div>${needRows}</div>
     </div>`;
   const canEdit=isAdmin()&&!contasFechadas();
-  ['lote-save','lote-addline','lote-ren-btn'].forEach(i=>{document.getElementById(i).style.display=canEdit?'':'none';});
-  loteRenameCancel();   // o painel de mudar o nome abre sempre fechado
+  loteRenameCancel();   // o painel de mudar o nome abre sempre fechado…
+  ['lote-save','lote-addline','lote-ren-btn'].forEach(i=>{document.getElementById(i).style.display=canEdit?'':'none';});   // …e só depois se decide quem vê o quê
   loteCatFill();
   loteReqFill();
   loteRenderAlocs();
   document.getElementById('lote-bg').classList.add('show');
   document.body.classList.add('no-scroll');
 }
-function closeLoteModal(){document.getElementById('lote-bg').classList.remove('show');document.body.classList.remove('no-scroll');editingLote=null;}
+// O reset do modo "mudar nome" fica para depois da animação de fecho — senão o
+// corpo do modal reaparece a meio do slide para baixo
+function closeLoteModal(){document.getElementById('lote-bg').classList.remove('show');document.body.classList.remove('no-scroll');editingLote=null;setTimeout(loteRenameCancel,320);}
+// ✕ do cabeçalho: em modo "mudar nome" volta atrás (o modal por baixo ainda é o
+// assunto); fora dele fecha, como sempre
+function loteHdrClose(){
+  const w=document.getElementById('lote-ren-wrap');
+  if(w&&w.style.display!=='none'){loteRenameCancel();return;}
+  closeLoteModal();
+}
 /* ── ✏️ Mudar o nome do artigo ──────────────────────────────────────
    Não há tabela de produtos: o nome de um artigo está ESCRITO em cada sítio
    que fala dele — nos lotes de stock (`artigo` = marca/produto, `lista_artigo`
@@ -5873,11 +5889,19 @@ function closeLoteModal(){document.getElementById('lote-bg').classList.remove('s
    categoria é por nome (shopArtKey) e por isso viaja com ele.
    Se o nome novo já existir noutro artigo, isto é uma FUSÃO — confirma-se
    primeiro, porque a partir daí somam como um só.
-   Um artigo pode ter DOIS níveis de nome: o do guarda-chuva (o pedido, "Batatas
-   Fritas") e o detalhado que veio do talão e ficou no lote ("RUFFLES ORIG 170G").
-   O painel dá um campo a cada um — os detalhados só aparecem quando existem, para
-   o modal não crescer à toa em quem só tem um nome (o caso normal). */
-let _loteRen=[];   // [{antigo,marca}] — o que cada campo do painel renomeia
+   Um artigo tem DOIS níveis de nome, e o painel trata-os de maneira diferente:
+   · o do GUARDA-CHUVA (o pedido, "Batatas Fritas") — muda em todo o lado, lotes
+     e pedidos da lista, porque é o nome pelo qual toda a app fala do artigo;
+   · o DETALHADO de cada lote (o que veio do talão, "RUFFLES ORIG 170G", ou o
+     nome genérico com que entrou numa compra simples) — muda SÓ no stock, e só
+     nos lotes deste artigo. Cada lote é uma entrada distinta e pode ser revisto
+     à parte: encurtar o descritivo interminável de uma fatura importada, ou dar
+     detalhe a um lote que entrou com o nome genérico do pedido ("Batatas Fritas"
+     → "Batatas Fritas Lay's Forno"). Ao ganhar nome próprio, o lote fica preso ao
+     pedido do guarda-chuva (lista_artigo) para não sair do cartão onde vive.
+   Os campos detalhados só aparecem quando dizem algo — um artigo de um só lote
+   com o nome do pedido não faz o modal crescer à toa (o caso normal). */
+let _loteRen=[];   // [{antigo,marca,meta}] — o que cada campo do painel renomeia
 // loteId (opcional): veio-se do nome de um lote na coluna das compras — abre já
 // com o cursor NESSE campo, em vez do nome do guarda-chuva.
 function loteRenameOpen(loteId){
@@ -5885,25 +5909,41 @@ function loteRenameOpen(loteId){
   if(!isAdmin()){toast('Só o admin muda nomes de artigos','bad');return;}
   if(contasFechadas()){toast('Contas fechadas — o stock já não se mexe','bad');return;}
   const wrap=document.getElementById('lote-ren-wrap');if(!wrap)return;
-  // Campo 1: o nome do artigo. Depois, um por cada nome detalhado dos lotes que
-  // difira dele (com um só nome, e igual, não há segundo campo nenhum).
-  _loteRen=[{antigo:editingLote.reqName||'',marca:false}].concat(
-    (editingLote.brands||[]).filter(b=>b&&!shopSameArtigo(b,editingLote.reqName))
-      .map(b=>({antigo:b,marca:true})));
+  const req=editingLote.reqName||'';
+  // Campo 1: o nome do artigo. Depois um por cada nome detalhado — TODOS, mesmo
+  // o que hoje repete o do guarda-chuva (é o do lote que veio de uma compra
+  // simples, e é justamente esse que se quer poder detalhar). Com um só lote
+  // que já diz o mesmo que o pedido não há segundo campo nenhum.
+  const dets=(editingLote.detalhes||[]).filter(d=>d.nome);
+  const mostrarDets=dets.length>1||(dets.length===1&&!shopSameArtigo(dets[0].nome,req));
+  _loteRen=[{antigo:req,marca:false,meta:''}].concat(mostrarDets?dets.map(d=>({antigo:d.nome,marca:true,meta:d.meta||''})):[]);
   document.getElementById('lote-ren-list').innerHTML=_loteRen.map((r,i)=>
-    (r.marca&&!_loteRen[i-1].marca?`<div class="lote-ren-sub">Nome detalhado dos lotes (como veio do talão) — muda em todos os lotes com esse nome:</div>`:'')+
+    (r.marca&&!_loteRen[i-1].marca?`<div class="lote-ren-sub">Nome de cada lote no stock — como entrou, e só muda aqui:</div>`:'')+
+    (r.meta?`<div class="lote-ren-cap">${escHtml(r.meta)}</div>`:'')+
     `<input class="lote-ren-in" id="lote-ren-${i}" type="text" maxlength="60" value="${escHtml(r.antigo)}" placeholder="Nome do artigo">`
   ).join('');
   const nota=document.getElementById('lote-ren-note');
-  if(nota)nota.textContent='Muda o nome em todo o lado: nos lotes de stock e nos pedidos da lista de compras.';
+  if(nota)nota.textContent=mostrarDets
+    ?'O nome de cima muda em todo o lado (lotes e pedidos da lista). Os de baixo são o nome de cada lote no stock — os pedidos ficam como estão.'
+    :'Muda o nome em todo o lado: nos lotes de stock e nos pedidos da lista de compras.';
   wrap.style.display='';
+  loteBodyShow(false);   // o resto do modal colapsa: é o mesmo pop-up, outro assunto
+  // Veio-se do nome de um lote: o cursor vai para o campo DESSE lote (o detalhado,
+  // nunca o do guarda-chuva, mesmo quando os dois dizem o mesmo)
   const lt=loteId!=null?(editingLote.lotesFifo||[]).find(x=>x._id===loteId):null;
-  const j=lt?_loteRen.findIndex(r=>shopSameArtigo(r.antigo,lt.artigo)):-1;
+  const j=lt?_loteRen.findIndex(r=>r.marca&&shopSameArtigo(r.antigo,lt.artigo)):-1;
   const inp=document.getElementById('lote-ren-'+(j>0?j:0));
-  if(inp){inp.focus();inp.select();inp.scrollIntoView({block:'nearest'});}
+  if(inp){inp.focus();inp.select();}
+}
+// Colapsa/repõe o corpo do modal (tudo o que não é o painel de mudar o nome)
+function loteBodyShow(on){
+  const b=document.getElementById('lote-body');if(b)b.style.display=on?'':'none';
+  const r=document.getElementById('lote-ren-btn');if(r)r.style.display=(on&&isAdmin()&&!contasFechadas())?'':'none';
+  const m=document.getElementById('lote-modal');if(m)m.scrollTop=0;
 }
 function loteRenameCancel(){
   const wrap=document.getElementById('lote-ren-wrap');if(wrap)wrap.style.display='none';
+  loteBodyShow(true);
   _loteRen=[];
 }
 // Nome já usado por algum artigo (stock ou lista)? — base do aviso de fusão
@@ -5915,22 +5955,23 @@ async function loteRenameSave(){
   if(!editingLote)return;
   if(!isAdmin()){toast('Só o admin muda nomes de artigos','bad');return;}
   if(contasFechadas()){toast('Contas fechadas — o stock já não se mexe','bad');return;}
-  const alvos=[];let vazio=false;
+  const umb=[],dets=[];let vazio=false;
   _loteRen.forEach((r,i)=>{
     const el=document.getElementById('lote-ren-'+i);if(!el)return;
     const novo=shopCapArtigo(el.value);
     if(!novo){vazio=true;return;}
-    if(novo!==r.antigo)alvos.push({antigo:r.antigo,novo});
+    if(novo!==r.antigo)(r.marca?dets:umb).push({antigo:r.antigo,novo});
   });
   if(vazio){toast('Os nomes não podem ficar em branco','bad');return;}
+  const alvos=dets.concat(umb);
   if(!alvos.length){loteRenameCancel();return;}
-  // Nome novo já em uso por outro artigo → passam a ser o mesmo (fusão). Um nome
-  // que esteja a ser renomeado neste mesmo painel não conta como "em uso".
-  const aSair=new Set(alvos.map(a=>shopArtKey(a.antigo)));
-  const fusoes=alvos.filter(a=>{
+  // Fusão só se põe ao nível do guarda-chuva: é esse nome que faz dois artigos
+  // passarem a ser um só. Um nome de lote fica preso ao pedido deste artigo, logo
+  // não arrasta nada consigo por muito que se repita noutro sítio.
+  const aSair=new Set(umb.map(a=>shopArtKey(a.antigo)));
+  const fusoes=umb.filter(a=>{
     const nk=shopArtKey(a.novo);
-    if(nk===shopArtKey(a.antigo))return false;                       // só mudou a grafia
-    if(alvos.some(b=>b!==a&&shopArtKey(b.novo)===nk))return true;    // dois campos para o mesmo nome
+    if(nk===shopArtKey(a.antigo))return false;                     // só mudou a grafia
     return !aSair.has(nk)&&artigoNomeEmUso(nk);
   });
   if(fusoes.length&&!confirm(`Já existe ${fusoes.map(a=>`"${a.novo}"`).join(' e ')}.\n\nAo mudar o nome, passam a ser o MESMO artigo — o stock e os pedidos juntam-se num só.\n\nContinuar?`))return;
@@ -5938,8 +5979,16 @@ async function loteRenameSave(){
   const btn=document.getElementById('lote-ren-save');if(btn)btn.disabled=true;
   setSync('load','a guardar…');
   try{
+    // Os lotes de cada campo detalhado fixam-se ANTES de mexer em nada: assim
+    // duas mudanças no mesmo painel não se apanham uma à outra (ex.: trocar dois
+    // nomes entre si). E os detalhados vão primeiro — se o guarda-chuva fosse
+    // antes, arrastava com ele o lote que ainda tem o nome genérico.
+    const req=editingLote.reqName||'';
+    const ids=new Set(editingLote.allIds||[]);
+    const jobs=dets.map(d=>({novo:d.novo,lotes:stockArr().filter(l=>l._id!=null&&ids.has(l._id)&&shopArtKey(l.artigo)===shopArtKey(d.antigo)&&l.artigo!==d.novo)}));
     let n=0;
-    for(const a of alvos)n+=await artigoRenameGlobal(a.antigo,a.novo);
+    for(const j of jobs)n+=await loteDetalheRename(j.lotes,j.novo,req);
+    for(const a of umb)n+=await artigoRenameGlobal(a.antigo,a.novo);
     syncMirror();marcaGuardado();
     CALC=calcular(JSON.parse(JSON.stringify(DATA)));
     loteRenameCancel();
@@ -5949,6 +5998,22 @@ async function loteRenameSave(){
     toast(`${alvos.length>1?'Nomes mudados':`Agora é "${alvos[0].novo}"`} — ${n} registo(s) atualizados ✓`,'ok');
   }catch(e){setSync('err','erro ao guardar');toast(permErrorMsg(e),'bad');}
   if(btn)btn.disabled=false;
+}
+/* Muda o nome DETALHADO de lotes concretos — não sai do stock: os pedidos da
+   lista, que falam do artigo pelo nome do guarda-chuva, ficam intocados. Se o
+   lote passa a ter nome próprio, prende-se ao pedido (lista_artigo) para
+   continuar debaixo do mesmo artigo em vez de ir viver sozinho para um cartão
+   novo. Devolve o nº de lotes tocados. */
+async function loteDetalheRename(lotes,novo,req){
+  let n=0;
+  for(const l of lotes){
+    const body={artigo:novo};
+    if(req&&!shopSameArtigo(novo,req)&&!(l._listArt&&String(l._listArt).trim()))body.lista_artigo=req;
+    await queueWrite(()=>sbReq('PATCH',`stock_lotes?id=eq.${l._id}`,body));
+    l.artigo=novo;if(body.lista_artigo)l._listArt=body.lista_artigo;
+    n++;
+  }
+  return n;
 }
 // Reescreve um nome de artigo em todos os sítios onde está escrito: pedidos da
 // lista de compras, lotes de stock (marca e ligação ao pedido) e a associação

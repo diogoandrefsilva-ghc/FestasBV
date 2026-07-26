@@ -1091,6 +1091,9 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 #lote-ren-list input{margin-top:6px}
 #lote-ren-list input:first-child{margin-top:0}
 .lote-ren-sub{font-size:11.5px;color:var(--faint);line-height:1.4;margin:10px 0 2px}
+/* De onde veio cada lote (9/jul · Continente) por cima do campo do seu nome */
+.lote-ren-cap{font-size:10.5px;color:var(--faint);line-height:1.3;margin:9px 0 3px}
+#lote-ren-list .lote-ren-cap+input{margin-top:0}
 /* Detalhe do lote: resumo + compras (esquerda) ↔ pedidos da lista (direita) */
 .lote-sum{font-size:13px;color:var(--muted);line-height:1.4}
 .lote-sum b{font-size:15px;font-weight:700;color:var(--ink)}
