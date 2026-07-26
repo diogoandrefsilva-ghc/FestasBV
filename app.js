@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v98 · 2026-07-25 · Stock: ✏️ para corrigir nomes de artigos (Acém → Bifes do acém) — o nome do artigo e os nomes detalhados do talão, nos lotes e nos pedidos da lista, com a categoria a acompanhar';
+const APP_BUILD = 'v99 · 2026-07-26 · Normalizar artigos: só nomes da lista de compras (os nomes detalhados dos talões deixam de ser propostos) e modal refeito — um cartão por grupo, nome final em destaque, grafias tocáveis e interruptor para deixar como está';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -3320,10 +3320,14 @@ async function catSugApply(){
    pontuação continuam a contar como artigos distintos — o que parte a soma da
    procura por refeição e a cobertura pelo stock. Este botão agrupa por uma
    chave "solta" (singular + unidades canónicas + sem pontuação), mostra os
-   grupos com >1 grafia e deixa o admin escolher o nome final; ao aplicar,
-   reescreve o nome em todos os pedidos da lista e nos lotes de stock (artigo e
-   lista_artigo) — a partir daí somam e casam como um só. É puro cliente (offline,
-   sem AI e sem redeploy) — a revisão do admin é a rede de segurança. */
+   grupos com >1 grafia e deixa o admin escolher o nome final.
+   ÂMBITO: só os nomes dos PEDIDOS DA LISTA/CARRINHO entram como candidatos. Os
+   nomes detalhados que vêm dos talões (lotes de stock, "Atum em Azeite Bom
+   Petisco 78g") NÃO são propostos — são o detalhe da compra e devem ficar como
+   estão. Ao aplicar, reescreve-se o nome nos pedidos da lista e, por arrasto,
+   nos lotes: lista_artigo (a ligação do lote ao pedido) e, só nos lotes sem
+   nome de talão, o próprio artigo — para a cobertura continuar a casar.
+   É puro cliente (offline, sem redeploy) — a revisão do admin é a rede de segurança. */
 let _normGroups=null;   // [{variants:[{name,count}],canon,apply}]
 let _normViaAI=false;   // sugestões vieram da AI (true) ou da heurística local (false)
 // Chave "solta" para agrupar grafias do mesmo produto: sem acentos/maiúsculas,
@@ -3358,7 +3362,6 @@ function shopNormGroups(){
     if(nm.length>g[ak].name.length)g[ak].name=nm;
   };
   shopArr().forEach(it=>{if(!shopIsRemoved(it))push(it.artigo);});
-  stockArr().forEach(l=>{if(stockBacked(l))push(l.artigo);});
   const groups=[];
   Object.keys(map).forEach(lk=>{
     const vs=Object.values(map[lk]);
@@ -3370,8 +3373,9 @@ function shopNormGroups(){
   groups.sort((a,b)=>b.variants.length-a.variants.length||b.variants.reduce((s,v)=>s+v.count,0)-a.variants.reduce((s,v)=>s+v.count,0));
   return groups;
 }
-// Nomes distintos em uso (lista + stock) com a contagem e a grafia mais completa
-// — base tanto para a heurística como para o mapeamento das sugestões da AI.
+// Nomes distintos em uso NA LISTA/CARRINHO (nunca os nomes de talão dos lotes)
+// com a contagem e a grafia mais completa — base tanto para a heurística como
+// para o mapeamento das sugestões da AI.
 function shopNormNameStats(){
   const stats={};   // ak → {name,count}
   const add=nome=>{
@@ -3382,7 +3386,6 @@ function shopNormNameStats(){
     if(nm.length>stats[k].name.length)stats[k].name=nm;
   };
   shopArr().forEach(it=>{if(!shopIsRemoved(it))add(it.artigo);});
-  stockArr().forEach(l=>{if(stockBacked(l))add(l.artigo);});
   return stats;
 }
 // Converte as sugestões da AI ({grupos:[{nome,variantes[]}]}) em _normGroups,
@@ -3441,29 +3444,87 @@ async function shopNormOpen(){
   document.getElementById('shopnorm-bg').classList.add('show');
   document.body.classList.add('no-scroll');
 }
+/* Um cartão por grupo: o nome final em destaque (editável), as grafias em uso
+   por baixo como opções tocáveis, e um interruptor para deixar o grupo como
+   está. O interruptor é um <button> e não uma checkbox porque `.modal input`
+   força width:100%/appearance:none a qualquer input dentro de um modal. */
 function shopNormRender(){
   if(!_normGroups)return;
-  const nOn=_normGroups.filter(g=>g.apply).length;
-  document.getElementById('shopnorm-info').textContent=
-    `${_normViaAI?'✨ ':''}${_normGroups.length} grupo(s) de grafias parecidas${_normViaAI?' (sugeridos pela AI)':' (deteção básica)'}. Escolhe o nome final de cada um (toca numa grafia ou escreve), tira o visto para deixar como está, e grava.`;
-  document.getElementById('shopnorm-list').innerHTML=_normGroups.map((g,i)=>{
-    const canK=shopArtKey(g.canon);
-    const chips=g.variants.map(v=>`<button type="button" class="norm-chip${shopArtKey(v.name)===canK?' on':''}" onclick="shopNormPick(${i},this.dataset.n)" data-n="${escHtml(v.name)}">${escHtml(v.name)}${v.count>1?`<i>·${v.count}</i>`:''}</button>`).join('');
-    return `<div class="norm-row${g.apply?'':' off'}">
-      <div class="norm-head">
-        <input type="checkbox" class="norm-cb" ${g.apply?'checked':''} onchange="_normGroups[${i}].apply=this.checked;shopNormRender()">
-        <input class="norm-canon" value="${escHtml(g.canon)}" oninput="_normGroups[${i}].canon=this.value" placeholder="nome final" ${g.apply?'':'disabled'}>
+  const nTot=_normGroups.length;
+  const info=document.getElementById('shopnorm-info');
+  if(info)info.textContent=`${nTot} grupo${nTot===1?'':'s'} de grafias parecidas na lista de compras${_normViaAI?', sugerido'+(nTot===1?'':'s')+' pela AI':' (deteção básica)'}. Confirma o nome final de cada grupo — ou desliga os que devem ficar como estão.`;
+  const bar=`<div class="norm-bar">
+    <span class="norm-bar-n" id="shopnorm-count"></span>
+    <button type="button" class="norm-bar-btn" id="shopnorm-all" onclick="shopNormAll()"></button>
+  </div>`;
+  const cards=_normGroups.map((g,i)=>{
+    const canK=shopArtKey(g.canon),dis=g.apply?'':' disabled';
+    const opts=g.variants.map(v=>
+      `<button type="button" class="norm-opt${shopArtKey(v.name)===canK?' sel':''}" data-n="${escHtml(v.name)}" onclick="shopNormPick(${i},this.dataset.n)"${dis}>`+
+      `<span class="norm-dot"></span><span class="norm-opt-n">${escHtml(v.name)}</span><span class="norm-opt-c">${v.count}×</span></button>`).join('');
+    return `<div class="norm-card${g.apply?'':' off'}">
+      <div class="norm-card-hd">
+        <span class="norm-card-lbl">${shopNormCardLbl(g)}</span>
+        <button type="button" class="norm-sw${g.apply?' on':''}" role="switch" aria-checked="${g.apply?'true':'false'}" aria-label="Juntar este grupo" onclick="shopNormToggle(${i})"><i></i></button>
       </div>
-      <div class="norm-vars"><span class="norm-vars-lbl">juntar</span>${chips}</div>
+      <input class="norm-canon" value="${escHtml(g.canon)}" placeholder="nome final" oninput="shopNormCanon(${i},this.value)"${dis}>
+      <div class="norm-opts-lbl">${shopNormOptsLbl(g)}</div>
+      <div class="norm-opts">${opts}</div>
     </div>`;
   }).join('');
-  const save=document.getElementById('shopnorm-save');
-  if(save){save.disabled=!nOn;save.textContent=nOn?`Normalizar ${nOn} grupo(s)`:'Normalizar';}
+  document.getElementById('shopnorm-list').innerHTML=bar+cards;
+  shopNormBarUpd();
+}
+function shopNormCardLbl(g){return g.apply?`Juntar ${g.variants.length} grafias em`:'Fica como está';}
+function shopNormOptsLbl(g){return g.apply?'Grafias na lista — toca para escolher':'Grafias que ficam separadas';}
+function shopNormCard(i){return document.querySelectorAll('#shopnorm-list .norm-card')[i]||null;}
+// Marca a opção que bate certo com o nome final (sem re-render: o campo de
+// texto está a ser escrito e não pode perder o foco)
+function shopNormMarkSel(card,name){
+  const k=shopArtKey(name);
+  card.querySelectorAll('.norm-opt').forEach(b=>b.classList.toggle('sel',shopArtKey(b.dataset.n||'')===k));
+}
+function shopNormCanon(i,val){
+  if(!_normGroups||!_normGroups[i])return;
+  _normGroups[i].canon=val;
+  const card=shopNormCard(i);if(card)shopNormMarkSel(card,val);
 }
 function shopNormPick(i,name){
   if(!_normGroups||!_normGroups[i])return;
   _normGroups[i].canon=name;
+  const card=shopNormCard(i);
+  if(!card){shopNormRender();return;}
+  const inp=card.querySelector('.norm-canon');if(inp)inp.value=name;
+  shopNormMarkSel(card,name);
+}
+function shopNormToggle(i){
+  const g=_normGroups&&_normGroups[i];if(!g)return;
+  g.apply=!g.apply;
+  const card=shopNormCard(i);
+  if(!card){shopNormRender();return;}
+  card.classList.toggle('off',!g.apply);
+  const sw=card.querySelector('.norm-sw');
+  if(sw){sw.classList.toggle('on',g.apply);sw.setAttribute('aria-checked',g.apply?'true':'false');}
+  const lbl=card.querySelector('.norm-card-lbl');if(lbl)lbl.textContent=shopNormCardLbl(g);
+  const ol=card.querySelector('.norm-opts-lbl');if(ol)ol.textContent=shopNormOptsLbl(g);
+  card.querySelectorAll('.norm-canon,.norm-opt').forEach(el=>{el.disabled=!g.apply;});
+  shopNormBarUpd();
+}
+function shopNormAll(){
+  if(!_normGroups)return;
+  const on=_normGroups.filter(g=>g.apply).length<_normGroups.length;
+  _normGroups.forEach(g=>{g.apply=on;});
   shopNormRender();
+}
+// Contador do topo + botão de gravar acompanham quantos grupos estão ligados
+function shopNormBarUpd(){
+  const gs=_normGroups||[],nOn=gs.filter(g=>g.apply).length,nTot=gs.length;
+  const c=document.getElementById('shopnorm-count');
+  if(c)c.textContent=`${nOn} de ${nTot} para juntar`;
+  const all=document.getElementById('shopnorm-all');
+  if(all)all.textContent=nOn<nTot?'Ligar todos':'Desligar todos';
+  const save=document.getElementById('shopnorm-save');
+  if(save){save.disabled=!nOn;save.textContent=nOn?`Juntar ${nOn} grupo${nOn===1?'':'s'}`:'Nada selecionado';}
 }
 function shopNormClose(){
   document.getElementById('shopnorm-bg').classList.remove('show');
@@ -3486,10 +3547,14 @@ async function shopNormApply(){
       if(it._id==null||shopIsRemoved(it))return;
       if(aks.has(shopArtKey(it.artigo))&&it.artigo!==canon){shopTo[it._id]=canon;touched=true;}
     });
+    // Lotes: seguem a lista sem nunca perder o nome do talão. Com _listArt, o
+    // artigo é o nome detalhado da fatura (intocável) e só a ligação à lista é
+    // renomeada; sem _listArt, o artigo do lote É o nome da lista.
     stockArr().forEach(l=>{
       if(l._id==null)return;
-      if(aks.has(shopArtKey(l.artigo))&&l.artigo!==canon){loteArt.push({id:l._id,l,canon});touched=true;}
-      if(l._listArt&&aks.has(shopArtKey(l._listArt))&&l._listArt!==canon){loteList.push({id:l._id,l,canon});touched=true;}
+      if(l._listArt){
+        if(aks.has(shopArtKey(l._listArt))&&l._listArt!==canon){loteList.push({id:l._id,l,canon});touched=true;}
+      }else if(aks.has(shopArtKey(l.artigo))&&l.artigo!==canon){loteArt.push({id:l._id,l,canon});touched=true;}
     });
     if(touched)nGroups++;
   });
