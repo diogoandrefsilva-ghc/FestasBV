@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v102 · 2026-07-26 · Cash-Flows: o detalhe da compra passa a dizer ONDE ENTRA o dinheiro — a linha técnica "Gerais · 🧺 Stock" abre na repartição real pelas refeições/tipos (e o que sobra por alocar diz-se por palavras); com um só destino não se repete o valor. Stock: o campo "Cobre o pedido de" deixa de aparecer a quem não é admin quando não há ligação feita.';
+const APP_BUILD = 'v103 · 2026-07-26 · Cash-Flows: o detalhe da compra passa a dizer ONDE ENTRA o dinheiro — a linha técnica "Gerais · 🧺 Stock" abre na repartição real pelas refeições/tipos (e o que sobra por alocar diz-se por palavras); com um só destino não se repete o valor. Stock: o campo "Cobre o pedido de" deixa de aparecer a quem não é admin quando não há ligação feita.';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -1311,7 +1311,7 @@ function cfStockSplit(compraId,total){
     const d=destinoAloc(k,0);
     const v=Math.min(by[k],resto);if(v<=0.004)return;
     resto=rnd(resto-v,2);
-    out.push({sub:d.tipo,dia:d.data?`${dataToDia(d.data)} ${fmtDiaMes(d.data)}`:'',valor:v,obs:'via stock'});
+    out.push({sub:d.tipo,dia:d.data?`${dataToDia(d.data)} ${fmtDiaMes(d.data)}`:'',valor:v,obs:''});
   });
   if(resto>0.004)out.push({sub:'Gerais',dia:'',valor:resto,obs:'stock por alocar'});
   return out;
