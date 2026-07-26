@@ -973,19 +973,30 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .lote-x:active{color:var(--red);background:rgba(179,64,47,.1)}
 /* Uma só linha por artigo: qtd + € + destino (+ ⇄ dividir) — tudo à mesma
    altura (40px) e com letra mais pequena para "1,124 kg" não ficar cortado */
-.lote-row{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.lote-row{display:flex;align-items:center;gap:7px}
 .lote-row .lote-qty{flex:0 0 72px;min-width:0;margin:0;text-align:center;padding:0 5px;height:40px;font-size:13px}
 .lote-row .price-in{flex:0 0 86px;min-width:0}
 .lote-row .price-in input{margin:0;height:40px;padding-top:0;padding-bottom:0;font-size:13px}
 .lote-row .price-in i{font-size:12.5px}
 .lote-row .dest-btn{padding:0 8px;height:40px;font-size:12.5px;gap:5px}
 .lote-row .lote-split-btn{height:40px}
-/* Ecrãs estreitos: qtd + preço deixam ao destino uns magros ~50px, e nenhum
-   rótulo de refeição cabe aí (medido: nem "Qui, 13/ago"). O destino passa a
-   ter a linha só para ele — continua o mesmo botão, só que legível. A base
-   é 100% menos o ⇄, para o ⇄ o acompanhar em vez de descer outra vez. */
+/* Ecrãs estreitos: tudo continua NUMA linha — o que encolhe é o resto, para
+   o destino ter onde respirar. A 324px úteis (ecrã de 390: modal 20px +
+   cartão 11px de cada lado) a qtd e o preço levavam 158px e sobravam ~50
+   para o destino, onde não cabia rótulo nenhum. Os campos ficam dimensionados
+   ao conteúdo real: "0,75" na qtd e "199,85 €" no preço. */
 @media (max-width:479px){
-  .lote-row .dest-btn{flex:1 1 calc(100% - 30px)}
+  .lote-row{gap:5px}
+  .lote-row .lote-qty{flex:0 0 46px;padding:0 3px}
+  /* 68px = 44px úteis: chegam para "199,85" (40px), que é alinhado à direita
+     — se não coubesse mostrava "99,85", que seria pior que cortar um rótulo */
+  .lote-row .price-in{flex:0 0 68px}
+  .lote-row .price-in input{padding-left:5px;padding-right:15px}
+  .lote-row .price-in i{right:4px;font-size:11px}
+  .lote-row .dest-btn{padding:0 5px;gap:3.5px;font-size:11.5px}
+  .lote-row .dest-ic{font-size:12.5px}
+  .lote-row .dest-chev{font-size:9px}
+  .lote-row .lote-split-btn{font-size:13px;padding:6px 1px}
 }
 /* Mesma altura nas linhas de split e no detalhe do lote (qtd vs seletor) */
 .split-row .split-qty{height:40px;padding-top:0;padding-bottom:0;font-size:13px}
@@ -993,6 +1004,9 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .lote-ln input{height:40px;padding-top:0;padding-bottom:0;font-size:13px}
 .price-in{position:relative;display:flex}
 .price-in input{width:100%;padding-right:26px;text-align:right}
+/* Sem as setas do input numérico (como no .lote-qty-w): reservavam largura e
+   comiam o valor à direita — "199,85" ficava "199,8" em campos estreitos */
+.price-in input[type=number]::-webkit-inner-spin-button,.price-in input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;appearance:none;margin:0}
 .price-in i{position:absolute;right:11px;top:50%;transform:translateY(-50%);font-style:normal;font-size:14px;color:var(--muted);font-weight:600;pointer-events:none}
 .lote-hint{margin-top:8px;font-size:11.5px;line-height:1.4;color:var(--gold)}
 .lote-hint b{color:var(--ink);font-weight:700}
