@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v110 · 2026-07-26 · Stock: mudar nome é um modo do próprio modal (o resto colapsa) e cada lote tem o seu campo — dá para encurtar o nome que veio da fatura e detalhar o que entrou genérico';
+const APP_BUILD = 'v111 · 2026-07-26 · Mudar nome: o nome genérico ganha destaque e os dos lotes recuam por baixo dele; sem lápis repetido nas compras e sem teclado a saltar ao abrir';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -5831,13 +5831,11 @@ function openLoteModal(id){
     const src=[org?org.lbl:(dsp&&dsp.dataDesp?fmtDiaMes(dsp.dataDesp):''),(dsp&&dsp.desc&&dsp.desc!=='Compras')?dsp.desc:''].filter(Boolean).join(' · ');
     (detMeta[l.artigo]=detMeta[l.artigo]||[]).push(src);
     // Marca em cima (quebra à vontade), detalhes por baixo — assim os nomes
-    // compridos deixam de sair cortados a meio. O nome detalhado do lote mostra-se
-    // sempre que diga algo mais que o do guarda-chuva; para o admin é o próprio
-    // atalho para o corrigir (abre o painel ✏️ já naquele campo).
+    // compridos deixam de sair cortados a meio. Mostra-se sempre que diga algo
+    // mais que o nome do guarda-chuva. Aqui é só leitura: mexer nos nomes é no
+    // ✏️ do cabeçalho, para não haver dois lápis a dizer o mesmo.
     const showN=multi||!shopSameArtigo(l.artigo,reqName);
-    const nome=!showN?''
-      :podeApagar?`<button type="button" class="lote-cmp-ren" title="Mudar este nome" onclick="loteRenameOpen(${l._id})">${escHtml(l.artigo)}<span class="pen">✏️</span></button>`
-      :`<span class="n">${escHtml(l.artigo)}</span>`;
+    const nome=showN?`<span class="n">${escHtml(l.artigo)}</span>`:'';
     const del=(org&&podeApagar&&l._id!=null)?`<button class="cmp-ln-del" title="Apagar este stock" onclick="stkDelLote(${l._id})">✕</button>`:'';
     return `<div class="lote-cmp-row${org?' org':''}"><span class="t">${nome}<span class="d">${parts.join(' · ')}</span></span>${del}</div>`;
   }).join('');
@@ -5902,38 +5900,37 @@ function loteHdrClose(){
    Os campos detalhados só aparecem quando dizem algo — um artigo de um só lote
    com o nome do pedido não faz o modal crescer à toa (o caso normal). */
 let _loteRen=[];   // [{antigo,marca,meta}] — o que cada campo do painel renomeia
-// loteId (opcional): veio-se do nome de um lote na coluna das compras — abre já
-// com o cursor NESSE campo, em vez do nome do guarda-chuva.
-function loteRenameOpen(loteId){
+function loteRenameOpen(){
   if(!editingLote)return;
   if(!isAdmin()){toast('Só o admin muda nomes de artigos','bad');return;}
   if(contasFechadas()){toast('Contas fechadas — o stock já não se mexe','bad');return;}
   const wrap=document.getElementById('lote-ren-wrap');if(!wrap)return;
   const req=editingLote.reqName||'';
-  // Campo 1: o nome do artigo. Depois um por cada nome detalhado — TODOS, mesmo
-  // o que hoje repete o do guarda-chuva (é o do lote que veio de uma compra
-  // simples, e é justamente esse que se quer poder detalhar). Com um só lote
-  // que já diz o mesmo que o pedido não há segundo campo nenhum.
+  // Campo 1: o nome genérico, o do artigo. Depois um por cada nome detalhado —
+  // TODOS, mesmo o que hoje repete o genérico (é o do lote que veio de uma compra
+  // simples, e é justamente esse que se quer poder detalhar). Com um só lote que
+  // já diz o mesmo que o pedido não há segundo campo nenhum.
   const dets=(editingLote.detalhes||[]).filter(d=>d.nome);
   const mostrarDets=dets.length>1||(dets.length===1&&!shopSameArtigo(dets[0].nome,req));
   _loteRen=[{antigo:req,marca:false,meta:''}].concat(mostrarDets?dets.map(d=>({antigo:d.nome,marca:true,meta:d.meta||''})):[]);
-  document.getElementById('lote-ren-list').innerHTML=_loteRen.map((r,i)=>
-    (r.marca&&!_loteRen[i-1].marca?`<div class="lote-ren-sub">Nome de cada lote no stock — como entrou, e só muda aqui:</div>`:'')+
-    (r.meta?`<div class="lote-ren-cap">${escHtml(r.meta)}</div>`:'')+
-    `<input class="lote-ren-in" id="lote-ren-${i}" type="text" maxlength="60" value="${escHtml(r.antigo)}" placeholder="Nome do artigo">`
-  ).join('');
+  const campo=(r,i)=>(r.meta?`<div class="lote-ren-cap">${escHtml(r.meta)}</div>`:'')
+    +`<input class="lote-ren-in" id="lote-ren-${i}" type="text" maxlength="60" value="${escHtml(r.antigo)}" placeholder="Nome do artigo">`;
+  // Os detalhados vivem dentro de um bloco recuado: lê-se logo que penduram do
+  // genérico, em vez de três campos ao mesmo nível a parecerem a mesma coisa
+  document.getElementById('lote-ren-list').innerHTML=campo(_loteRen[0],0)+(mostrarDets
+    ?`<div class="lote-ren-dets"><div class="lote-ren-sub">Nome de cada lote no stock — como entrou, e só muda aqui:</div>`
+      +_loteRen.slice(1).map((r,k)=>campo(r,k+1)).join('')+`</div>`
+    :'');
+  const lbl=document.getElementById('lote-ren-lbl');
+  if(lbl)lbl.textContent=mostrarDets?'✏️ Nome genérico do artigo':'✏️ Nome do artigo';
   const nota=document.getElementById('lote-ren-note');
   if(nota)nota.textContent=mostrarDets
-    ?'O nome de cima muda em todo o lado (lotes e pedidos da lista). Os de baixo são o nome de cada lote no stock — os pedidos ficam como estão.'
+    ?'O nome genérico muda em todo o lado (lotes e pedidos da lista). Os de baixo são o nome de cada lote no stock — os pedidos ficam como estão.'
     :'Muda o nome em todo o lado: nos lotes de stock e nos pedidos da lista de compras.';
   wrap.style.display='';
   loteBodyShow(false);   // o resto do modal colapsa: é o mesmo pop-up, outro assunto
-  // Veio-se do nome de um lote: o cursor vai para o campo DESSE lote (o detalhado,
-  // nunca o do guarda-chuva, mesmo quando os dois dizem o mesmo)
-  const lt=loteId!=null?(editingLote.lotesFifo||[]).find(x=>x._id===loteId):null;
-  const j=lt?_loteRen.findIndex(r=>r.marca&&shopSameArtigo(r.antigo,lt.artigo)):-1;
-  const inp=document.getElementById('lote-ren-'+(j>0?j:0));
-  if(inp){inp.focus();inp.select();}
+  // Sem focar nada: focar abria o teclado por cima do painel mal se tocava no ✏️,
+  // e o que se quer primeiro é LER os nomes para decidir qual se muda.
 }
 // Colapsa/repõe o corpo do modal (tudo o que não é o painel de mudar o nome)
 function loteBodyShow(on){
