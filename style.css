@@ -1100,12 +1100,15 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 /* Detalhe do lote: resumo + compras (esquerda) ↔ pedidos da lista (direita) */
 .lote-sum{font-size:13px;color:var(--muted);line-height:1.4}
 .lote-sum b{font-size:15px;font-weight:700;color:var(--ink)}
-.lote-sum-sub{font-size:11px;color:var(--faint);line-height:1.4;margin-top:2px}
 /* Compras e Pedidos empilhados: fechados mostram só o resumo (à direita), e
    abrem um de cada vez com a largura toda — os nomes de fatura e as linhas das
-   refeições deixam de se espremer em meia coluna */
-.lote-acc{margin-top:9px;border-top:1px solid var(--line)}
-.lote-acc-sec+.lote-acc-sec{border-top:1px dotted var(--line)}
+   refeições deixam de se espremer em meia coluna.
+   O bloco recolhe-se da margem esquerda e encosta à direita: os filetes ficam
+   mais curtos que o resto do modal e isso, por si só, diz que este é um nível à
+   parte — contexto de consulta, não o formulário de alocar. Os três filetes
+   (topo, meio e fecho) são iguais, para o conjunto ler como uma caixa. */
+.lote-acc{margin:10px 0 2px auto;width:82%;min-width:200px;max-width:100%;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.lote-acc-sec+.lote-acc-sec{border-top:1px solid var(--line)}
 .lote-acc-h{display:flex;align-items:center;gap:7px;width:100%;padding:8px 0;background:transparent;border:none;cursor:pointer;text-align:left;color:inherit;font-family:inherit}
 .lote-acc-ic{flex:0 0 auto;font-size:13px;line-height:1}
 .lote-acc-lbl{flex:0 0 auto;font-size:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--faint)}

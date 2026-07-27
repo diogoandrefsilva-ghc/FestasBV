@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v115a · 2026-07-26 · [Opção A] Alocação de stock: Compras e Pedidos deixam de ser lado a lado — empilhados e fechados, com o resumo no cabeçalho. Mais: destino sem bold nos cash-flows e botão ＋🛒 na Shop List';
+const APP_BUILD = 'v115a2 · 2026-07-27 · [Opção A] Alocação: Compras/Pedidos recuados da margem esquerda e fechados por filetes iguais; sai a nota do FIFO';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -5889,7 +5889,6 @@ function openLoteModal(id){
     :'sem pedidos';
   document.getElementById('lote-info').innerHTML=
     `<div class="lote-sum">Em stock: <b>${escHtml(fmtQty(totQ,editingLote.u))}</b> · <b>${semCusto?'sem custo':eur(totV)}</b></div>`+
-    (lotes.length>1?`<div class="lote-sum-sub">${lotes.length} ${anyOrg?'origens':'compras'} — a distribuição por elas é automática (FIFO)</div>`:'')+
     `<div class="lote-acc">
       ${loteAccSec('cmp',anyOrg?'📦':'🛒',anyOrg?'Origem':'Compras',cmpSum,comprasRows)}
       ${loteAccSec('need','📋','Pedidos na lista',needSum,needRows)}
