@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v120 · 2026-07-27 · Cash-Flows: em Almoço/Jantar a data-valor passa a ser a lista de refeições (escolhe-se a refeição, não uma data)';
+const APP_BUILD = 'v121 · 2026-07-27 · Histórico só para admin; Conta mostra membro/casal ligado e só o nº da versão';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -2702,8 +2702,10 @@ function toggleSettingsBlock(hdr){
 function openAdmin(){
   const em=document.getElementById('adm-conta-email');
   if(em)em.textContent=_sbSession?_sbSession.user.email:'—';
+  renderContaLigacao();
   const ver=document.getElementById('adm-versao');
-  if(ver)ver.textContent='Versão '+APP_BUILD;
+  // Só o número da versão (o descritivo do APP_BUILD fica para o código)
+  if(ver)ver.textContent='Versão '+APP_BUILD.split('·')[0].trim();
   const adm=document.getElementById('adm-pedidos-wrap');
   if(adm)adm.style.display=isAdmin()?'':'none';
   if(isAdmin()){sbRenderPedidos();sbRenderLigacoes();loadNotif();admCatCancel();renderAdmCats();}
@@ -2715,6 +2717,25 @@ function openAdmin(){
   document.body.classList.add('no-scroll');
 }
 function closeAdmin(){document.getElementById('admin-bg').classList.remove('show');document.body.classList.remove('no-scroll');}
+
+/* Conta › a que membro esta conta está ligada e com quem faz casal (quem pode
+   marcar presenças/convidados/despesas por mim). */
+function renderContaLigacao(){
+  const el=document.getElementById('adm-conta-lig');
+  if(!el)return;
+  const meu=meuNomePrincipal();
+  if(!meu){el.innerHTML='<span style="color:var(--faint)">Sem membro associado — pede ao admin para ligar a conta.</span>';return;}
+  const c=conjugeDe(meu);
+  let h=`👤 Ligado ao membro <b style="color:var(--ink)">${escHtml(meu)}</b>`;
+  if(c){
+    const email=(USER_AMIGOS.find(u=>u.amigo===c)||{}).email;
+    h+=`<br>💞 Casal com <b style="color:var(--ink)">${escHtml(c)}</b>`;
+    h+=email?` <span style="color:var(--faint)">(${escHtml(email)})</span>`:' <span style="color:var(--faint)">(sem conta)</span>';
+  }else{
+    h+='<br><span style="color:var(--faint)">Sem casal definido.</span>';
+  }
+  el.innerHTML=h;
+}
 
 
 /* ── Parametrizações ── */
