@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v114 · 2026-07-26 · Detalhe do artigo em stock: a quem não é admin a categoria só aparece enquanto está por preencher — trancada não dizia nada que o separador já não mostre';
+const APP_BUILD = 'v115a3 · 2026-07-27 · [Opção A] Alocação: cada cabeçalho leva a quantidade entre parênteses — comprado, pedido e alocado lêem-se em coluna; "Alocado a" passa a "Alocação"';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -4150,7 +4150,9 @@ function shopItemCard(it,mineView,noBadge,grouped){
     right=`<span class="cmp-chip">🛒 ${escHtml(it.tratadoPor)}</span>`;
   }else{
     if(it.criadoPor)sub=`<div class="cmp-sub">pedido por ${escHtml(it.criadoPor)}</div>`;
-    right=`<button class="cmp-mini cart write-action" onclick="event.stopPropagation();claimItem(${it._id})"><i class="cmp-plus">＋</i>🛒 Carrinho</button>`;
+    // Só ＋🛒 (sem a palavra "Carrinho"): o nome do artigo é o que interessa ler
+    // e num ecrã estreito era o botão que lhe comia a largura.
+    right=`<button class="cmp-mini cart write-action" title="Pôr no carrinho" aria-label="Pôr no carrinho" onclick="event.stopPropagation();claimItem(${it._id})"><i class="cmp-plus">＋</i>🛒</button>`;
   }
   if(removed)sub=`<div class="cmp-sub alert">⚠️ removido por ${escHtml(it.cfDesc||'?')}${mineView?' — abre para largar':''}</div>`;
   // Dica de stock: no coberto o chip "em stock" já o diz (não se repete); nos
@@ -4411,7 +4413,7 @@ function renderCompras(){
   }else if(SHOP_TAB==='carrinho'){
     // ── O meu carrinho (artigos que disse que tratava) ──
     if(!mine.length){
-      h+='<div class="cmp-empty sf"><span class="cmp-empty-ico">🛒</span>O teu carrinho está vazio.<br>Passa por <b>📝 Em falta</b> e toca em <b>Carrinho</b> nos artigos que fores buscar.</div>';
+      h+='<div class="cmp-empty sf"><span class="cmp-empty-ico">🛒</span>O teu carrinho está vazio.<br>Passa por <b>📝 Em falta</b> e toca no <b>＋🛒</b> dos artigos que fores buscar.</div>';
     }else{
       h+=listOf(mine,true);
     }
@@ -5790,6 +5792,31 @@ function umbrellaLotes(reqName,u){
   return stockArr().filter(l=>stockBacked(l)&&shopSameArtigo(loteReqArtigo(l),reqName)&&(l.unidade||'')===(u||''))
     .sort((a,b)=>loteCompraDate(a).localeCompare(loteCompraDate(b))||(a.criadoEm||'').localeCompare(b.criadoEm||'')||((a._id||0)-(b._id||0)));
 }
+/* ── Compras / Pedidos: duas secções empilhadas e fechadas ───────────────
+   O estado (aberto/fechado) de cada uma fica guardado no aparelho: quem anda a
+   alocar artigo atrás de artigo abre a secção uma vez e não a volta a abrir em
+   cada modal. */
+let _LOTE_ACC=(function(){try{return JSON.parse(localStorage.getItem('festasbv_lote_acc'))||{};}catch(e){return{};}})();
+function loteAccSec(key,ic,lbl,qtd,sum,body){
+  const open=!!_LOTE_ACC[key];
+  const u=editingLote?editingLote.u:'';
+  return `<div class="lote-acc-sec${open?' open':''}">
+    <button type="button" class="lote-acc-h" aria-expanded="${open?'true':'false'}" onclick="loteAccToggle('${key}',this)">
+      <span class="lote-acc-ic">${ic}</span><span class="lote-acc-lbl">${lbl}</span>
+      <span class="lote-acc-q">(${escHtml(fmtQty(rnd(qtd||0,3),u))})</span>
+      <span class="lote-acc-sum">${sum}</span><i class="lote-acc-chev">▾</i>
+    </button>
+    <div class="lote-acc-b">${body}</div>
+  </div>`;
+}
+function loteAccToggle(key,btn){
+  const open=!_LOTE_ACC[key];
+  _LOTE_ACC[key]=open;
+  try{localStorage.setItem('festasbv_lote_acc',JSON.stringify(_LOTE_ACC));}catch(e){}
+  const sec=btn&&btn.parentNode;
+  if(sec){sec.classList.toggle('open',open);btn.setAttribute('aria-expanded',open?'true':'false');}
+}
+
 function openLoteModal(id){
   const base=stockArr().find(x=>x._id===id);
   if(!base){toast('Artigo não encontrado','bad');return;}
@@ -5851,12 +5878,23 @@ function openLoteModal(id){
     return `<div class="lote-need-row">${ic} ${escHtml(diaAbrev(a.data)+' '+fmtDiaMes(a.data))} · <b>${escHtml(fmtQty(dem[k],editingLote.u))}</b></div>`;
   }).join(''):`<div class="lote-need-row empty">— sem pedidos na lista —</div>`;
   const semCusto=lotes.length>0&&lotes.every(loteSemCompra);
+  // Compras e Pedidos deixam de disputar meia largura cada: empilham-se e abrem
+  // um de cada vez. Fechados, o cabeçalho leva já o número que interessa
+  // (quantas compras · quantas refeições pedem e quanto), e o detalhe — nomes
+  // compridos de faturas, uma linha por refeição — só ocupa ecrã quando o
+  // pedimos. Assim o modal abre logo no que se vem cá fazer: alocar.
+  // A quantidade de cada secção vai à cabeça, entre parênteses: lendo os três
+  // cabeçalhos de cima a baixo — comprado, pedido, alocado — vê-se de relance
+  // se o stock chega e o que falta entregar, sem contas nem contadores à
+  // direita a dizer o mesmo por outras palavras.
+  const demTot=rnd(needKeys.reduce((s,k)=>s+dem[k],0),3);
+  const nL=lotes.length;
+  const cmpSum=nL?`${nL} ${anyOrg?(nL===1?'origem':'origens'):(nL===1?'compra':'compras')}`:'—';
   document.getElementById('lote-info').innerHTML=
     `<div class="lote-sum">Em stock: <b>${escHtml(fmtQty(totQ,editingLote.u))}</b> · <b>${semCusto?'sem custo':eur(totV)}</b></div>`+
-    (lotes.length>1?`<div class="lote-sum-sub">${lotes.length} ${anyOrg?'origens':'compras'} — a distribuição por elas é automática (FIFO)</div>`:'')+
-    `<div class="lote-cols">
-      <div class="lote-col"><div class="lote-col-h"><span>${anyOrg?'📦':'🛒'}</span>${anyOrg?'Origem':'Compras'}</div>${comprasRows}</div>
-      <div class="lote-col"><div class="lote-col-h"><span>📋</span>Pedidos na lista</div>${needRows}</div>
+    `<div class="lote-acc">
+      ${loteAccSec('cmp',anyOrg?'📦':'🛒',anyOrg?'Origem':'Compras',totQ,cmpSum,comprasRows)}
+      ${loteAccSec('need','📋','Pedidos na lista',demTot,'',needRows)}
     </div>`;
   const canEdit=isAdmin()&&!contasFechadas();
   // A categoria e a ligação ao pedido são edição do artigo: vivem no painel ✏️.
@@ -6229,6 +6267,9 @@ function loteRenderAlocs(){
     (html?(solo?`<div class="lote-solos">${html}</div>`:html):'<div class="empty sf" style="margin-top:8px">Sem alocações — está tudo na bolsa comum.</div>');
   const tot=editingLote.alocs.reduce((s,a)=>s+(+a.qtd||0),0);
   const livre=rnd(editingLote.totQ-tot,3);
+  // O total alocado sobe para o rótulo, na mesma forma dos cabeçalhos de cima
+  const lbl=document.getElementById('lote-aloc-lbl');
+  if(lbl)lbl.innerHTML=`🍽️ Alocação <span class="lote-acc-q">(${escHtml(fmtQty(rnd(tot,3),editingLote.u))})</span>`;
   // O que sobra na bolsa comum é o que o alocado não levou (0 € se o que sobra
   // for stock oferecido / do ano anterior)
   const restoVal=Math.max(0,rnd(editingLote.totV-lineVal.reduce((s,v)=>s+(+v||0),0),2));

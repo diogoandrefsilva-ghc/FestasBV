@@ -697,11 +697,13 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .cmp-badge.meal{background:rgba(30,122,77,.12);border-color:rgba(30,122,77,.35);color:var(--green)}
 .cmp-mini{background:var(--panel2);border:1px solid var(--line);color:var(--ink);font-size:11px;font-weight:600;border-radius:8px;padding:4px 8px;cursor:pointer;flex:0 0 auto;white-space:nowrap}
 .cmp-mini.prim{background:var(--barrete);color:#fff;border-color:var(--barrete)}
-/* Botão "🛒 Carrinho": fundo claro para o emoji (cinzento) se ver — o verde
-   cheio engolia-o. Contorno e texto verdes mantêm o destaque de ação primária */
-.cmp-mini.cart{background:#FFFDF6;border:1.5px solid var(--barrete);color:var(--barrete);font-weight:700;padding:4px 9px}
+/* Botão "＋🛒": fundo claro para o emoji (cinzento) se ver — o verde cheio
+   engolia-o. Contorno verde mantém o destaque de ação primária. Só ícones, e
+   com a altura das outras ações da linha (✓ / ✕), para o nome do artigo ficar
+   com a largura toda em vez de sair cortado. */
+.cmp-mini.cart{background:#FFFDF6;border:1.5px solid var(--barrete);color:var(--barrete);font-weight:700;padding:0 7px;height:26px;display:inline-flex;align-items:center;justify-content:center;gap:1px;font-size:12px;line-height:1}
 /* ＋ dentro do botão Carrinho: sinal discreto de "adicionar ao carrinho" */
-.cmp-mini.cart .cmp-plus{font-style:normal;font-weight:800;font-size:13px;line-height:1;margin-right:2px;vertical-align:-1px}
+.cmp-mini.cart .cmp-plus{font-style:normal;font-weight:800;font-size:13px;line-height:1;margin-right:0;vertical-align:0}
 /* ✕ no cartão do Carrinho: largar o artigo (volta a "Em falta") */
 .cmp-x{flex:0 0 auto;width:24px;height:24px;border-radius:50%;border:1.5px solid var(--line);background:transparent;color:var(--faint);font-size:12px;font-weight:700;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0}
 .cmp-x:active{color:var(--red);border-color:var(--red)}
@@ -1098,11 +1100,27 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 /* Detalhe do lote: resumo + compras (esquerda) ↔ pedidos da lista (direita) */
 .lote-sum{font-size:13px;color:var(--muted);line-height:1.4}
 .lote-sum b{font-size:15px;font-weight:700;color:var(--ink)}
-.lote-sum-sub{font-size:11px;color:var(--faint);line-height:1.4;margin-top:2px}
-.lote-cols{display:flex;gap:12px;margin-top:9px;border-top:1px solid var(--line);padding-top:9px}
-.lote-col{flex:1 1 0;min-width:0}
-.lote-col:first-child{border-right:1px solid var(--line);padding-right:12px}
-.lote-col-h{display:flex;align-items:center;gap:5px;font-size:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--faint);margin-bottom:5px}
+/* Compras e Pedidos empilhados: fechados mostram só o resumo (à direita), e
+   abrem um de cada vez com a largura toda — os nomes de fatura e as linhas das
+   refeições deixam de se espremer em meia coluna.
+   O bloco recolhe-se da margem esquerda e encosta à direita: os filetes ficam
+   mais curtos que o resto do modal e isso, por si só, diz que este é um nível à
+   parte — contexto de consulta, não o formulário de alocar. Os três filetes
+   (topo, meio e fecho) são iguais, para o conjunto ler como uma caixa. */
+.lote-acc{margin:10px 0 2px auto;width:82%;min-width:200px;max-width:100%;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.lote-acc-sec+.lote-acc-sec{border-top:1px solid var(--line)}
+.lote-acc-h{display:flex;align-items:center;gap:7px;width:100%;padding:8px 0;background:transparent;border:none;cursor:pointer;text-align:left;color:inherit;font-family:inherit}
+.lote-acc-ic{flex:0 0 auto;font-size:13px;line-height:1}
+.lote-acc-lbl{flex:0 0 auto;font-size:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--faint)}
+/* A quantidade da secção, colada ao rótulo: é o que se compara de cabeçalho
+   para cabeçalho (comprado → pedido → alocado), por isso tem a tinta do texto */
+.lote-acc-q{flex:0 0 auto;font-size:11px;font-weight:700;color:var(--ink);letter-spacing:0;text-transform:none;white-space:nowrap}
+.lote-acc-sum{flex:1;min-width:0;text-align:right;font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lote-acc-chev{flex:0 0 auto;font-style:normal;font-size:11px;color:var(--faint);transition:transform .2s}
+.lote-acc-sec.open .lote-acc-chev{transform:rotate(180deg)}
+.lote-acc-sec.open .lote-acc-sum{color:var(--faint)}
+.lote-acc-b{display:none;padding:0 0 8px}
+.lote-acc-sec.open .lote-acc-b{display:block}
 .lote-need-row{font-size:12px;color:var(--muted);padding:3px 0;line-height:1.35;overflow-wrap:anywhere}
 .lote-need-row+.lote-need-row{border-top:1px dotted var(--line)}
 .lote-need-row b{color:var(--ink);font-weight:700}
@@ -1165,7 +1183,10 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .cft-subs-h{font-size:9px;letter-spacing:.09em;text-transform:uppercase;color:var(--faint);font-weight:700;margin-bottom:1px}
 .cft-sub{display:flex;justify-content:space-between;align-items:baseline;gap:10px;font-size:11.5px;color:var(--muted);line-height:1.4}
 .cft-sub i{font-style:normal;color:var(--faint)}
-.cft-sub span:last-child{flex:0 0 auto;font-variant-numeric:tabular-nums;font-weight:600;color:var(--ink)}
+/* Só o VALOR (2.º span) é que ganha peso. Com uma linha só não há valor — e
+   antes o destino apanhava este estilo por ser :last-child, ficando a bold só
+   nas compras de uma refeição (nas de várias, nenhum destino ficava). */
+.cft-sub span+span{flex:0 0 auto;font-variant-numeric:tabular-nums;font-weight:600;color:var(--ink)}
 .cft-prevista{border-left-style:dashed;background:repeating-linear-gradient(135deg,rgba(168,123,20,.04) 0 9px,transparent 9px 18px)}
 .cft-prevista .cft-kind{color:var(--gold)}
 
