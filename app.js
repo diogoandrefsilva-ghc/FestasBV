@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v121 · 2026-07-27 · Histórico só para admin; Conta mostra membro/casal ligado e só o nº da versão';
+const APP_BUILD = 'v122 · 2026-07-27 · Compra em consulta mostra "Detalhe Compra" em vez de "Editar Compra"';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -5071,11 +5071,12 @@ function openCompra(compraId){
   if(isEdit&&!compraEdit.lines.length)compraEdit.lines.push({tipo:'Gerais',dataValor:null,valor:'',obs:''});
 
   // Cabeçalho
-  document.getElementById('shop-buy-title').textContent=isEdit?'Editar Compra':'Registar Compra';
-  document.getElementById('shop-buy-save').textContent=isEdit?'Guardar':'Registar compra';
   // Editar/apagar uma compra já registada mexe em despesas → só admin (as despesas
   // não têm policy de self-update/delete). Criar uma compra nova é permitido a membros.
   const ro=isEdit&&!isAdmin();
+  // Em consulta o título não promete edição: é só "Detalhe Compra".
+  document.getElementById('shop-buy-title').textContent=isEdit?(ro?'Detalhe Compra':'Editar Compra'):'Registar Compra';
+  document.getElementById('shop-buy-save').textContent=isEdit?'Guardar':'Registar compra';
   document.getElementById('shop-buy-del').style.display=(isEdit&&isAdmin())?'':'none';
   document.getElementById('shop-buy-save').style.display=ro?'none':'';
   const who0=isEdit?((DATA.despesas.find(d=>d.compraId===compraId)||{}).quem||myPrimaryName()):myPrimaryName();
