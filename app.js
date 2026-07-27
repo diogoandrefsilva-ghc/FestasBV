@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v115 · 2026-07-27 · Alocação de stock: Compras e Pedidos empilhados e fechados, com a quantidade de cada um à cabeça (comprado · pedido · alocado). Cash-flows sem bold no destino e botão ＋🛒 na Shop List';
+const APP_BUILD = 'v116 · 2026-07-27 · Shop List: "pedido por" também nas linhas de artigos agrupados e nos artigos já em carrinho; a data da refeição dentro do grupo passa a chip verde, igual aos outros cartões';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -4121,10 +4121,11 @@ function shopItemCard(it,mineView,noBadge,grouped){
   const meal=shopIsMeal(it.tipo)&&it.dataValor;
   // Em modo "grouped" (dentro de um artigo agrupado), o rótulo principal passa a
   // ser a REFEIÇÃO (não se repete o nome do artigo, que está no cabeçalho).
-  const primary=grouped
-    ?(meal?`${shopTipoIcon(it.tipo)} ${fmtDiaMes(it.dataValor)}`:`${shopTipoIcon(it.tipo)} ${escHtml(it.tipo)}`)
-    :escHtml(it.artigo);
-  const badge=(noBadge||grouped)?'':(meal?`<span class="cmp-badge meal">${shopTipoIcon(it.tipo)} ${fmtDiaMes(it.dataValor)}</span>`:`<span class="cmp-badge">${shopTipoIcon(it.tipo)} ${it.tipo}</span>`);
+  // O mesmo chip de refeição/tipo, quer vá para a direita (cartão normal) quer
+  // fique à cabeça da linha (agrupado) — assim lê-se sempre igual na lista.
+  const chip=meal?`<span class="cmp-badge meal">${shopTipoIcon(it.tipo)} ${fmtDiaMes(it.dataValor)}</span>`:`<span class="cmp-badge">${shopTipoIcon(it.tipo)} ${escHtml(it.tipo)}</span>`;
+  const primary=grouped?chip:escHtml(it.artigo);
+  const badge=(noBadge||grouped)?'':chip;
   const qtdTxt=shopQtyLabel(it);
   const qtd=qtdTxt?`<span class="cmp-qtd">${escHtml(qtdTxt)}</span>`:'';
   const removed=shopIsRemoved(it);
@@ -4135,8 +4136,11 @@ function shopItemCard(it,mineView,noBadge,grouped){
   // Se a alocação mudar, o pedido volta sozinho ao estado normal.
   const covered=shopIsCovered(it);
   let check='',right='',sub='';
+  // "pedido por" aparece SEMPRE que se sabe quem pediu: também nas linhas de um
+  // artigo agrupado (cada refeição pode ter sido pedida por outra pessoa) e nos
+  // artigos já em carrinho (quem trata quer saber a quem perguntar detalhes).
+  if(it.criadoPor)sub=`<div class="cmp-sub">pedido por ${escHtml(it.criadoPor)}</div>`;
   if(covered){
-    if(it.criadoPor)sub=`<div class="cmp-sub">pedido por ${escHtml(it.criadoPor)}</div>`;
     right='<span class="cmp-chip stock">🧺 em stock</span>';
   }else if(mineView){
     // Checklist de compras: a bolinha marca "já está no carrinho físico".
@@ -4149,7 +4153,6 @@ function shopItemCard(it,mineView,noBadge,grouped){
     // do carrinho é detalhe de quem anda nas compras).
     right=`<span class="cmp-chip">🛒 ${escHtml(it.tratadoPor)}</span>`;
   }else{
-    if(it.criadoPor)sub=`<div class="cmp-sub">pedido por ${escHtml(it.criadoPor)}</div>`;
     // Só ＋🛒 (sem a palavra "Carrinho"): o nome do artigo é o que interessa ler
     // e num ecrã estreito era o botão que lhe comia a largura.
     right=`<button class="cmp-mini cart write-action" title="Pôr no carrinho" aria-label="Pôr no carrinho" onclick="event.stopPropagation();claimItem(${it._id})"><i class="cmp-plus">＋</i>🛒</button>`;
@@ -4158,15 +4161,13 @@ function shopItemCard(it,mineView,noBadge,grouped){
   // Dica de stock: no coberto o chip "em stock" já o diz (não se repete); nos
   // outros, a dica normal — incl. o botão de um toque para alocar o livre.
   const hint=covered?'':shopHintHtml(it,'cmp-hint');
-  // Agrupado: mostra só o alerta (removido); o "pedido por" iria repetir-se
-  const subShow=(grouped&&!removed)?'':sub;
   // A dica sai da coluna do artigo e vai para uma linha própria, a toda a largura
   // por baixo do cartão: assim não colide com o badge da refeição nem com o
   // botão do carrinho (nem fica cortada com "…").
   const hintRow=hint?`<div class="cmp-hint-row">${hint}</div>`:'';
   return `<div class="cmp-item cmp-line cmp-tap${grouped?' cmp-sub':''}${mineView&&it.noCarrinho?' incart':''}${removed?' removed':''}" onclick="openShopItemModal(${it._id})">
     ${check}
-    <div class="cmp-main"><div class="cmp-artigo">${primary}${qtd}</div>${subShow}</div>
+    <div class="cmp-main"><div class="cmp-artigo">${primary}${qtd}</div>${sub}</div>
     ${badge}${right}<span class="cmp-chev-r">›</span>${hintRow}
   </div>`;
 }
