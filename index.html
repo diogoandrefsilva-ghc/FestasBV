@@ -672,6 +672,18 @@ setTimeout(function(){ if (window.fbvEsconderSplash) window.fbvEsconderSplash();
             <span id="adm-notif-knob" style="position:absolute;top:2px;left:2px;width:20px;height:20px;background:var(--ink);border-radius:50%;transition:.2s"></span>
           </label>
         </div>
+        <div class="admin-only" style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;margin-bottom:12px">
+          <div style="flex:1">
+            <div style="font-size:13px;font-weight:600">Avisos de presenças em refeições</div>
+            <div style="font-size:11px;color:var(--faint);line-height:1.4">Desligado, marcar/desmarcar presenças deixa de enviar Telegram (a ninguém). Nomeações de responsáveis, convidados e compras continuam a avisar. O histórico fica sempre registado.</div>
+            <div id="adm-notif-pres-hint" style="display:none;font-size:11px;color:var(--red);line-height:1.5;margin-top:6px"></div>
+          </div>
+          <label style="position:relative;width:44px;height:24px;margin:0;flex-shrink:0">
+            <input type="checkbox" id="adm-notif-pres" onchange="saveNotifPres()" style="opacity:0;width:0;height:0;position:absolute">
+            <span style="position:absolute;inset:0;background:var(--line);border-radius:12px;cursor:pointer;transition:.2s"></span>
+            <span id="adm-notif-pres-knob" style="position:absolute;top:2px;left:2px;width:20px;height:20px;background:var(--ink);border-radius:50%;transition:.2s"></span>
+          </label>
+        </div>
         <p style="font-size:12px;color:var(--muted);margin-bottom:10px;line-height:1.5">Recebe avisos no Telegram: quando fores nomeado responsável de uma refeição, quando alteram presenças/convidados de refeições tuas, e quando fica um artigo por tratar nas compras.</p>
         <div id="my-notif-body"><div class="note">A carregar…</div></div>
       </div>
