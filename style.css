@@ -204,17 +204,17 @@ body.read-only .fab.green,body.contas-fechadas .fab.green{display:none!important
 /* Cash Flow wheel/carousel */
 .cf-wheel{display:flex;gap:6px;margin-top:6px;overflow-x:auto;padding-bottom:4px;-webkit-overflow-scrolling:touch;scrollbar-width:none}
 .cf-wheel::-webkit-scrollbar{display:none}
-/* Seletor de tipo (#cf-wheel): grelha de colunas iguais — nunca corta o último ícone */
-#cf-wheel{display:grid;grid-template-columns:repeat(var(--cf-cols,4),1fr);gap:6px;overflow:visible}
-#cf-wheel .cf-opt{min-width:0;padding:10px 3px}
+/* Seletores de tipo (#cf-wheel novo / #ecf-wheel detalhe): colunas iguais para os
+   tipos visíveis — cabem sempre no ecrã, sem scroll e sem cortar o último */
+#cf-wheel,#ecf-wheel{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:5px;overflow:visible}
+#cf-wheel .cf-opt,#ecf-wheel .cf-opt{min-width:0;padding:10px 2px}
 .cf-opt{flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 12px;border-radius:12px;border:1.5px solid var(--line);background:#FFFDF6;cursor:pointer;transition:.18s;min-width:72px;user-select:none}
 .cf-opt:active{transform:scale(.95)}
 .cf-opt.on{border-color:var(--barrete);background:rgba(30,122,77,.09)}
 .cf-opt .cf-icon{font-size:22px;line-height:1}
-.cf-opt .cf-lbl{font-size:9.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.02em;text-align:center;line-height:1.2;white-space:nowrap}
+/* Etiqueta acompanha a largura do ecrã (a mais longa é "Pagar Dívida") — nunca quebra */
+.cf-opt .cf-lbl{font-size:clamp(7px,2.45vw,9.5px);font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.01em;text-align:center;line-height:1.2;white-space:nowrap}
 .cf-opt.on .cf-lbl{color:var(--barrete)}
-@media (max-width:380px){.cf-opt .cf-lbl{font-size:8.5px}}
-@media (max-width:340px){.cf-opt .cf-lbl{font-size:8px}}
 
 /* Inline row (value + date on same line) */
 .inline-row{display:flex;gap:10px;align-items:flex-start}
