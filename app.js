@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v117 · 2026-07-27 · Cash-Flows: filtro dividido em dois — por pessoa e por refeição/tipo de despesa (mostra os movimentos que tocam nas gerais, no jantar de sábado, etc.)';
+const APP_BUILD = 'v118 · 2026-07-27 · Cash-Flows: os dois filtros passam a alinhar com as pílulas de cima — cada um ocupa exatamente duas';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -1149,11 +1149,11 @@ function renderCashFlows(){
   // Rótulo curto (o ☀️/🌙 já diz se é almoço ou jantar) — o select é estreito
   const destOpt=k=>{const d=destLabel(k);return `<option value="${escHtml(k)}"${cfFilterDest===k?' selected':''}>${d.icon} ${escHtml(d.short)}</option>`;};
   pp+=`<div class="cf-filters">
-    <div class="cf-filter" style="flex:.85"><select onchange="cfFilterPerson=this.value;renderCashFlows()">
+    <div class="cf-filter"><select onchange="cfFilterPerson=this.value;renderCashFlows()">
       <option value="all"${cfFilterPerson==='all'?' selected':''}>Todas as pessoas</option>
       ${personList.map(p=>`<option value="${p}"${cfFilterPerson===p?' selected':''}>${p}</option>`).join('')}
     </select></div>
-    ${destList.length>1?`<div class="cf-filter" style="flex:1.15"><select onchange="cfFilterDest=this.value;cfFilterSub='all';renderCashFlows()">
+    ${destList.length>1?`<div class="cf-filter"><select onchange="cfFilterDest=this.value;cfFilterSub='all';renderCashFlows()">
       <option value="all"${cfFilterDest==='all'?' selected':''}>Tudo · refeições/tipos</option>
       ${destTipos.length?`<optgroup label="Tipos de despesa">${destTipos.map(destOpt).join('')}</optgroup>`:''}
       ${destMeals.length?`<optgroup label="Refeições">${destMeals.map(destOpt).join('')}</optgroup>`:''}
