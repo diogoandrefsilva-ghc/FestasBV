@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v115a3 · 2026-07-27 · [Opção A] Alocação: cada cabeçalho leva a quantidade entre parênteses — comprado, pedido e alocado lêem-se em coluna; "Alocado a" passa a "Alocação"';
+const APP_BUILD = 'v115 · 2026-07-27 · Alocação de stock: Compras e Pedidos empilhados e fechados, com a quantidade de cada um à cabeça (comprado · pedido · alocado). Cash-flows sem bold no destino e botão ＋🛒 na Shop List';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
