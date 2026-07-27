@@ -832,6 +832,9 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 /* Linha-refeição dentro do grupo: rótulo principal é a refeição, mais leve */
 .cmp-item.cmp-sub .cmp-artigo{font-size:13px;font-weight:600;color:var(--muted)}
 .cmp-item.cmp-sub .cmp-artigo .cmp-qtd{color:var(--ink);font-weight:700}
+/* A refeição vai à cabeça da linha com o MESMO chip dos cartões normais (aqui
+   é inline, dentro do rótulo — não é filho do flex do cartão) */
+.cmp-item.cmp-sub .cmp-artigo .cmp-badge{display:inline-block;vertical-align:middle}
 /* Lista de compras dentro do cartão da refeição (tab Refeições) */
 .msl{cursor:default}
 .msl-det{margin-top:0;border-top:none;padding-top:0}
