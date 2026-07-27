@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v118 · 2026-07-27 · Cash-Flows: os dois filtros passam a alinhar com as pílulas de cima — cada um ocupa exatamente duas';
+const APP_BUILD = 'v119 · 2026-07-27 · Cash-Flows: os 4 tipos cabem sempre no ecrã (sem corte/scroll), não-admin vê só despesas, botão «Importar / detalhar fatura»';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -1946,7 +1946,7 @@ function updateCfForm(){
       <input type="text" id="cf-desc" placeholder="Ex: Continente — Bacalhau" maxlength="30" oninput="updDescCount('cf')">
       <label>Observações</label>
       <textarea id="cf-obs" placeholder="Detalhe adicional (opcional)" rows="2"></textarea>
-      ${STOCK_TABLE?`<button class="btn ghost" style="width:100%;margin-top:14px" onclick="cfAbrirCompraFatura()">🧾 Itemizar / importar fatura →<span style="display:block;font-size:11px;font-weight:400;color:var(--muted);margin-top:2px;text-transform:none;letter-spacing:0">detalhar itens e alocar a refeições/tipos (stock)</span></button>`:''}`;
+      ${STOCK_TABLE?`<button class="btn ghost" style="width:100%;margin-top:14px" onclick="cfAbrirCompraFatura()">🧾 Importar / detalhar fatura →<span style="display:block;font-size:11px;font-weight:400;color:var(--muted);margin-top:2px;text-transform:none;letter-spacing:0">detalhar itens e alocar a refeições/tipos (stock)</span></button>`:''}`;
     setTimeout(cfTipoChanged,10);
   } else if(cfDir==='mealheiro'){
     f.innerHTML=`
@@ -2233,12 +2233,12 @@ function updateExtraTotal(){
 function openPayModal(){
   document.getElementById('pay-bg').classList.add('show');
   document.body.classList.add('no-scroll');
-  // Nº de colunas da grelha = tipos visíveis (não-admin só vê "Despesa")
+  // Não-admin só pode lançar despesas: esconde a roda (ícone único) e diz-o no título
+  const soDespesa=!isAdmin()&&!contasFechadas();
   const wheel=document.getElementById('cf-wheel');
-  if(wheel){
-    const visiveis=[...wheel.querySelectorAll('.cf-opt')].filter(o=>getComputedStyle(o).display!=='none').length;
-    wheel.style.setProperty('--cf-cols',Math.max(1,visiveis));
-  }
+  if(wheel)wheel.style.display=soDespesa?'none':'';
+  const ttl=document.getElementById('pay-title');
+  if(ttl)ttl.textContent=soDespesa?'Cash Flows — Despesas':'Cash Flows';
   setCfType(contasFechadas()?'saldar':'despesa');
   const note=document.getElementById('cf-note');
   if(note)note.textContent=contasFechadas()?'Contas fechadas — só pagamentos de dívidas.':(isAdmin()?'Guardado na base de dados do grupo.':'Podes registar despesas pagas por ti ou pelo teu cônjuge.');
