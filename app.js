@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v119 · 2026-07-27 · Cash-Flows: os 4 tipos cabem sempre no ecrã (sem corte/scroll), não-admin vê só despesas, botão «Importar / detalhar fatura»';
+const APP_BUILD = 'v120 · 2026-07-27 · Cash-Flows: em Almoço/Jantar a data-valor passa a ser a lista de refeições (escolhe-se a refeição, não uma data)';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -1940,7 +1940,10 @@ function updateCfForm(){
       <div class="cf-quando-hint" id="cf-quando-hint">Despesa já realizada, com data conhecida.</div>
       <div id="cf-date-row" class="inline-row" style="margin-top:14px">
         <div><label>Data Despesa</label><input type="date" id="cf-date" value="${today}" oninput="cfSyncDataValor()"></div>
-        <div><label>Data-Valor</label><input type="date" id="cf-date2" value=""></div>
+        <div><label id="cf-dv-lbl">Data-Valor</label>
+          <select id="cf-dv-sel" onchange="cfMealChanged()" style="display:none"></select>
+          <input type="date" id="cf-date2" value="">
+        </div>
       </div>
       <label>Descritivo <span class="cf-desc-count" id="cf-desc-count">0/30</span></label>
       <input type="text" id="cf-desc" placeholder="Ex: Continente — Bacalhau" maxlength="30" oninput="updDescCount('cf')">
@@ -2008,34 +2011,87 @@ function updateCfForm(){
   }
 }
 
-function cfTipoChanged(){
-  if(isCfPrevista('cf'))return; // prevista: datas escondidas
-  const tipo=document.getElementById('cf-tipo')?.value||'Gerais';
-  const d2=document.getElementById('cf-date2');
-  const d1=document.getElementById('cf-date');
-  if(!d2||!d1)return;
-  // Data-valor só é editável em Almoço/Jantar. Bebidas/Gerais → igual à data-despesa, bloqueado.
-  const editavel=tipo==='Almoço'||tipo==='Jantar';
-  if(editavel){
+/* ── Data-Valor = refeição (Almoço/Jantar) ──
+   A data-valor existe para alocar a despesa a uma refeição concreta: no
+   calcular(), só entra como despesa DIRETA se casar exatamente com a data de
+   uma refeição definida (Fdir). Uma data escrita à mão que não case com
+   nenhuma refeição sai da bolsa indireta mas não entra em lado nenhum.
+   Por isso, em Almoço/Jantar mostramos a lista de refeições em vez do
+   calendário — o que se guarda continua a ser a data (nada muda na BD). */
+function dvMeals(ref){
+  return (DATA&&DATA.refeicoesDef||[]).filter(r=>r.ref===ref).slice()
+    .sort((a,b)=>(a.data||'').localeCompare(b.data||''));
+}
+function dvMealOptions(ref,sel){
+  const meals=dvMeals(ref);
+  let h='<option value="">— escolhe —</option>';
+  // data-valor que não casa com nenhuma refeição (ex.: refeição entretanto
+  // apagada) — fica visível e selecionada para não se perder ao guardar
+  if(sel&&!meals.some(r=>r.data===sel))
+    h+=`<option value="${sel}" selected>${fmtDiaMes(sel)} · fora das refeições</option>`;
+  meals.forEach(r=>{
+    h+=`<option value="${r.data}"${sel===r.data?' selected':''}>${diaCurto(r.data)}, ${fmtDiaMes(r.data)}${r.prato?' · '+escHtml(r.prato):''}</option>`;
+  });
+  return h;
+}
+/* O <input date> é sempre a fonte do valor; o <select> das refeições é só a
+   interface. prefix: 'cf' (criar) ou 'ecf' (editar). */
+function dvSync(prefix){
+  if(isCfPrevista(prefix))return; // prevista: datas escondidas
+  const tipo=document.getElementById(prefix+'-tipo')?.value||'Gerais';
+  const d1=document.getElementById(prefix+'-date');
+  const d2=document.getElementById(prefix+'-date2');
+  const sel=document.getElementById(prefix+'-dv-sel');
+  const lbl=document.getElementById(prefix+'-dv-lbl');
+  if(!d1||!d2)return;
+  const usaRefeicoes=shopIsMeal(tipo)&&dvMeals(tipo).length>0;
+  if(sel)sel.style.display=usaRefeicoes?'':'none';
+  d2.style.display=usaRefeicoes?'none':'';
+  if(lbl)lbl.textContent=usaRefeicoes?'Refeição':'Data-Valor';
+  if(usaRefeicoes){
+    d2.readOnly=false;d2.style.opacity='1';d2.style.pointerEvents='';   // limpa o estado de um tipo anterior
+    // veio de um tipo que impôs a data-despesa → devolve a escolha original
+    if(sel.dataset.imposto){d2.value=sel.dataset.last||'';delete sel.dataset.imposto;delete sel.dataset.last;}
+    // ainda sem escolha: se a data-despesa for dia de refeição, propõe essa
+    if(!d2.value&&dvMeals(tipo).some(r=>r.data===d1.value))d2.value=d1.value;
+    sel.innerHTML=dvMealOptions(tipo,d2.value);
+    d2.value=sel.value;
+  }else if(shopIsMeal(tipo)){
+    // ano ainda sem refeições definidas → data livre (como antes)
     d2.readOnly=false;d2.style.opacity='1';d2.style.pointerEvents='';
+    if(!d2.value)d2.value=d1.value;
   }else{
+    // guarda a refeição escolhida — se o utilizador voltar a Almoço/Jantar, não a perde
+    if(sel&&!sel.dataset.imposto){sel.dataset.last=d2.value||'';sel.dataset.imposto='1';}
     d2.value=d1.value;            // força igual à data-despesa
     d2.readOnly=true;d2.style.opacity='.55';d2.style.pointerEvents='none';
   }
 }
-function cfSyncDataValor(){
-  const tipo=document.getElementById('cf-tipo')?.value||'Gerais';
-  const d2=document.getElementById('cf-date2');
-  const d1=document.getElementById('cf-date');
+function dvMealChanged(prefix){
+  const sel=document.getElementById(prefix+'-dv-sel'),d2=document.getElementById(prefix+'-date2');
+  if(sel&&d2)d2.value=sel.value;
+}
+function dvSyncFromDate(prefix){
+  const tipo=document.getElementById(prefix+'-tipo')?.value||'Gerais';
+  const d1=document.getElementById(prefix+'-date');
+  const d2=document.getElementById(prefix+'-date2');
   if(!d2||!d1)return;
   // Gerais/Bebidas: data-valor segue sempre a data-despesa.
-  // Almoço/Jantar: só preenche se ainda estiver vazia (não mexe se o user já a definiu).
-  if(tipo==='Almoço'||tipo==='Jantar'){
-    if(!d2.value)d2.value=d1.value;
+  // Almoço/Jantar: só propõe se ainda não houver escolha (não mexe no que o user definiu).
+  if(shopIsMeal(tipo)){
+    if(!d2.value)dvSync(prefix);
   }else{
     d2.value=d1.value;
   }
 }
+/* Falta escolher a refeição? (só quando há refeições definidas para o tipo) */
+function dvFaltaRefeicao(prefix,tipo){
+  return shopIsMeal(tipo)&&dvMeals(tipo).length>0&&!document.getElementById(prefix+'-date2')?.value;
+}
+
+function cfTipoChanged(){dvSync('cf');}
+function cfSyncDataValor(){dvSyncFromDate('cf');}
+function cfMealChanged(){dvMealChanged('cf');}
 function isCfPrevista(prefix){
   return document.querySelector(`#${prefix}-quando .cfq.on`)?.dataset?.q==='prevista';
 }
@@ -2064,32 +2120,9 @@ function setCfQuando(prefix,q){
   }
 }
 
-function ecfTipoChanged(){
-  if(isCfPrevista('ecf'))return; // prevista: datas escondidas
-  const tipo=document.getElementById('ecf-tipo')?.value||'Gerais';
-  const d2=document.getElementById('ecf-date2');
-  const d1=document.getElementById('ecf-date');
-  if(!d2||!d1)return;
-  const editavel=tipo==='Almoço'||tipo==='Jantar';
-  if(editavel){
-    d2.readOnly=false;d2.style.opacity='1';d2.style.pointerEvents='';
-    if(!d2.value)d2.value=d1.value;
-  }else{
-    d2.value=d1.value;
-    d2.readOnly=true;d2.style.opacity='.55';d2.style.pointerEvents='none';
-  }
-}
-function ecfSyncDataValor(){
-  const tipo=document.getElementById('ecf-tipo')?.value||'Gerais';
-  const d2=document.getElementById('ecf-date2');
-  const d1=document.getElementById('ecf-date');
-  if(!d2||!d1)return;
-  if(tipo==='Almoço'||tipo==='Jantar'){
-    if(!d2.value)d2.value=d1.value;
-  }else{
-    d2.value=d1.value;
-  }
-}
+function ecfTipoChanged(){dvSync('ecf');}
+function ecfSyncDataValor(){dvSyncFromDate('ecf');}
+function ecfMealChanged(){dvMealChanged('ecf');}
 
 function setMealSubtype(el, sub){
   document.querySelectorAll('#meal-subtype-wheel .cf-opt').forEach(e=>e.classList.toggle('on',e.dataset.sub===sub));
@@ -2275,6 +2308,10 @@ async function saveCashFlow(){
     const prevista=isCfPrevista('cf');
     const obs=document.getElementById('cf-obs')?.value?.trim()||'';
     const descD=desc.slice(0,30);
+    if(!prevista&&dvFaltaRefeicao('cf',tipo)){
+      toast(`Escolhe a ${tipo.toLowerCase()} a que esta despesa pertence`,'bad');
+      document.getElementById('pay-save').disabled=false;return;
+    }
     const date2=prevista?'':(document.getElementById('cf-date2')?.value||date);
     const dDesp=prevista?'':date;
     if(!isAdmin()&&!MY_NAMES.includes(who)){
@@ -2475,7 +2512,10 @@ function editCfEntry(source,idx){
       <div class="cf-quando-hint" id="ecf-quando-hint">${isPrev?'Despesa prevista — entra nas contas, mas ainda sem data de pagamento.':'Despesa já realizada, com data conhecida.'}</div>
       <div id="ecf-date-row" class="inline-row" style="margin-top:14px${isPrev?';display:none':''}">
         <div><label>Data Despesa</label><input type="date" id="ecf-date" value="${d.dataDesp||''}" oninput="ecfSyncDataValor()"></div>
-        <div><label>Data-Valor</label><input type="date" id="ecf-date2" value="${d.dataValor||''}"></div>
+        <div><label id="ecf-dv-lbl">Data-Valor</label>
+          <select id="ecf-dv-sel" onchange="ecfMealChanged()" style="display:none"></select>
+          <input type="date" id="ecf-date2" value="${d.dataValor||''}">
+        </div>
       </div>
       <label>Descritivo <span class="cf-desc-count" id="ecf-desc-count"></span></label>
       <input type="text" id="ecf-desc" maxlength="30" value="${escHtml((d.desc||'').slice(0,30))}" oninput="updDescCount('ecf')">
@@ -2626,10 +2666,15 @@ async function saveEditCf(){
   } else if(source==='despesas'){
     const d=DATA.despesas[idx];
     const prevista=isCfPrevista('ecf');
+    const tipoE=document.getElementById('ecf-tipo').value;
+    if(!prevista&&dvFaltaRefeicao('ecf',tipoE)){
+      toast(`Escolhe a ${tipoE.toLowerCase()} a que esta despesa pertence`,'bad');
+      document.getElementById('edit-cf-save').disabled=false;return;
+    }
     d.quem=document.getElementById('ecf-who').value;
     d.dataDesp=prevista?'':document.getElementById('ecf-date').value;
     d.dataValor=prevista?'':document.getElementById('ecf-date2').value;
-    d.tipo=document.getElementById('ecf-tipo').value;
+    d.tipo=tipoE;
     d.valor=parseFloat(document.getElementById('ecf-val').value)||d.valor;
     d.desc=(document.getElementById('ecf-desc')?.value||'').trim().slice(0,30);
     const obsEl=document.getElementById('ecf-obs');
