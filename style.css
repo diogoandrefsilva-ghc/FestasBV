@@ -1186,6 +1186,9 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .cft-subs-h{font-size:9px;letter-spacing:.09em;text-transform:uppercase;color:var(--faint);font-weight:700;margin-bottom:1px}
 .cft-sub{display:flex;justify-content:space-between;align-items:baseline;gap:10px;font-size:11.5px;color:var(--muted);line-height:1.4}
 .cft-sub i{font-style:normal;color:var(--faint)}
+/* Linha que corresponde ao filtro por refeição/tipo — porque é que este
+   movimento aparece na lista */
+.cft-sub.on{color:var(--ink);font-weight:700}
 /* Só o VALOR (2.º span) é que ganha peso. Com uma linha só não há valor — e
    antes o destino apanhava este estilo por ser :last-child, ficando a bold só
    nas compras de uma refeição (nas de várias, nenhum destino ficava). */
