@@ -1,4 +1,4 @@
-const CACHE_NAME = 'app-cache-v132';
+const CACHE_NAME = 'app-cache-v133';
 
 self.addEventListener('install', () => self.skipWaiting());
 
