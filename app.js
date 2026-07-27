@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v123 · 2026-07-27 · Ano fechado: refeições, convidados, presenças e plantel só de leitura (também para o admin)';
+const APP_BUILD = 'v124 · 2026-07-27 · Notas do menu passam para baixo do prato do dia (card e formulário)';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -978,10 +978,10 @@ function renderAll(){
       const ementa=(rd.prato||mp.entradas||mp.sobremesa||mp.outras)?`<div class="ementa sf">
         <div class="ementa-hd">Prato do dia</div>
         ${rd.prato?`<div class="em-prato">${escHtml(rd.prato)}</div>`:''}
-        ${(mp.entradas||mp.sobremesa||mp.outras)?'<div class="em-rule"></div>':''}
+        ${mp.outras?`<div class="em-notas">${escHtml(mp.outras)}</div>`:''}
+        ${(mp.entradas||mp.sobremesa)?'<div class="em-rule"></div>':''}
         ${mp.entradas?`<div class="em-linha"><span class="em-lk">Entradas</span>${escHtml(mp.entradas)}</div>`:''}
         ${mp.sobremesa?`<div class="em-linha"><span class="em-lk">Sobremesa</span>${escHtml(mp.sobremesa)}</div>`:''}
-        ${mp.outras?`<div class="em-notas">${escHtml(mp.outras)}</div>`:''}
       </div>`:'';
       r+=`<div class="refmeal" data-i="${rd._idx}" style="${rd._idx===sel?'':'display:none'}">
         <div class="refdef-day-hdr sf">${diaExtenso(rd.data)||rd.dia} · ${rd.data}</div>
