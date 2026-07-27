@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v115a2 · 2026-07-27 · [Opção A] Alocação: Compras/Pedidos recuados da margem esquerda e fechados por filetes iguais; sai a nota do FIFO';
+const APP_BUILD = 'v115a3 · 2026-07-27 · [Opção A] Alocação: cada cabeçalho leva a quantidade entre parênteses — comprado, pedido e alocado lêem-se em coluna; "Alocado a" passa a "Alocação"';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -5797,11 +5797,13 @@ function umbrellaLotes(reqName,u){
    alocar artigo atrás de artigo abre a secção uma vez e não a volta a abrir em
    cada modal. */
 let _LOTE_ACC=(function(){try{return JSON.parse(localStorage.getItem('festasbv_lote_acc'))||{};}catch(e){return{};}})();
-function loteAccSec(key,ic,lbl,sum,body){
+function loteAccSec(key,ic,lbl,qtd,sum,body){
   const open=!!_LOTE_ACC[key];
+  const u=editingLote?editingLote.u:'';
   return `<div class="lote-acc-sec${open?' open':''}">
     <button type="button" class="lote-acc-h" aria-expanded="${open?'true':'false'}" onclick="loteAccToggle('${key}',this)">
       <span class="lote-acc-ic">${ic}</span><span class="lote-acc-lbl">${lbl}</span>
+      <span class="lote-acc-q">(${escHtml(fmtQty(rnd(qtd||0,3),u))})</span>
       <span class="lote-acc-sum">${sum}</span><i class="lote-acc-chev">▾</i>
     </button>
     <div class="lote-acc-b">${body}</div>
@@ -5881,17 +5883,18 @@ function openLoteModal(id){
   // (quantas compras · quantas refeições pedem e quanto), e o detalhe — nomes
   // compridos de faturas, uma linha por refeição — só ocupa ecrã quando o
   // pedimos. Assim o modal abre logo no que se vem cá fazer: alocar.
+  // A quantidade de cada secção vai à cabeça, entre parênteses: lendo os três
+  // cabeçalhos de cima a baixo — comprado, pedido, alocado — vê-se de relance
+  // se o stock chega e o que falta entregar, sem contas nem contadores à
+  // direita a dizer o mesmo por outras palavras.
   const demTot=rnd(needKeys.reduce((s,k)=>s+dem[k],0),3);
   const nL=lotes.length;
   const cmpSum=nL?`${nL} ${anyOrg?(nL===1?'origem':'origens'):(nL===1?'compra':'compras')}`:'—';
-  const needSum=needKeys.length
-    ?`${needKeys.length} ${needKeys.length===1?'refeição':'refeições'} · ${escHtml(fmtQty(demTot,editingLote.u))}`
-    :'sem pedidos';
   document.getElementById('lote-info').innerHTML=
     `<div class="lote-sum">Em stock: <b>${escHtml(fmtQty(totQ,editingLote.u))}</b> · <b>${semCusto?'sem custo':eur(totV)}</b></div>`+
     `<div class="lote-acc">
-      ${loteAccSec('cmp',anyOrg?'📦':'🛒',anyOrg?'Origem':'Compras',cmpSum,comprasRows)}
-      ${loteAccSec('need','📋','Pedidos na lista',needSum,needRows)}
+      ${loteAccSec('cmp',anyOrg?'📦':'🛒',anyOrg?'Origem':'Compras',totQ,cmpSum,comprasRows)}
+      ${loteAccSec('need','📋','Pedidos na lista',demTot,'',needRows)}
     </div>`;
   const canEdit=isAdmin()&&!contasFechadas();
   // A categoria e a ligação ao pedido são edição do artigo: vivem no painel ✏️.
@@ -6264,6 +6267,9 @@ function loteRenderAlocs(){
     (html?(solo?`<div class="lote-solos">${html}</div>`:html):'<div class="empty sf" style="margin-top:8px">Sem alocações — está tudo na bolsa comum.</div>');
   const tot=editingLote.alocs.reduce((s,a)=>s+(+a.qtd||0),0);
   const livre=rnd(editingLote.totQ-tot,3);
+  // O total alocado sobe para o rótulo, na mesma forma dos cabeçalhos de cima
+  const lbl=document.getElementById('lote-aloc-lbl');
+  if(lbl)lbl.innerHTML=`🍽️ Alocação <span class="lote-acc-q">(${escHtml(fmtQty(rnd(tot,3),editingLote.u))})</span>`;
   // O que sobra na bolsa comum é o que o alocado não levou (0 € se o que sobra
   // for stock oferecido / do ano anterior)
   const restoVal=Math.max(0,rnd(editingLote.totV-lineVal.reduce((s,v)=>s+(+v||0),0),2));
