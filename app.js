@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v122 · 2026-07-27 · Compra em consulta mostra "Detalhe Compra" em vez de "Editar Compra"';
+const APP_BUILD = 'v123 · 2026-07-27 · Ano fechado: refeições, convidados, presenças e plantel só de leitura (também para o admin)';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -118,7 +118,9 @@ function myPrimaryName(){
   const names=(DATA.membros||[]).map(m=>m.nome);
   return MY_NAMES.find(n=>names.includes(n))||'';
 }
-function canTouchPresenca(nome,dia){return isAdmin()||(MY_NAMES.includes(nome)&&diaEditavel(dia));}
+// Ano fechado tranca as presenças a toda a gente (o admin também) — o CSS já as
+// bloqueia à vista, mas a regra tem de viver aqui para valer sempre.
+function canTouchPresenca(nome,dia){return !contasFechadas()&&(isAdmin()||(MY_NAMES.includes(nome)&&diaEditavel(dia)));}
 function permErrorMsg(e){
   const m=(e&&e.message||'')+'';
   if(/row-level security|42501|permission/i.test(m))return 'Sem permissão para esta alteração (ou a data já passou)';
@@ -127,6 +129,14 @@ function permErrorMsg(e){
 
 /* ── Fecho de contas + validação ── */
 function contasFechadas(){return !!(DATA&&DATA.evento&&DATA.evento.contasFechadas);}
+/* Guarda de escrita para anos fechados. O CSS esconde os botões, mas isso é só a
+   camada de cima: quem chegar à função à mesma (modal já aberto, ecrã em cache,
+   onclick inline) tem de bater aqui. Devolve true = a edição não pode seguir. */
+function bloqueadoPorFecho(){
+  if(!contasFechadas())return false;
+  toast('Contas fechadas — o ano já não se edita','bad');
+  return true;
+}
 function ultimaRefeicaoISO(){const ds=(DATA&&DATA.refeicoesDef||[]).map(r=>r.data).filter(Boolean);return ds.length?ds.slice().sort().slice(-1)[0]:null;}
 function temDespesasPendentes(){return (DATA&&DATA.despesas||[]).some(d=>!d.dataValor);}  // sem data-valor = pagamento ainda não efetivo
 function podeFecharContas(){
@@ -3192,6 +3202,7 @@ function renderPlantel(){
 }
 
 async function addMember(){
+  if(bloqueadoPorFecho())return;
   const nome=(document.getElementById('adm-new-member').value||'').trim();
   const fator=parseFloat(document.getElementById('adm-new-fator').value)||1;
   if(!nome){toast('Indica o nome','bad');return;}
@@ -3208,6 +3219,7 @@ async function addMember(){
 }
 
 async function removeMember(idx){
+  if(bloqueadoPorFecho())return;
   const nome=DATA.membros[idx].nome;
   if(nome===DATA.evento.tesoureiro){toast('Não podes remover o tesoureiro','bad');return;}
   // Check if member has ANY data in this year
@@ -3231,6 +3243,7 @@ async function removeMember(idx){
 }
 
 async function updateFator(idx,val){
+  if(bloqueadoPorFecho()){renderPlantel();return;}
   const fator=parseFloat(val);
   if(isNaN(fator)||fator<0){toast('Fator inválido','bad');renderPlantel();return;}
   DATA.membros[idx].fator=fator;
@@ -3243,6 +3256,7 @@ async function updateFator(idx,val){
 }
 
 async function toggleSexo(idx){
+  if(bloqueadoPorFecho())return;
   const m=DATA.membros[idx];
   m.sexo=(m.sexo==='F')?'M':'F';
   renderPlantel();
@@ -6845,6 +6859,7 @@ function myMemberOptions(sel){
 }
 
 function openGuestModal(){
+  if(bloqueadoPorFecho())return;
   // Build a simple modal for adding guests
   const allDays=[...new Set((DATA.refeicoesDef||[]).map(r=>r.dia))];
   const days=isAdmin()?allDays:allDays.filter(d=>diaEditavel(d));
@@ -6890,6 +6905,7 @@ async function saveGuest(){
   const pagante=document.getElementById('guest-pagante').value;
   if(!nome){toast('Indica o nome do convidado','bad');return;}
   if(!membro){toast('Seleciona quem traz o convidado','bad');return;}
+  if(bloqueadoPorFecho())return;
   if(!isAdmin()){
     if(!MY_NAMES.includes(membro)){toast('Só podes registar convidados teus ou do teu cônjuge','bad');return;}
     if(!diaEditavel(dia)){toast('Esse dia já passou — fala com o administrador','bad');return;}
@@ -6918,6 +6934,8 @@ async function saveGuest(){
 
 async function deleteGuest(idx){
   const g=DATA.convidados[idx];
+  if(!g)return;
+  if(bloqueadoPorFecho())return;
   if(!isAdmin()&&(!MY_NAMES.includes(g.membro)||!diaEditavel(g.dia))){
     toast('Só o administrador pode remover este convidado','bad');return;
   }
@@ -6942,6 +6960,7 @@ async function deleteGuest(idx){
 function editGuest(idx){
   const g=DATA.convidados[idx];
   if(!g)return;
+  if(bloqueadoPorFecho())return;
   if(!isAdmin()&&(!MY_NAMES.includes(g.membro)||!diaEditavel(g.dia))){
     toast('Não podes editar este convidado','bad');return;
   }
@@ -6975,6 +6994,7 @@ async function saveGuestEdit(idx){
   const nome=(document.getElementById('guest-edit-nome').value||'').trim();
   const pagante=document.getElementById('guest-edit-pagante').value;
   if(!nome){toast('Indica o nome do convidado','bad');return;}
+  if(bloqueadoPorFecho())return;
   if(!isAdmin()&&(!MY_NAMES.includes(g.membro)||!diaEditavel(g.dia))){
     toast('Não podes editar este convidado','bad');return;
   }
@@ -7120,6 +7140,11 @@ function _respOptions(sel){
 function openRefdefModal(editIdx){
   editingRefdef=typeof editIdx==='number'?editIdx:null;
   const isEdit=editingRefdef!==null;
+  // Contas fechadas → o modal abre só para consulta, mesmo para o admin.
+  // (Adicionar nem chega a abrir: o botão está escondido, mas isto trava o resto.)
+  const fechadas=contasFechadas();
+  if(fechadas&&!isEdit){editingRefdef=null;bloqueadoPorFecho();return;}
+  const ro=!isAdmin()||fechadas;
   document.getElementById('refdef-title').textContent=isEdit?'Detalhe da Refeição':'Adicionar Refeição';
 
   // Responsáveis e menu (só com a migração db/notifs.sql corrida)
@@ -7156,8 +7181,10 @@ function openRefdefModal(editIdx){
     document.getElementById('rd-extraconv').value='2';
   }
 
-  document.getElementById('rd-del').style.display=(isEdit&&isAdmin())?'':'none';
-  applyRoFields(document.getElementById('refdef-modal'),!isAdmin());
+  document.getElementById('rd-del').style.display=(isEdit&&!ro)?'':'none';
+  const save=document.getElementById('rd-save');
+  if(save)save.style.display=ro?'none':'';
+  applyRoFields(document.getElementById('refdef-modal'),ro);
   document.getElementById('refdef-bg').classList.add('show');
   document.body.classList.add('no-scroll');
 }
@@ -7191,6 +7218,8 @@ function diaExtenso(dataStr){
 }
 
 async function saveRefdef(){
+  if(!isAdmin()){toast('Sem permissão para editar refeições','bad');return;}
+  if(bloqueadoPorFecho())return;
   const data=document.getElementById('rd-data').value;
   const ref=document.getElementById('rd-ref').value;
   const prato=document.getElementById('rd-prato').value.trim();
@@ -7279,6 +7308,9 @@ async function deleteRefdefFromModal(){
 
 async function deleteRefdef(idx){
   const rd=DATA.refeicoesDef[idx];
+  if(!rd)return;
+  if(!isAdmin()){toast('Sem permissão para remover refeições','bad');return;}
+  if(bloqueadoPorFecho())return;
   if(!confirm(`Remover ${rd.dia} ${rd.ref}?`))return;
   // Also clean up presencas that reference this slot
   const slotKey=rd.dia+'|'+(rd.ref==='Lanche'?'Tarde':rd.ref);
