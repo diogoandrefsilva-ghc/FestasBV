@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v125 · 2026-07-27 · Switch próprio para os avisos de presenças no Telegram (Definições › Notificações)';
+const APP_BUILD = 'v126 · 2026-07-27 · Switch dos avisos de presenças passa a abranger também os convidados';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -1722,6 +1722,10 @@ function sbLog(tipo,accao,alvo,detalhe){
     const autor=meuNomePrincipal()||null;
     const det=Object.assign({},detalhe||{});
     det.frase=fraseHistorico(tipo,accao,alvo,autor,det);
+    // Switch "Avisos de presenças" desligado (Definições › Notificações):
+    // presenças e convidados continuam a ir para o histórico, mas marcados
+    // para não notificar. Nomeações e compras não são afetadas.
+    if(!NOTIF_PRES&&(tipo==='presenca'||tipo==='convidado'))det.silencioso=true;
     sbReq('POST','historico',[{
       evento_id:DATA._sbId,
       autor_email:_sbSession.user.email,
@@ -1822,9 +1826,6 @@ function _flushPresLog(key){
   // lida pela Edge (notif-festas), que trava o envio. Para voltar a notificar
   // estas duas transições, comenta/remove a linha seguinte.
   if((e.origem===null&&e.final==='bebe')||(e.origem==='bebe'&&e.final===null))det.silencioso=true;
-  // Switch "Avisos de presenças" desligado (Definições › Notificações): a
-  // entrada continua a ir para o histórico, mas marcada para não notificar.
-  if(!NOTIF_PRES)det.silencioso=true;
   sbLog('presenca',accao,e.alvo,det);
 }
 function flushPresLogs(){for(const k of [..._presLogPend.keys()])_flushPresLog(k);}
@@ -2831,11 +2832,11 @@ async function saveNotif(){
   }
 }
 
-/* ── Avisos de PRESENÇAS (só admin · flag global em festasbv.config) ──
+/* ── Avisos de PRESENÇAS E CONVIDADOS (só admin · flag em festasbv.config) ──
    Ao contrário do interruptor geral, este não é lido pelas Edge Functions: é a
-   app que, com ele desligado, marca as entradas de presença com
+   app que, com ele desligado, marca as entradas de presença/convidado com
    detalhe.silencioso — marca que a notif-festas e a notif-pessoais já
-   respeitam. Não mexe em nomeações, convidados nem compras. */
+   respeitam (ver sbLog). Não mexe em nomeações nem em compras. */
 const NOTIF_PRES_SQL="INSERT INTO festasbv.config (chave,valor) VALUES ('notif_presencas','true') ON CONFLICT (chave) DO NOTHING;";
 function _setNotifPresKnob(on){
   const knob=document.getElementById('adm-notif-pres-knob');
@@ -2866,7 +2867,7 @@ async function saveNotifPres(){
     const upd=await sbReq('PATCH','config?chave=eq.notif_presencas',{valor:on?'true':'false'},{Prefer:'return=representation'});
     if(!Array.isArray(upd)||!upd.length){_notifPresFalta(true);throw new Error('a chave notif_presencas ainda não existe na config');}
     NOTIF_PRES=on;_notifPresFalta(false);
-    toast(on?'Avisos de presenças ligados ✓':'Avisos de presenças desligados ✓','ok');
+    toast(on?'Avisos de presenças/convidados ligados ✓':'Avisos de presenças/convidados desligados ✓','ok');
   }catch(e){
     cb.checked=!on;_setNotifPresKnob(!on);   // reverte o visual se a gravação falhar
     toast('Erro ao guardar: '+e.message,'bad');
