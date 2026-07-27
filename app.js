@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v124 · 2026-07-27 · Notas do menu passam para baixo do prato do dia (card e formulário)';
+const APP_BUILD = 'v125 · 2026-07-27 · Switch próprio para os avisos de presenças no Telegram (Definições › Notificações)';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -95,6 +95,11 @@ let VALIDACOES=[];    // [{evento_id,amigo,validado_por_email,validado_em}]
 let MY_NAMES=[];      // nomes que o utilizador atual pode gerir (próprio + cônjuge)
 let REFDEF_RESP_COLS=false;   // BD já tem resp_cozinha/resp_compras? (migração db/notifs.sql)
 let STOCK_TABLE=false;        // BD já tem stock_lotes? (migração SQL do stock por refeição)
+// Switch das notificações de PRESENÇAS (config 'notif_presencas'). Lido em
+// carregar() por todos os utilizadores, porque é a app que marca as entradas
+// de presença como silenciosas quando está desligado (ver _flushPresLog).
+// Fail-open: sem chave / sem ligação assume LIGADO, igual às Edge Functions.
+let NOTIF_PRES=true;
 const enc=encodeURIComponent;
 
 function isAdmin(){return !!_sbSession&&_sbSession.user.email===ADMIN_EMAIL;}
@@ -1554,7 +1559,7 @@ async function carregar(){
     const sel='*,membros(*,presencas(*)),refeicoes_def(*),despesas(*),convidados(*),mealheiros(*),pagamentos(*)';
     // shoplist vai numa fetch SEPARADA e tolerante a falha: se a tabela ainda
     // não existir (migração por correr) o resto da app continua a funcionar.
-    const [res,uaRes,cjRes,vlRes,slRes,stRes,ctRes,acRes]=await Promise.all([
+    const [res,uaRes,cjRes,vlRes,slRes,stRes,ctRes,acRes,npRes]=await Promise.all([
       sbFetch(`${SB_URL}/rest/v1/eventos?select=${encodeURIComponent(sel)}&order=ano.asc`,{headers:sbHeaders(),cache:'no-store'}),
       sbFetch(`${SB_URL}/rest/v1/user_amigos?select=email,amigo`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null),
       sbFetch(`${SB_URL}/rest/v1/conjuges?select=amigo_a,amigo_b`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null),
@@ -1565,7 +1570,10 @@ async function carregar(){
       // categorias de artigos (db/categorias.sql): também tolerantes — sem a
       // migração, CATS_TABLE=false e tudo o que é categorias fica escondido
       sbFetch(`${SB_URL}/rest/v1/categorias?select=*`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null),
-      sbFetch(`${SB_URL}/rest/v1/artigo_categorias?select=*`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null)
+      sbFetch(`${SB_URL}/rest/v1/artigo_categorias?select=*`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null),
+      // switch das notificações de presenças (config): toda a gente precisa
+      // dele para marcar/não marcar as entradas como silenciosas
+      sbFetch(`${SB_URL}/rest/v1/config?chave=eq.notif_presencas&select=valor`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null)
     ]);
     if(!res.ok)throw new Error('HTTP '+res.status);
     const rows=await res.json();
@@ -1575,6 +1583,7 @@ async function carregar(){
     const shopRows=(slRes&&slRes.ok)?await slRes.json():[];
     STOCK_TABLE=!!(stRes&&stRes.ok);
     const stockRows=STOCK_TABLE?await stRes.json():[];
+    if(npRes&&npRes.ok){const cfg=await npRes.json();NOTIF_PRES=(Array.isArray(cfg)&&cfg[0])?(cfg[0].valor==='true'):true;}
     CATS_TABLE=!!(ctRes&&ctRes.ok&&acRes&&acRes.ok);
     CATEGORIAS=CATS_TABLE?(await ctRes.json()).sort((a,b)=>a.nome.localeCompare(b.nome,'pt')):[];
     ART_CATS={};
@@ -1813,6 +1822,9 @@ function _flushPresLog(key){
   // lida pela Edge (notif-festas), que trava o envio. Para voltar a notificar
   // estas duas transições, comenta/remove a linha seguinte.
   if((e.origem===null&&e.final==='bebe')||(e.origem==='bebe'&&e.final===null))det.silencioso=true;
+  // Switch "Avisos de presenças" desligado (Definições › Notificações): a
+  // entrada continua a ir para o histórico, mas marcada para não notificar.
+  if(!NOTIF_PRES)det.silencioso=true;
   sbLog('presenca',accao,e.alvo,det);
 }
 function flushPresLogs(){for(const k of [..._presLogPend.keys()])_flushPresLog(k);}
@@ -2718,7 +2730,7 @@ function openAdmin(){
   if(ver)ver.textContent='Versão '+APP_BUILD.split('·')[0].trim();
   const adm=document.getElementById('adm-pedidos-wrap');
   if(adm)adm.style.display=isAdmin()?'':'none';
-  if(isAdmin()){sbRenderPedidos();sbRenderLigacoes();loadNotif();admCatCancel();renderAdmCats();}
+  if(isAdmin()){sbRenderPedidos();sbRenderLigacoes();loadNotif();loadNotifPres();admCatCancel();renderAdmCats();}
   loadMyNotif();
   loadParams();
   renderPlantel();
@@ -2815,6 +2827,48 @@ async function saveNotif(){
     toast(on?'Notificações ligadas ✓':'Notificações desligadas ✓','ok');
   }catch(e){
     cb.checked=!on;_setNotifKnob(!on);   // reverte o visual se a gravação falhar
+    toast('Erro ao guardar: '+e.message,'bad');
+  }
+}
+
+/* ── Avisos de PRESENÇAS (só admin · flag global em festasbv.config) ──
+   Ao contrário do interruptor geral, este não é lido pelas Edge Functions: é a
+   app que, com ele desligado, marca as entradas de presença com
+   detalhe.silencioso — marca que a notif-festas e a notif-pessoais já
+   respeitam. Não mexe em nomeações, convidados nem compras. */
+const NOTIF_PRES_SQL="INSERT INTO festasbv.config (chave,valor) VALUES ('notif_presencas','true') ON CONFLICT (chave) DO NOTHING;";
+function _setNotifPresKnob(on){
+  const knob=document.getElementById('adm-notif-pres-knob');
+  const track=knob?.previousElementSibling;
+  if(knob)knob.style.left=on?'22px':'2px';
+  if(track)track.style.background=on?'var(--gold)':'var(--line)';
+}
+function _notifPresFalta(falta){
+  const h=document.getElementById('adm-notif-pres-hint');if(!h)return;
+  h.style.display=falta?'':'none';
+  h.innerHTML=falta?'⚠️ Falta a chave <b>notif_presencas</b> na config — o switch não guarda. Corre uma vez no SQL Editor do Supabase:<br><code style="user-select:all;word-break:break-all">'+escHtml(NOTIF_PRES_SQL)+'</code>':'';
+}
+async function loadNotifPres(){
+  const cb=document.getElementById('adm-notif-pres');if(!cb)return;
+  try{
+    const rows=await sbReq('GET','config?chave=eq.notif_presencas&select=valor');
+    const falta=!(Array.isArray(rows)&&rows[0]);
+    const on=falta?true:(rows[0].valor==='true');   // sem chave = ligado (fail-open)
+    NOTIF_PRES=on;cb.checked=on;_setNotifPresKnob(on);_notifPresFalta(falta);
+  }catch(_){cb.checked=true;_setNotifPresKnob(true);}
+}
+async function saveNotifPres(){
+  const cb=document.getElementById('adm-notif-pres');if(!cb)return;
+  const on=cb.checked;_setNotifPresKnob(on);
+  try{
+    // return=representation: se vier vazio, a chave não existe (o PATCH do
+    // PostgREST não dá erro quando não encontra linhas)
+    const upd=await sbReq('PATCH','config?chave=eq.notif_presencas',{valor:on?'true':'false'},{Prefer:'return=representation'});
+    if(!Array.isArray(upd)||!upd.length){_notifPresFalta(true);throw new Error('a chave notif_presencas ainda não existe na config');}
+    NOTIF_PRES=on;_notifPresFalta(false);
+    toast(on?'Avisos de presenças ligados ✓':'Avisos de presenças desligados ✓','ok');
+  }catch(e){
+    cb.checked=!on;_setNotifPresKnob(!on);   // reverte o visual se a gravação falhar
     toast('Erro ao guardar: '+e.message,'bad');
   }
 }
