@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v116 · 2026-07-27 · Shop List: "pedido por" também nas linhas de artigos agrupados e nos artigos já em carrinho; a data da refeição dentro do grupo passa a chip verde, igual aos outros cartões';
+const APP_BUILD = 'v117 · 2026-07-27 · Cash-Flows: filtro dividido em dois — por pessoa e por refeição/tipo de despesa (mostra os movimentos que tocam nas gerais, no jantar de sábado, etc.)';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -1028,6 +1028,7 @@ function renderAll(){
 
 let cfFilterType='all';
 let cfFilterPerson='all';
+let cfFilterDest='all';   // destino: 'Tipo' (Gerais/Bebidas/…) ou 'Ref|data' (refeição)
 let cfFilterSub='all';
 let cfFilterView='mov';   // 'mov' = movimentos datados · 'previstas' = sem data
 
@@ -1073,7 +1074,9 @@ function renderCashFlows(){
       if(dd)dia=dd;
     }
     const prevista=!d.dataDesp&&!d.dataValor;
+    const dests=cfDespDests(d);
     allCf.push({type:'despesa',date:d.dataDesp||d.dataValor||'',label:'Despesa',icon:'🛒',sub:d.tipo||'Gerais',dia,prevista,obs:d.obs||'',fromList:!!d.compraId,compraId:d.compraId||null,quem:d.quem,
+      dests,destKey:dests.length===1?dests[0]:null,
       line1:d.desc||'(sem descrição)',line2:`${prevista?'pagará':'pagou'} ${d.quem}`,valor:d.valor,
       sign:'neg',source:'despesas',idx:i,people:[d.quem]});
   });
@@ -1134,16 +1137,32 @@ function renderCashFlows(){
     ${pill('saldar','🤝','Dívidas','set','')}
   </div>`;
 
-  // Filtro de pessoa (mantém-se em select — 19+ nomes)
+  // Dois filtros lado a lado (ambos em select — muitas opções para chips):
+  // por pessoa e por refeição/tipo de despesa (o destino onde o dinheiro entra).
+  // Só entram destinos realmente tocados pelos movimentos deste ano.
+  const destSet=new Set();
+  visCf.forEach(cf=>(cf.dests||[]).forEach(k=>destSet.add(k)));
+  const destList=[...destSet].sort(destKeyCmp);
+  if(cfFilterDest!=='all'&&!destList.includes(cfFilterDest))cfFilterDest='all';
+  const destMeals=destList.filter(k=>k.includes('|'));
+  const destTipos=destList.filter(k=>!k.includes('|'));
+  // Rótulo curto (o ☀️/🌙 já diz se é almoço ou jantar) — o select é estreito
+  const destOpt=k=>{const d=destLabel(k);return `<option value="${escHtml(k)}"${cfFilterDest===k?' selected':''}>${d.icon} ${escHtml(d.short)}</option>`;};
   pp+=`<div class="cf-filters">
-    <div class="cf-filter" style="flex:1"><select onchange="cfFilterPerson=this.value;renderCashFlows()">
+    <div class="cf-filter" style="flex:.85"><select onchange="cfFilterPerson=this.value;renderCashFlows()">
       <option value="all"${cfFilterPerson==='all'?' selected':''}>Todas as pessoas</option>
       ${personList.map(p=>`<option value="${p}"${cfFilterPerson===p?' selected':''}>${p}</option>`).join('')}
     </select></div>
+    ${destList.length>1?`<div class="cf-filter" style="flex:1.15"><select onchange="cfFilterDest=this.value;cfFilterSub='all';renderCashFlows()">
+      <option value="all"${cfFilterDest==='all'?' selected':''}>Tudo · refeições/tipos</option>
+      ${destTipos.length?`<optgroup label="Tipos de despesa">${destTipos.map(destOpt).join('')}</optgroup>`:''}
+      ${destMeals.length?`<optgroup label="Refeições">${destMeals.map(destOpt).join('')}</optgroup>`:''}
+    </select></div>`:''}
   </div>`;
 
-  // Sub-filtros variáveis (subtipos de despesa / mealheiro)
-  if(cfFilterType==='despesa'||cfFilterType==='mealheiro'){
+  // Sub-filtros variáveis (subtipos de despesa / mealheiro). Com um destino
+  // escolhido ficam escondidos — dizem o mesmo, mas com menos detalhe.
+  if(cfFilterDest==='all'&&(cfFilterType==='despesa'||cfFilterType==='mealheiro')){
     const subs=[...new Set(visCf.filter(c=>c.type===cfFilterType&&c.sub).map(c=>c.sub))];
     if(subs.length>1){
       pp+=`<div class="cf-subchips">
@@ -1174,8 +1193,13 @@ function renderCashFlows(){
 
   // Agrupa para apresentação (exceto ao filtrar por sub-tipo — aí mostram-se as
   // linhas individuais que correspondem ao filtro).
-  const display=(cfFilterSub==='all')?groupCompraCfs(filtered):filtered;
+  let display=(cfFilterSub==='all')?groupCompraCfs(filtered):filtered;
   const totalCount=(cfFilterSub==='all')?visGrouped.length:visCf.length;
+
+  // Filtro por refeição/tipo: aplica-se DEPOIS do agrupamento — uma compra da
+  // lista fica inteira desde que alguma das suas linhas toque o destino (é essa
+  // a pergunta: que movimentos tocaram no jantar de sábado / nas gerais).
+  if(cfFilterDest!=='all')display=display.filter(cf=>(cf.dests||[]).includes(cfFilterDest));
 
   // As despesas sem data (previstas) vivem num 2.º tabulador em vez de
   // aparecerem no fim da cronologia.
@@ -1191,7 +1215,7 @@ function renderCashFlows(){
   const shown=cfFilterView==='previstas'?undated:dated;
 
   const filteredTotal=shown.reduce((a,cf)=>a+cf.valor,0);
-  const showTotal=(cfFilterView==='previstas'||cfFilterType!=='all'||cfFilterPerson!=='all')&&shown.length>0;
+  const showTotal=(cfFilterView==='previstas'||cfFilterType!=='all'||cfFilterPerson!=='all'||cfFilterDest!=='all')&&shown.length>0;
   pp+=`<div class="sec-title sf" style="display:flex;justify-content:space-between;align-items:center">
     <span>${cfFilterView==='previstas'?'Previstas':'Movimentos'} (${shown.length}${cfFilterView==='mov'&&shown.length!==totalCount?' de '+totalCount:''})</span>
     ${showTotal?`<span style="color:var(--gold);font-size:12px;font-weight:700;letter-spacing:0">${eur(filteredTotal)}</span>`:''}
@@ -1209,7 +1233,9 @@ function renderCashFlows(){
       // Com uma linha só, o valor é o da compra inteira — repeti-lo não acrescenta
       // nada; fica só o destino.
       const one=subs.length===1;
-      const lines=subs.map(l=>`<div class="cft-sub"><span>${shopTipoIcon(l.sub)} ${l.sub}${l.dia?' · '+l.dia:''}${l.obs?' · <i>'+escHtml(l.obs)+'</i>':''}</span>${one?'':`<span>−${eur(l.valor)}</span>`}</div>`).join('');
+      // Com um destino filtrado, a linha que fez a compra entrar na lista fica
+      // marcada — é a resposta a "o que é que esta compra tem a ver com isto?"
+      const lines=subs.map(l=>`<div class="cft-sub${cfFilterDest!=='all'&&l.key===cfFilterDest?' on':''}"><span>${shopTipoIcon(l.sub)} ${l.sub}${l.dia?' · '+l.dia:''}${l.obs?' · <i>'+escHtml(l.obs)+'</i>':''}</span>${one?'':`<span>−${eur(l.valor)}</span>`}</div>`).join('');
       return `<div class="card cft-card b-despesa" onclick="openCompra('${cf.compraId}')">
         <div class="cft-kind k-despesa sf">🛒 Compra · lista</div>
         <div class="cft-l1"><div class="cft-title">${escHtml(cf.line1)}</div><span class="cft-v neg">−${eur(cf.valor)}</span></div>
@@ -1267,11 +1293,12 @@ function groupCompraCfs(list){
       let g=byId[cf.compraId];
       if(!g){
         g={type:'despesa',isCompra:true,compraId:cf.compraId,date:cf.date,icon:'🛒',label:'Compra',
-           line1:'',line2:cf.line2,valor:0,sign:'neg',people:cf.people?[...cf.people]:[],lines:[],_desc:''};
+           line1:'',line2:cf.line2,valor:0,sign:'neg',people:cf.people?[...cf.people]:[],lines:[],dests:[],_desc:''};
         byId[cf.compraId]=g;out.push(g);
       }
       g.valor=rnd(g.valor+cf.valor,2);
-      g.lines.push({sub:cf.sub,dia:cf.dia,valor:cf.valor,obs:cf.obs});
+      g.lines.push({key:cf.destKey,sub:cf.sub,dia:cf.dia,valor:cf.valor,obs:cf.obs});
+      (cf.dests||[]).forEach(k=>{if(!g.dests.includes(k))g.dests.push(k);});
       if(cf.date&&(!g.date||cf.date<g.date))g.date=cf.date;   // dia mais antigo
       if(!g._desc&&cf.line1&&cf.line1!=='Compras'&&cf.line1!=='(sem descrição)')g._desc=cf.line1;
     }else out.push(cf);
@@ -1297,9 +1324,11 @@ function cfCompraLines(g){
   return out;
 }
 /* Reparte o valor da linha "🧺 Stock" de uma compra pelos destinos dos seus
-   lotes (refeição ou tipo puro). O que ainda não está alocado fica em Gerais —
-   e é mesmo isso que é, a bolsa comum, sem precisar de explicação. */
-function cfStockSplit(compraId,total){
+   lotes (refeição ou tipo puro) → mapa {chave de destino: valor}. O que ainda
+   não está alocado fica em Gerais — e é mesmo isso que é, a bolsa comum, sem
+   precisar de explicação. Serve a apresentação (cfStockSplit) e o filtro por
+   refeição/despesa (cfDespDests). */
+function cfStockDestMap(compraId,total){
   const by={};
   stockArr().filter(l=>l.compraId===compraId&&+l.qtd>0).forEach(l=>{
     const unit=l.valor/l.qtd;
@@ -1309,15 +1338,34 @@ function cfStockSplit(compraId,total){
       by[k]=rnd((by[k]||0)+v,2);
     });
   });
-  const out=[];let resto=rnd(total,2);
+  const out={};let resto=rnd(total,2);
   Object.keys(by).sort(destKeyCmp).forEach(k=>{
-    const d=destinoAloc(k,0);
     const v=Math.min(by[k],resto);if(v<=0.004)return;
     resto=rnd(resto-v,2);
-    out.push({sub:d.tipo,dia:d.data?`${dataToDia(d.data)} ${fmtDiaMes(d.data)}`:'',valor:v,obs:''});
+    out[k]=rnd((out[k]||0)+v,2);
   });
-  if(resto>0.004)out.push({sub:'Gerais',dia:'',valor:resto,obs:''});
+  if(resto>0.004)out['Gerais']=rnd((out['Gerais']||0)+resto,2);
   return out;
+}
+// Mesma repartição, já em linhas para o cartão da compra
+function cfStockSplit(compraId,total){
+  const m=cfStockDestMap(compraId,total);
+  return Object.keys(m).sort(destKeyCmp).map(k=>{
+    const d=destinoAloc(k,0);
+    return{key:k,sub:d.tipo,dia:d.data?`${dataToDia(d.data)} ${fmtDiaMes(d.data)}`:'',valor:m[k],obs:''};
+  });
+}
+
+/* Destinos que uma despesa toca — mesmo vocabulário do seletor "Alocar a…":
+   'Tipo' (Gerais/Bebidas/Cerveja/…) ou 'Ref|data' (uma refeição concreta).
+   Uma despesa normal toca um destino só; a linha "🧺 Stock" de uma compra
+   toca todos os destinos dos seus lotes. */
+function cfDespDests(d){
+  if((d.obs||'')===STOCK_OBS&&d.tipo==='Gerais'&&d.compraId){
+    const ks=Object.keys(cfStockDestMap(d.compraId,d.valor));
+    if(ks.length)return ks;
+  }
+  return[shopIsMeal(d.tipo)&&d.dataValor?d.tipo+'|'+d.dataValor:(d.tipo||'Gerais')];
 }
 
 function truncRef(s){return s.length>40?s.slice(0,37)+'…':s;}
