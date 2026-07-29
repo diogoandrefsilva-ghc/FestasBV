@@ -636,6 +636,22 @@ setTimeout(function(){ if (window.fbvEsconderSplash) window.fbvEsconderSplash();
             <button class="btn prim" onclick="sbAddConjuge()">Ligar casal</button>
           </div>
         </div>
+
+        <div class="sf" style="font-size:11px;font-weight:700;color:var(--gold);letter-spacing:.04em;margin:18px 0 6px">FILHOS (CRIANÇAS)</div>
+        <p style="font-size:12px;color:var(--muted);margin-bottom:8px;line-height:1.5">As crianças não pagam nada — servem só para se saber quantas bocas há em cada refeição. Aparecem na grelha de presenças logo a seguir aos pais, e ou comem ou não contam (não há "só bebe").</p>
+        <div id="adm-filhos-list"><div class="note">A carregar…</div></div>
+        <div style="border:1px dashed var(--line);border-radius:10px;padding:12px;margin-top:8px">
+          <div class="sf" style="font-size:11px;color:var(--faint);text-transform:uppercase;letter-spacing:.08em;font-weight:700;margin-bottom:8px">Adicionar filho/a</div>
+          <input type="text" id="adm-filho-nome" placeholder="Nome da criança" style="width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:9px 10px;color:var(--ink);font-size:13px;margin-bottom:8px">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+            <select id="adm-filho-pa" class="sf" style="width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:9px 10px;color:var(--ink);font-size:13px;-webkit-appearance:none;appearance:none;min-width:0"></select>
+            <select id="adm-filho-pb" class="sf" style="width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:9px 10px;color:var(--ink);font-size:13px;-webkit-appearance:none;appearance:none;min-width:0"></select>
+          </div>
+          <div class="sf" style="font-size:10.5px;color:var(--faint);margin-top:6px">Deixa o 2.º progenitor em "—" se for pai ou mãe solteiro/a. Escolher alguém que já é casal preenche o outro sozinho.</div>
+          <div class="mbtns" style="margin-top:8px">
+            <button class="btn prim" onclick="sbAddFilho()">Adicionar filho/a</button>
+          </div>
+        </div>
       </div>
     </div>
 
