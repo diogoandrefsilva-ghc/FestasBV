@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v128 · 2026-07-29 · Crianças: recuo curto, letra menor e presença em dourado; lista de filhos com scroll no admin';
+const APP_BUILD = 'v129 · 2026-07-29 · Presenças: blocos alternados por agregado na grelha (famílias em blocos)';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -6874,16 +6874,19 @@ function renderPresencaGrid(){
   });
   const _hasMine=casas.some(c=>c._rank<2);
   let _sepDone=false,_selfDone=false;
-  casas.forEach(casa=>{
-    casa.membros.forEach(({m,oi})=>{
+  casas.forEach((casa,ci)=>{
+    // Classes de agregado p/ o CSS: cor própria (pres-fam-N) e paridade (pres-famz-N)
+    const famCls='pres-fam pres-fam-'+(ci%8)+' pres-famz-'+(ci%2);
+    casa.membros.forEach(({m,oi},fi)=>{
       const mi=oi;
       const _r=_rankP(m.nome);
-      const _rowCls=[];
+      const _rowCls=[famCls];
+      if(fi===0)_rowCls.push('pres-fam-first');
       if(_hasMine&&!_selfDone&&_r<2){_rowCls.push('pres-row-self');_selfDone=true;}
       if(_hasMine&&!_sepDone&&_r===2){_rowCls.push('pres-row-other1');_sepDone=true;}
       const pres=m.presencas||[];
       const memberCount=pres.length;
-      h+=`<tr${_rowCls.length?` class="${_rowCls.join(' ')}"`:''}>`;
+      h+=`<tr class="${_rowCls.join(' ')}">`;
       const meu=MY_NAMES.includes(m.nome);
       h+=`<td class="pres-name"><div class="pres-name-inner"><div class="pres-name-av" style="background:${AVCOL[mi%AVCOL.length]}">${m.nome.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase()}</div><span class="pres-name-txt sf">${m.nome}</span></div></td>`;
       days.forEach(d=>{
@@ -6901,7 +6904,7 @@ function renderPresencaGrid(){
     // Filhos do agregado: linha mais discreta, ciclo binário (come / não conta)
     casa.filhos.forEach(f=>{
       const nComeu=filhoPresKeys(f.id).length;
-      h+='<tr class="pres-row-filho">';
+      h+=`<tr class="pres-row-filho ${famCls}">`;
       h+=`<td class="pres-name"><div class="pres-name-inner"><div class="pres-name-av pres-av-filho">${f.nome.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase()}</div><span class="pres-name-txt sf">${escHtml(f.nome)}<span class="pres-tag-filho sf">criança</span></span></div></td>`;
       days.forEach(d=>{
         const isToday=d.data===hoje;
