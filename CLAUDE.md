@@ -13,6 +13,14 @@ App pessoal de gestão de despesas das Festas (Barrete Verde e Salinas).
 ## Como NÃO gastar tokens à toa (importante)
 - **Não leias o `app.js` inteiro.** Está dividido em secções com comentários `/* ═══ TÍTULO ═══ */`. Para achar algo, faz `grep` pelo título e lê só esse troço. Secções:
   Sessão/refresh do token · Permissões · Fecho de contas + validação · Fator das quotas · Ícones de refeição · Classificar cash-flow · Histórico (auditoria) · **Cash Flow Modal** · Edit/Delete Cash Flow · Parametrizações · Notificações Telegram · Limpeza · Add New Year · Plantel · Categorias de Artigos (agrupadores + AI) · **Compras/Shoplist** · Separador Stock · Stock sem compra (ofertas / ano anterior) · Importar Fatura (OCR) · **Presenças Grid** · Convidados · Refeições Def (CRUD) · Hero sub-totais · **Relatórios/PDF** · Read-only mode · Resumo fundido nos Saldos (despesa por membro + movimentos + saldo) · FABs arrastáveis · **Auth (Supabase)** · Utilizadores↔Membros
+
+## Crianças (filhos + convidados-criança)
+**Não pagam nada.** Não entram no `calcular()` — existem só para se saber quantas bocas há por refeição (compras/cozinha). Se mexeres em quotas ou saldos, as crianças não têm de aparecer lá.
+- `filhos` é **global** (como `conjuges`): pais parametrizados pelo admin em Definições › Utilizadores & Casais. `filho_presencas` é **por evento**.
+- `filho_presencas` **não tem coluna `modo`, de propósito**: uma criança ou come ou não conta — não há "só bebe". A linha existir = come. Não lhe acrescentes estados.
+- A grelha de presenças está ordenada **por agregado** (casal junto), com os filhos logo a seguir aos pais.
+- Convidados têm o flag `crianca`; criança força `pagante=false`.
+- Migração: `db/filhos.sql`. Tudo tolerante: sem ela, `FILHOS_TABLE=false` e as crianças ficam escondidas.
 - Mudança **só visual** → `style.css`. Mudança de **lógica/dados** → `app.js`. Para localizar um botão/campo: procura o `id` no `index.html` e salta para o handler no `app.js`.
 - Faz **edições cirúrgicas** (diffs pequenos). **Nunca reescrevas o ficheiro inteiro.**
 

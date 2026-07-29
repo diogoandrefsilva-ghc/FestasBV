@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v126 · 2026-07-27 · Switch dos avisos de presenças passa a abranger também os convidados';
+const APP_BUILD = 'v127 · 2026-07-29 · Crianças: filhos dos membros na grelha de presenças e convidados-criança';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -95,6 +95,13 @@ let VALIDACOES=[];    // [{evento_id,amigo,validado_por_email,validado_em}]
 let MY_NAMES=[];      // nomes que o utilizador atual pode gerir (próprio + cônjuge)
 let REFDEF_RESP_COLS=false;   // BD já tem resp_cozinha/resp_compras? (migração db/notifs.sql)
 let STOCK_TABLE=false;        // BD já tem stock_lotes? (migração SQL do stock por refeição)
+// Filhos dos membros (migração db/filhos.sql). Global, como os casais: um filho
+// é filho em todos os anos. As PRESENÇAS deles é que são por evento e vivem no
+// ano (DATA.filhosPres). Sem a migração, FILHOS_TABLE=false e tudo o que é
+// crianças fica escondido — a app funciona exatamente como antes.
+let FILHOS=[];                // [{id,nome,progenitorA,progenitorB}]
+let FILHOS_TABLE=false;
+let CONV_CRIANCA_COL=false;   // convidados já tem a coluna 'crianca'?
 // Switch das notificações de PRESENÇAS (config 'notif_presencas'). Lido em
 // carregar() por todos os utilizadores, porque é a app que marca as entradas
 // de presença como silenciosas quando está desligado (ver _flushPresLog).
@@ -177,6 +184,36 @@ function amigoTemUtilizador(nome){return USER_AMIGOS.some(u=>u.amigo===nome);}
 function conjugeDe(nome){for(const c of CONJUGES){if(c.amigo_a===nome)return c.amigo_b;if(c.amigo_b===nome)return c.amigo_a;}return null;}
 // O agregado (próprio + cônjuge) tem pelo menos um utilizador ativo?
 function agregadoTemUtilizador(nome){if(amigoTemUtilizador(nome))return true;const c=conjugeDe(nome);return c?amigoTemUtilizador(c):false;}
+
+/* ── Filhos (crianças) ──────────────────────────────────────────────────
+   Não pagam nada: não entram em nenhuma conta de dinheiro (calcular() nem
+   os vê). Existem só para se saber quantas bocas há em cada refeição.
+   Uma criança OU come OU não conta — não há "só bebe" (por isso a linha de
+   presença não tem 'modo': existir = come). */
+function paisDoFilho(f){return [f.progenitorA,f.progenitorB].filter(Boolean);}
+function filhoLabelPais(f){return paisDoFilho(f).join(' / ');}
+// Presenças do filho no ano ativo: DATA.filhosPres = {filhoId:['dia|ref', …]}
+function filhoPresKeys(fid){return((DATA&&DATA.filhosPres)||{})[fid]||[];}
+function filhoCome(fid,slotKey){return filhoPresKeys(fid).includes(slotKey);}
+// Quem pode mexer: o admin, ou quem tem um dos pais no seu agregado (dia aberto).
+function canTouchFilho(f,dia){
+  if(contasFechadas())return false;
+  if(isAdmin())return true;
+  return paisDoFilho(f).some(p=>MY_NAMES.includes(p))&&diaEditavel(dia);
+}
+// Nº de crianças a comer numa refeição (filhos + convidados-criança).
+// slotKey usa 'Tarde' para o lanche, igual às presenças dos membros.
+function filhosComemNoSlot(slotKey){
+  if(!DATA)return 0;
+  const nomes=new Set((DATA.membros||[]).map(m=>m.nome));
+  return FILHOS.filter(f=>paisDoFilho(f).some(p=>nomes.has(p))&&filhoCome(f.id,slotKey)).length;
+}
+function criancasNoSlot(slotKey){
+  const parts=(slotKey||'').split('|');
+  const dia=parts[0],ref=parts[1]==='Tarde'?'Lanche':parts[1];
+  const gc=((DATA&&DATA.convidados)||[]).filter(g=>g.dia===dia&&g.ref===ref&&g.crianca).length;
+  return filhosComemNoSlot(slotKey)+gc;
+}
 // Amigos que o admin pode validar: membros sem utilizador no agregado, fora do próprio agregado do admin.
 function amigosSemUtilizador(){
   if(!isAdmin()||!DATA)return[];
@@ -762,20 +799,30 @@ function togglePeople(id){const e=document.getElementById(id);if(!e)return;const
 /* Detalhe "quem vai" agrupado por agregado (casal): os membros que comem numa
    linha ("Diogo / Margarida") e os convidados desse agregado por baixo, em tom
    apagado. Convidados de quem não come aparecem num grupo próprio. */
-function casaisPanelHtml(membrosCome,guests){
+function casaisPanelHtml(membrosCome,guests,slotKey){
   const key=n=>{const c=conjugeDe(n);return c?[n,c].sort((a,b)=>a.localeCompare(b,'pt')).join('|'):n;};
   const hh={};
-  const get=k=>hh[k]||(hh[k]={nomes:[],convs:[]});
+  const get=k=>hh[k]||(hh[k]={nomes:[],convs:[],kids:[]});
   membrosCome.forEach(n=>get(key(n)).nomes.push(n));
   guests.forEach(g=>get(g.membro?key(g.membro):'?').convs.push(g));
+  // Filhos inscritos nesta refeição, agrupados no agregado dos pais
+  if(slotKey)FILHOS.forEach(f=>{
+    if(!filhoCome(f.id,slotKey))return;
+    const pais=paisDoFilho(f);
+    if(!pais.length)return;
+    get(key(pais[0])).kids.push(f);
+  });
   return Object.keys(hh).sort((a,b)=>a.localeCompare(b,'pt')).map(k=>{
     const h=hh[k];
     h.convs.sort((a,b)=>a.nome.localeCompare(b.nome,'pt'));
+    h.kids.sort((a,b)=>a.nome.localeCompare(b.nome,'pt'));
     const head=h.nomes.length
       ?h.nomes.join(' / ')
-      :'convidados de '+[...new Set(h.convs.map(g=>g.membro||'?'))].join(' / ');
-    const convs=h.convs.length?`<div class="rdc-casal-conv">🎟 ${h.convs.map(g=>escHtml(g.nome)+(g.pagante==='Sim'?'':' <small>(não paga)</small>')).join(', ')}</div>`:'';
-    return `<div class="rdc-casal"><div class="rdc-casal-n${h.nomes.length?'':' off'}">${escHtml(head)}</div>${convs}</div>`;
+      :(h.convs.length?'convidados de '+[...new Set(h.convs.map(g=>g.membro||'?'))].join(' / ')
+                      :'filhos de '+[...new Set(h.kids.flatMap(paisDoFilho))].join(' / '));
+    const convs=h.convs.length?`<div class="rdc-casal-conv">🎟 ${h.convs.map(g=>escHtml(g.nome)+(g.crianca?' <small>(criança)</small>':(g.pagante==='Sim'?'':' <small>(não paga)</small>'))).join(', ')}</div>`:'';
+    const kids=h.kids.length?`<div class="rdc-casal-conv">🧒 ${h.kids.map(f=>escHtml(f.nome)).join(', ')}</div>`:'';
+    return `<div class="rdc-casal"><div class="rdc-casal-n${h.nomes.length?'':' off'}">${escHtml(head)}</div>${kids}${convs}</div>`;
   }).join('');
 }
 
@@ -962,19 +1009,22 @@ function renderAll(){
         const membrosCome=(DATA.membros||[]).filter(m=>(m.presencas||[]).some(p=>p.k===rkey&&p.modo==='come')).map(m=>m.nome).sort((a,b)=>a.localeCompare(b,'pt'));
         const guestsAll=(DATA.convidados||[]).filter(g=>g.dia===rd.dia&&g.ref===rd.ref);
         const guestsPay=guestsAll.filter(g=>g.pagante==='Sim');
+        const nCriancas=criancasNoSlot(rkey);   // filhos inscritos + convidados-criança
         const pid='rdp'+rd._idx;
-        const temDetM=membrosCome.length>0||guestsAll.length>0;
-        const memPanel=temDetM?`<div class="rdc-ppl casais" id="${pid}m" style="display:none" onclick="event.stopPropagation()">${casaisPanelHtml(membrosCome,guestsAll)}</div>`:'';
+        const temDetM=membrosCome.length>0||guestsAll.length>0||nCriancas>0;
+        const memPanel=temDetM?`<div class="rdc-ppl casais" id="${pid}m" style="display:none" onclick="event.stopPropagation()">${casaisPanelHtml(membrosCome,guestsAll,rkey)}</div>`:'';
         const guestPanel=guestsPay.length?`<div class="rdc-ppl" id="${pid}g" style="display:none" onclick="event.stopPropagation()">${guestsPay.map(g=>`<span class="rdc-ppl-it">${escHtml(g.nome)}${g.membro?`<small> · ${escHtml(g.membro)}</small>`:''}</span>`).join('')}</div>`:'';
         const memAttrs=temDetM?`class="rdc-cell rdc-cell-btn" data-tgt="${pid}m" onclick="event.stopPropagation();togglePeople('${pid}m')"`:'class="rdc-cell"';
         const guestAttrs=guestsPay.length?`class="rdc-cell rdc-cell-btn" data-tgt="${pid}g" onclick="event.stopPropagation();togglePeople('${pid}g')"`:'class="rdc-cell"';
         const membroCell=`<div ${memAttrs}><div class="rdc-cell-k">Membro${membrosCount?`<span class="rdc-cell-n">${membrosCount}</span>`:''}${temDetM?'<span class="rdc-cell-arrow">›</span>':''}</div><div class="rdc-cell-v rdc-cell-v-gold">${calcRef.D>0?eur(calcRef.P):'<span class="rdc-na">N/A</span>'}</div></div>`;
         const convCell=`<div ${guestAttrs}><div class="rdc-cell-k">Convidado${calcRef.E?`<span class="rdc-cell-n">${calcRef.E}</span>`:''}${guestsPay.length?'<span class="rdc-cell-arrow">›</span>':''}</div><div class="rdc-cell-v">${calcRef.E?eur(calcRef.Q):'<span class="rdc-na">N/A</span>'}</div></div>`;
+        // Crianças: só bocas para a cozinha/compras — não pagam nada
+        const kidsCell=nCriancas?`<div class="rdc-cell"><div class="rdc-cell-k">Criança<span class="rdc-cell-n">${nCriancas}</span></div><div class="rdc-cell-v"><span class="rdc-na">não paga</span></div></div>`:'';
         const presNota=calcRef.D>0?'':'<div class="rdc-sempres">Sem presenças marcadas</div>';
         costCards+=`<div class="rdc rdc-hero sf">
           <div class="rdc-hdr"><span class="rdc-lbl rdc-lbl-green">Custo da refeição</span><span class="rdc-tot">${eur(calcRef.custoTotal)}</span>${ppTag(rnd(indPP+dirPP,2))}<span class="rdc-fold-arrow" style="visibility:hidden">›</span></div>
           ${presNota}
-          <div class="rdc-cells">${membroCell}${convCell}</div>
+          <div class="rdc-cells">${membroCell}${convCell}${kidsCell}</div>
           ${memPanel}${guestPanel}
         </div>`;
       }
@@ -1559,7 +1609,7 @@ async function carregar(){
     const sel='*,membros(*,presencas(*)),refeicoes_def(*),despesas(*),convidados(*),mealheiros(*),pagamentos(*)';
     // shoplist vai numa fetch SEPARADA e tolerante a falha: se a tabela ainda
     // não existir (migração por correr) o resto da app continua a funcionar.
-    const [res,uaRes,cjRes,vlRes,slRes,stRes,ctRes,acRes,npRes]=await Promise.all([
+    const [res,uaRes,cjRes,vlRes,slRes,stRes,ctRes,acRes,npRes,flRes,fpRes,ccRes]=await Promise.all([
       sbFetch(`${SB_URL}/rest/v1/eventos?select=${encodeURIComponent(sel)}&order=ano.asc`,{headers:sbHeaders(),cache:'no-store'}),
       sbFetch(`${SB_URL}/rest/v1/user_amigos?select=email,amigo`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null),
       sbFetch(`${SB_URL}/rest/v1/conjuges?select=amigo_a,amigo_b`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null),
@@ -1573,7 +1623,13 @@ async function carregar(){
       sbFetch(`${SB_URL}/rest/v1/artigo_categorias?select=*`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null),
       // switch das notificações de presenças (config): toda a gente precisa
       // dele para marcar/não marcar as entradas como silenciosas
-      sbFetch(`${SB_URL}/rest/v1/config?chave=eq.notif_presencas&select=valor`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null)
+      sbFetch(`${SB_URL}/rest/v1/config?chave=eq.notif_presencas&select=valor`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null),
+      // filhos + presenças deles (db/filhos.sql): tolerantes — sem a migração,
+      // FILHOS_TABLE=false e as crianças ficam escondidas
+      sbFetch(`${SB_URL}/rest/v1/filhos?select=*`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null),
+      sbFetch(`${SB_URL}/rest/v1/filho_presencas?select=*`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null),
+      // sonda à coluna convidados.crianca (mesma migração): 200 = já existe
+      sbFetch(`${SB_URL}/rest/v1/convidados?select=crianca&limit=1`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null)
     ]);
     if(!res.ok)throw new Error('HTTP '+res.status);
     const rows=await res.json();
@@ -1589,6 +1645,19 @@ async function carregar(){
     ART_CATS={};
     if(CATS_TABLE)(await acRes.json()).forEach(r=>{ART_CATS[r.artigo_key]={catId:r.categoria_id,origem:r.origem||'manual'};});
     const stockByEv={};stockRows.forEach(s=>{(stockByEv[s.evento_id]=stockByEv[s.evento_id]||[]).push(s);});
+    FILHOS_TABLE=!!(flRes&&flRes.ok&&fpRes&&fpRes.ok);
+    FILHOS=FILHOS_TABLE
+      ?(await flRes.json()).map(f=>({id:f.id,nome:f.nome,progenitorA:f.progenitor_a,progenitorB:f.progenitor_b||null}))
+        .sort((a,b)=>a.nome.localeCompare(b.nome,'pt'))
+      :[];
+    // filhosPres por evento: {filhoId:['dia|ref', …]} — sem 'modo', existir = come
+    const fpByEv={};
+    if(FILHOS_TABLE)(await fpRes.json()).forEach(p=>{
+      const ev=fpByEv[p.evento_id]=fpByEv[p.evento_id]||{};
+      (ev[p.filho_id]=ev[p.filho_id]||[]).push(`${p.dia}|${p.ref}`);
+    });
+    // Só gravamos o flag de convidado-criança se a coluna já existir
+    CONV_CRIANCA_COL=!!(ccRes&&ccRes.ok);
     // Só gravamos os responsáveis se as colunas já existirem no Supabase
     // (senão o replace das refeições falhava todo — padrão dividas_publicas)
     REFDEF_RESP_COLS=rows.some(ev=>(ev.refeicoes_def||[]).some(r=>'resp_cozinha' in r));
@@ -1604,7 +1673,8 @@ async function carregar(){
       })),
       refeicoesDef:(ev.refeicoes_def||[]).map(r=>({data:r.data,dia:r.dia,ref:r.ref,prato:r.prato||'',peso:N(r.peso),minMEO:N(r.min_meo),minConv:N(r.min_conv),extraConv:N(r.extra_conv),respCozinha:r.resp_cozinha||'',menu:r.menu||''})),
       despesas:(ev.despesas||[]).map(d=>({_id:d.id,quem:d.quem,dataDesp:d.data_desp,dataValor:d.data_valor,desc:d.descricao,tipo:d.tipo,valor:N(d.valor),obs:d.observacoes||'',compraId:d.compra_id||null})),
-      convidados:(ev.convidados||[]).map(c=>({_id:c.id,membro:c.membro,nome:c.nome,data:c.data,dia:c.dia,ref:c.ref,pagante:c.pagante?'Sim':'Não',preco:N(c.preco)})),
+      convidados:(ev.convidados||[]).map(c=>({_id:c.id,membro:c.membro,nome:c.nome,data:c.data,dia:c.dia,ref:c.ref,pagante:c.pagante?'Sim':'Não',crianca:!!c.crianca,preco:N(c.preco)})),
+      filhosPres:fpByEv[ev.id]||{},
       mealheiros:(ev.mealheiros||[]).map(m=>({quem:m.quem,data:m.data,valor:N(m.valor),subtipo:m.subtipo,desc:m.descricao})),
       pagamentos:(ev.pagamentos||[]).map(p=>({de:p.de,para:p.para,valor:N(p.valor),ref:p.ref,data:p.data,extra:N(p.extra)})),
       shoplist:(shopByEv[ev.id]||[]).map(s=>({_id:s.id,artigo:s.artigo,quantidade:s.quantidade||'',tamanho:s.tamanho||'',tipo:s.tipo,dataValor:s.data_valor,estado:s.estado||'pendente',tratadoPor:s.tratado_por||null,noCarrinho:!!s.no_carrinho,compraId:s.compra_id||null,cfDesc:s.cf_desc||null,valor:s.valor!=null?N(s.valor):null,criadoPor:s.criado_por||'',criadoEm:s.criado_em,compradoEm:s.comprado_em})),
@@ -1687,7 +1757,11 @@ async function sbGuardarEvento(y,slot){
       if(Array.isArray(dres))dres.forEach((r,i)=>{if(y.despesas[i])y.despesas[i]._id=r.id;});
     }
     if(y.convidados&&y.convidados.length){
-      const cres=await sbReq('POST','convidados',y.convidados.map(c=>({evento_id:eid,membro:c.membro,nome:c.nome,data:c.data||null,dia:c.dia,ref:c.ref,pagante:c.pagante==='Sim',preco:c.preco||0})),{Prefer:'return=representation'});
+      const cres=await sbReq('POST','convidados',y.convidados.map(c=>{
+        const row={evento_id:eid,membro:c.membro,nome:c.nome,data:c.data||null,dia:c.dia,ref:c.ref,pagante:c.pagante==='Sim',preco:c.preco||0};
+        if(CONV_CRIANCA_COL)row.crianca=!!c.crianca;
+        return row;
+      }),{Prefer:'return=representation'});
       if(Array.isArray(cres))cres.forEach((r,i)=>{if(y.convidados[i])y.convidados[i]._id=r.id;});
     }
     if(y.mealheiros&&y.mealheiros.length)
@@ -1725,7 +1799,7 @@ function sbLog(tipo,accao,alvo,detalhe){
     // Switch "Avisos de presenças" desligado (Definições › Notificações):
     // presenças e convidados continuam a ir para o histórico, mas marcados
     // para não notificar. Nomeações e compras não são afetadas.
-    if(!NOTIF_PRES&&(tipo==='presenca'||tipo==='convidado'))det.silencioso=true;
+    if(!NOTIF_PRES&&(tipo==='presenca'||tipo==='convidado'||tipo==='crianca'))det.silencioso=true;
     sbReq('POST','historico',[{
       evento_id:DATA._sbId,
       autor_email:_sbSession.user.email,
@@ -1765,9 +1839,18 @@ function fraseHistorico(tipo,accao,alvo,autor,d){
   }
   if(tipo==='convidado'){
     const dono=(d.membro&&d.membro!==autor)?` (convidado de ${d.membro})`:'';
-    if(accao==='removeu')return `${A} já não vai levar ${alvo} ao ${refDia}${dono}`;
-    if(accao==='editou')return `${A} alterou o convidado ${alvo} no ${refDia}${dono}`;
-    return `${A} vai levar ${alvo} ao ${refDia}${dono}`;
+    const kid=d.crianca?' (criança)':'';
+    if(accao==='removeu')return `${A} já não vai levar ${alvo}${kid} ao ${refDia}${dono}`;
+    if(accao==='editou')return `${A} alterou o convidado ${alvo}${kid} no ${refDia}${dono}`;
+    return `${A} vai levar ${alvo}${kid} ao ${refDia}${dono}`;
+  }
+  if(tipo==='crianca'){
+    const tot=(d.totalCome!=null)?` — ${d.totalCome} a comer`:'';
+    // Só se diz de quem é filho quando não é do próprio autor
+    const listaPais=(d.pais||'').split(' / ').filter(Boolean);
+    const pais=(listaPais.length&&!listaPais.includes(autor))?` (filho/a de ${d.pais})`:'';
+    if(accao==='removeu')return `${A} tirou ${alvo}${pais} do ${refDia}${tot}`;
+    return `${A} inscreveu ${alvo}${pais} no ${refDia}${tot}`;
   }
   // presença: usa a transição origem(de) -> destino(para)
   const de=('de'in d)?d.de:undefined;
@@ -1803,15 +1886,17 @@ function scheduleLogPresenca(m,dia,ref,origemTap,finalTap){
   if(e.timer)clearTimeout(e.timer);
   e.timer=setTimeout(()=>_flushPresLog(key),2500);
 }
-/* Total de pessoas a comer numa refeição: membros com modo 'come' + convidados
-   (que comem sempre). Reproduz o mapeamento Tarde→Lanche do rodapé da grelha,
-   porque os convidados guardam a refeição do lanche como 'Lanche'. */
+/* Total de bocas numa refeição: membros com modo 'come' + convidados (que comem
+   sempre) + crianças (filhos inscritos e convidados-criança). Reproduz o
+   mapeamento Tarde→Lanche do rodapé da grelha, porque os convidados guardam a
+   refeição do lanche como 'Lanche'. */
 function totalComeRefeicao(dia,ref){
   const membros=(DATA&&DATA.membros)||[];
-  const nMembros=membros.filter(m=>presModo(m,dia+'|'+ref)==='come').length;
+  const slot=dia+'|'+ref;
+  const nMembros=membros.filter(m=>presModo(m,slot)==='come').length;
   const refConv=(ref==='Tarde')?'Lanche':ref;
-  const nConv=((DATA&&DATA.convidados)||[]).filter(g=>g.dia===dia&&g.ref===refConv).length;
-  return nMembros+nConv;
+  const nConv=((DATA&&DATA.convidados)||[]).filter(g=>g.dia===dia&&g.ref===refConv&&!g.crianca).length;
+  return nMembros+nConv+criancasNoSlot(slot);
 }
 function _flushPresLog(key){
   const e=_presLogPend.get(key);
@@ -1878,7 +1963,7 @@ function renderHistList(){
       const d=r.detalhe||{};
       const quando=new Date(r.ts).toLocaleString('pt-PT',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
       const quem=escHtml(r.autor_amigo||r.autor_email||'?');
-      const icon=r.tipo==='presenca'?'✋':r.tipo==='compras'?'🛒':r.tipo==='refeicao'?'🧑‍🍳':'👥';
+      const icon=r.tipo==='presenca'?'✋':r.tipo==='compras'?'🛒':r.tipo==='refeicao'?'🧑‍🍳':r.tipo==='crianca'?'🧒':'👥';
       const slot=[d.dia,d.ref].filter(Boolean).join(' · ');
       let txt,sub;
       if(d.frase){
@@ -6726,7 +6811,7 @@ function renderPresencaGrid(){
   });
   h+='<th class="pres-ref-hdr sf" style="color:var(--muted)"></th></tr>';
 
-  // Linha-resumo: total que come (membros + convidados) por refeição — fica junto ao cabeçalho
+  // Linha-resumo: total de bocas (membros + convidados + crianças) por refeição
   h+='<tr><th class="pres-corner pres-sum-corner sf">Total</th>';
   let sumComeAll=0;
   days.forEach(d=>{
@@ -6735,8 +6820,8 @@ function renderPresencaGrid(){
       const parts=s.key.split('|');
       const slotDia=parts[0];
       const slotRef=parts[1]==='Tarde'?'Lanche':parts[1];
-      const gCount=(DATA.convidados||[]).filter(g=>g.dia===slotDia&&g.ref===slotRef).length;
-      const total=memCome+gCount;
+      const gCount=(DATA.convidados||[]).filter(g=>g.dia===slotDia&&g.ref===slotRef&&!g.crianca).length;
+      const total=memCome+gCount+criancasNoSlot(s.key);
       sumComeAll+=total;
       h+=`<th class="pres-sum sf${total>0?' has':''}">${total||'—'}</th>`;
     });
@@ -6749,40 +6834,86 @@ function renderPresencaGrid(){
   // Member rows
   h+='<tbody>';
   h+='<tr class="pres-gap"><td colspan="'+(totalSlots+2)+'"></td></tr>';
-  // Ordem das linhas: próprio → cônjuge → restantes (alfabética), igual ao Resumo.
+  // Ordem das linhas: por AGREGADO (casal junto), com os filhos logo a seguir
+  // aos pais. O meu agregado vem primeiro; dentro dele eu antes do/a cônjuge.
   // Preserva-se o índice original (oi) porque togglePresenca/data-member dependem dele.
   const _meuP=meuNomePrincipal();
   const _conjP=MY_NAMES.filter(n=>n!==_meuP);
   const _rankP=n=>n===_meuP?0:(_conjP.includes(n)?1:2);
-  const mbrsOrd=mbrs.map((m,oi)=>({m,oi})).sort((a,b)=>{
-    const ra=_rankP(a.m.nome),rb=_rankP(b.m.nome);
-    if(ra!==rb)return ra-rb;
-    return a.m.nome.localeCompare(b.m.nome,'pt');
+  // Agrupar membros por agregado (chave = casal ordenado, ou o próprio nome)
+  const casas=[],casaIdx={};
+  mbrs.forEach((m,oi)=>{
+    const c=conjugeDe(m.nome);
+    const k=c?[m.nome,c].sort((a,b)=>a.localeCompare(b,'pt')).join('|'):m.nome;
+    if(casaIdx[k]===undefined){casaIdx[k]=casas.length;casas.push({k,membros:[],filhos:[]});}
+    casas[casaIdx[k]].membros.push({m,oi});
   });
-  const _hasMine=mbrsOrd.some(x=>_rankP(x.m.nome)<2);
-  let _sepDone=false,_selfDone=false;
-  mbrsOrd.forEach(({m,oi})=>{
-    const mi=oi;
-    const _r=_rankP(m.nome);
-    const _rowCls=[];
-    if(_hasMine&&!_selfDone&&_r<2){_rowCls.push('pres-row-self');_selfDone=true;}
-    if(_hasMine&&!_sepDone&&_r===2){_rowCls.push('pres-row-other1');_sepDone=true;}
-    const pres=m.presencas||[];
-    const memberCount=pres.length;
-    h+=`<tr${_rowCls.length?` class="${_rowCls.join(' ')}"`:''}>`;
-    const meu=MY_NAMES.includes(m.nome);
-    h+=`<td class="pres-name"><div class="pres-name-inner"><div class="pres-name-av" style="background:${AVCOL[mi%AVCOL.length]}">${m.nome.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase()}</div><span class="pres-name-txt sf">${m.nome}</span></div></td>`;
-    days.forEach(d=>{
-      const isToday=d.data===hoje;
-      const pode=adm||(meu&&d.data>=hoje);
-      d.slots.forEach(s=>{
-        const modo=presModo(m,s.key);
-        const cls=modo==='bebe'?' bebe':(modo==='come'?' on':'');
-        h+=`<td class="pres-cell${isToday?' today':''}"><button class="pres-btn${cls}${pode?'':' locked'}" data-member="${mi}" data-slot="${s.key}"${pode?` onclick="togglePresenca(${mi},'${s.key}',this)"`:''}>${modo==='bebe'?BEER_SVG:''}</button></td>`;
-      });
+  // Cada filho entra no agregado do 1º progenitor que exista no plantel deste
+  // ano — só uma vez, mesmo que o casal esteja todo no plantel. Filhos sem
+  // nenhum pai no plantel não aparecem: não vêm com ninguém.
+  const _casaDe={};
+  casas.forEach((c,i)=>c.membros.forEach(({m})=>{if(_casaDe[m.nome]===undefined)_casaDe[m.nome]=i;}));
+  FILHOS.forEach(f=>{
+    const pai=paisDoFilho(f).find(p=>_casaDe[p]!==undefined);
+    if(pai!==undefined)casas[_casaDe[pai]].filhos.push(f);
+  });
+  casas.forEach(c=>{
+    c.membros.sort((a,b)=>{
+      const ra=_rankP(a.m.nome),rb=_rankP(b.m.nome);
+      if(ra!==rb)return ra-rb;
+      return a.m.nome.localeCompare(b.m.nome,'pt');
     });
-    h+=`<td class="pres-member-count sf${memberCount===totalSlots?' full':''}">${memberCount}/${totalSlots}</td>`;
-    h+='</tr>';
+    c.filhos.sort((a,b)=>a.nome.localeCompare(b.nome,'pt'));
+    c._rank=Math.min(...c.membros.map(x=>_rankP(x.m.nome)));
+    c._ord=c.membros[0].m.nome;
+  });
+  casas.sort((a,b)=>{
+    const ra=a._rank<2?0:1,rb=b._rank<2?0:1;
+    if(ra!==rb)return ra-rb;
+    return a._ord.localeCompare(b._ord,'pt');
+  });
+  const _hasMine=casas.some(c=>c._rank<2);
+  let _sepDone=false,_selfDone=false;
+  casas.forEach(casa=>{
+    casa.membros.forEach(({m,oi})=>{
+      const mi=oi;
+      const _r=_rankP(m.nome);
+      const _rowCls=[];
+      if(_hasMine&&!_selfDone&&_r<2){_rowCls.push('pres-row-self');_selfDone=true;}
+      if(_hasMine&&!_sepDone&&_r===2){_rowCls.push('pres-row-other1');_sepDone=true;}
+      const pres=m.presencas||[];
+      const memberCount=pres.length;
+      h+=`<tr${_rowCls.length?` class="${_rowCls.join(' ')}"`:''}>`;
+      const meu=MY_NAMES.includes(m.nome);
+      h+=`<td class="pres-name"><div class="pres-name-inner"><div class="pres-name-av" style="background:${AVCOL[mi%AVCOL.length]}">${m.nome.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase()}</div><span class="pres-name-txt sf">${m.nome}</span></div></td>`;
+      days.forEach(d=>{
+        const isToday=d.data===hoje;
+        const pode=adm||(meu&&d.data>=hoje);
+        d.slots.forEach(s=>{
+          const modo=presModo(m,s.key);
+          const cls=modo==='bebe'?' bebe':(modo==='come'?' on':'');
+          h+=`<td class="pres-cell${isToday?' today':''}"><button class="pres-btn${cls}${pode?'':' locked'}" data-member="${mi}" data-slot="${s.key}"${pode?` onclick="togglePresenca(${mi},'${s.key}',this)"`:''}>${modo==='bebe'?BEER_SVG:''}</button></td>`;
+        });
+      });
+      h+=`<td class="pres-member-count sf${memberCount===totalSlots?' full':''}">${memberCount}/${totalSlots}</td>`;
+      h+='</tr>';
+    });
+    // Filhos do agregado: linha mais discreta, ciclo binário (come / não conta)
+    casa.filhos.forEach(f=>{
+      const nComeu=filhoPresKeys(f.id).length;
+      h+='<tr class="pres-row-filho">';
+      h+=`<td class="pres-name"><div class="pres-name-inner"><div class="pres-name-av pres-av-filho">${f.nome.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase()}</div><span class="pres-name-txt sf">${escHtml(f.nome)}<span class="pres-tag-filho sf">criança</span></span></div></td>`;
+      days.forEach(d=>{
+        const isToday=d.data===hoje;
+        d.slots.forEach(s=>{
+          const come=filhoCome(f.id,s.key);
+          const pode=canTouchFilho(f,d.dia);
+          h+=`<td class="pres-cell${isToday?' today':''}"><button class="pres-btn pres-btn-filho${come?' on':''}${pode?'':' locked'}" data-filho="${f.id}" data-slot="${s.key}"${pode?` onclick="toggleFilhoPresenca(${f.id},'${s.key}',this)"`:''}></button></td>`;
+        });
+      });
+      h+=`<td class="pres-member-count sf${nComeu===totalSlots?' full':''}">${nComeu}/${totalSlots}</td>`;
+      h+='</tr>';
+    });
   });
   h+='</tbody>';
 
@@ -6798,11 +6929,20 @@ function renderPresencaGrid(){
   days.forEach(d=>{d.slots.forEach(s=>{const count=mbrs.filter(m=>presModo(m,s.key)==='come').length;h+=`<td class="pres-count sf${count>0?' has':''}">${count}</td>`;});});
   h+='<td class="pres-count sf"></td></tr>';
 
-  // Convidados (também comem)
+  // Convidados adultos (também comem) — os convidados-criança contam na linha "Crianças"
   let totalGuestAll=0;
   h+='<tr><td class="pres-name pres-foot-cell" style="border-bottom:none"><span class="sf pres-foot-sub">Convidados</span></td>';
-  days.forEach(d=>{d.slots.forEach(s=>{const parts=s.key.split('|');const slotDia=parts[0];const slotRef=parts[1]==='Tarde'?'Lanche':parts[1];const guestCount=(DATA.convidados||[]).filter(g=>g.dia===slotDia&&g.ref===slotRef).length;totalGuestAll+=guestCount;h+=`<td class="pres-count sf${guestCount>0?' has':''}" style="${guestCount>0?'color:var(--gold)':''}">${guestCount||'—'}</td>`;});});
+  days.forEach(d=>{d.slots.forEach(s=>{const parts=s.key.split('|');const slotDia=parts[0];const slotRef=parts[1]==='Tarde'?'Lanche':parts[1];const guestCount=(DATA.convidados||[]).filter(g=>g.dia===slotDia&&g.ref===slotRef&&!g.crianca).length;totalGuestAll+=guestCount;h+=`<td class="pres-count sf${guestCount>0?' has':''}" style="${guestCount>0?'color:var(--gold)':''}">${guestCount||'—'}</td>`;});});
   h+='<td class="pres-count sf"></td></tr>';
+
+  // Crianças (filhos dos membros + convidados-criança): comem, não pagam.
+  // A linha só aparece quando há crianças parametrizadas ou convidadas.
+  const temCriancas=FILHOS.length>0||(DATA.convidados||[]).some(g=>g.crianca);
+  if(temCriancas){
+    h+='<tr><td class="pres-name pres-foot-cell" style="border-bottom:none"><span class="sf pres-foot-sub">Crianças</span></td>';
+    days.forEach(d=>{d.slots.forEach(s=>{const c=criancasNoSlot(s.key);h+=`<td class="pres-count sf${c>0?' has':''}" style="${c>0?'color:var(--blue)':''}">${c||'—'}</td>`;});});
+    h+='<td class="pres-count sf"></td></tr>';
+  }
 
   // Grupo "Só bebem" — linha leve de separação por cima
   let totalBebeAll=0;
@@ -6889,7 +7029,9 @@ function renderGuestSection(){
         const icon=mealIco(g.ref,14);
         h+=`<div style="font-size:11px;color:var(--gold);font-weight:700;letter-spacing:.1em;text-transform:uppercase;margin:12px 0 6px;display:flex;align-items:center;gap:6px" class="sf"><span>${icon}</span>${diaExtenso(diaToDate[g.dia]||g.data)||g.dia} · ${g.ref}</div>`;
       }
-      const paysBadge=g.pagante==='Sim'?'':'<span class="pg-badge free sf">Oferta</span>';
+      // Criança manda sobre "Oferta": não paga por ser criança, não por ser oferta
+      const paysBadge=g.crianca?'<span class="pg-badge kid sf">Criança</span>'
+        :(g.pagante==='Sim'?'':'<span class="pg-badge free sf">Oferta</span>');
       h+=`<div class="pres-guest-card">
         <div class="pg-info sf">
           <span class="pg-name">${g.nome}</span>
@@ -6936,8 +7078,12 @@ function openGuestModal(){
       <select id="guest-ref">${refs.map(r=>`<option value="${r}">${r}</option>`).join('')}</select>
     </div>
   </div>
-  <label>Pagante?</label>
-  <select id="guest-pagante"><option value="Sim">Sim — paga a quota</option><option value="Não">Não — é oferta</option></select>
+  ${CONV_CRIANCA_COL?`<label>Criança?</label>
+  <select id="guest-crianca" onchange="guestCriancaSync('guest')"><option value="0">Não — é adulto</option><option value="1">Sim — é criança</option></select>`:''}
+  <div id="guest-pagante-row">
+    <label>Pagante?</label>
+    <select id="guest-pagante"><option value="Sim">Sim — paga a quota</option><option value="Não">Não — é oferta</option></select>
+  </div>
   <div class="mbtns"><button class="btn prim" onclick="saveGuest()">Guardar</button></div>`;
   // Reuse a dynamic modal
   let bg=document.getElementById('guest-modal-bg');
@@ -6952,12 +7098,26 @@ function openGuestModal(){
   document.body.classList.add('no-scroll');
 }
 
+/* Convidado-criança não paga: esconde o "Pagante?" e força a oferta.
+   (pref = 'guest' no modal de adicionar, 'guest-edit' no de editar) */
+function guestCriancaSync(pref){
+  const sel=document.getElementById(pref==='guest'?'guest-crianca':'guest-edit-crianca');
+  const row=document.getElementById(pref==='guest'?'guest-pagante-row':'guest-edit-pagante-row');
+  if(!sel||!row)return;
+  const kid=sel.value==='1';
+  row.style.display=kid?'none':'';
+  if(kid){const p=row.querySelector('select');if(p)p.value='Não';}
+}
+
 async function saveGuest(){
   const nome=(document.getElementById('guest-nome').value||'').trim();
   const membro=document.getElementById('guest-membro').value;
   const dia=document.getElementById('guest-dia').value;
   const ref=document.getElementById('guest-ref').value;
-  const pagante=document.getElementById('guest-pagante').value;
+  const cEl=document.getElementById('guest-crianca');
+  const crianca=!!cEl&&cEl.value==='1';
+  // Uma criança nunca paga quota — o flag manda sobre o "Pagante?"
+  const pagante=crianca?'Não':document.getElementById('guest-pagante').value;
   if(!nome){toast('Indica o nome do convidado','bad');return;}
   if(!membro){toast('Seleciona quem traz o convidado','bad');return;}
   if(bloqueadoPorFecho())return;
@@ -6968,12 +7128,12 @@ async function saveGuest(){
   if(!DATA._sbId){toast('Sem ligação à base de dados — recarrega a página','bad');return;}
   setSync('load','a guardar…');
   try{
-    const ins=await queueWrite(()=>sbReq('POST','convidados',
-      [{evento_id:DATA._sbId,membro,nome,data:null,dia,ref,pagante:pagante==='Sim',preco:0}],
-      {Prefer:'return=representation'}));
+    const row={evento_id:DATA._sbId,membro,nome,data:null,dia,ref,pagante:pagante==='Sim',preco:0};
+    if(CONV_CRIANCA_COL)row.crianca=crianca;
+    const ins=await queueWrite(()=>sbReq('POST','convidados',[row],{Prefer:'return=representation'}));
     if(!DATA.convidados)DATA.convidados=[];
-    DATA.convidados.push({_id:ins&&ins[0]?ins[0].id:null,nome,membro,dia,ref,pagante});
-    sbLog('convidado','adicionou',nome,{membro,dia,ref,pagante});
+    DATA.convidados.push({_id:ins&&ins[0]?ins[0].id:null,nome,membro,dia,ref,pagante,crianca});
+    sbLog('convidado','adicionou',nome,{membro,dia,ref,pagante,crianca});
     syncMirror();
     marcaGuardado();
     const bg=document.getElementById('guest-modal-bg');
@@ -7000,7 +7160,7 @@ async function deleteGuest(idx){
   try{
     await queueWrite(()=>sbReq('DELETE',`convidados?id=eq.${g._id}`));
     DATA.convidados.splice(idx,1);
-    sbLog('convidado','removeu',g.nome,{membro:g.membro,dia:g.dia,ref:g.ref});
+    sbLog('convidado','removeu',g.nome,{membro:g.membro,dia:g.dia,ref:g.ref,crianca:!!g.crianca});
     syncMirror();
     marcaGuardado();
     CALC=calcular(JSON.parse(JSON.stringify(DATA)));
@@ -7028,8 +7188,12 @@ function editGuest(idx){
   <div class="sf" style="font-size:11px;color:var(--faint);margin:-4px 0 12px">${dataDia} · ${g.ref} — convidado por ${g.membro}</div>
   <label>Nome do convidado</label>
   <input type="text" id="guest-edit-nome" placeholder="Nome" value="${escHtml(g.nome)}">
-  <label>Pagante?</label>
-  <select id="guest-edit-pagante"><option value="Sim"${g.pagante==='Sim'?' selected':''}>Sim — paga a quota</option><option value="Não"${g.pagante!=='Sim'?' selected':''}>Não — é oferta</option></select>
+  ${CONV_CRIANCA_COL?`<label>Criança?</label>
+  <select id="guest-edit-crianca" onchange="guestCriancaSync('guest-edit')"><option value="0"${g.crianca?'':' selected'}>Não — é adulto</option><option value="1"${g.crianca?' selected':''}>Sim — é criança</option></select>`:''}
+  <div id="guest-edit-pagante-row"${g.crianca?' style="display:none"':''}>
+    <label>Pagante?</label>
+    <select id="guest-edit-pagante"><option value="Sim"${g.pagante==='Sim'?' selected':''}>Sim — paga a quota</option><option value="Não"${g.pagante!=='Sim'?' selected':''}>Não — é oferta</option></select>
+  </div>
   <div class="mbtns"><button class="btn prim" onclick="saveGuestEdit(${idx})">Guardar</button></div>`;
   let bg=document.getElementById('guest-modal-bg');
   if(!bg){
@@ -7047,24 +7211,29 @@ async function saveGuestEdit(idx){
   const g=DATA.convidados[idx];
   if(!g)return;
   const nome=(document.getElementById('guest-edit-nome').value||'').trim();
-  const pagante=document.getElementById('guest-edit-pagante').value;
+  const cEl=document.getElementById('guest-edit-crianca');
+  const crianca=cEl?cEl.value==='1':!!g.crianca;
+  // Uma criança nunca paga quota — o flag manda sobre o "Pagante?"
+  const pagante=crianca?'Não':document.getElementById('guest-edit-pagante').value;
   if(!nome){toast('Indica o nome do convidado','bad');return;}
   if(bloqueadoPorFecho())return;
   if(!isAdmin()&&(!MY_NAMES.includes(g.membro)||!diaEditavel(g.dia))){
     toast('Não podes editar este convidado','bad');return;
   }
   const bg=document.getElementById('guest-modal-bg');
-  if(nome===g.nome&&pagante===g.pagante){
+  if(nome===g.nome&&pagante===g.pagante&&crianca===!!g.crianca){
     if(bg){bg.classList.remove('show');document.body.classList.remove('no-scroll');}
     return;
   }
   if(!g._id){toast('Sem ligação à base de dados — recarrega a página','bad');return;}
   setSync('load','a guardar…');
-  const _ant={nome:g.nome,pagante:g.pagante};
+  const _ant={nome:g.nome,pagante:g.pagante,crianca:!!g.crianca};
   try{
-    await queueWrite(()=>sbReq('PATCH',`convidados?id=eq.${g._id}`,{nome,pagante:pagante==='Sim'}));
-    sbLog('convidado','editou',nome,{membro:g.membro,dia:g.dia,ref:g.ref,de:_ant,para:{nome,pagante}});
-    g.nome=nome;g.pagante=pagante;
+    const patch={nome,pagante:pagante==='Sim'};
+    if(CONV_CRIANCA_COL)patch.crianca=crianca;
+    await queueWrite(()=>sbReq('PATCH',`convidados?id=eq.${g._id}`,patch));
+    sbLog('convidado','editou',nome,{membro:g.membro,dia:g.dia,ref:g.ref,crianca,de:_ant,para:{nome,pagante,crianca}});
+    g.nome=nome;g.pagante=pagante;g.crianca=crianca;
     syncMirror();
     marcaGuardado();
     if(bg){bg.classList.remove('show');document.body.classList.remove('no-scroll');}
@@ -7143,6 +7312,58 @@ function paintPresBtn(btn,modo){
   if(modo==='come'){btn.classList.add('on');btn.innerHTML='';}
   else if(modo==='bebe'){btn.classList.add('bebe');btn.innerHTML=BEER_SVG;}
   else btn.innerHTML='';
+}
+
+/* Presença de uma criança: ciclo BINÁRIO (come ↔ não conta). Uma criança não
+   pode "só beber" — por isso não há estado 'bebe' nem coluna `modo` na BD:
+   a linha existir é o "come". Não mexe em dinheiro nenhum. */
+async function toggleFilhoPresenca(fid,slotKey,btn){
+  if(btn.classList.contains('saving'))return;
+  const f=FILHOS.find(x=>x.id===fid);
+  if(!f)return;
+  const [dia,ref]=slotKey.split('|');
+  if(!canTouchFilho(f,dia)){
+    toast(paisDoFilho(f).some(p=>MY_NAMES.includes(p))?'Esse dia já passou — fala com o administrador':'Só podes marcar as presenças dos teus filhos','bad');
+    return;
+  }
+  if(!DATA._sbId){toast('Sem ligação à base de dados — recarrega a página','bad');return;}
+  if(!DATA.filhosPres)DATA.filhosPres={};
+  const arr=DATA.filhosPres[fid]=DATA.filhosPres[fid]||[];
+  const i=arr.indexOf(slotKey);
+  const come=i<0;                       // estado a seguir ao toque
+  // estado local otimista
+  if(come)arr.push(slotKey);else arr.splice(i,1);
+  btn.classList.toggle('on',come);
+  btn.classList.add('saving');
+  setSync('load','a guardar…');
+
+  queueWrite(async()=>{
+    try{
+      if(come)await sbReq('POST','filho_presencas?on_conflict=filho_id,evento_id,dia,ref',
+        [{filho_id:fid,evento_id:DATA._sbId,dia,ref}],{Prefer:'resolution=merge-duplicates'});
+      else await sbReq('DELETE',`filho_presencas?filho_id=eq.${fid}&evento_id=eq.${DATA._sbId}&dia=eq.${enc(dia)}&ref=eq.${enc(ref)}`);
+      sbLog('crianca',come?'marcou':'removeu',f.nome,{dia,ref,pais:filhoLabelPais(f),totalCome:totalComeRefeicao(dia,ref)});
+      btn.classList.remove('saving');
+      marcaGuardado();
+      clearTimeout(presDebounce);
+      presDebounce=setTimeout(()=>{
+        syncMirror();
+        CALC=calcular(JSON.parse(JSON.stringify(DATA)));
+        renderAll();
+      },400);
+      return true;
+    }catch(e){
+      // reverter
+      const j=(DATA.filhosPres[fid]||[]).indexOf(slotKey);
+      if(come){if(j>=0)DATA.filhosPres[fid].splice(j,1);}
+      else if(j<0)(DATA.filhosPres[fid]=DATA.filhosPres[fid]||[]).push(slotKey);
+      btn.classList.toggle('on',!come);
+      btn.classList.remove('saving');
+      setSync('err','erro ao guardar');
+      toast(permErrorMsg(e),'bad');
+      return false;
+    }
+  });
 }
 
 /* ═══ REFEIÇÕES DEF CRUD ═══ */
@@ -8181,6 +8402,7 @@ async function sbRenderLigacoes(){
   const elL=document.getElementById('adm-ligacoes-list');
   const elC=document.getElementById('adm-casais-list');
   if(!elL||!elC)return;
+  sbRenderFilhos();
   try{
     const [users,ua,cj]=await Promise.all([
       sbReq('GET','allowed_users?select=email&order=email.asc'),
@@ -8242,6 +8464,83 @@ async function sbDelConjuge(a,b){
     await sbReq('DELETE',`conjuges?amigo_a=eq.${enc(a)}&amigo_b=eq.${enc(b)}`);
     toast('Casal removido','ok');
     sbRenderLigacoes();
+  }catch(e){toast('Erro: '+e.message,'bad');}
+}
+
+/* ── Filhos (crianças) — parametrização do admin ──
+   Lista global, como os casais: um filho é filho em todos os anos. Só se
+   guardam aqui os PAIS; as presenças marcam-se na grelha, ano a ano. */
+function sbRenderFilhos(){
+  const el=document.getElementById('adm-filhos-list');
+  if(!el)return;
+  if(!FILHOS_TABLE){
+    el.innerHTML='<div class="note">Tabela de filhos ainda não existe. Corre o script <b>db/filhos.sql</b> no Supabase.</div>';
+    return;
+  }
+  const esc=s=>String(s).replace(/'/g,"\\'");
+  // Agrupar por agregado para o admin ver a família toda de uma vez
+  const grupos={};
+  FILHOS.forEach(f=>{
+    const k=paisDoFilho(f).slice().sort((a,b)=>a.localeCompare(b,'pt')).join(' ↔ ');
+    (grupos[k]=grupos[k]||[]).push(f);
+  });
+  const keys=Object.keys(grupos).sort((a,b)=>a.localeCompare(b,'pt'));
+  el.innerHTML=keys.length?keys.map(k=>{
+    const filhos=grupos[k].slice().sort((a,b)=>a.nome.localeCompare(b.nome,'pt'));
+    return `<div style="margin-bottom:8px">
+      <div class="sf" style="font-size:11px;color:var(--faint);margin-bottom:3px">${escHtml(k)}</div>
+      ${filhos.map(f=>`<div class="lig-row sf">
+        <span style="flex:1;font-size:12.5px;color:var(--ink)">🧒 ${escHtml(f.nome)}</span>
+        <button class="card-act del" title="Remover" onclick="sbDelFilho(${f.id},'${esc(f.nome)}')">✕</button>
+      </div>`).join('')}
+    </div>`;
+  }).join(''):'<div class="note">Sem filhos definidos.</div>';
+
+  const names=allMemberNames();
+  const sa=document.getElementById('adm-filho-pa'),sb2=document.getElementById('adm-filho-pb');
+  if(sa&&sb2){
+    const prevA=sa.value,prevB=sb2.value;
+    sa.innerHTML=names.map(n=>`<option value="${escHtml(n)}"${prevA===n?' selected':''}>${escHtml(n)}</option>`).join('');
+    sb2.innerHTML='<option value="">— sem 2.º progenitor —</option>'+names.map(n=>`<option value="${escHtml(n)}"${prevB===n?' selected':''}>${escHtml(n)}</option>`).join('');
+    // Escolher alguém que já é casal preenche o cônjuge sozinho (é o caso comum)
+    sa.onchange=()=>{const c=conjugeDe(sa.value);if(c&&names.includes(c))sb2.value=c;};
+    if(!prevA&&sa.value){const c=conjugeDe(sa.value);if(c&&names.includes(c))sb2.value=c;}
+  }
+}
+
+async function sbAddFilho(){
+  const inp=document.getElementById('adm-filho-nome');
+  const nome=(inp.value||'').trim();
+  const a=document.getElementById('adm-filho-pa').value;
+  const b=document.getElementById('adm-filho-pb').value;
+  if(!nome){toast('Indica o nome da criança','bad');return;}
+  if(!a){toast('Escolhe pelo menos um progenitor','bad');return;}
+  if(b&&b===a){toast('Os dois progenitores têm de ser pessoas diferentes','bad');return;}
+  const pais=[a,b].filter(Boolean);
+  if(FILHOS.some(f=>f.nome===nome&&paisDoFilho(f).sort().join('|')===pais.slice().sort().join('|'))){
+    toast('Essa criança já está registada','bad');return;
+  }
+  try{
+    const ins=await sbReq('POST','filhos',[{nome,progenitor_a:a,progenitor_b:b||null}],{Prefer:'return=representation'});
+    FILHOS.push({id:ins&&ins[0]?ins[0].id:null,nome,progenitorA:a,progenitorB:b||null});
+    FILHOS.sort((x,y)=>x.nome.localeCompare(y.nome,'pt'));
+    inp.value='';
+    sbRenderFilhos();
+    renderAll();
+    toast(nome+' adicionado ✓','ok');
+  }catch(e){toast('Erro: '+e.message,'bad');}
+}
+
+async function sbDelFilho(id,nome){
+  if(!confirm(`Remover ${nome}? As presenças dele/a em todos os anos são apagadas.`))return;
+  try{
+    await sbReq('DELETE',`filhos?id=eq.${id}`);   // cascade apaga filho_presencas
+    FILHOS=FILHOS.filter(f=>f.id!==id);
+    ALL_YEARS.forEach(y=>{if(y.filhosPres)delete y.filhosPres[id];});
+    if(DATA&&DATA.filhosPres)delete DATA.filhosPres[id];
+    sbRenderFilhos();
+    renderAll();
+    toast(nome+' removido ✓','ok');
   }catch(e){toast('Erro: '+e.message,'bad');}
 }
 

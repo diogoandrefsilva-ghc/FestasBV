@@ -390,6 +390,7 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .pres-guest-card .pg-badge{font-size:10px;font-weight:700;padding:2px 8px;border-radius:6px}
 .pres-guest-card .pg-badge.pays{background:rgba(30,122,77,.12);color:var(--green)}
 .pres-guest-card .pg-badge.free{background:rgba(46,111,168,.12);color:var(--blue)}
+.pres-guest-card .pg-badge.kid{background:rgba(168,123,20,.14);color:var(--gold)}
 .pres-guest-add{display:flex;align-items:center;gap:6px;padding:10px 16px;border-radius:10px;border:1.5px dashed var(--line);background:transparent;color:var(--barrete);font-size:13px;font-weight:600;cursor:pointer;transition:.15s;width:100%;justify-content:center;margin-top:8px}
 .pres-guest-add:active{background:rgba(30,122,77,.06);transform:scale(.97)}
 
@@ -485,6 +486,19 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .pres-foot-midcell{border-top:1px solid var(--line)}
 .pres-row-self>td{border-top:2px solid var(--line)}
 .pres-row-other1>td{border-top:1.5px solid var(--line)}
+
+/* Linhas de filhos (crianças): pendem do pai/mãe acima — nome recuado, avatar
+   apagado e etiqueta. O botão é binário (come / não conta): nunca fica azul. */
+.pres-row-filho .pres-name-inner{padding-left:12px}
+.pres-name-av.pres-av-filho{background:var(--panel2);color:var(--muted);border:1px dashed var(--line);font-size:9px}
+.pres-tag-filho{display:block;font-size:8.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);line-height:1.1;margin-top:1px}
+.pres-btn-filho{width:26px;height:26px;border-radius:7px}
+@media(max-width:420px){
+  .pres-row-filho .pres-name-inner{padding-left:8px}
+  .pres-name-av.pres-av-filho{font-size:7.5px}
+  .pres-tag-filho{font-size:7.5px}
+  .pres-btn-filho{width:23px;height:23px}
+}
 
 /* Stats row at bottom */
 .pres-stats{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
