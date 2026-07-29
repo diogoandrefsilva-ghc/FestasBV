@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v127 · 2026-07-29 · Crianças: filhos dos membros na grelha de presenças e convidados-criança';
+const APP_BUILD = 'v128 · 2026-07-29 · Crianças: recuo curto, letra menor e presença em dourado; lista de filhos com scroll no admin';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -6940,7 +6940,7 @@ function renderPresencaGrid(){
   const temCriancas=FILHOS.length>0||(DATA.convidados||[]).some(g=>g.crianca);
   if(temCriancas){
     h+='<tr><td class="pres-name pres-foot-cell" style="border-bottom:none"><span class="sf pres-foot-sub">Crianças</span></td>';
-    days.forEach(d=>{d.slots.forEach(s=>{const c=criancasNoSlot(s.key);h+=`<td class="pres-count sf${c>0?' has':''}" style="${c>0?'color:var(--blue)':''}">${c||'—'}</td>`;});});
+    days.forEach(d=>{d.slots.forEach(s=>{const c=criancasNoSlot(s.key);h+=`<td class="pres-count sf${c>0?' has':''}" style="${c>0?'color:var(--gold)':''}">${c||'—'}</td>`;});});
     h+='<td class="pres-count sf"></td></tr>';
   }
 
