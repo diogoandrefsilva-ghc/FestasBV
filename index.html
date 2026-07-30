@@ -307,8 +307,8 @@ setTimeout(function(){ if (window.fbvEsconderSplash) window.fbvEsconderSplash();
 <div class="modal-bg" id="stkadd-bg">
   <div class="modal" id="stkadd-modal">
     <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:10px">
-      <h3 style="margin-bottom:0">➕ Stock sem compra</h3>
-      <button onclick="stkAddClose()" style="background:var(--panel2);border:1px solid var(--line);color:var(--muted);border-radius:9px;width:32px;height:32px;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0">✕</button>
+      <h3 style="margin-bottom:0" id="stkadd-title">➕ Stock sem compra</h3>
+      <button onclick="stkAddClose(true)" style="background:var(--panel2);border:1px solid var(--line);color:var(--muted);border-radius:9px;width:32px;height:32px;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0">✕</button>
     </div>
     <div class="note" style="margin-top:0">Para o que entrou sem ser comprado. Fica no stock e aloca-se às refeições como qualquer artigo, mas <b>custa 0 €</b> — não mexe nas contas nem em quem pagou o quê.</div>
     <label>De onde vem</label>
@@ -325,7 +325,7 @@ setTimeout(function(){ if (window.fbvEsconderSplash) window.fbvEsconderSplash();
       <select id="stkadd-un"></select>
     </div>
     <div class="mbtns">
-      <button class="btn ghost" onclick="stkAddClose()">Cancelar</button>
+      <button class="btn ghost" onclick="stkAddClose(true)">Cancelar</button>
       <button class="btn prim" id="stkadd-save" onclick="stkAddSave()">Adicionar</button>
     </div>
   </div>

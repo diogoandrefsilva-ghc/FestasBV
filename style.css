@@ -1034,6 +1034,9 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .lote-cmp-row.org{display:flex;align-items:center;gap:6px}
 .lote-cmp-row .t{display:block;min-width:0;flex:1}
 .lote-cmp-row.org .cmp-ln-del{flex:0 0 auto;padding:2px 0 2px 4px}
+/* ✏️ do lote sem compra (corrigir quantidade/unidade/origem) — ao lado do ✕ */
+.cmp-ln-ed{background:transparent;border:none;font-size:13px;cursor:pointer;padding:2px 2px 2px 4px;line-height:1;border-radius:6px;flex:0 0 auto;opacity:.75}
+.cmp-ln-ed:hover{opacity:1;background:rgba(30,122,77,.1)}
 /* Marcas listadas no cartão de stock (Ruffles · Lays) */
 .stk-marcas{font-size:11.5px;color:var(--muted);margin:1px 0 5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 /* Ligação manual "pertence a" no registo da compra (lotes livres) */

@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v137 · 2026-07-30 · Stock de oferta recolhido como uma compra (responde a um pedido da lista, aloca-se sozinho) + "un" e "sem unidade" passam a casar';
+const APP_BUILD = 'v138 · 2026-07-30 · Stock sem compra: ✏️ para corrigir quantidade, unidade, artigo e origem (antes só se podia apagar e refazer)';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -6277,8 +6277,12 @@ function openLoteModal(id){
     // ✏️ do cabeçalho, para não haver dois lápis a dizer o mesmo.
     const showN=multi||!shopSameArtigo(l.artigo,reqName);
     const nome=showN?`<span class="n">${escHtml(l.artigo)}</span>`:'';
+    // Um lote sem compra não tem talão onde corrigir a quantidade: se a oferta
+    // afinal eram 6 e não 1, é aqui que se muda (o ✏️ do cabeçalho trata dos
+    // nomes; este trata do que só este lote sabe — quanto, em quê e de onde vem).
+    const ed=(org&&podeApagar&&l._id!=null)?`<button class="cmp-ln-ed" title="Corrigir este stock" onclick="stkAddOpen(${l._id})">✏️</button>`:'';
     const del=(org&&podeApagar&&l._id!=null)?`<button class="cmp-ln-del" title="Apagar este stock" onclick="stkDelLote(${l._id})">✕</button>`:'';
-    return `<div class="lote-cmp-row${org?' org':''}"><span class="t">${nome}<span class="d">${parts.join(' · ')}</span></span>${del}</div>`;
+    return `<div class="lote-cmp-row${org?' org':''}"><span class="t">${nome}<span class="d">${parts.join(' · ')}</span></span>${ed}${del}</div>`;
   }).join('');
   // Um campo por nome detalhado (na ordem FIFO dos lotes), com a origem à frente
   editingLote.detalhes=brands.map(b=>({nome:b,meta:[...new Set(detMeta[b]||[])].filter(Boolean).join(' · ')}));
@@ -6854,6 +6858,7 @@ function stkAddReqs(){
 // Rótulo de um pedido no seletor: artigo + o que falta (na forma como foi pedido)
 function stkAddReqLabel(r){
   const tam=r.tam?' × '+r.tam:'';
+  if(r.fora)return r.artigo+' — já não está na lista';
   if(!r.num)return r.artigo+' — sem quantidade pedida';
   if(r.falta<=0.0005)return r.artigo+' — já coberto';
   return r.artigo+' — falta '+fmtQty(r.falta,r.u)+tam;
@@ -6870,18 +6875,38 @@ function stkAddRenderUnits(sel,tam){
       return `<option value="${v}"${uKey(v)===uKey(sel)?' selected':''}>${escHtml(lbl)}</option>`;
     }).join('');
 }
-function stkAddOpen(){
+/* Abre para CRIAR (sem id) ou para CORRIGIR um lote sem compra (com id).
+   É o mesmo formulário nos dois casos de propósito: um lote de oferta não tem
+   talão nem compra onde emendar o que se escreveu — quantidade, unidade, artigo
+   e origem só se corrigem aqui. (Os lotes comprados não passam por aqui: a
+   verdade deles é a compra, e é lá que se muda.) */
+function stkAddOpen(loteId){
   if(!STOCK_TABLE)return;
   if(!isAdmin()){toast('Só o admin mexe no stock','bad');return;}
   if(contasFechadas()){toast('Contas fechadas — o stock já não se mexe','bad');return;}
-  stkAdd={origem:'oferta',reqs:stkAddReqs(),req:null};
-  document.getElementById('stkadd-art').value='';
-  document.getElementById('stkadd-qtd').value='';
+  const lote=loteId!=null?stockArr().find(l=>l._id===loteId):null;
+  if(loteId!=null&&(!lote||!loteSemCompra(lote))){toast('Este stock veio de uma compra — corrige-se na compra','bad');return;}
+  if(lote)closeLoteModal();   // vinha do detalhe do artigo: um modal de cada vez
+  stkAdd={origem:lote?loteOrigem(lote):'oferta',reqs:stkAddReqs(),req:null,edit:lote||null};
+  document.getElementById('stkadd-art').value=lote?lote.artigo:'';
+  document.getElementById('stkadd-qtd').value=lote?String(lote.qtd).replace('.',','):'';
   document.getElementById('stkadd-list').innerHTML=stkAddNomes().map(n=>`<option value="${escHtml(n)}">`).join('');
+  // A editar, o pedido que o lote já responde vem escolhido (pelo lista_artigo,
+  // ou pelo próprio nome quando é ele que casa com a lista). Se esse pedido já
+  // não está na lista (foi comprado ou removido), entra à mesma como opção: sem
+  // ele, gravar largava a ligação sem ninguém pedir e o lote saía do cartão.
+  const alvo=lote?loteReqArtigo(lote):'';
+  let iSel=lote?stkAdd.reqs.findIndex(r=>shopSameArtigo(r.artigo,alvo)&&sameUnit(r.u,lote.unidade)):-1;
+  if(lote&&iSel<0&&lote._listArt&&String(lote._listArt).trim()){
+    iSel=stkAdd.reqs.push({artigo:lote._listArt,u:lote.unidade,tam:'',num:false,tot:0,pares:{},falta:0,fora:true})-1;
+  }
+  stkAdd.req=iSel>=0?stkAdd.reqs[iSel]:null;
   document.getElementById('stkadd-req').innerHTML=
-    `<option value="">— não está na lista —</option>`
-    +stkAdd.reqs.map((r,i)=>`<option value="${i}">${escHtml(stkAddReqLabel(r))}</option>`).join('');
-  stkAddRenderUnits('','');
+    `<option value=""${iSel<0?' selected':''}>— não está na lista —</option>`
+    +stkAdd.reqs.map((r,i)=>`<option value="${i}"${i===iSel?' selected':''}>${escHtml(stkAddReqLabel(r))}</option>`).join('');
+  stkAddRenderUnits(lote?lote.unidade:'',stkAdd.req?stkAdd.req.tam:'');
+  document.getElementById('stkadd-title').textContent=lote?'✏️ Corrigir stock sem compra':'➕ Stock sem compra';
+  document.getElementById('stkadd-save').textContent=lote?'Guardar':'Adicionar';
   stkAddRenderOrigem();stkAddRenderReq();
   document.getElementById('stkadd-bg').classList.add('show');
   document.body.classList.add('no-scroll');
@@ -6895,9 +6920,14 @@ function stkAddPickReq(v){
   const r=v===''?null:stkAdd.reqs[+v];
   stkAdd.req=r||null;
   if(r){
-    document.getElementById('stkadd-art').value=r.artigo;
-    if(r.falta>0.0005)document.getElementById('stkadd-qtd').value=String(r.falta).replace('.',',');
-    stkAddRenderUnits(r.u,r.tam);
+    // A corrigir não se pisa o que lá está: o lote já tem nome e quantidade e
+    // quem abriu veio emendá-los, não recomeçar. Só o rótulo da unidade segue
+    // o pedido novo.
+    if(!stkAdd.edit){
+      document.getElementById('stkadd-art').value=r.artigo;
+      if(r.falta>0.0005)document.getElementById('stkadd-qtd').value=String(r.falta).replace('.',',');
+    }
+    stkAddRenderUnits(stkAdd.edit?document.getElementById('stkadd-un').value:r.u,r.tam);
   }else stkAddRenderUnits(document.getElementById('stkadd-un').value,'');
   stkAddRenderReq();
 }
@@ -6916,7 +6946,15 @@ function stkAddRenderReq(){
    :`<div class="lote-need-row empty">— nenhuma refeição à espera; fica na bolsa comum —</div>`;
   el.innerHTML=`<div class="lote-need-row hdr">🍽️ Ainda pedem <b>${escHtml(r.artigo)}</b>:</div>`+rows;
 }
-function stkAddClose(){document.getElementById('stkadd-bg').classList.remove('show');document.body.classList.remove('no-scroll');stkAdd=null;}
+// Fechar sem gravar: se a correção veio do detalhe do artigo (que se fechou
+// para não empilhar modais), volta-se lá — cancelar não é sair do sítio.
+function stkAddClose(voltar){
+  const lote=stkAdd&&stkAdd.edit;
+  document.getElementById('stkadd-bg').classList.remove('show');
+  document.body.classList.remove('no-scroll');
+  stkAdd=null;
+  if(voltar===true&&lote&&lote._id!=null)openLoteModal(lote._id);
+}
 function stkAddOrigem(o){if(!stkAdd||!STOCK_ORIGENS[o])return;stkAdd.origem=o;stkAddRenderOrigem();}
 function stkAddRenderOrigem(){
   const el=document.getElementById('stkadd-org');if(!el||!stkAdd)return;
@@ -6924,6 +6962,23 @@ function stkAddRenderOrigem(){
     const m=STOCK_ORIGENS[o];
     return `<span class="sd-chip${stkAdd.origem===o?' on':''}" onclick="stkAddOrigem('${o}')"><b>${m.ic} ${escHtml(m.lbl)}</b><small>${escHtml(m.sub)}</small></span>`;
   }).join('');
+}
+/* Baixar a quantidade de um lote pode deixá-lo a dever o que já prometeu às
+   refeições. Apara-se o excesso pelas refeições mais TARDE primeiro — as que
+   estão à porta ficam servidas, e quem perde é quem ainda vai a tempo de
+   comprar. Devolve as alocações novas e quanto se tirou. */
+function stkTrimAlocs(alocs,qtd){
+  const out=(alocs||[]).map(a=>({tipo:a.tipo,data:a.data,qtd:+a.qtd||0}));
+  let excesso=rnd(out.reduce((s,a)=>s+a.qtd,0)-qtd,3);
+  if(excesso<=0.0005)return{alocs:out,cortado:0};
+  const cortado=excesso;
+  out.sort((a,b)=>(b.data||'').localeCompare(a.data||''));
+  for(const a of out){
+    if(excesso<=0.0005)break;
+    const tira=Math.min(a.qtd,excesso);
+    a.qtd=rnd(a.qtd-tira,3);excesso=rnd(excesso-tira,3);
+  }
+  return{alocs:out.filter(a=>a.qtd>0.0005),cortado};
 }
 async function stkAddSave(){
   if(!stkAdd||!isAdmin()||contasFechadas())return;
@@ -6937,15 +6992,37 @@ async function stkAddSave(){
   // batatas fritas). Nome igual não precisa de ligação — o próprio nome casa.
   const req=stkAdd.req;
   const listArt=(req&&!shopSameArtigo(req.artigo,artigo))?req.artigo:null;
-  // E aloca-se logo às refeições que pedem, por ordem de data — exatamente o
-  // que uma compra faz (resolveLoteAlocs → fifoAlocar). Sem isto, a oferta
+  const lote=stkAdd.edit;
+  // A CRIAR aloca-se logo às refeições que pedem, por ordem de data — exatamente
+  // o que uma compra faz (resolveLoteAlocs → fifoAlocar). Sem isto, a oferta
   // ficava em stock à espera de alguém se lembrar de a repartir. O que sobrar
   // fica na bolsa comum e o detalhe do artigo abre a seguir para ajustar.
-  const alocacoes=fifoAlocar(listArt||artigo,qtd,unidade,null,null);
-  const compraId='x-'+origem+'-'+Date.now();
+  // A CORRIGIR não se re-aloca nada: o que já foi repartido à mão é para ficar.
+  // Só se a quantidade nova for MENOR do que o já alocado é que se apara — pelas
+  // refeições mais tarde primeiro, para as que estão à porta ficarem servidas.
+  const t=lote?stkTrimAlocs(lote.alocacoes,qtd):null;
+  const alocacoes=lote?t.alocs:fifoAlocar(listArt||artigo,qtd,unidade,null,null);
+  const cortado=lote?t.cortado:0;
+  if(cortado>0.0005&&!confirm(`${artigo} passa a ${fmtQty(qtd,unidade)}, menos do que está alocado às refeições.\n\nTiram-se ${fmtQty(cortado,unidade)} às refeições mais tarde. Continuar?`))return;
+  // A origem vive no compra_id ('x-oferta-…' / 'x-anterior-…'), logo mudá-la é
+  // reescrevê-lo. O sufixo antigo mantém-se para não nascer um lote "novo".
+  const sufixo=(lote&&(/^x-\w+-(.+)$/.exec(lote.compraId||'')||[])[1])||String(Date.now());
+  const compraId='x-'+origem+'-'+sufixo;
   const btn=document.getElementById('stkadd-save');btn.disabled=true;
   setSync('load','a guardar…');
   try{
+    if(lote){
+      await queueWrite(()=>sbReq('PATCH',`stock_lotes?id=eq.${lote._id}`,
+        {compra_id:compraId,artigo,qtd,unidade,alocacoes,lista_artigo:listArt}));
+      Object.assign(lote,{compraId,artigo,qtd,unidade,alocacoes,_listArt:listArt});
+      syncMirror();marcaGuardado();
+      btn.disabled=false;stkAddClose();
+      CALC=calcular(JSON.parse(JSON.stringify(DATA)));
+      renderAll();renderStock();renderCompras();
+      toast(`${STOCK_ORIGENS[origem].ic} ${artigo} corrigido ✓${cortado>0.0005?` — ${fmtQty(cortado,unidade)} desalocado`:''}`,'ok');
+      openLoteModal(lote._id);   // volta ao detalhe de onde se veio
+      return;
+    }
     const row={evento_id:DATA._sbId,compra_id:compraId,artigo,qtd,unidade,valor:0,alocacoes};
     if(listArt)row.lista_artigo=listArt;
     const ins=await queueWrite(()=>sbReq('POST','stock_lotes',[row],{Prefer:'return=representation'}));
