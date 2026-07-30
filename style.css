@@ -491,6 +491,19 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .pres-row-self>td{border-top:2px solid var(--line)}
 .pres-row-other1>td{border-top:1.5px solid var(--line)}
 
+/* ── Agregados: blocos alternados ──
+   As linhas de cada agregado (casal + filhos) formam um bloco com fundo
+   alternado (pergaminho base / pergaminho claro), sem cores novas — a
+   alternância garante que dois agregados vizinhos nunca ficam iguais.
+   O 1º de cada agregado leva ainda um separador mais forte por cima. */
+.pres-fam-first>td{border-top:2px solid var(--line)}
+/* O traço entre famílias é a soma de dois: o border-bottom fininho da linha
+   de cima + estes 2px. À cabeça da grelha não há linha acima (só o espaçador),
+   logo o separador ficava mais magro — aqui vale por os dois. */
+.pres-fam-head>td{border-top:3px solid var(--line)}
+.pres-famz-1>td{background:var(--panel2)}
+.pres-famz-1>.pres-name{background:var(--panel2)}
+
 /* Linhas de filhos (crianças): pendem do pai/mãe acima — nome recuado, avatar
    apagado e etiqueta. O botão é binário (come / não conta): nunca fica azul.
    A coluna dos nomes é sticky e manda na largura da tabela, por isso tudo aqui
