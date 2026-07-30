@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v132 · 2026-07-30 · Shop List: loja por artigo, ordenação por loja e quantidade em linha própria';
+const APP_BUILD = 'v133 · 2026-07-30 · Lista da refeição agrupada por loja (soltos em "Loja não especificada")';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -4033,6 +4033,7 @@ function shopQtyLabel(it){
    ninguém a nada — quem compra segue-a ou não. Serve para agrupar a lista por
    loja (ordenação "🏬 Loja") e evitar viagens a mais.
    Coluna opcional: sem a migração (SHOP_LOJA_COL=false) nada disto aparece. */
+const SHOP_SEM_LOJA='Loja não especificada';   // rótulo do grupo dos artigos sem indicação
 function shopLojaTxt(it){return ((it&&it.loja)||'').trim();}
 // Chave para juntar grafias ("continente" = "Continente"): maiúsculas sem acentos
 function shopLojaKey(s){return (s||'').trim().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');}
@@ -4586,7 +4587,7 @@ function shopLojaGroupedList(list,mineView){
   let h='';
   order.forEach(k=>{
     const g=lojas[k];
-    h+=`<div class="cmp-grp-hdr sf"><span class="cmp-grp-label">${k==='none'?'🛒 Onde calhar':'🏬 '+escHtml(g.nome)}</span><span class="cmp-count">${g.items.length}</span></div>`;
+    h+=`<div class="cmp-grp-hdr sf"><span class="cmp-grp-label">${k==='none'?'🛒 '+SHOP_SEM_LOJA:'🏬 '+escHtml(g.nome)}</span><span class="cmp-count">${g.items.length}</span></div>`;
     const byArt={},aOrder=[];
     g.items.forEach(it=>{const ak=shopArtKey(it.artigo);if(!byArt[ak]){byArt[ak]={items:[]};aOrder.push(ak);}byArt[ak].items.push(it);});
     aOrder.forEach(ak=>{h+=shopArtNestHtml(byArt[ak].items,mineView,true);});
@@ -4630,9 +4631,24 @@ function mealShopSection(rd){
     // Dica de stock: quanto está coberto, ou stock livre por alocar (botão de um
     // toque para alocar o livre a esta refeição). Ver shopStockHint/shopHintHtml.
     const hint=(!done&&!past)?shopHintHtml(it,'msl-hint'):'';
-    const loja=shopLojaTxt(it);
     return `<div class="msl-it${dim?' msl-dim':''}" onclick="openShopItemModal(${it._id})">
-      <span class="msl-art">${escHtml(it.artigo)}${qtdTxt?` <i>${escHtml(qtdTxt)}</i>`:''}${loja?` <span class="msl-loja">🏬 ${escHtml(loja)}</span>`:''}${hint}</span>${st}</div>`;
+      <span class="msl-art">${escHtml(it.artigo)}${qtdTxt?` <i>${escHtml(qtdTxt)}</i>`:''}${hint}</span>${st}</div>`;
+  };
+  /* A loja NÃO vai em cada linha: nesta lista estreita a etiqueta caía para
+     baixo numas linhas e não noutras (leitura aos solavancos). Vai antes como
+     cabeçalho de grupo — e os artigos sem indicação ficam no fim, em "Loja não
+     especificada". Sem nenhuma loja indicada, é a lista simples de sempre. */
+  const listaHtml=arr=>{
+    if(!shopHasLojas(arr))return arr.map(it=>lineOf(it,past)).join('');
+    const g={},order=[];
+    arr.forEach(it=>{
+      const l=shopLojaTxt(it),k=l?shopLojaKey(l):'none';
+      if(!g[k]){g[k]={nome:l,items:[]};order.push(k);}
+      g[k].items.push(it);
+    });
+    order.sort((a,b)=>(a==='none'?1:0)-(b==='none'?1:0)||g[a].nome.localeCompare(g[b].nome,'pt'));
+    return order.map(k=>`<div class="msl-grp">${k==='none'?'🛒 '+SHOP_SEM_LOJA:'🏬 '+escHtml(g[k].nome)}</div>`
+      +g[k].items.map(it=>lineOf(it,past)).join('')).join('');
   };
   // Dois blocos independentes: 📝 a lista (pendentes) e 🧺 o que já foi comprado
   // para a refeição (lotes alocados c/ € + artigos comprados sem lote — um pedido
@@ -4655,7 +4671,7 @@ function mealShopSection(rd){
     </details>`;
   };
   const listaDet=(pend.length||canAdd)?det('|l',past?'📝 Não comprado':'🛒 Lista de compras',pend.length||'',
-    (pend.length?pend.map(it=>lineOf(it,past)).join(''):'<div class="msl-empty">Ainda sem ingredientes nesta lista.</div>')+
+    (pend.length?listaHtml(pend):'<div class="msl-empty">Ainda sem ingredientes nesta lista.</div>')+
     (canAdd?`<button class="cmp-mini prim write-action msl-add" onclick="openShopItemModal(null,'${rd.ref}','${rd.data}')">＋ Ingrediente</button>`:'')):'';
   const compDet=nComp?det('|c','🧺 Comprado',nComp,alocLines+bought.map(it=>lineOf(it,false)).join('')):'';
   return `<div class="rdc sf msl" onclick="event.stopPropagation()">${past?compDet+listaDet:listaDet+compDet}</div>`;

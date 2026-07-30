@@ -905,7 +905,11 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .msl-it:last-of-type{border-bottom:none}
 .msl-art{min-width:0;color:var(--ink)}
 .msl-art i{font-style:normal;color:var(--faint);font-size:11px;margin-left:4px}
-.msl-loja{font-size:10.5px;font-weight:700;color:#9A6E0E;margin-left:4px;white-space:nowrap}
+/* Cabeçalho de loja dentro da lista da refeição: a indicação sai das linhas
+   (onde quebrava numas e noutras não) e passa a arrumar a lista por sítio */
+.msl-grp{display:flex;align-items:center;gap:6px;font-size:10.5px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;color:#9A6E0E;margin:9px 0 1px;white-space:nowrap;overflow:hidden}
+.msl-grp:first-child{margin-top:1px}
+.msl-grp::after{content:'';flex:1;height:0;border-top:1px dashed rgba(154,110,14,.35)}
 .msl-st{font-size:11px;color:var(--muted);white-space:nowrap;flex:0 0 auto}
 .msl-st.ok{color:var(--green)}
 .msl-st.falta{color:#9A6E0E}
