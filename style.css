@@ -718,11 +718,11 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .cz-meal .mi-almoco{color:#F0C14B}
 .cz-meal .mi-lanche{color:#8FC4EA}
 .cz-meal .mi-jantar{color:#C9AEEA}
-.cz-chef{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;font-size:10.5px;font-weight:500;letter-spacing:0;text-transform:none;color:#EFC9A8;opacity:.85}
+/* Notas do menu (é aqui que se escreve quem é o chef) — ao lado da refeição */
+.cz-obs{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;font-size:10.5px;font-weight:500;letter-spacing:0;text-transform:none;color:#EFC9A8;opacity:.85;white-space:pre-line}
 .cz-prato{font-family:var(--display);font-size:21px;font-weight:600;letter-spacing:.02em;color:#F3D9A8;line-height:1.18;margin-top:3px}
 .cz-linha{font-size:12px;font-weight:500;color:var(--sal);line-height:1.4;margin-top:3px}
 .cz-lk{font-family:var(--display);font-size:10.5px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:#EFC9A8;margin-right:6px}
-.cz-notas{font-size:10.5px;color:#EFC9A8;opacity:.85;margin-top:4px;white-space:pre-line;line-height:1.35;font-style:italic}
 .cz-porvir{font-size:11px;color:#EFC9A8;opacity:.6;font-style:italic;margin-top:2px}
 .cz-empty{font-size:12.5px;color:#EFC9A8;opacity:.85;margin:14px 0 4px;font-style:italic}
 .cz-foot{font-family:var(--display);font-size:12px;font-weight:600;letter-spacing:.26em;text-transform:uppercase;color:#EFC9A8;opacity:.75;margin-top:16px}

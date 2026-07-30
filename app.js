@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v140 · 2026-07-30 · Cartaz das Ementas: todas as ementas do ano num modal, com partilha em texto';
+const APP_BUILD = 'v141 · 2026-07-30 · Cartaz das Ementas mostra as notas do menu (chef) em vez dos responsáveis';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -8020,14 +8020,14 @@ function cartazHtml(){
       <div class="cz-day-hd"><span class="cz-day-nome">${escHtml(diaExtenso(g.data)||g.dia||'')}</span><span class="cz-day-dot">•</span><span class="cz-day-data">${escHtml(fmtDiaMes(g.data))}</span></div>`;
     g.itens.forEach(rd=>{
       const mp=parseMenuParts(rd.menu);
-      const resp=(rd.responsaveis||[]).filter(Boolean);
+      // As notas do menu (onde se escreve quem é o chef) ficam ao lado do nome
+      // da refeição — é o que interessa ver no cartaz, não a lista de responsáveis.
       const temMenu=rd.prato||mp.entradas||mp.sobremesa||mp.outras;
       h+=`<div class="cz-meal">
-        <div class="cz-meal-hd">${mealIco(rd.ref,15)}<span class="cz-meal-ref">${escHtml(rd.ref)}</span>${resp.length?`<span class="cz-chef">👨‍🍳 ${escHtml(resp.join(' · '))}</span>`:''}</div>
+        <div class="cz-meal-hd">${mealIco(rd.ref,15)}<span class="cz-meal-ref">${escHtml(rd.ref)}</span>${mp.outras?`<span class="cz-obs">${escHtml(mp.outras)}</span>`:''}</div>
         ${rd.prato?`<div class="cz-prato">${escHtml(rd.prato)}</div>`:''}
         ${mp.entradas?`<div class="cz-linha"><span class="cz-lk">Entradas</span>${escHtml(mp.entradas)}</div>`:''}
         ${mp.sobremesa?`<div class="cz-linha"><span class="cz-lk">Sobremesa</span>${escHtml(mp.sobremesa)}</div>`:''}
-        ${mp.outras?`<div class="cz-notas">${escHtml(mp.outras)}</div>`:''}
         ${temMenu?'':'<div class="cz-porvir">Ementa por definir</div>'}
       </div>`;
     });
@@ -8057,12 +8057,10 @@ function cartazTexto(){
     L.push('— '+((diaExtenso(g.data)||g.dia||'')+' · '+fmtDiaMes(g.data)).trim()+' —');
     g.itens.forEach(rd=>{
       const mp=parseMenuParts(rd.menu);
-      const resp=(rd.responsaveis||[]).filter(Boolean);
-      L.push(rd.ref+(resp.length?' (👨‍🍳 '+resp.join(' · ')+')':''));
+      L.push(rd.ref+(mp.outras?' — '+mp.outras.replace(/\n/g,' · '):''));
       if(rd.prato)L.push('🍲 '+rd.prato);
       if(mp.entradas)L.push('🥗 Entradas: '+mp.entradas);
       if(mp.sobremesa)L.push('🍰 Sobremesa: '+mp.sobremesa);
-      if(mp.outras)L.push('📝 '+mp.outras);
       if(!(rd.prato||mp.entradas||mp.sobremesa||mp.outras))L.push('— ementa por definir —');
     });
   });
