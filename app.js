@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v141 · 2026-07-30 · Cartaz das Ementas mostra as notas do menu (chef) em vez dos responsáveis';
+const APP_BUILD = 'v142 · 2026-07-30 · Cartaz das Ementas em pergaminho dourado (era campino escuro)';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
