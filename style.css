@@ -852,7 +852,13 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .cmp-main{flex:1;min-width:0}
 .cmp-sub{font-size:11px;color:var(--faint);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .cmp-sub.alert{color:var(--red);font-weight:600}
-/* Loja pedida: nota discreta na linha do "pedido por" — indicação, não regra */
+/* Rodapé de quem pediu: o dado menos importante do cartão, fica mais pequeno.
+   Scoped ao filho de .cmp-main para não apanhar .cmp-item.cmp-sub (o modificador
+   das linhas-refeição de um artigo agrupado, que usa a mesma palavra). */
+.cmp-main>.cmp-sub{font-size:10px}
+/* Loja pedida: linha própria a seguir à quantidade — é indicação de compra e
+   lê-se com ela, não misturada no "pedido por" */
+.cmp-loja-row{font-size:12px;line-height:1.3;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .cmp-loja{color:#9A6E0E;font-weight:700}
 /* Linha própria da dica de stock, por baixo do resto do cartão (largura toda,
    sem colidir com o badge da refeição nem com o botão do carrinho) */

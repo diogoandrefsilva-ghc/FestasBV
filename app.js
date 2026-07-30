@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v133 · 2026-07-30 · Lista da refeição agrupada por loja (soltos em "Loja não especificada")';
+const APP_BUILD = 'v134 · 2026-07-30 · Shop List: loja em linha própria no cartão; "pedido por" mais discreto';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -4457,13 +4457,13 @@ function shopItemCard(it,mineView,noBadge,grouped,noLoja){
   // "pedido por" aparece SEMPRE que se sabe quem pediu: também nas linhas de um
   // artigo agrupado (cada refeição pode ter sido pedida por outra pessoa) e nos
   // artigos já em carrinho (quem trata quer saber a quem perguntar detalhes).
-  // A loja pedida vai na mesma linha do "pedido por" (não rouba largura ao nome
-  // do artigo). Na vista agrupada por loja o cabeçalho já a diz → noLoja.
+  // A loja pedida tem LINHA PRÓPRIA, logo a seguir à quantidade: é indicação de
+  // compra, lê-se com ela e não misturada no rodapé de quem pediu (que é o dado
+  // menos importante do cartão, e por isso mais pequeno). Na vista agrupada por
+  // loja o cabeçalho já a diz → noLoja.
   const lojaTxt=noLoja?'':shopLojaTxt(it);
-  const subParts=[];
-  if(it.criadoPor)subParts.push(`pedido por ${escHtml(it.criadoPor)}`);
-  if(lojaTxt)subParts.push(`<span class="cmp-loja">🏬 ${escHtml(lojaTxt)}</span>`);
-  if(subParts.length)sub=`<div class="cmp-sub">${subParts.join(' · ')}</div>`;
+  const lojaRow=lojaTxt?`<div class="cmp-loja-row"><span class="cmp-loja">🏬 ${escHtml(lojaTxt)}</span></div>`:'';
+  if(it.criadoPor)sub=`<div class="cmp-sub">pedido por ${escHtml(it.criadoPor)}</div>`;
   if(covered){
     right='<span class="cmp-chip stock">🧺 em stock</span>';
   }else if(mineView){
@@ -4491,7 +4491,7 @@ function shopItemCard(it,mineView,noBadge,grouped,noLoja){
   const hintRow=hint?`<div class="cmp-hint-row">${hint}</div>`:'';
   return `<div class="cmp-item cmp-line cmp-tap${grouped?' cmp-sub':''}${mineView&&it.noCarrinho?' incart':''}${removed?' removed':''}" onclick="openShopItemModal(${it._id})">
     ${check}
-    <div class="cmp-main"><div class="cmp-artigo">${primary}</div>${qtd}${sub}</div>
+    <div class="cmp-main"><div class="cmp-artigo">${primary}</div>${qtd}${lojaRow}${sub}</div>
     ${badge}${right}<span class="cmp-chev-r">›</span>${hintRow}
   </div>`;
 }
