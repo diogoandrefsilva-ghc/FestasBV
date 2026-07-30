@@ -313,6 +313,9 @@ setTimeout(function(){ if (window.fbvEsconderSplash) window.fbvEsconderSplash();
     <div class="note" style="margin-top:0">Para o que entrou sem ser comprado. Fica no stock e aloca-se às refeições como qualquer artigo, mas <b>custa 0 €</b> — não mexe nas contas nem em quem pagou o quê.</div>
     <label>De onde vem</label>
     <div class="stk-org-pick" id="stkadd-org"></div>
+    <label>Responde a que pedido da lista?</label>
+    <select id="stkadd-req" onchange="stkAddPickReq(this.value)"></select>
+    <div class="stkadd-need" id="stkadd-need"></div>
     <label>Artigo</label>
     <input id="stkadd-art" list="stkadd-list" placeholder="ex.: Ovos" autocomplete="off">
     <datalist id="stkadd-list"></datalist>
