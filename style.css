@@ -695,6 +695,37 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .refdef-add-bar{margin-top:10px;display:flex;gap:8px;align-items:center}
 .refdef-add-btn{display:flex;align-items:center;gap:6px;padding:10px 16px;border-radius:10px;border:1.5px dashed var(--line);background:transparent;color:var(--barrete);font-size:13px;font-weight:600;cursor:pointer;transition:.15s;flex:1;justify-content:center}
 .refdef-add-btn:active{background:rgba(30,122,77,.06);transform:scale(.97)}
+/* Botão do cartaz — sólido campino, para se ver logo (aberto a toda a gente) */
+.cartaz-btn{display:flex;align-items:center;justify-content:center;gap:7px;flex:1;padding:11px 16px;border-radius:10px;border:1px solid var(--campino-escuro);background:repeating-linear-gradient(0deg,rgba(255,255,255,.05) 0 7px,transparent 7px 14px),var(--campino-escuro);color:#F3D9A8;font-family:var(--display);font-size:15px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;transition:.15s;box-shadow:0 3px 10px rgba(110,32,18,.28)}
+.cartaz-btn:active{transform:scale(.97);filter:brightness(1.1)}
+.cz-btn-ic{font-size:15px;line-height:1}
+
+/* ═══ Cartaz das ementas (modal) ═══ */
+.cartaz{background:repeating-linear-gradient(0deg,rgba(255,255,255,.05) 0 7px,transparent 7px 14px),var(--campino-escuro);border:1px solid var(--campino-escuro);border-radius:14px;padding:6px;box-shadow:0 4px 16px rgba(110,32,18,.3)}
+.cz-frame{border:1px solid rgba(243,217,168,.32);border-radius:10px;padding:16px 14px 14px;text-align:center}
+.cz-top{font-family:var(--display);font-size:11px;font-weight:600;letter-spacing:.28em;text-transform:uppercase;color:#EFC9A8;line-height:1.3}
+.cz-title{font-family:var(--display);font-size:34px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:#F3D9A8;line-height:1.05;margin-top:2px}
+.cz-year{font-family:var(--display);font-size:15px;font-weight:600;letter-spacing:.3em;color:#EFC9A8;line-height:1.2}
+.cz-sub{font-size:11px;color:#EFC9A8;opacity:.85;margin-top:3px;font-style:italic}
+.cz-rule{height:1px;max-width:230px;margin:11px auto 2px;background:linear-gradient(90deg,transparent,rgba(243,217,168,.8) 22%,rgba(243,217,168,.8) 78%,transparent)}
+.cz-day{margin-top:15px}
+.cz-day-hd{display:flex;align-items:center;justify-content:center;gap:7px;font-family:var(--display);font-size:13px;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:#EFC9A8;line-height:1.2}
+.cz-day-dot{opacity:.5}
+.cz-day-data{color:#F3D9A8;opacity:.9}
+.cz-meal{margin-top:8px;padding:9px 10px;background:rgba(0,0,0,.16);border:1px solid rgba(243,217,168,.18);border-radius:10px}
+.cz-meal-hd{display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:6px;font-family:var(--display);font-size:12px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#EFC9A8;line-height:1.2}
+.cz-meal .meal-ic{color:#F3D9A8}
+.cz-meal .mi-almoco{color:#F0C14B}
+.cz-meal .mi-lanche{color:#8FC4EA}
+.cz-meal .mi-jantar{color:#C9AEEA}
+.cz-chef{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;font-size:10.5px;font-weight:500;letter-spacing:0;text-transform:none;color:#EFC9A8;opacity:.85}
+.cz-prato{font-family:var(--display);font-size:21px;font-weight:600;letter-spacing:.02em;color:#F3D9A8;line-height:1.18;margin-top:3px}
+.cz-linha{font-size:12px;font-weight:500;color:var(--sal);line-height:1.4;margin-top:3px}
+.cz-lk{font-family:var(--display);font-size:10.5px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:#EFC9A8;margin-right:6px}
+.cz-notas{font-size:10.5px;color:#EFC9A8;opacity:.85;margin-top:4px;white-space:pre-line;line-height:1.35;font-style:italic}
+.cz-porvir{font-size:11px;color:#EFC9A8;opacity:.6;font-style:italic;margin-top:2px}
+.cz-empty{font-size:12.5px;color:#EFC9A8;opacity:.85;margin:14px 0 4px;font-style:italic}
+.cz-foot{font-family:var(--display);font-size:12px;font-weight:600;letter-spacing:.26em;text-transform:uppercase;color:#EFC9A8;opacity:.75;margin-top:16px}
 
 /* Ref def modal */
 .refdef-modal-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}

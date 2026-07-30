@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v139 · 2026-07-30 · Stock sem compra com tamanho + quantidade iguais aos pedidos da lista ("6 × 2,5 kg")';
+const APP_BUILD = 'v140 · 2026-07-30 · Cartaz das Ementas: todas as ementas do ano num modal, com partilha em texto';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -1061,6 +1061,7 @@ function renderAll(){
     });
     r+='</div>';
   }
+  r+=`<div class="refdef-add-bar"><button class="cartaz-btn sf" onclick="openCartaz()"><span class="cz-btn-ic">📜</span> Cartaz das Ementas</button></div>`;
   r+=`<div class="refdef-add-bar"><button class="refdef-add-btn sf write-action admin-only" onclick="openRefdefModal()">＋ Adicionar Refeição</button></div>`;
   r+=`<details class="calc-help sf" style="margin-top:14px">
     <summary><span class="ch-ico">ⓘ</span> Como se calculam os custos? <span class="chev">›</span></summary>
@@ -7973,6 +7974,112 @@ async function deleteRefdef(idx){
   }
 }
 
+/* ═══ CARTAZ DAS EMENTAS ═══
+   Todas as ementas do ano num só ecrã, em jeito de cartaz de festa. É só
+   leitura (não edita nem lê contas) e está aberto a toda a gente — o botão
+   fica na aba Refeições, antes do "Adicionar Refeição". */
+const CARTAZ_REF_ORD={Almoço:0,Lanche:1,Jantar:2};
+
+function cartazMeals(){
+  return (DATA.refeicoesDef||[]).slice().sort((a,b)=>
+    String(a.data||'').localeCompare(String(b.data||''))||
+    (CARTAZ_REF_ORD[a.ref]||0)-(CARTAZ_REF_ORD[b.ref]||0));
+}
+// Agrupa por dia mantendo a ordem (um bloco por data, com as refeições dentro)
+function cartazDias(){
+  const dias=[];
+  cartazMeals().forEach(rd=>{
+    let g=dias.find(x=>x.data===rd.data);
+    if(!g){g={data:rd.data,dia:rd.dia,itens:[]};dias.push(g);}
+    g.itens.push(rd);
+  });
+  return dias;
+}
+
+function cartazHtml(){
+  const dias=cartazDias();
+  const nome=(DATA.evento.nome||'').replace(/\s*\d{4}\s*/g,'').trim()||'Festas';
+  const ano=DATA.evento.ano||'';
+  const datas=DATA.evento.datas||'';
+  if(!dias.length){
+    return `<div class="cartaz"><div class="cz-frame">
+      <div class="cz-top">${escHtml(nome)}</div>
+      <div class="cz-title">Ementas</div>
+      ${ano?`<div class="cz-year">${escHtml(String(ano))}</div>`:''}
+      <div class="cz-empty">Ainda não há refeições definidas para este ano.</div>
+    </div></div>`;
+  }
+  let h=`<div class="cartaz"><div class="cz-frame">
+    <div class="cz-top">${escHtml(nome)}</div>
+    <div class="cz-title">Ementas</div>
+    ${ano?`<div class="cz-year">${escHtml(String(ano))}</div>`:''}
+    ${datas?`<div class="cz-sub">${escHtml(datas)}</div>`:''}
+    <div class="cz-rule"></div>`;
+  dias.forEach(g=>{
+    h+=`<div class="cz-day">
+      <div class="cz-day-hd"><span class="cz-day-nome">${escHtml(diaExtenso(g.data)||g.dia||'')}</span><span class="cz-day-dot">•</span><span class="cz-day-data">${escHtml(fmtDiaMes(g.data))}</span></div>`;
+    g.itens.forEach(rd=>{
+      const mp=parseMenuParts(rd.menu);
+      const resp=(rd.responsaveis||[]).filter(Boolean);
+      const temMenu=rd.prato||mp.entradas||mp.sobremesa||mp.outras;
+      h+=`<div class="cz-meal">
+        <div class="cz-meal-hd">${mealIco(rd.ref,15)}<span class="cz-meal-ref">${escHtml(rd.ref)}</span>${resp.length?`<span class="cz-chef">👨‍🍳 ${escHtml(resp.join(' · '))}</span>`:''}</div>
+        ${rd.prato?`<div class="cz-prato">${escHtml(rd.prato)}</div>`:''}
+        ${mp.entradas?`<div class="cz-linha"><span class="cz-lk">Entradas</span>${escHtml(mp.entradas)}</div>`:''}
+        ${mp.sobremesa?`<div class="cz-linha"><span class="cz-lk">Sobremesa</span>${escHtml(mp.sobremesa)}</div>`:''}
+        ${mp.outras?`<div class="cz-notas">${escHtml(mp.outras)}</div>`:''}
+        ${temMenu?'':'<div class="cz-porvir">Ementa por definir</div>'}
+      </div>`;
+    });
+    h+='</div>';
+  });
+  h+='<div class="cz-foot">Bom apetite!</div></div></div>';
+  return h;
+}
+
+function openCartaz(){
+  document.getElementById('cartaz-body').innerHTML=cartazHtml();
+  document.getElementById('cartaz-bg').classList.add('show');
+  document.body.classList.add('no-scroll');
+}
+function closeCartaz(){
+  document.getElementById('cartaz-bg').classList.remove('show');
+  document.body.classList.remove('no-scroll');
+}
+
+// Mesmo cartaz em texto simples, para mandar no WhatsApp/Telegram
+function cartazTexto(){
+  const nome=(DATA.evento.nome||'').replace(/\s*\d{4}\s*/g,'').trim()||'Festas';
+  const ano=DATA.evento.ano||'';
+  const L=['📜 EMENTAS · '+nome+(ano?' '+ano:'')];
+  cartazDias().forEach(g=>{
+    L.push('');
+    L.push('— '+((diaExtenso(g.data)||g.dia||'')+' · '+fmtDiaMes(g.data)).trim()+' —');
+    g.itens.forEach(rd=>{
+      const mp=parseMenuParts(rd.menu);
+      const resp=(rd.responsaveis||[]).filter(Boolean);
+      L.push(rd.ref+(resp.length?' (👨‍🍳 '+resp.join(' · ')+')':''));
+      if(rd.prato)L.push('🍲 '+rd.prato);
+      if(mp.entradas)L.push('🥗 Entradas: '+mp.entradas);
+      if(mp.sobremesa)L.push('🍰 Sobremesa: '+mp.sobremesa);
+      if(mp.outras)L.push('📝 '+mp.outras);
+      if(!(rd.prato||mp.entradas||mp.sobremesa||mp.outras))L.push('— ementa por definir —');
+    });
+  });
+  return L.join('\n');
+}
+function shareCartaz(){
+  const txt=cartazTexto();
+  const ano=DATA.evento.ano||'';
+  if(navigator.share){
+    navigator.share({title:'Ementas'+(ano?' '+ano:''),text:txt}).catch(()=>{});
+    return;
+  }
+  if(navigator.clipboard&&navigator.clipboard.writeText){
+    navigator.clipboard.writeText(txt).then(()=>toast('Ementas copiadas ✓','ok')).catch(()=>toast('Não foi possível copiar','bad'));
+  } else toast('Partilha não disponível neste dispositivo','bad');
+}
+
 /* ═══ HERO SUB-TOTALS ═══ */
 function renderHeroSubtotals(){
   if(!CALC)return;
@@ -8925,5 +9032,6 @@ document.getElementById('admin-bg').addEventListener('click',e=>{if(e.target.id=
 document.getElementById('pay-bg').addEventListener('click',e=>{if(e.target.id==='pay-bg')closePayModal();});
 document.getElementById('edit-cf-bg').addEventListener('click',e=>{if(e.target.id==='edit-cf-bg')closeEditCf();});
 document.getElementById('refdef-bg').addEventListener('click',e=>{if(e.target.id==='refdef-bg')closeRefdefModal();});
+document.getElementById('cartaz-bg').addEventListener('click',e=>{if(e.target.id==='cartaz-bg')closeCartaz();});
 document.getElementById('shop-item-bg').addEventListener('click',e=>{if(e.target.id==='shop-item-bg')closeShopItemModal();});
 document.getElementById('shop-buy-bg').addEventListener('click',e=>{if(e.target.id==='shop-buy-bg')closeShopBuyModal();});
