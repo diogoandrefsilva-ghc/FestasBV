@@ -174,6 +174,12 @@ setTimeout(function(){ if (window.fbvEsconderSplash) window.fbvEsconderSplash();
       <select id="shop-cat"></select>
       <div class="note" id="shop-cat-note" style="display:none;margin-top:4px"></div>
     </div>
+    <div id="shop-loja-wrap" style="display:none">
+      <label>Loja 🏬 <i style="font-weight:400;color:var(--faint)">(opcional)</i></label>
+      <input type="text" id="shop-loja" maxlength="40" placeholder="Ex: Continente" list="shop-loja-list" autocomplete="off" onchange="this.value=shopCapArtigo(this.value)">
+      <datalist id="shop-loja-list"></datalist>
+      <div class="note" style="margin-top:4px">Onde se costuma encontrar / onde preferes que se compre. É só uma indicação para quem vai às compras.</div>
+    </div>
     <div id="shop-ctx-lock" class="shop-ctx-lock" style="display:none"></div>
     <div id="shop-tipo-wrap">
       <label>Tipo de despesa</label>

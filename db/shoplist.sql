@@ -37,6 +37,12 @@ CREATE INDEX IF NOT EXISTS shoplist_evento_idx ON festasbv.shoplist (evento_id);
 -- ao CREATE TABLE já ter a coluna) — idempotente como o resto do ficheiro.
 ALTER TABLE festasbv.shoplist ADD COLUMN IF NOT EXISTS tamanho text;
 
+-- 2026-07: loja preferida/obrigatória do artigo ("só há no X", "prefiro o Y").
+-- É só uma INDICAÇÃO de quem pede — quem compra segue-a ou não. A app agrupa a
+-- lista por loja quando este campo está preenchido. Sem esta coluna a app
+-- esconde o campo e a ordenação (sonda shoplist?select=loja&limit=1).
+ALTER TABLE festasbv.shoplist ADD COLUMN IF NOT EXISTS loja text;
+
 -- Ligação da compra ao cash-flow: cada despesa criada a partir de uma compra
 -- da lista fica marcada com o mesmo token. Permite reabrir a compra ao editar.
 ALTER TABLE festasbv.despesas ADD COLUMN IF NOT EXISTS compra_id text;
