@@ -413,9 +413,9 @@ setTimeout(function(){ if (window.fbvEsconderSplash) window.fbvEsconderSplash();
         <input type="text" id="rd-sobremesa" maxlength="150" placeholder="ex: baba de camelo">
       </div>
       <div id="rd-resp-wrap" style="grid-column:1/-1;display:none">
-        <label>👨‍🍳 Resp. cozinha</label>
-        <select id="rd-resp-coz"></select>
-        <div class="note" style="margin-top:6px">Quem for nomeado é avisado no Telegram com a lista de quem vai e os totais (se tiver as notificações ligadas).</div>
+        <label>👨‍🍳 Responsáveis <span id="rd-resp-count" class="rd-resp-count"></span></label>
+        <div class="sd-list" id="rd-resp-chips"></div>
+        <div class="note" style="margin-top:6px">Toca para escolher — podem ser vários, todos com a mesma responsabilidade. Cada um é avisado no Telegram com a lista de quem vai e os totais (se tiver as notificações ligadas).</div>
       </div>
       <div>
         <label>Peso indireto (%)</label>

@@ -5,7 +5,7 @@
 // Esta função recebe DOIS tipos de POST e distingue-os pelo payload:
 //
 //  A) Database Webhook (INSERT em festasbv.historico) → decide QUEM avisar:
-//     - presenca/convidado ......... responsáveis (cozinha+compras) da refeição
+//     - presenca/convidado ......... TODOS os responsáveis da refeição
 //     - refeicao + nomeou/retirou .. o próprio nomeado/retirado (a nomeação
 //                                    leva em detalhe.resumo a lista de quem
 //                                    vai e os totais, redigida pela app)
@@ -142,7 +142,16 @@ async function handleHistorico(record: any): Promise<Response> {
         "GET",
         `refeicoes_def?evento_id=eq.${record.evento_id}&dia=eq.${encodeURIComponent(d.dia)}&ref=eq.${encodeURIComponent(ref)}&select=resp_cozinha,resp_compras`,
       );
-      for (const nome of [rd?.[0]?.resp_cozinha, rd?.[0]?.resp_compras]) {
+      // Uma refeição pode ter VÁRIOS responsáveis: a app grava-os na mesma
+      // coluna separados por " · " (sem migração). Um nome sozinho — como era
+      // antes — continua a ler-se na mesma. resp_compras é legado: a app já
+      // não distingue papéis, mas lê-se na mesma para não perder linhas antigas.
+      const nomes = new Set<string>();
+      for (const col of [rd?.[0]?.resp_cozinha, rd?.[0]?.resp_compras]) {
+        String(col ?? "").split("·").map((s) => s.trim()).filter(Boolean)
+          .forEach((n) => nomes.add(n));
+      }
+      for (const nome of nomes) {
         const em = await emailDoAmigo(nome);
         if (em) destinos.add(em);
       }
