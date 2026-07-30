@@ -450,6 +450,21 @@ setTimeout(function(){ if (window.fbvEsconderSplash) window.fbvEsconderSplash();
   </div>
 </div>
 
+<!-- Cartaz das ementas (só leitura, aberto a toda a gente) -->
+<div class="modal-bg" id="cartaz-bg">
+  <div class="modal" id="cartaz-modal">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+      <h3 style="margin-bottom:0">📜 Cartaz das Ementas</h3>
+      <button onclick="closeCartaz()" style="background:var(--panel2);border:1px solid var(--line);color:var(--muted);border-radius:9px;width:32px;height:32px;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0">✕</button>
+    </div>
+    <div id="cartaz-body"></div>
+    <div class="mbtns">
+      <button class="btn ghost" onclick="shareCartaz()">📤 Partilhar</button>
+      <button class="btn prim" onclick="closeCartaz()">Fechar</button>
+    </div>
+  </div>
+</div>
+
 <!-- Admin modal -->
 <div class="modal-bg" id="admin-bg">
   <div class="modal">
