@@ -497,6 +497,10 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
    alternância garante que dois agregados vizinhos nunca ficam iguais.
    O 1º de cada agregado leva ainda um separador mais forte por cima. */
 .pres-fam-first>td{border-top:2px solid var(--line)}
+/* O traço entre famílias é a soma de dois: o border-bottom fininho da linha
+   de cima + estes 2px. À cabeça da grelha não há linha acima (só o espaçador),
+   logo o separador ficava mais magro — aqui vale por os dois. */
+.pres-fam-head>td{border-top:3px solid var(--line)}
 .pres-famz-1>td{background:var(--panel2)}
 .pres-famz-1>.pres-name{background:var(--panel2)}
 

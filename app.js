@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v129 · 2026-07-29 · Presenças: blocos alternados por agregado na grelha (famílias em blocos)';
+const APP_BUILD = 'v129 · 2026-07-30 · Presenças: famílias em blocos alternados na grelha, com separador igual à cabeça';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -6875,13 +6875,17 @@ function renderPresencaGrid(){
   const _hasMine=casas.some(c=>c._rank<2);
   let _sepDone=false,_selfDone=false;
   casas.forEach((casa,ci)=>{
-    // Classes de agregado p/ o CSS: cor própria (pres-fam-N) e paridade (pres-famz-N)
-    const famCls='pres-fam pres-fam-'+(ci%8)+' pres-famz-'+(ci%2);
+    // Paridade do agregado: o CSS pinta os ímpares para as famílias saírem em
+    // blocos alternados (casal + filhos ficam com o mesmo fundo).
+    const famCls='pres-famz-'+(ci%2);
     casa.membros.forEach(({m,oi},fi)=>{
       const mi=oi;
       const _r=_rankP(m.nome);
       const _rowCls=[famCls];
       if(fi===0)_rowCls.push('pres-fam-first');
+      // A 1ª linha da grelha não tem linha por cima que lhe some o traço fino,
+      // por isso leva o separador cheio de uma vez (ver CSS).
+      if(ci===0&&fi===0)_rowCls.push('pres-fam-head');
       if(_hasMine&&!_selfDone&&_r<2){_rowCls.push('pres-row-self');_selfDone=true;}
       if(_hasMine&&!_sepDone&&_r===2){_rowCls.push('pres-row-other1');_sepDone=true;}
       const pres=m.presencas||[];
