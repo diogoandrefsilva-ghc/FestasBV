@@ -849,6 +849,8 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .cmp-main{flex:1;min-width:0}
 .cmp-sub{font-size:11px;color:var(--faint);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .cmp-sub.alert{color:var(--red);font-weight:600}
+/* Loja pedida: nota discreta na linha do "pedido por" — indicação, não regra */
+.cmp-loja{color:#9A6E0E;font-weight:700}
 /* Linha própria da dica de stock, por baixo do resto do cartão (largura toda,
    sem colidir com o badge da refeição nem com o botão do carrinho) */
 .cmp-hint-row{flex:0 0 100%;width:100%;min-width:0;margin-top:1px}
@@ -899,6 +901,7 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .msl-it:last-of-type{border-bottom:none}
 .msl-art{min-width:0;color:var(--ink)}
 .msl-art i{font-style:normal;color:var(--faint);font-size:11px;margin-left:4px}
+.msl-loja{font-size:10.5px;font-weight:700;color:#9A6E0E;margin-left:4px;white-space:nowrap}
 .msl-st{font-size:11px;color:var(--muted);white-space:nowrap;flex:0 0 auto}
 .msl-st.ok{color:var(--green)}
 .msl-st.falta{color:#9A6E0E}
@@ -1359,7 +1362,7 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 #view-compras .cmp-sort .sd-chip::before{content:"";flex:0 0 auto;width:.95em;height:.95em;background:currentColor;opacity:.55;-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M7 5v14M4 8l3-3 3 3M17 19V5M14 16l3 3 3-3'/%3E%3C/svg%3E") center/contain no-repeat;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M7 5v14M4 8l3-3 3 3M17 19V5M14 16l3 3 3-3'/%3E%3C/svg%3E") center/contain no-repeat}
 #view-compras .cmp-sort .sd-chip.on::before{opacity:.8}
 #view-compras .cmp-sort .sd-chip.on,#view-stock .stk-filter .sd-chip.on{background:rgba(30,122,77,.12)}
-/* As 3 chips de ordenação em PARTES IGUAIS (1/3 cada) com fonte FLUIDA
+/* As chips de ordenação em PARTES IGUAIS com fonte FLUIDA
    (escala com a largura do ecrã, travada a 13px). Assim cabem SEMPRE numa
    linha, todas no ecrã, sem scroll horizontal, sem quebra de texto e sem
    nenhuma passar para baixo — em qualquer largura, pequena ou grande.
@@ -1367,6 +1370,13 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
    fonte em vw → o texto encolhe o suficiente para caber em ecrãs estreitos. */
 #view-compras .cmp-sort{flex-wrap:nowrap;gap:5px}
 #view-compras .cmp-sort .sd-chip{flex:1 1 0;min-width:0;justify-content:center;overflow:hidden;font-size:min(13px,2.6vw);gap:.3em;padding:.5em .6em}
+/* Com QUATRO critérios (refeição · artigo · categoria · loja) as partes iguais
+   já não chegam para "Categoria": os chips passam a medir-se pelo conteúdo
+   (flex-basis auto), com fonte e folgas um pouco mais curtas. Continuam numa
+   só linha (nowrap + shrink), sem scroll horizontal nem quebras. */
+#view-compras .cmp-sort.n4{gap:4px}
+#view-compras .cmp-sort.n4 .sd-chip{flex:1 1 auto;font-size:min(12.5px,2.35vw);gap:.25em;padding:.5em .5em;white-space:nowrap;text-overflow:ellipsis}
+#view-compras .cmp-sort.n4 .sd-chip::before{width:.85em;height:.85em}
 /* Nos filtros do Stock (chips ao alto) o furo caía em cima do emoji —
    ficam etiquetas kraft lisas, sem furo e com canto simétrico */
 #view-stock .stk-filter .sd-chip{border-radius:11px}

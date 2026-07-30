@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v130 · 2026-07-30 · Refeições: vários responsáveis por refeição (chips), todos avisados no Telegram';
+const APP_BUILD = 'v131 · 2026-07-30 · Shop List: loja preferida por artigo + ordenação por loja';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -102,6 +102,10 @@ let STOCK_TABLE=false;        // BD já tem stock_lotes? (migração SQL do stoc
 let FILHOS=[];                // [{id,nome,progenitorA,progenitorB}]
 let FILHOS_TABLE=false;
 let CONV_CRIANCA_COL=false;   // convidados já tem a coluna 'crianca'?
+// shoplist já tem a coluna 'loja' (loja preferida do artigo)? Sem a migração,
+// SHOP_LOJA_COL=false: o campo e a ordenação por loja ficam escondidos e nunca
+// se grava a coluna — a app funciona exatamente como antes.
+let SHOP_LOJA_COL=false;
 // Switch das notificações de PRESENÇAS (config 'notif_presencas'). Lido em
 // carregar() por todos os utilizadores, porque é a app que marca as entradas
 // de presença como silenciosas quando está desligado (ver _flushPresLog).
@@ -1609,7 +1613,7 @@ async function carregar(){
     const sel='*,membros(*,presencas(*)),refeicoes_def(*),despesas(*),convidados(*),mealheiros(*),pagamentos(*)';
     // shoplist vai numa fetch SEPARADA e tolerante a falha: se a tabela ainda
     // não existir (migração por correr) o resto da app continua a funcionar.
-    const [res,uaRes,cjRes,vlRes,slRes,stRes,ctRes,acRes,npRes,flRes,fpRes,ccRes]=await Promise.all([
+    const [res,uaRes,cjRes,vlRes,slRes,stRes,ctRes,acRes,npRes,flRes,fpRes,ccRes,sljRes]=await Promise.all([
       sbFetch(`${SB_URL}/rest/v1/eventos?select=${encodeURIComponent(sel)}&order=ano.asc`,{headers:sbHeaders(),cache:'no-store'}),
       sbFetch(`${SB_URL}/rest/v1/user_amigos?select=email,amigo`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null),
       sbFetch(`${SB_URL}/rest/v1/conjuges?select=amigo_a,amigo_b`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null),
@@ -1629,7 +1633,9 @@ async function carregar(){
       sbFetch(`${SB_URL}/rest/v1/filhos?select=*`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null),
       sbFetch(`${SB_URL}/rest/v1/filho_presencas?select=*`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null),
       // sonda à coluna convidados.crianca (mesma migração): 200 = já existe
-      sbFetch(`${SB_URL}/rest/v1/convidados?select=crianca&limit=1`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null)
+      sbFetch(`${SB_URL}/rest/v1/convidados?select=crianca&limit=1`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null),
+      // sonda à coluna shoplist.loja (db/shoplist.sql): 200 = já existe
+      sbFetch(`${SB_URL}/rest/v1/shoplist?select=loja&limit=1`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null)
     ]);
     if(!res.ok)throw new Error('HTTP '+res.status);
     const rows=await res.json();
@@ -1658,6 +1664,7 @@ async function carregar(){
     });
     // Só gravamos o flag de convidado-criança se a coluna já existir
     CONV_CRIANCA_COL=!!(ccRes&&ccRes.ok);
+    SHOP_LOJA_COL=!!(sljRes&&sljRes.ok);
     // Só gravamos os responsáveis se as colunas já existirem no Supabase
     // (senão o replace das refeições falhava todo — padrão dividas_publicas)
     REFDEF_RESP_COLS=rows.some(ev=>(ev.refeicoes_def||[]).some(r=>'resp_cozinha' in r));
@@ -1677,7 +1684,7 @@ async function carregar(){
       filhosPres:fpByEv[ev.id]||{},
       mealheiros:(ev.mealheiros||[]).map(m=>({quem:m.quem,data:m.data,valor:N(m.valor),subtipo:m.subtipo,desc:m.descricao})),
       pagamentos:(ev.pagamentos||[]).map(p=>({de:p.de,para:p.para,valor:N(p.valor),ref:p.ref,data:p.data,extra:N(p.extra)})),
-      shoplist:(shopByEv[ev.id]||[]).map(s=>({_id:s.id,artigo:s.artigo,quantidade:s.quantidade||'',tamanho:s.tamanho||'',tipo:s.tipo,dataValor:s.data_valor,estado:s.estado||'pendente',tratadoPor:s.tratado_por||null,noCarrinho:!!s.no_carrinho,compraId:s.compra_id||null,cfDesc:s.cf_desc||null,valor:s.valor!=null?N(s.valor):null,criadoPor:s.criado_por||'',criadoEm:s.criado_em,compradoEm:s.comprado_em})),
+      shoplist:(shopByEv[ev.id]||[]).map(s=>({_id:s.id,artigo:s.artigo,quantidade:s.quantidade||'',tamanho:s.tamanho||'',loja:s.loja||'',tipo:s.tipo,dataValor:s.data_valor,estado:s.estado||'pendente',tratadoPor:s.tratado_por||null,noCarrinho:!!s.no_carrinho,compraId:s.compra_id||null,cfDesc:s.cf_desc||null,valor:s.valor!=null?N(s.valor):null,criadoPor:s.criado_por||'',criadoEm:s.criado_em,compradoEm:s.comprado_em})),
       stockLotes:(stockByEv[ev.id]||[]).map(l=>({_id:l.id,compraId:l.compra_id,artigo:l.artigo,qtd:N(l.qtd),unidade:l.unidade||'',valor:N(l.valor),alocacoes:Array.isArray(l.alocacoes)?l.alocacoes:[],_listArt:l.lista_artigo||null,criadoEm:l.criado_em}))
     }));
     ALL_YEARS.sort((a,b)=>(a.evento.ano||0)-(b.evento.ano||0));
@@ -1841,7 +1848,8 @@ function fraseHistorico(tipo,accao,alvo,autor,d){
   if(tipo==='compras'){
     const q=d.quantidade?` (${d.quantidade})`:'';
     const dest=d.dataValor?` para o ${refDia}`:'';
-    return `${A} pôs "${alvo}"${q} na lista de compras${dest}${d.tratoEu?` — trata ${A}`:' — falta quem trate'}`;
+    const loja=d.loja?` · 🏬 ${d.loja}`:'';
+    return `${A} pôs "${alvo}"${q} na lista de compras${dest}${loja}${d.tratoEu?` — trata ${A}`:' — falta quem trate'}`;
   }
   if(tipo==='convidado'){
     const dono=(d.membro&&d.membro!==autor)?` (convidado de ${d.membro})`:'';
@@ -4010,6 +4018,28 @@ function shopCapArtigo(s){
 // Etiqueta qtd + tamanho/embalagem para mostrar (ex.: "4 × lata 250 ml").
 // Na BD são colunas separadas (quantidade, tamanho) — juntam-se só na UI.
 function shopQtyLabel(it){const q=normalizeQty(it.quantidade),t=(it.tamanho||'').trim();return q&&t?`${q} × ${t}`:(q||t);}
+/* ── LOJA (indicação de onde comprar) ──────────────────────────────
+   Nota de quem pede: "isto só há no X" / "prefiro comprar no Y". Não obriga
+   ninguém a nada — quem compra segue-a ou não. Serve para agrupar a lista por
+   loja (ordenação "🏬 Loja") e evitar viagens a mais.
+   Coluna opcional: sem a migração (SHOP_LOJA_COL=false) nada disto aparece. */
+function shopLojaTxt(it){return ((it&&it.loja)||'').trim();}
+// Chave para juntar grafias ("continente" = "Continente"): maiúsculas sem acentos
+function shopLojaKey(s){return (s||'').trim().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');}
+// Lojas já usadas (todos os anos) — alimenta o datalist de sugestões, para não
+// nascerem cinco grafias da mesma loja
+function shopLojaNomes(){
+  const m={};
+  ALL_YEARS.forEach(y=>(y.shoplist||[]).forEach(it=>{const l=shopLojaTxt(it);if(l&&!m[shopLojaKey(l)])m[shopLojaKey(l)]=l;}));
+  return Object.values(m).sort((a,b)=>a.localeCompare(b,'pt'));
+}
+// Ordenação por loja: com loja primeiro (alfabética), "sem loja" no fim
+function shopLojaCmp(a,b){
+  const la=shopLojaTxt(a),lb=shopLojaTxt(b);
+  return ((la?0:1)-(lb?0:1))||la.localeCompare(lb,'pt');
+}
+// Há alguma loja indicada nesta lista? (só então faz sentido ordenar por loja)
+function shopHasLojas(list){return SHOP_LOJA_COL&&list.some(it=>shopLojaTxt(it));}
 // Nomes com que reclamo artigos (próprio + cônjuge; admin sem membro → 'Admin')
 function myClaimNames(){const s=new Set(MY_NAMES);const p=myPrimaryName()||(isAdmin()?'Admin':'');if(p)s.add(p);return s;}
 function shopMine(it){return !!it.tratadoPor&&myClaimNames().has(it.tratadoPor);}
@@ -4391,7 +4421,7 @@ function aplicarStock(data){
   }
 }
 
-function shopItemCard(it,mineView,noBadge,grouped){
+function shopItemCard(it,mineView,noBadge,grouped,noLoja){
   const meal=shopIsMeal(it.tipo)&&it.dataValor;
   // Em modo "grouped" (dentro de um artigo agrupado), o rótulo principal passa a
   // ser a REFEIÇÃO (não se repete o nome do artigo, que está no cabeçalho).
@@ -4413,7 +4443,13 @@ function shopItemCard(it,mineView,noBadge,grouped){
   // "pedido por" aparece SEMPRE que se sabe quem pediu: também nas linhas de um
   // artigo agrupado (cada refeição pode ter sido pedida por outra pessoa) e nos
   // artigos já em carrinho (quem trata quer saber a quem perguntar detalhes).
-  if(it.criadoPor)sub=`<div class="cmp-sub">pedido por ${escHtml(it.criadoPor)}</div>`;
+  // A loja pedida vai na mesma linha do "pedido por" (não rouba largura ao nome
+  // do artigo). Na vista agrupada por loja o cabeçalho já a diz → noLoja.
+  const lojaTxt=noLoja?'':shopLojaTxt(it);
+  const subParts=[];
+  if(it.criadoPor)subParts.push(`pedido por ${escHtml(it.criadoPor)}`);
+  if(lojaTxt)subParts.push(`<span class="cmp-loja">🏬 ${escHtml(lojaTxt)}</span>`);
+  if(subParts.length)sub=`<div class="cmp-sub">${subParts.join(' · ')}</div>`;
   if(covered){
     right='<span class="cmp-chip stock">🧺 em stock</span>';
   }else if(mineView){
@@ -4450,12 +4486,12 @@ function shopItemCard(it,mineView,noBadge,grouped){
    mesma coluna e com o mesmo peso) e, recuadas por baixo, uma linha por
    refeição ligadas pelo fio verde. O grupo conta como um artigo só: a lista
    lê-se pelos nomes a negrito, não pelo número de linhas. */
-function shopArtNestHtml(items,mineView){
-  if(items.length===1)return shopItemCard(items[0],mineView,false);
+function shopArtNestHtml(items,mineView,noLoja){
+  if(items.length===1)return shopItemCard(items[0],mineView,false,false,noLoja);
   const tot=shopSumQtys(items);
   const qtd=tot?`<span class="cmp-qtd">${escHtml(tot)}</span>`:'';
   let h=`<div class="cmp-artgrp"><div class="cmp-artgrp-h"><span class="cmp-artgrp-name">${escHtml(items[0].artigo)}${qtd}</span><span class="cmp-artgrp-n">${items.length} refeições</span></div><div class="cmp-artgrp-body">`;
-  items.forEach(it=>{h+=shopItemCard(it,mineView,false,true);});
+  items.forEach(it=>{h+=shopItemCard(it,mineView,false,true,noLoja);});
   return h+'</div></div>';
 }
 
@@ -4514,6 +4550,29 @@ function shopCatGroupedList(list,mineView){
   return '<div class="cmp-list">'+h+'</div>';
 }
 
+/* Lista agrupada por LOJA: "isto só há no X" / "prefiro comprar no Y". Um
+   cabeçalho por loja e, no fim, os artigos sem indicação (compra-se onde
+   calhar). Dentro de cada loja junta-se o mesmo artigo, como na vista por
+   categoria — a lista lê-se como uma ida às compras por sítio. */
+function shopLojaGroupedList(list,mineView){
+  const lojas={},order=[];
+  list.forEach(it=>{
+    const l=shopLojaTxt(it),k=l?shopLojaKey(l):'none';
+    if(!lojas[k]){lojas[k]={items:[],nome:l};order.push(k);}
+    lojas[k].items.push(it);
+  });
+  order.sort((a,b)=>(a==='none'?1:0)-(b==='none'?1:0));
+  let h='';
+  order.forEach(k=>{
+    const g=lojas[k];
+    h+=`<div class="cmp-grp-hdr sf"><span class="cmp-grp-label">${k==='none'?'🛒 Onde calhar':'🏬 '+escHtml(g.nome)}</span><span class="cmp-count">${g.items.length}</span></div>`;
+    const byArt={},aOrder=[];
+    g.items.forEach(it=>{const ak=shopArtKey(it.artigo);if(!byArt[ak]){byArt[ak]={items:[]};aOrder.push(ak);}byArt[ak].items.push(it);});
+    aOrder.forEach(ak=>{h+=shopArtNestHtml(byArt[ak].items,mineView,true);});
+  });
+  return '<div class="cmp-list">'+h+'</div>';
+}
+
 /* Lista de compras da refeição — mostra no cartão da refeição (tab Refeições)
    os artigos da shoplist ligados a ela (tipo Almoço/Jantar + data). É a MESMA
    lista do separador Compras: adicionar aqui ou lá dá exatamente no mesmo. */
@@ -4550,8 +4609,9 @@ function mealShopSection(rd){
     // Dica de stock: quanto está coberto, ou stock livre por alocar (botão de um
     // toque para alocar o livre a esta refeição). Ver shopStockHint/shopHintHtml.
     const hint=(!done&&!past)?shopHintHtml(it,'msl-hint'):'';
+    const loja=shopLojaTxt(it);
     return `<div class="msl-it${dim?' msl-dim':''}" onclick="openShopItemModal(${it._id})">
-      <span class="msl-art">${escHtml(it.artigo)}${qtdTxt?` <i>${escHtml(qtdTxt)}</i>`:''}${hint}</span>${st}</div>`;
+      <span class="msl-art">${escHtml(it.artigo)}${qtdTxt?` <i>${escHtml(qtdTxt)}</i>`:''}${loja?` <span class="msl-loja">🏬 ${escHtml(loja)}</span>`:''}${hint}</span>${st}</div>`;
   };
   // Dois blocos independentes: 📝 a lista (pendentes) e 🧺 o que já foi comprado
   // para a refeição (lotes alocados c/ € + artigos comprados sem lote — um pedido
@@ -4589,7 +4649,8 @@ function renderShopViews(){
 }
 
 // Ordenação do separador Shop List: 'ref' = agrupado por refeição/tipo (defeito);
-// 'art' = lista plana por ordem alfabética de artigo. Fica memorizada no aparelho.
+// 'art' = lista plana por ordem alfabética de artigo; 'cat' = por categoria de
+// produto; 'loja' = pela loja indicada por quem pediu. Memorizada no aparelho.
 let SHOP_ORDER=(function(){try{return localStorage.getItem('festasbv_shop_order')||'ref';}catch(e){return 'ref';}})();
 function setShopOrder(o){SHOP_ORDER=o;try{localStorage.setItem('festasbv_shop_order',o);}catch(e){}renderCompras();}
 
@@ -4605,21 +4666,29 @@ function renderCompras(){
   const canW=shopCanWrite();
   const fechadas=contasFechadas();
   const ord={};SHOP_TIPOS.forEach((t,i)=>ord[t]=i);
+  // A ordenação por loja só existe quando há lojas indicadas (senão era um chip
+  // que dava sempre um grupo só). Se estava escolhida e as lojas desapareceram,
+  // cai para o defeito sem obrigar o utilizador a mexer.
+  const temLojas=shopHasLojas(act);
   const byArt=SHOP_ORDER==='art';
   const byCat=SHOP_ORDER==='cat'&&CATS_TABLE;
+  const byLoja=SHOP_ORDER==='loja'&&temLojas;
   // Por categoria: agrupa por categoria de produto (sem categoria no fim) — a
   // vista "corredor do supermercado"; o badge fica para identificar o destino
   const catCmp=(a,b)=>{
     const ca=artCat(a.artigo),cb=artCat(b.artigo);
     return ((ca?0:1)-(cb?0:1))||(ca&&cb?ca.nome.localeCompare(cb.nome,'pt'):0);
   };
-  const sortF=byCat
+  const sortF=byLoja
+    ?(a,b)=>shopLojaCmp(a,b)||a.artigo.localeCompare(b.artigo,'pt')||(ord[a.tipo]-ord[b.tipo])||((a.dataValor||'').localeCompare(b.dataValor||''))
+    :byCat
     ?(a,b)=>catCmp(a,b)||a.artigo.localeCompare(b.artigo,'pt')||(ord[a.tipo]-ord[b.tipo])||((a.dataValor||'').localeCompare(b.dataValor||''))
     :byArt
     ?(a,b)=>a.artigo.localeCompare(b.artigo,'pt')||(ord[a.tipo]-ord[b.tipo])||((a.dataValor||'').localeCompare(b.dataValor||''))
     :(a,b)=>(ord[a.tipo]-ord[b.tipo])||((a.dataValor||'').localeCompare(b.dataValor||''))||a.artigo.localeCompare(b.artigo,'pt');
   // Por artigo: lista plana com o badge da refeição em cada cartão
-  const listOf=(arr,mineView)=>byCat?shopCatGroupedList(arr,mineView)
+  const listOf=(arr,mineView)=>byLoja?shopLojaGroupedList(arr,mineView)
+    :byCat?shopCatGroupedList(arr,mineView)
     :byArt?shopArtGroupedList(arr,mineView)
     :shopGroupedList(arr,mineView);
   // A COBERTURA precede tudo: um pedido coberto pelo stock não está "em falta"
@@ -4655,10 +4724,16 @@ function renderCompras(){
   // No Histórico não há chips, mas mantém-se a mesma linha divisória dos outros
   // sub-separadores para o cabeçalho ficar coerente.
   if(SHOP_TAB!=='hist'){
-    h+=`<div class="cmp-sort">
-      <span class="sd-chip${(byArt||byCat)?'':' on'}" onclick="setShopOrder('ref')">📅 Por refeição</span>
-      <span class="sd-chip${byArt?' on':''}" onclick="setShopOrder('art')">🔤 Por artigo</span>
-      ${CATS_TABLE?`<span class="sd-chip${byCat?' on':''}" onclick="setShopOrder('cat')">🏷️ Por categoria</span>`:''}
+    // Sem a palavra "Por": com quatro critérios só assim cabem todos numa
+    // linha em ecrã de telemóvel (o ícone de ordenação do chip já o diz).
+    const chips=[
+      ['ref','📅','Refeição',!(byArt||byCat||byLoja)],
+      ['art','🔤','Artigo',byArt],
+      ...(CATS_TABLE?[['cat','🏷️','Categoria',byCat]]:[]),
+      ...(temLojas?[['loja','🏬','Loja',byLoja]]:[])
+    ];
+    h+=`<div class="cmp-sort n${chips.length}">
+      ${chips.map(c=>`<span class="sd-chip${c[3]?' on':''}" onclick="setShopOrder('${c[0]}')">${c[1]} ${c[2]}</span>`).join('')}
     </div>`;
   }else{
     h+='<div class="cmp-divider"></div>';
@@ -4925,6 +5000,15 @@ function openShopItemModal(id,presetTipo,presetData){
   if(artList)artList.innerHTML=stkAddNomes().map(n=>`<option value="${escHtml(n)}">`).join('');
   document.getElementById('shop-qtd').value=it?normalizeQty(it.quantidade):'';
   document.getElementById('shop-tam').value=it?(it.tamanho||''):'';
+  // Loja preferida (só com a coluna migrada). Sugestões = lojas já usadas —
+  // é o que evita "Continente"/"continente"/"Cont." como três lojas.
+  const lojaWrap=document.getElementById('shop-loja-wrap');
+  if(lojaWrap){
+    lojaWrap.style.display=SHOP_LOJA_COL?'':'none';
+    document.getElementById('shop-loja').value=it?shopLojaTxt(it):'';
+    const ll=document.getElementById('shop-loja-list');
+    if(ll&&SHOP_LOJA_COL)ll.innerHTML=shopLojaNomes().map(n=>`<option value="${escHtml(n)}">`).join('');
+  }
   document.getElementById('shop-tipo').value=it?it.tipo:(presetTipo||'Gerais');
   // Contexto de refeição trancado: esconde tipo+refeições e mostra o destino fixo
   document.getElementById('shop-tipo-wrap').style.display=shopCtxLock?'none':'';
@@ -5050,6 +5134,7 @@ async function saveShopItem(){
   const artigo=shopCapArtigo(document.getElementById('shop-artigo').value);
   const qtd=normalizeQty(document.getElementById('shop-qtd').value);
   const tam=normalizeQty(document.getElementById('shop-tam').value);
+  const loja=SHOP_LOJA_COL?shopCapArtigo(document.getElementById('shop-loja').value).slice(0,40):'';
   const tipo=shopCtxLock?shopCtxLock.tipo:document.getElementById('shop-tipo').value;
   if(!artigo){toast('Indica o artigo','bad');return;}
   let dataValor=null,datasMulti=null;
@@ -5071,6 +5156,7 @@ async function saveShopItem(){
       const it=shopArr().find(x=>x._id===editingItemId);
       const patch={artigo,quantidade:qtd,tamanho:tam||null,tipo,data_valor:dataValor};
       const local={artigo,quantidade:qtd,tamanho:tam,tipo,dataValor};
+      if(SHOP_LOJA_COL){patch.loja=loja||null;local.loja=loja;}
       // Admin pode reatribuir quem trata (puxar/largar por outrem)
       if(it&&isAdmin()&&document.getElementById('shop-claim-wrap').style.display!=='none'){
         const nv=document.getElementById('shop-claim').value||null;
@@ -5088,13 +5174,14 @@ async function saveShopItem(){
       // refeição (cada uma mantém a sua lista e o custo cai no sítio certo)
       const rows=(datasMulti||[dataValor]).map(dv=>{
         const r={evento_id:DATA._sbId,artigo,quantidade:qtd,tamanho:tam||null,tipo,data_valor:dv,estado:'pendente',criado_por:criadoPor};
+        if(SHOP_LOJA_COL)r.loja=loja||null;
         if(tratoEu)r.tratado_por=criadoPor;
         return r;
       });
       const ins=await queueWrite(()=>sbReq('POST','shoplist',rows,{Prefer:'return=representation'}));
       rows.forEach((r,i)=>{
-        shopArr().push({_id:ins&&ins[i]?ins[i].id:null,artigo,quantidade:qtd,tamanho:tam,tipo,dataValor:r.data_valor,estado:'pendente',tratadoPor:tratoEu?criadoPor:null,noCarrinho:false,compraId:null,cfDesc:null,valor:null,criadoPor,criadoEm:new Date().toISOString(),compradoEm:null});
-        sbLog('compras','adicionou',artigo,{tratoEu,quantidade:shopQtyLabel({quantidade:qtd,tamanho:tam}),tipoDesp:tipo,dataValor:r.data_valor,dia:r.data_valor?dataToDia(r.data_valor):undefined,ref:shopIsMeal(tipo)?tipo:undefined});
+        shopArr().push({_id:ins&&ins[i]?ins[i].id:null,artigo,quantidade:qtd,tamanho:tam,loja,tipo,dataValor:r.data_valor,estado:'pendente',tratadoPor:tratoEu?criadoPor:null,noCarrinho:false,compraId:null,cfDesc:null,valor:null,criadoPor,criadoEm:new Date().toISOString(),compradoEm:null});
+        sbLog('compras','adicionou',artigo,{tratoEu,quantidade:shopQtyLabel({quantidade:qtd,tamanho:tam}),loja:loja||undefined,tipoDesp:tipo,dataValor:r.data_valor,dia:r.data_valor?dataToDia(r.data_valor):undefined,ref:shopIsMeal(tipo)?tipo:undefined});
       });
       toast(rows.length>1?`Artigo adicionado a ${rows.length} refeições ✓`:'Artigo adicionado ✓','ok');
     }
