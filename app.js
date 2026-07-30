@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v134 · 2026-07-30 · Shop List: loja em linha própria no cartão; "pedido por" mais discreto';
+const APP_BUILD = 'v135 · 2026-07-30 · Lista da refeição: botão ＋🛒 em vez de "falta quem trate"';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -4625,9 +4625,13 @@ function mealShopSection(rd){
     const qtdTxt=shopQtyLabel(it);
     // Sem "riscado": um artigo comprado é uma linha normal do bloco Comprado,
     // igual às dos lotes — o bloco onde está já diz tudo
+    // Sem dono: em vez de dizer "falta quem trate", dá-se logo o botão de o
+    // resolver — o mesmo ＋🛒 da Shop List, um toque e o artigo é meu. Em
+    // refeições passadas não há nada a tratar: fica só a constatação.
     const st=done?''
       :it.tratadoPor?`<span class="msl-st">🛒 ${escHtml(it.tratadoPor)}</span>`
-      :'<span class="msl-st falta">falta quem trate</span>';
+      :past?'<span class="msl-st falta">falta quem trate</span>'
+      :`<button class="cmp-mini cart write-action msl-claim" title="Pôr no carrinho" aria-label="Pôr no carrinho" onclick="event.stopPropagation();claimItem(${it._id})"><i class="cmp-plus">＋</i>🛒</button>`;
     // Dica de stock: quanto está coberto, ou stock livre por alocar (botão de um
     // toque para alocar o livre a esta refeição). Ver shopStockHint/shopHintHtml.
     const hint=(!done&&!past)?shopHintHtml(it,'msl-hint'):'';
