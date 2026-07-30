@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v142 · 2026-07-30 · Cartaz das Ementas em pergaminho dourado (era campino escuro)';
+const APP_BUILD = 'v143 · 2026-07-30 · Partilhar o cartaz manda a imagem (PNG desenhado no canvas), já não texto';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -8047,35 +8047,205 @@ function closeCartaz(){
   document.body.classList.remove('no-scroll');
 }
 
-// Mesmo cartaz em texto simples, para mandar no WhatsApp/Telegram
-function cartazTexto(){
+/* ── Cartaz em imagem ──────────────────────────────────────────────────────
+   O cartaz sai como PNG (é assim que vai para o WhatsApp). Como não há build
+   nem bibliotecas, é desenhado à mão num <canvas> com o mesmo aspeto do modal:
+   pergaminho dourado, moldura, um bloco por dia, um cartão por refeição.
+   Tudo síncrono de propósito — o Safari só deixa chamar navigator.share() no
+   mesmo "tick" do toque, e um await pelo meio perde essa autorização.        */
+const CZI={
+  W:600,SC:2,                       // largura lógica; o PNG sai ao dobro
+  MARG:18,PADX:28,                  // margem do pergaminho · respiro na moldura
+  FUNDO:'#E9DCBB',
+  INK:'#2C1F12',RED:'#6E2012',GOLD:'#7A5A0E',MUTED:'#6F5C42',FAINT:'#9A8765',
+  DISPLAY:'"Barlow Condensed",-apple-system,sans-serif',
+  SANS:'-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif'
+};
+const czFont=st=>`${st.it?'italic ':''}${st.peso||600} ${st.px}px ${st.fam||CZI.DISPLAY}`;
+const czEmoji=ref=>{
+  const r=(ref||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+  return r.startsWith('alm')?'☀️':r.startsWith('jan')?'🌙':'☕';
+};
+// Largura de um texto com "tracking" (o letter-spacing do cartaz)
+function czTrackW(ctx,txt,tr){
+  let w=0,n=0;
+  for(const ch of txt){w+=ctx.measureText(ch).width+tr;n++;}
+  return n?w-tr:0;
+}
+function czDrawTracked(ctx,txt,cx,y,tr){
+  let x=cx-czTrackW(ctx,txt,tr)/2;
+  for(const ch of txt){ctx.fillText(ch,x,y);x+=ctx.measureText(ch).width+tr;}
+}
+function czWrap(ctx,txt,max){
+  const out=[];
+  String(txt).split('\n').forEach(par=>{
+    const w=par.split(/\s+/).filter(Boolean);
+    if(!w.length)return;
+    let ln=w[0];
+    for(let i=1;i<w.length;i++){
+      const t=ln+' '+w[i];
+      if(ctx.measureText(t).width<=max)ln=t;else{out.push(ln);ln=w[i];}
+    }
+    out.push(ln);
+  });
+  return out;
+}
+function czRoundRect(ctx,x,y,w,h,r){
+  ctx.beginPath();
+  ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);
+  ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath();
+}
+
+/* Estilos do cartaz (o equivalente às classes .cz-* do CSS) */
+const CZS={
+  nome:{px:15,cor:()=>CZI.GOLD,tr:4.2},
+  titulo:{px:50,cor:()=>CZI.RED,tr:5},
+  ano:{px:21,cor:()=>CZI.GOLD,tr:6.5},
+  datas:{px:14,fam:CZI.SANS,peso:400,it:1,cor:()=>CZI.GOLD},
+  dia:{px:18,cor:()=>CZI.RED,tr:3},
+  ref:{px:17,cor:()=>CZI.GOLD,tr:2.4},
+  obs:{px:13.5,fam:CZI.SANS,peso:400,it:1,cor:()=>CZI.MUTED},
+  prato:{px:31,cor:()=>CZI.RED,tr:.4},
+  porvir:{px:14,fam:CZI.SANS,peso:400,it:1,cor:()=>CZI.FAINT},
+  foot:{px:17,cor:()=>CZI.GOLD,tr:6}
+};
+
+/* Uma só passagem serve para medir e para desenhar: primeiro corre-se com
+   `draw=false` (só para saber que altura tem o PNG e a altura de cada cartão,
+   que fica em `cards`), depois com `draw=true` a usar essas alturas — assim o
+   cartão pode ser pintado antes do texto que leva por cima. */
+function czRender(ctx,draw,cards){
+  const W=CZI.W,cx=W/2,inner=W-2*(CZI.MARG+CZI.PADX);
   const nome=(DATA.evento.nome||'').replace(/\s*\d{4}\s*/g,'').trim()||'Festas';
-  const ano=DATA.evento.ano||'';
-  const L=['📜 EMENTAS · '+nome+(ano?' '+ano:'')];
+  const ano=String(DATA.evento.ano||''),datas=DATA.evento.datas||'';
+  ctx.textBaseline='top';ctx.textAlign='left';
+  // Escreve (ou só mede) uma linha centrada e devolve a altura que ocupou
+  const linha=(txt,st,y)=>{
+    ctx.font=czFont(st);
+    if(draw){ctx.fillStyle=st.cor();czDrawTracked(ctx,txt,cx,y,st.tr||0);}
+    return st.px*1.16;
+  };
+  let y=CZI.MARG+30,ci=0;
+  y+=linha(nome.toUpperCase(),CZS.nome,y)+3;
+  y+=linha('EMENTAS',CZS.titulo,y);
+  if(ano)y+=linha(ano,CZS.ano,y)+2;
+  if(datas)y+=linha(datas,CZS.datas,y);
+  y+=16;
+  if(draw){ // filete dourado
+    const g=ctx.createLinearGradient(cx-130,0,cx+130,0);
+    g.addColorStop(0,'rgba(110,75,25,0)');g.addColorStop(.22,'rgba(110,75,25,.55)');
+    g.addColorStop(.78,'rgba(110,75,25,.55)');g.addColorStop(1,'rgba(110,75,25,0)');
+    ctx.fillStyle=g;ctx.fillRect(cx-130,y,260,1);
+  }
+  y+=8;
+
   cartazDias().forEach(g=>{
-    L.push('');
-    L.push('— '+((diaExtenso(g.data)||g.dia||'')+' · '+fmtDiaMes(g.data)).trim()+' —');
+    y+=16;
+    y+=linha(((diaExtenso(g.data)||g.dia||'')+'  •  '+fmtDiaMes(g.data)).toUpperCase(),CZS.dia,y)+4;
     g.itens.forEach(rd=>{
       const mp=parseMenuParts(rd.menu);
-      L.push(rd.ref+(mp.outras?' — '+mp.outras.replace(/\n/g,' · '):''));
-      if(rd.prato)L.push('🍲 '+rd.prato);
-      if(mp.entradas)L.push('🥗 Entradas: '+mp.entradas);
-      if(mp.sobremesa)L.push('🍰 Sobremesa: '+mp.sobremesa);
-      if(!(rd.prato||mp.entradas||mp.sobremesa||mp.outras))L.push('— ementa por definir —');
+      const cardTop=y,cardX=CZI.MARG+CZI.PADX-8,cardW=inner+16;
+      if(draw){
+        czRoundRect(ctx,cardX,cardTop,cardW,cards[ci],13);
+        ctx.fillStyle='rgba(255,253,246,.62)';ctx.fill();
+        ctx.strokeStyle='rgba(168,123,20,.34)';ctx.lineWidth=1;ctx.stroke();
+      }
+      let cy=y+13;
+      // Refeição (ícone em emoji — o canvas desenha-o sem precisar do SVG)
+      cy+=linha(czEmoji(rd.ref)+'  '+rd.ref.toUpperCase(),CZS.ref,cy)+1;
+      if(mp.outras){                         // notas do menu (onde vai o chef)
+        ctx.font=czFont(CZS.obs);
+        czWrap(ctx,mp.outras,inner-20).forEach(ln=>{cy+=linha(ln,CZS.obs,cy)+1;});
+      }
+      if(rd.prato){
+        cy+=3;
+        ctx.font=czFont(CZS.prato);
+        czWrap(ctx,rd.prato,inner-20).forEach(ln=>{cy+=linha(ln,CZS.prato,cy)-3;});
+        cy+=3;
+      }
+      // Entradas / Sobremesa: etiqueta + valor na mesma linha, centrados
+      [['Entradas',mp.entradas],['Sobremesa',mp.sobremesa]].forEach(([lbl,val])=>{
+        if(!val)return;
+        cy+=4;
+        const fL=czFont({px:12.5,peso:600}),fV=czFont({px:15,peso:500,fam:CZI.SANS});
+        ctx.font=fL;const wL=czTrackW(ctx,lbl.toUpperCase(),1.6)+9;
+        ctx.font=fV;
+        const lns=czWrap(ctx,val,inner-24-wL);
+        const wV=Math.max(...lns.map(l=>ctx.measureText(l).width));
+        const lx=cx-(wL+wV)/2;
+        if(draw){
+          ctx.font=fL;ctx.fillStyle=CZI.GOLD;
+          let px=lx;for(const ch of lbl.toUpperCase()){ctx.fillText(ch,px,cy+2);px+=ctx.measureText(ch).width+1.6;}
+          ctx.font=fV;ctx.fillStyle=CZI.INK;
+          lns.forEach((l,i)=>ctx.fillText(l,lx+wL,cy+i*18));
+        }
+        cy+=lns.length*18;
+      });
+      if(!(rd.prato||mp.entradas||mp.sobremesa||mp.outras))
+        cy+=linha('Ementa por definir',CZS.porvir,cy)+2;
+      cy+=13;
+      if(!draw)cards.push(cy-cardTop);
+      ci++;
+      y=cy+9;
     });
   });
-  return L.join('\n');
+  y+=18;
+  y+=linha('BOM APETITE!',CZS.foot,y);
+  return y+CZI.MARG+22;
 }
+
+// Canvas final: fundo, pergaminho e depois o conteúdo por cima
+function cartazCanvas(){
+  const medida=document.createElement('canvas').getContext('2d');
+  const cards=[];                       // altura de cada cartão, medida à frente
+  const H=czRender(medida,false,cards);
+  const cv=document.createElement('canvas');
+  cv.width=CZI.W*CZI.SC;cv.height=Math.ceil(H)*CZI.SC;
+  const ctx=cv.getContext('2d');
+  ctx.scale(CZI.SC,CZI.SC);
+  ctx.fillStyle=CZI.FUNDO;ctx.fillRect(0,0,CZI.W,H);
+  // Pergaminho dourado + as riscas finas do resto da app
+  ctx.save();
+  czRoundRect(ctx,CZI.MARG,CZI.MARG,CZI.W-2*CZI.MARG,H-2*CZI.MARG,18);
+  ctx.clip();
+  const g=ctx.createLinearGradient(0,CZI.MARG,CZI.W*.4,H);
+  g.addColorStop(0,'#F6E5B4');g.addColorStop(1,'#E6C878');
+  ctx.fillStyle=g;ctx.fillRect(0,0,CZI.W,H);
+  ctx.fillStyle='rgba(255,255,255,.10)';
+  for(let sy=CZI.MARG;sy<H;sy+=14)ctx.fillRect(0,sy,CZI.W,7);
+  ctx.restore();
+  czRoundRect(ctx,CZI.MARG,CZI.MARG,CZI.W-2*CZI.MARG,H-2*CZI.MARG,18);
+  ctx.strokeStyle='#A87B14';ctx.lineWidth=1.5;ctx.stroke();
+  czRoundRect(ctx,CZI.MARG+8,CZI.MARG+8,CZI.W-2*CZI.MARG-16,H-2*CZI.MARG-16,12);
+  ctx.strokeStyle='rgba(110,75,25,.35)';ctx.lineWidth=1;ctx.stroke();
+  czRender(ctx,true,cards);
+  return cv;
+}
+// dataURL → Blob sem passos assíncronos (ver nota da autorização do share)
+function czBlob(cv){
+  const b64=cv.toDataURL('image/png').split(',')[1],bin=atob(b64);
+  const arr=new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++)arr[i]=bin.charCodeAt(i);
+  return new Blob([arr],{type:'image/png'});
+}
+
 function shareCartaz(){
-  const txt=cartazTexto();
+  if(!(DATA.refeicoesDef||[]).length){toast('Ainda não há refeições para pôr no cartaz','bad');return;}
   const ano=DATA.evento.ano||'';
-  if(navigator.share){
-    navigator.share({title:'Ementas'+(ano?' '+ano:''),text:txt}).catch(()=>{});
+  let file;
+  try{
+    file=new File([czBlob(cartazCanvas())],'ementas'+(ano?'-'+ano:'')+'.png',{type:'image/png'});
+  }catch(e){toast('Não foi possível gerar a imagem','bad');return;}
+  if(navigator.canShare&&navigator.canShare({files:[file]})){
+    navigator.share({files:[file],title:'Ementas'+(ano?' '+ano:'')}).catch(()=>{});
     return;
   }
-  if(navigator.clipboard&&navigator.clipboard.writeText){
-    navigator.clipboard.writeText(txt).then(()=>toast('Ementas copiadas ✓','ok')).catch(()=>toast('Não foi possível copiar','bad'));
-  } else toast('Partilha não disponível neste dispositivo','bad');
+  // Sem partilha de ficheiros (desktop, browsers antigos) → descarrega o PNG
+  const url=URL.createObjectURL(file);
+  const a=document.createElement('a');
+  a.href=url;a.download=file.name;document.body.appendChild(a);a.click();a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),4000);
+  toast('Cartaz guardado como imagem ✓','ok');
 }
 
 /* ═══ HERO SUB-TOTALS ═══ */
