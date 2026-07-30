@@ -132,8 +132,10 @@ body::before{content:"";position:fixed;top:0;left:0;right:0;height:env(safe-area
 .chip{background:var(--panel2);padding:2px 8px;border-radius:6px;color:var(--muted)}.chip.t{color:var(--gold);font-weight:700}
 
 /* Sheet (detail) */
-.sheet-bg{position:fixed;inset:0;background:rgba(60,38,15,.45);backdrop-filter:blur(3px);opacity:0;pointer-events:none;transition:.25s;z-index:50}
-.sheet-bg.show{opacity:1;pointer-events:auto}
+/* O blur só existe quando o fundo está aberto: um backdrop-filter permanente
+   obriga o iOS a recompor o ecrã todo e deixa traços horizontais no scroll. */
+.sheet-bg{position:fixed;inset:0;background:rgba(60,38,15,.45);opacity:0;visibility:hidden;pointer-events:none;transition:opacity .25s,visibility .25s;z-index:50}
+.sheet-bg.show{opacity:1;visibility:visible;pointer-events:auto;-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}
 .sheet{position:fixed;left:0;right:0;bottom:0;max-width:560px;margin:0 auto;background:var(--panel);border-radius:22px 22px 0 0;border:1px solid var(--line);border-bottom:none;z-index:51;transform:translateY(100%);transition:transform .3s cubic-bezier(.3,.8,.3,1);max-height:92vh;display:flex;flex-direction:column;box-shadow:0 -10px 40px rgba(60,38,15,.3)}
 .sheet.show{transform:translateY(0)}
 body.no-scroll{overflow:hidden;position:fixed;width:100%;}
@@ -184,8 +186,10 @@ body.read-only .fab.green,body.contas-fechadas .fab.green{display:none!important
 .fab.dark{background:var(--panel);color:var(--muted);border:1px solid var(--line)}
 
 /* Modal */
-.modal-bg{position:fixed;inset:0;background:rgba(60,38,15,.5);backdrop-filter:blur(4px);opacity:0;pointer-events:none;transition:.2s;z-index:60;display:flex;align-items:flex-end;justify-content:center;padding:0}
-.modal-bg.show{opacity:1;pointer-events:auto}
+/* Idem: há ~16 .modal-bg sempre no DOM — com blur fixo eram 16 camadas
+   compostas em permanência e o scroll ficava com bandas/traços no iOS. */
+.modal-bg{position:fixed;inset:0;background:rgba(60,38,15,.5);opacity:0;visibility:hidden;pointer-events:none;transition:opacity .2s,visibility .2s;z-index:60;display:flex;align-items:flex-end;justify-content:center;padding:0}
+.modal-bg.show{opacity:1;visibility:visible;pointer-events:auto;-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px)}
 .modal{background:var(--panel);border:1px solid var(--line);border-radius:22px 22px 0 0;padding:22px 20px 34px;max-width:560px;width:100%;max-height:86vh;overflow-y:auto;transform:translateY(100%);transition:transform .3s cubic-bezier(.3,.8,.3,1);-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
 .modal-bg.show .modal{transform:translateY(0)}
 .modal h3{font-family:var(--display);font-size:21px;letter-spacing:.03em;text-transform:uppercase;font-weight:600;margin-bottom:14px;color:var(--campino-escuro)}
