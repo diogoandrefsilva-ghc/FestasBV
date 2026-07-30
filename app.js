@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v131 · 2026-07-30 · Shop List: loja preferida por artigo + ordenação por loja';
+const APP_BUILD = 'v132 · 2026-07-30 · Shop List: loja por artigo, ordenação por loja e quantidade em linha própria';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -4017,7 +4017,17 @@ function shopCapArtigo(s){
 }
 // Etiqueta qtd + tamanho/embalagem para mostrar (ex.: "4 × lata 250 ml").
 // Na BD são colunas separadas (quantidade, tamanho) — juntam-se só na UI.
-function shopQtyLabel(it){const q=normalizeQty(it.quantidade),t=(it.tamanho||'').trim();return q&&t?`${q} × ${t}`:(q||t);}
+// Sem embalagem indicada, um número seco são UNIDADES ("3" → "3 unidades"):
+// é o que quem escreve quer dizer, e evita a leitura ambígua na lista.
+// Sem quantidade nenhuma não há etiqueta (fica só o nome do artigo).
+function shopQtyLabel(it){
+  const q=normalizeQty(it.quantidade),t=(it.tamanho||'').trim();
+  if(q&&t)return `${q} × ${t}`;
+  if(!q)return t;                      // só embalagem ("lata 250 ml") — mostra-se na mesma
+  const p=qtyParse(q);
+  if(p&&(!p.u||p.u==='un'))return fmtQty(p.n,p.n===1?'unidade':'unidades');
+  return q;                            // já traz unidade própria ("2,5 kg", "1 L")
+}
 /* ── LOJA (indicação de onde comprar) ──────────────────────────────
    Nota de quem pede: "isto só há no X" / "prefiro comprar no Y". Não obriga
    ninguém a nada — quem compra segue-a ou não. Serve para agrupar a lista por
@@ -4430,8 +4440,11 @@ function shopItemCard(it,mineView,noBadge,grouped,noLoja){
   const chip=meal?`<span class="cmp-badge meal">${shopTipoIcon(it.tipo)} ${fmtDiaMes(it.dataValor)}</span>`:`<span class="cmp-badge">${shopTipoIcon(it.tipo)} ${escHtml(it.tipo)}</span>`;
   const primary=grouped?chip:escHtml(it.artigo);
   const badge=(noBadge||grouped)?'':chip;
+  // A quantidade tem LINHA PRÓPRIA por baixo do artigo: ao lado do nome era a
+  // primeira coisa a desaparecer (nome comprido → "…") e é justamente o que
+  // interessa a quem está no corredor do supermercado.
   const qtdTxt=shopQtyLabel(it);
-  const qtd=qtdTxt?`<span class="cmp-qtd">${escHtml(qtdTxt)}</span>`:'';
+  const qtd=qtdTxt?`<div class="cmp-qtd-row">Quantidade: <b>${escHtml(qtdTxt)}</b></div>`:'';
   const removed=shopIsRemoved(it);
   // Cartão de UMA linha (escala para dezenas de artigos). Editar/eliminar/largar
   // vivem no detalhe (toca no artigo); no cartão só a ação principal de cada vista.
@@ -4477,7 +4490,7 @@ function shopItemCard(it,mineView,noBadge,grouped,noLoja){
   const hintRow=hint?`<div class="cmp-hint-row">${hint}</div>`:'';
   return `<div class="cmp-item cmp-line cmp-tap${grouped?' cmp-sub':''}${mineView&&it.noCarrinho?' incart':''}${removed?' removed':''}" onclick="openShopItemModal(${it._id})">
     ${check}
-    <div class="cmp-main"><div class="cmp-artigo">${primary}${qtd}</div>${sub}</div>
+    <div class="cmp-main"><div class="cmp-artigo">${primary}</div>${qtd}${sub}</div>
     ${badge}${right}<span class="cmp-chev-r">›</span>${hintRow}
   </div>`;
 }
@@ -4489,8 +4502,10 @@ function shopItemCard(it,mineView,noBadge,grouped,noLoja){
 function shopArtNestHtml(items,mineView,noLoja){
   if(items.length===1)return shopItemCard(items[0],mineView,false,false,noLoja);
   const tot=shopSumQtys(items);
-  const qtd=tot?`<span class="cmp-qtd">${escHtml(tot)}</span>`:'';
-  let h=`<div class="cmp-artgrp"><div class="cmp-artgrp-h"><span class="cmp-artgrp-name">${escHtml(items[0].artigo)}${qtd}</span><span class="cmp-artgrp-n">${items.length} refeições</span></div><div class="cmp-artgrp-body">`;
+  // Total do grupo: mesma linha própria dos cartões (nome em cima, quantidade
+  // por baixo) — é a resposta a "quanto preciso ao todo deste artigo".
+  const qtd=tot?`<div class="cmp-qtd-row cmp-artgrp-qtd">Quantidade: <b>${escHtml(tot)}</b></div>`:'';
+  let h=`<div class="cmp-artgrp"><div class="cmp-artgrp-h"><span class="cmp-artgrp-name">${escHtml(items[0].artigo)}</span><span class="cmp-artgrp-n">${items.length} refeições</span></div>${qtd}<div class="cmp-artgrp-body">`;
   items.forEach(it=>{h+=shopItemCard(it,mineView,false,true,noLoja);});
   return h+'</div></div>';
 }
@@ -4515,7 +4530,13 @@ function shopSumQtys(items){
   const byU={};let hasNum=false;
   items.forEach(it=>{const q=qtyParse(it.quantidade);if(q){hasNum=true;byU[q.u]=rnd((byU[q.u]||0)+q.n,3);}});
   if(!hasNum)return '';
-  return Object.keys(byU).map(u=>fmtQty(byU[u],u)).join(' + ');
+  // Números secos são unidades — mas só se NENHUM pedido do grupo trouxer
+  // embalagem (com "lata 250 ml" pelo meio, 4 são 4 latas, não 4 unidades).
+  const semTam=!items.some(it=>(it.tamanho||'').trim());
+  return Object.keys(byU).map(u=>{
+    const n=byU[u];
+    return (semTam&&(!u||u==='un'))?fmtQty(n,n===1?'unidade':'unidades'):fmtQty(n,u);
+  }).join(' + ');
 }
 /* Lista agrupada por ARTIGO: junta os pedidos do mesmo artigo (ex.: "Chouriços"
    para dois jantares) sob um cabeçalho com o TOTAL a comprar; cada refeição fica
