@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v129 · 2026-07-30 · Presenças: famílias em blocos alternados na grelha, com separador igual à cabeça';
+const APP_BUILD = 'v130 · 2026-07-30 · Refeições: vários responsáveis por refeição (chips), todos avisados no Telegram';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -1043,7 +1043,7 @@ function renderAll(){
         <div class="refdef-row${isAdmin()?' refdef-click':''}" style="flex-wrap:wrap"${isAdmin()?` onclick="openRefdefModal(${rd._idx})"`:''}>
           <span class="refdef-icon">${icon}</span>
           <div class="refdef-info">
-            <div class="refdef-ref sf">${rd.ref}${rd.respCozinha?`<span class="refdef-resp-inline sf"> · 👨‍🍳 ${escHtml(rd.respCozinha)}</span>`:''}</div>
+            <div class="refdef-ref sf">${rd.ref}${(rd.responsaveis||[]).length?`<span class="refdef-resp-inline sf"> · 👨‍🍳 ${escHtml((rd.responsaveis||[]).join(' · '))}</span>`:''}</div>
           </div>
           ${isAdmin()?'<span class="refdef-chevron sf">›</span>':''}
           ${ementa}
@@ -1671,7 +1671,7 @@ async function carregar(){
         _id:m.id,nome:m.nome,fator:N(m.fator),sexo:m.sexo==='F'?'F':'M',
         presencas:(m.presencas||[]).map(p=>({k:`${p.dia}|${p.ref}`,modo:p.modo==='bebe'?'bebe':'come'}))
       })),
-      refeicoesDef:(ev.refeicoes_def||[]).map(r=>({data:r.data,dia:r.dia,ref:r.ref,prato:r.prato||'',peso:N(r.peso),minMEO:N(r.min_meo),minConv:N(r.min_conv),extraConv:N(r.extra_conv),respCozinha:r.resp_cozinha||'',menu:r.menu||''})),
+      refeicoesDef:(ev.refeicoes_def||[]).map(r=>({data:r.data,dia:r.dia,ref:r.ref,prato:r.prato||'',peso:N(r.peso),minMEO:N(r.min_meo),minConv:N(r.min_conv),extraConv:N(r.extra_conv),responsaveis:parseResps(r.resp_cozinha),menu:r.menu||''})),
       despesas:(ev.despesas||[]).map(d=>({_id:d.id,quem:d.quem,dataDesp:d.data_desp,dataValor:d.data_valor,desc:d.descricao,tipo:d.tipo,valor:N(d.valor),obs:d.observacoes||'',compraId:d.compra_id||null})),
       convidados:(ev.convidados||[]).map(c=>({_id:c.id,membro:c.membro,nome:c.nome,data:c.data,dia:c.dia,ref:c.ref,pagante:c.pagante?'Sim':'Não',crianca:!!c.crianca,preco:N(c.preco)})),
       filhosPres:fpByEv[ev.id]||{},
@@ -1749,7 +1749,7 @@ async function sbGuardarEvento(y,slot){
     if(y.refeicoesDef&&y.refeicoesDef.length)
       await sbReq('POST','refeicoes_def',y.refeicoesDef.map(r=>{
         const row={evento_id:eid,data:r.data,dia:r.dia,ref:r.ref,prato:r.prato||null,peso:r.peso||0,min_meo:r.minMEO||0,min_conv:r.minConv||0,extra_conv:r.extraConv||0};
-        if(REFDEF_RESP_COLS){row.resp_cozinha=r.respCozinha||null;row.menu=r.menu||null;}
+        if(REFDEF_RESP_COLS){row.resp_cozinha=joinResps(r.responsaveis);row.menu=r.menu||null;}
         return row;
       }));
     if(y.despesas&&y.despesas.length){
@@ -1822,15 +1822,21 @@ function _refNat(ref){
   if(r.startsWith('tar')||r.startsWith('lan'))return {noun:'lanche',verb:'lanchar'};
   return {noun:'jantar',verb:'jantar'};
 }
+// Enumeração natural: "Ana" · "Ana e João" · "Ana, João e Zé"
+function _listaNat(arr){
+  const a=(Array.isArray(arr)?arr:[]).filter(Boolean);
+  if(a.length<2)return a[0]||'';
+  return a.slice(0,-1).join(', ')+' e '+a[a.length-1];
+}
 function fraseHistorico(tipo,accao,alvo,autor,d){
   const A=autor||'Alguém';
   const dn=_diaNat(d.dia), rn=_refNat(d.ref);
   const diaStr=`${dn.prep} ${dn.nome}`;       // "na sexta"
   const refDia=`${rn.noun} de ${dn.nome}`;     // "jantar de sexta"
   if(tipo==='refeicao'){
-    const papel=d.papel==='compras'?'pelas compras':'pela cozinha';
-    if(accao==='retirou')return `${A} retirou ${alvo} de responsável ${papel} do ${refDia}`;
-    return `${A} nomeou ${alvo} responsável ${papel} do ${refDia}`;
+    if(accao==='retirou')return `${A} retirou ${alvo} de responsável do ${refDia}`;
+    const outros=_listaNat(d.acompanha);
+    return `${A} nomeou ${alvo} responsável pelo ${refDia}`+(outros?` — em conjunto com ${outros}`:'');
   }
   if(tipo==='compras'){
     const q=d.quantidade?` (${d.quantidade})`:'';
@@ -7411,13 +7417,33 @@ function applyRoFields(modalEl,ro){
   });
 }
 
-// Opções dos selects de responsável (membros do ano; mantém valor desconhecido se existir)
-function _respOptions(sel){
-  let h='<option value="">— ninguém —</option>';
+/* Responsáveis da refeição — podem ser vários e são todos iguais entre si
+   (não há papéis: quem está na lista trata da refeição e é avisado no
+   Telegram). Guardam-se na coluna `resp_cozinha` (texto) separados por " · ",
+   por isso não é preciso migração: um nome sozinho lê-se como sempre. */
+const RESP_SEP=' · ';
+function parseResps(v){
+  return String(v||'').split('·').map(s=>s.trim()).filter(Boolean);
+}
+function joinResps(arr){
+  return (Array.isArray(arr)?arr:parseResps(arr)).filter(Boolean).join(RESP_SEP)||null;
+}
+// Chips de responsável (membros do ano + nomes que já lá estivessem, ex.: quem saiu do plantel)
+function _respChips(sel){
+  const escolhidos=Array.isArray(sel)?sel.slice():parseResps(sel);
   const nomes=(DATA.membros||[]).map(m=>m.nome).sort((a,b)=>a.localeCompare(b,'pt'));
-  if(sel&&!nomes.includes(sel))h+=`<option value="${escHtml(sel)}" selected>${escHtml(sel)}</option>`;
-  nomes.forEach(n=>{h+=`<option value="${escHtml(n)}"${sel===n?' selected':''}>${escHtml(n)}</option>`;});
-  return h;
+  escolhidos.forEach(n=>{if(!nomes.includes(n))nomes.push(n);});
+  if(!nomes.length)return '<div class="note">Sem membros no plantel.</div>';
+  return nomes.map(n=>`<div class="sd-chip${escolhidos.includes(n)?' on':''}" onclick="toggleRespChip(this)" data-nome="${escHtml(n)}"><span class="sd-dot"></span>${escHtml(n)}</div>`).join('');
+}
+function toggleRespChip(el){el.classList.toggle('on');_respCount();}
+function _respSelected(){
+  return [...document.querySelectorAll('#rd-resp-chips .sd-chip.on')].map(c=>c.dataset.nome);
+}
+function _respCount(){
+  const el=document.getElementById('rd-resp-count');if(!el)return;
+  const n=_respSelected().length;
+  el.textContent=n?(n===1?'1 escolhido':n+' escolhidos'):'ninguém';
 }
 
 function openRefdefModal(editIdx){
@@ -7438,7 +7464,7 @@ function openRefdefModal(editIdx){
 
   if(isEdit){
     const rd=DATA.refeicoesDef[editingRefdef];
-    document.getElementById('rd-resp-coz').innerHTML=_respOptions(rd.respCozinha||'');
+    document.getElementById('rd-resp-chips').innerHTML=_respChips(rd.responsaveis);
     const mp=parseMenuParts(rd.menu||'');
     document.getElementById('rd-entradas').value=mp.entradas;
     document.getElementById('rd-sobremesa').value=mp.sobremesa;
@@ -7451,7 +7477,7 @@ function openRefdefModal(editIdx){
     document.getElementById('rd-minconv').value=rd.minConv||10;
     document.getElementById('rd-extraconv').value=rd.extraConv||2;
   } else {
-    document.getElementById('rd-resp-coz').innerHTML=_respOptions('');
+    document.getElementById('rd-resp-chips').innerHTML=_respChips([]);
     document.getElementById('rd-entradas').value='';
     document.getElementById('rd-sobremesa').value='';
     document.getElementById('rd-menu').value='';
@@ -7464,6 +7490,7 @@ function openRefdefModal(editIdx){
     document.getElementById('rd-extraconv').value='2';
   }
 
+  _respCount();
   document.getElementById('rd-del').style.display=(isEdit&&!ro)?'':'none';
   const save=document.getElementById('rd-save');
   if(save)save.style.display=ro?'none':'';
@@ -7521,13 +7548,13 @@ async function saveRefdef(){
 
   const wasEdit=editingRefdef!==null;
   const anterior=wasEdit?DATA.refeicoesDef[editingRefdef]:null;
-  const respCozinha=REFDEF_RESP_COLS?(document.getElementById('rd-resp-coz').value||''):((anterior&&anterior.respCozinha)||'');
+  const responsaveis=REFDEF_RESP_COLS?_respSelected():((anterior&&anterior.responsaveis)||[]);
   const menu=REFDEF_RESP_COLS?buildMenu(
     (document.getElementById('rd-entradas').value||'').trim(),
     (document.getElementById('rd-sobremesa').value||'').trim(),
     (document.getElementById('rd-menu').value||'').trim()
   ):((anterior&&anterior.menu)||'');
-  const entry={data,dia,ref,prato:prato||'',peso:ref==='Lanche'?null:peso,minMEO,minConv,extraConv,respCozinha,menu};
+  const entry={data,dia,ref,prato:prato||'',peso:ref==='Lanche'?null:peso,minMEO,minConv,extraConv,responsaveis,menu};
 
   document.getElementById('rd-save').disabled=true;
   if(wasEdit){
@@ -7572,13 +7599,20 @@ function resumoRefeicao(rd){
   if(rd.menu)L.push('📋 '+rd.menu);
   return L.join('\n');
 }
+/* Diff dos responsáveis: cada um que entra leva o SEU aviso (com o resumo da
+   refeição e quem mais ficou responsável); cada um que sai leva o "retirou". */
 function logNomeacoes(antes,depois){
-  [['respCozinha','cozinha']].forEach(([k,papel])=>{
-    const de=(antes&&antes[k])||'',para=depois[k]||'';
-    if(de===para)return;
-    if(para)sbLog('refeicao','nomeou',para,{dia:depois.dia,ref:depois.ref,papel,resumo:resumoRefeicao(depois)});
-    if(de)sbLog('refeicao','retirou',de,{dia:depois.dia,ref:depois.ref,papel});
-  });
+  const de=new Set((antes&&antes.responsaveis)||[]);
+  const para=(depois.responsaveis||[]);
+  const novos=para.filter(n=>!de.has(n));
+  if(novos.length){
+    const resumo=resumoRefeicao(depois);
+    novos.forEach(n=>sbLog('refeicao','nomeou',n,{
+      dia:depois.dia,ref:depois.ref,resumo,
+      acompanha:para.filter(x=>x!==n)
+    }));
+  }
+  de.forEach(n=>{if(!para.includes(n))sbLog('refeicao','retirou',n,{dia:depois.dia,ref:depois.ref});});
 }
 
 // Eliminar a partir do detalhe (modal)
