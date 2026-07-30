@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v138 · 2026-07-30 · Stock sem compra: ✏️ para corrigir quantidade, unidade, artigo e origem (antes só se podia apagar e refazer)';
+const APP_BUILD = 'v139 · 2026-07-30 · Stock sem compra com tamanho + quantidade iguais aos pedidos da lista ("6 × 2,5 kg")';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -106,6 +106,10 @@ let CONV_CRIANCA_COL=false;   // convidados já tem a coluna 'crianca'?
 // SHOP_LOJA_COL=false: o campo e a ordenação por loja ficam escondidos e nunca
 // se grava a coluna — a app funciona exatamente como antes.
 let SHOP_LOJA_COL=false;
+// stock_lotes já tem a coluna 'tamanho' (a embalagem, como nos pedidos da
+// lista: "6 × 2,5 kg")? Sem a migração, STOCK_TAM_COL=false: o campo não
+// aparece e nunca se grava — a app funciona exatamente como antes.
+let STOCK_TAM_COL=false;
 // Switch das notificações de PRESENÇAS (config 'notif_presencas'). Lido em
 // carregar() por todos os utilizadores, porque é a app que marca as entradas
 // de presença como silenciosas quando está desligado (ver _flushPresLog).
@@ -995,7 +999,7 @@ function renderAll(){
         // Alocações de stock a esta refeição contam como custo direto — entram no detalhe
         // (o que veio de oferta/ano anterior entra na mesma, mas a 0 € — leva o
         // ícone da origem em vez do 🧺 para se perceber porque não custa nada)
-        stockArr().forEach(l=>{if(!stockBacked(l)||!(l.qtd>0))return;const om=origemMeta(l);(l.alocacoes||[]).forEach(a=>{if(a.tipo===rd.ref&&a.data===rd.data&&+a.qtd>0)dirItems.push({desc:(om?om.ic:'🧺')+' '+l.artigo+' ('+fmtQty(+a.qtd,l.unidade)+')',quem:om?om.lbl:'',valor:rnd(l.valor/l.qtd*a.qtd,2)});});});
+        stockArr().forEach(l=>{if(!stockBacked(l)||!(l.qtd>0))return;const om=origemMeta(l);(l.alocacoes||[]).forEach(a=>{if(a.tipo===rd.ref&&a.data===rd.data&&+a.qtd>0)dirItems.push({desc:(om?om.ic:'🧺')+' '+l.artigo+' ('+loteQtdLabel(l,+a.qtd)+')',quem:om?om.lbl:'',valor:rnd(l.valor/l.qtd*a.qtd,2)});});});
         const dirDetBody=dirItems.length?`<div class="rdc-det-body">${dirItems.map(it=>`<div class="rdc-det-it"><span class="k">${escHtml(it.desc||'(sem descrição)')}${it.quem?`<small> · ${escHtml(it.quem)}</small>`:''}</span><span class="v">${eur(it.valor||0)}</span></div>`).join('')}</div>`:'';
         let dirChipsRow='';
         if(dirTot>0){
@@ -1613,7 +1617,7 @@ async function carregar(){
     const sel='*,membros(*,presencas(*)),refeicoes_def(*),despesas(*),convidados(*),mealheiros(*),pagamentos(*)';
     // shoplist vai numa fetch SEPARADA e tolerante a falha: se a tabela ainda
     // não existir (migração por correr) o resto da app continua a funcionar.
-    const [res,uaRes,cjRes,vlRes,slRes,stRes,ctRes,acRes,npRes,flRes,fpRes,ccRes,sljRes]=await Promise.all([
+    const [res,uaRes,cjRes,vlRes,slRes,stRes,ctRes,acRes,npRes,flRes,fpRes,ccRes,sljRes,stmRes]=await Promise.all([
       sbFetch(`${SB_URL}/rest/v1/eventos?select=${encodeURIComponent(sel)}&order=ano.asc`,{headers:sbHeaders(),cache:'no-store'}),
       sbFetch(`${SB_URL}/rest/v1/user_amigos?select=email,amigo`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null),
       sbFetch(`${SB_URL}/rest/v1/conjuges?select=amigo_a,amigo_b`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null),
@@ -1635,7 +1639,9 @@ async function carregar(){
       // sonda à coluna convidados.crianca (mesma migração): 200 = já existe
       sbFetch(`${SB_URL}/rest/v1/convidados?select=crianca&limit=1`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null),
       // sonda à coluna shoplist.loja (db/shoplist.sql): 200 = já existe
-      sbFetch(`${SB_URL}/rest/v1/shoplist?select=loja&limit=1`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null)
+      sbFetch(`${SB_URL}/rest/v1/shoplist?select=loja&limit=1`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null),
+      // sonda à coluna stock_lotes.tamanho (a embalagem do lote): 200 = já existe
+      sbFetch(`${SB_URL}/rest/v1/stock_lotes?select=tamanho&limit=1`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null)
     ]);
     if(!res.ok)throw new Error('HTTP '+res.status);
     const rows=await res.json();
@@ -1665,6 +1671,7 @@ async function carregar(){
     // Só gravamos o flag de convidado-criança se a coluna já existir
     CONV_CRIANCA_COL=!!(ccRes&&ccRes.ok);
     SHOP_LOJA_COL=!!(sljRes&&sljRes.ok);
+    STOCK_TAM_COL=STOCK_TABLE&&!!(stmRes&&stmRes.ok);
     // Só gravamos os responsáveis se as colunas já existirem no Supabase
     // (senão o replace das refeições falhava todo — padrão dividas_publicas)
     REFDEF_RESP_COLS=rows.some(ev=>(ev.refeicoes_def||[]).some(r=>'resp_cozinha' in r));
@@ -1685,7 +1692,7 @@ async function carregar(){
       mealheiros:(ev.mealheiros||[]).map(m=>({quem:m.quem,data:m.data,valor:N(m.valor),subtipo:m.subtipo,desc:m.descricao})),
       pagamentos:(ev.pagamentos||[]).map(p=>({de:p.de,para:p.para,valor:N(p.valor),ref:p.ref,data:p.data,extra:N(p.extra)})),
       shoplist:(shopByEv[ev.id]||[]).map(s=>({_id:s.id,artigo:s.artigo,quantidade:s.quantidade||'',tamanho:s.tamanho||'',loja:s.loja||'',tipo:s.tipo,dataValor:s.data_valor,estado:s.estado||'pendente',tratadoPor:s.tratado_por||null,noCarrinho:!!s.no_carrinho,compraId:s.compra_id||null,cfDesc:s.cf_desc||null,valor:s.valor!=null?N(s.valor):null,criadoPor:s.criado_por||'',criadoEm:s.criado_em,compradoEm:s.comprado_em})),
-      stockLotes:(stockByEv[ev.id]||[]).map(l=>({_id:l.id,compraId:l.compra_id,artigo:l.artigo,qtd:N(l.qtd),unidade:l.unidade||'',valor:N(l.valor),alocacoes:Array.isArray(l.alocacoes)?l.alocacoes:[],_listArt:l.lista_artigo||null,criadoEm:l.criado_em}))
+      stockLotes:(stockByEv[ev.id]||[]).map(l=>({_id:l.id,compraId:l.compra_id,artigo:l.artigo,qtd:N(l.qtd),unidade:l.unidade||'',tamanho:l.tamanho||'',valor:N(l.valor),alocacoes:Array.isArray(l.alocacoes)?l.alocacoes:[],_listArt:l.lista_artigo||null,criadoEm:l.criado_em}))
     }));
     ALL_YEARS.sort((a,b)=>(a.evento.ano||0)-(b.evento.ano||0));
     // Restaurar onde o utilizador estava (ano + separadores), senão ano mais recente
@@ -4126,6 +4133,18 @@ function fmtQty(n,u){
    lotes antigos ('un') e os novos ('') passam a casar na mesma. */
 function uKey(u){const s=(u||'').trim();return s==='un'?'':s;}
 function sameUnit(a,b){return uKey(a)===uKey(b);}
+/* Quantidade de UM lote como a lista a escreve: "6 × 2,5 kg". O `tamanho` é a
+   embalagem e vive à parte da quantidade — nos pedidos (shopQtyLabel) e agora
+   também nos lotes, para os dois lados se lerem da mesma maneira. Como na
+   lista, o tamanho é só descrição: quem casa com a procura é a quantidade e a
+   unidade. Só serve para mostrar UM lote — em somas de vários não há uma
+   embalagem só, e aí fica o fmtQty seco. */
+function loteQtdLabel(l,qtd){
+  const n=qtd==null?(l&&l.qtd||0):qtd;
+  const t=((l&&l.tamanho)||'').trim();
+  const q=fmtQty(n,(l&&l.unidade)||'');
+  return t?`${q} × ${t}`:q;
+}
 
 /* Procura de um artigo por refeição (o que foi pedido na lista, comprado ou
    não — a procura é o pedido). Só entra o que tiver qtd numérica na mesma
@@ -4629,7 +4648,7 @@ function mealShopSection(rd){
   if(!items.length&&!alocs.length&&!canAdd)return '';
   const key=rd.data+'|'+rd.ref;
   const alocLines=alocs.map(x=>`<div class="msl-it stk" onclick="openLoteModal(${x.l._id})">
-      <span class="msl-art">${escHtml(x.l.artigo)} <i>${escHtml(fmtQty(x.qtd,x.l.unidade))}</i></span><span class="msl-st ok">${x.org?x.org.ic+' '+escHtml(x.org.lbl):eur(x.val)}</span></div>`).join('');
+      <span class="msl-art">${escHtml(x.l.artigo)} <i>${escHtml(loteQtdLabel(x.l,x.qtd))}</i></span><span class="msl-st ok">${x.org?x.org.ic+' '+escHtml(x.org.lbl):eur(x.val)}</span></div>`).join('');
   const lineOf=(it,dim)=>{
     const done=shopIsBought(it);
     const qtdTxt=shopQtyLabel(it);
@@ -6267,7 +6286,7 @@ function openLoteModal(id){
     const parts=[];
     if(org)parts.push(org.ic+' '+escHtml(org.lbl));
     else if(dsp&&dsp.dataDesp)parts.push(fmtDiaMes(dsp.dataDesp));
-    parts.push(escHtml(fmtQty(l.qtd,l.unidade)),org?'sem custo':eur(l.valor));
+    parts.push(escHtml(loteQtdLabel(l)),org?'sem custo':eur(l.valor));
     if(dsp&&dsp.desc&&dsp.desc!=='Compras')parts.push(escHtml(dsp.desc));
     const src=[org?org.lbl:(dsp&&dsp.dataDesp?fmtDiaMes(dsp.dataDesp):''),(dsp&&dsp.desc&&dsp.desc!=='Compras')?dsp.desc:''].filter(Boolean).join(' · ');
     (detMeta[l.artigo]=detMeta[l.artigo]||[]).push(src);
@@ -6810,11 +6829,12 @@ async function saveLote(){
 
 /* ── Adicionar stock sem compra (ofertas / ano anterior) ──
    Um lote novo com valor 0 e um compra_id de origem. Depois de gravar abre-se
-   logo o detalhe do artigo, que é onde se aloca às refeições. */
-const STK_UNITS=[['un','un'],['kg','kg'],['l','L'],['duzia','dúzia'],['pacote','pacote'],
-                 ['caixa','caixa'],['garrafa','garrafa'],['lata','lata'],['grade','grade'],
-                 ['saco','saco'],['fatia','fatia'],['molho','molho'],['','sem unidade']];
-let stkAdd=null;   // {origem,reqs,req} enquanto o modal está aberto
+   logo o detalhe do artigo, que é onde se aloca às refeições.
+   Os campos são os MESMOS de um pedido da lista — artigo, tamanho/embalagem e
+   quantidade em texto livre, com o mesmo normalizeQty a arrumar o que se
+   escreve e o mesmo qtyParse a lê-lo. Havia aqui um seletor de unidades à
+   parte, e era ele que punha os dois lados a falar línguas diferentes. */
+let stkAdd=null;   // {origem,reqs,req,edit} enquanto o modal está aberto
 // Nomes já conhecidos (stock + lista de compras) para o datalist do artigo
 function stkAddNomes(){
   const s=new Set();
@@ -6863,18 +6883,6 @@ function stkAddReqLabel(r){
   if(r.falta<=0.0005)return r.artigo+' — já coberto';
   return r.artigo+' — falta '+fmtQty(r.falta,r.u)+tam;
 }
-/* Unidades: com um pedido escolhido, a opção "sem unidade" passa a dizer o que
-   é mesmo — a embalagem pedida ("× 2,5 kg") ou unidades soltas. É esta a que
-   casa com um número seco da lista, e por isso é a que vem escolhida. */
-function stkAddRenderUnits(sel,tam){
-  const t=(tam||'').trim();
-  document.getElementById('stkadd-un').innerHTML=STK_UNITS
-    .filter(([v])=>v!=='un')   // 'un' e '' são a mesma unidade (ver uKey) — uma entrada só
-    .map(([v,l])=>{
-      const lbl=v===''?(t?'× '+t:'unidades / embalagens'):l;
-      return `<option value="${v}"${uKey(v)===uKey(sel)?' selected':''}>${escHtml(lbl)}</option>`;
-    }).join('');
-}
 /* Abre para CRIAR (sem id) ou para CORRIGIR um lote sem compra (com id).
    É o mesmo formulário nos dois casos de propósito: um lote de oferta não tem
    talão nem compra onde emendar o que se escreveu — quantidade, unidade, artigo
@@ -6889,7 +6897,12 @@ function stkAddOpen(loteId){
   if(lote)closeLoteModal();   // vinha do detalhe do artigo: um modal de cada vez
   stkAdd={origem:lote?loteOrigem(lote):'oferta',reqs:stkAddReqs(),req:null,edit:lote||null};
   document.getElementById('stkadd-art').value=lote?lote.artigo:'';
-  document.getElementById('stkadd-qtd').value=lote?String(lote.qtd).replace('.',','):'';
+  // Quantidade e tamanho como na lista: a qtd é texto e traz a unidade lá dentro
+  // ("6", "2,5 kg"), a embalagem fica no campo ao lado
+  document.getElementById('stkadd-qtd').value=lote?fmtQty(lote.qtd,lote.unidade):'';
+  const tamEl=document.getElementById('stkadd-tam');
+  tamEl.value=lote?(lote.tamanho||''):'';
+  tamEl.parentElement.style.display=STOCK_TAM_COL?'':'none';
   document.getElementById('stkadd-list').innerHTML=stkAddNomes().map(n=>`<option value="${escHtml(n)}">`).join('');
   // A editar, o pedido que o lote já responde vem escolhido (pelo lista_artigo,
   // ou pelo próprio nome quando é ele que casa com a lista). Se esse pedido já
@@ -6904,31 +6917,28 @@ function stkAddOpen(loteId){
   document.getElementById('stkadd-req').innerHTML=
     `<option value=""${iSel<0?' selected':''}>— não está na lista —</option>`
     +stkAdd.reqs.map((r,i)=>`<option value="${i}"${i===iSel?' selected':''}>${escHtml(stkAddReqLabel(r))}</option>`).join('');
-  stkAddRenderUnits(lote?lote.unidade:'',stkAdd.req?stkAdd.req.tam:'');
   document.getElementById('stkadd-title').textContent=lote?'✏️ Corrigir stock sem compra':'➕ Stock sem compra';
   document.getElementById('stkadd-save').textContent=lote?'Guardar':'Adicionar';
   stkAddRenderOrigem();stkAddRenderReq();
   document.getElementById('stkadd-bg').classList.add('show');
   document.body.classList.add('no-scroll');
 }
-/* Escolher o pedido preenche o resto: artigo, quantidade em falta e a unidade
-   em que foi pedido. Tudo editável — se ofereceram menos, corrige-se o número;
-   se o produto tem outro nome ("Lays" para "batatas fritas"), muda-se o artigo
-   e a ligação ao pedido fica guardada na mesma (lista_artigo). */
+/* Escolher o pedido preenche o resto tal como ele está na lista: artigo, a
+   quantidade que falta (com a unidade em que foi pedida) e a embalagem. Tudo
+   editável — se ofereceram menos, corrige-se o número; se o produto tem outro
+   nome ("Lays" para "batatas fritas"), muda-se o artigo e a ligação ao pedido
+   fica guardada na mesma (lista_artigo). */
 function stkAddPickReq(v){
   if(!stkAdd)return;
   const r=v===''?null:stkAdd.reqs[+v];
   stkAdd.req=r||null;
-  if(r){
-    // A corrigir não se pisa o que lá está: o lote já tem nome e quantidade e
-    // quem abriu veio emendá-los, não recomeçar. Só o rótulo da unidade segue
-    // o pedido novo.
-    if(!stkAdd.edit){
-      document.getElementById('stkadd-art').value=r.artigo;
-      if(r.falta>0.0005)document.getElementById('stkadd-qtd').value=String(r.falta).replace('.',',');
-    }
-    stkAddRenderUnits(stkAdd.edit?document.getElementById('stkadd-un').value:r.u,r.tam);
-  }else stkAddRenderUnits(document.getElementById('stkadd-un').value,'');
+  // A corrigir não se pisa o que lá está: o lote já tem nome, quantidade e
+  // embalagem, e quem abriu veio emendá-los, não recomeçar.
+  if(r&&!stkAdd.edit){
+    document.getElementById('stkadd-art').value=r.artigo;
+    if(r.falta>0.0005)document.getElementById('stkadd-qtd').value=fmtQty(r.falta,r.u);
+    if(STOCK_TAM_COL)document.getElementById('stkadd-tam').value=r.tam||'';
+  }
   stkAddRenderReq();
 }
 // Nota do pedido escolhido: que refeições ainda o pedem e quanto (o mesmo que o
@@ -6983,8 +6993,13 @@ function stkTrimAlocs(alocs,qtd){
 async function stkAddSave(){
   if(!stkAdd||!isAdmin()||contasFechadas())return;
   const artigo=(document.getElementById('stkadd-art').value||'').trim();
-  const qtd=rnd(parseFloat(String(document.getElementById('stkadd-qtd').value||'').replace(',','.'))||0,3);
-  const unidade=document.getElementById('stkadd-un').value||'';
+  // Quantidade lida como na lista: o texto traz a unidade lá dentro ("6",
+  // "2,5 kg", "3 pacotes") e o qtyParse separa-as — é o mesmo parser dos dois
+  // lados, e é isso que garante que o lote e o pedido falam a mesma língua.
+  const q=qtyParse(normalizeQty(document.getElementById('stkadd-qtd').value||''));
+  const qtd=q?rnd(q.n,3):0;
+  const unidade=q?q.u:'';
+  const tamanho=STOCK_TAM_COL?normalizeQty(document.getElementById('stkadd-tam').value||'').slice(0,20):'';
   if(!artigo){toast('Falta o nome do artigo','bad');return;}
   if(!(qtd>0)){toast('Falta a quantidade','bad');return;}
   const origem=stkAdd.origem;
@@ -7012,9 +7027,10 @@ async function stkAddSave(){
   setSync('load','a guardar…');
   try{
     if(lote){
-      await queueWrite(()=>sbReq('PATCH',`stock_lotes?id=eq.${lote._id}`,
-        {compra_id:compraId,artigo,qtd,unidade,alocacoes,lista_artigo:listArt}));
-      Object.assign(lote,{compraId,artigo,qtd,unidade,alocacoes,_listArt:listArt});
+      const patch={compra_id:compraId,artigo,qtd,unidade,alocacoes,lista_artigo:listArt};
+      if(STOCK_TAM_COL)patch.tamanho=tamanho||null;
+      await queueWrite(()=>sbReq('PATCH',`stock_lotes?id=eq.${lote._id}`,patch));
+      Object.assign(lote,{compraId,artigo,qtd,unidade,tamanho,alocacoes,_listArt:listArt});
       syncMirror();marcaGuardado();
       btn.disabled=false;stkAddClose();
       CALC=calcular(JSON.parse(JSON.stringify(DATA)));
@@ -7025,9 +7041,10 @@ async function stkAddSave(){
     }
     const row={evento_id:DATA._sbId,compra_id:compraId,artigo,qtd,unidade,valor:0,alocacoes};
     if(listArt)row.lista_artigo=listArt;
+    if(STOCK_TAM_COL&&tamanho)row.tamanho=tamanho;
     const ins=await queueWrite(()=>sbReq('POST','stock_lotes',[row],{Prefer:'return=representation'}));
     const id=ins&&ins[0]?ins[0].id:null;
-    stockArr().push({_id:id,compraId,artigo,qtd,unidade,valor:0,alocacoes,_listArt:listArt,criadoEm:new Date().toISOString()});
+    stockArr().push({_id:id,compraId,artigo,qtd,unidade,tamanho,valor:0,alocacoes,_listArt:listArt,criadoEm:new Date().toISOString()});
     syncMirror();marcaGuardado();
     btn.disabled=false;stkAddClose();
     CALC=calcular(JSON.parse(JSON.stringify(DATA)));
@@ -7044,7 +7061,7 @@ async function stkDelLote(id){
   const l=stockArr().find(x=>x._id===id);
   const m=l?origemMeta(l):null;
   if(!l||!m)return;
-  if(!confirm(`Apagar ${l.artigo} (${fmtQty(l.qtd,l.unidade)}) — ${m.lbl.toLowerCase()}? As alocações deste lote desaparecem com ele.`))return;
+  if(!confirm(`Apagar ${l.artigo} (${loteQtdLabel(l)}) — ${m.lbl.toLowerCase()}? As alocações deste lote desaparecem com ele.`))return;
   const reabrir=editingLote?{req:editingLote.reqName,u:editingLote.u}:null;
   setSync('load','a guardar…');
   try{

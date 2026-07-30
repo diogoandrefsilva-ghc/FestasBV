@@ -319,10 +319,9 @@ setTimeout(function(){ if (window.fbvEsconderSplash) window.fbvEsconderSplash();
     <label>Artigo</label>
     <input id="stkadd-art" list="stkadd-list" placeholder="ex.: Ovos" autocomplete="off">
     <datalist id="stkadd-list"></datalist>
-    <label>Quantidade</label>
-    <div class="stkadd-qtd">
-      <input id="stkadd-qtd" type="number" step="any" min="0" inputmode="decimal" placeholder="ex.: 6">
-      <select id="stkadd-un"></select>
+    <div class="inline-row">
+      <div style="flex:3"><label>Tamanho / embalagem</label><input type="text" id="stkadd-tam" maxlength="20" placeholder="Ex: lata 250 ml" onblur="this.value=normalizeQty(this.value)"></div>
+      <div style="flex:2"><label>Qtd.</label><input type="text" id="stkadd-qtd" maxlength="20" placeholder="Ex: 4" onblur="this.value=normalizeQty(this.value)"></div>
     </div>
     <div class="mbtns">
       <button class="btn ghost" onclick="stkAddClose(true)">Cancelar</button>

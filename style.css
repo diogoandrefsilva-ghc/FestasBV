@@ -1027,9 +1027,6 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .stkadd-need{margin-top:6px;padding:8px 10px;border:1px solid var(--line);border-radius:11px;background:var(--panel2)}
 .stkadd-need:empty{display:none}
 .stkadd-need .lote-need-row.hdr{color:var(--muted);border:none;padding-top:0}
-.stkadd-qtd{display:flex;gap:8px}
-.stkadd-qtd input{flex:1 1 0;min-width:0;margin:0}
-.stkadd-qtd select{flex:0 0 44%;margin:0}
 /* Linha de origem apagável no detalhe do artigo (o ✕ do lote sem compra) */
 .lote-cmp-row.org{display:flex;align-items:center;gap:6px}
 .lote-cmp-row .t{display:block;min-width:0;flex:1}
