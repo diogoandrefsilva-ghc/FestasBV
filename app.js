@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v144 · 2026-07-30 · Fim dos traços horizontais no scroll (blur dos fundos só quando abertos)';
+const APP_BUILD = 'v145 · 2026-07-30 · Shop List: refeição por baixo do artigo, ordenação por loja por defeito, separador antes do Cash-Flow';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -4465,11 +4465,15 @@ function shopItemCard(it,mineView,noBadge,grouped,noLoja){
   const meal=shopIsMeal(it.tipo)&&it.dataValor;
   // Em modo "grouped" (dentro de um artigo agrupado), o rótulo principal passa a
   // ser a REFEIÇÃO (não se repete o nome do artigo, que está no cabeçalho).
-  // O mesmo chip de refeição/tipo, quer vá para a direita (cartão normal) quer
+  // O mesmo chip de refeição/tipo, quer vá para baixo (cartão normal) quer
   // fique à cabeça da linha (agrupado) — assim lê-se sempre igual na lista.
   const chip=meal?`<span class="cmp-badge meal">${shopTipoIcon(it.tipo)} ${fmtDiaMes(it.dataValor)}</span>`:`<span class="cmp-badge">${shopTipoIcon(it.tipo)} ${escHtml(it.tipo)}</span>`;
   const primary=grouped?chip:escHtml(it.artigo);
-  const badge=(noBadge||grouped)?'':chip;
+  // O chip da refeição/tipo desceu para dentro da coluna do artigo (linha
+  // própria, mais pequeno): à direita comia a largura ao nome e os artigos com
+  // mais que duas palavras saíam cortados com "…" — e o nome é o que se lê no
+  // corredor do supermercado.
+  const badge=(noBadge||grouped)?'':`<div class="cmp-badge-row">${chip}</div>`;
   // A quantidade tem LINHA PRÓPRIA por baixo do artigo: ao lado do nome era a
   // primeira coisa a desaparecer (nome comprido → "…") e é justamente o que
   // interessa a quem está no corredor do supermercado.
@@ -4520,8 +4524,8 @@ function shopItemCard(it,mineView,noBadge,grouped,noLoja){
   const hintRow=hint?`<div class="cmp-hint-row">${hint}</div>`:'';
   return `<div class="cmp-item cmp-line cmp-tap${grouped?' cmp-sub':''}${mineView&&it.noCarrinho?' incart':''}${removed?' removed':''}" onclick="openShopItemModal(${it._id})">
     ${check}
-    <div class="cmp-main"><div class="cmp-artigo">${primary}</div>${qtd}${lojaRow}${sub}</div>
-    ${badge}${right}<span class="cmp-chev-r">›</span>${hintRow}
+    <div class="cmp-main"><div class="cmp-artigo">${primary}</div>${qtd}${lojaRow}${badge}${sub}</div>
+    ${right}<span class="cmp-chev-r">›</span>${hintRow}
   </div>`;
 }
 /* Um artigo agrupado: um só pedido → cartão normal; vários pedidos (mesmo nome,
@@ -4719,10 +4723,12 @@ function renderShopViews(){
   if(!CALC||TAB!=='compras')renderCompras();
 }
 
-// Ordenação do separador Shop List: 'ref' = agrupado por refeição/tipo (defeito);
-// 'art' = lista plana por ordem alfabética de artigo; 'cat' = por categoria de
-// produto; 'loja' = pela loja indicada por quem pediu. Memorizada no aparelho.
-let SHOP_ORDER=(function(){try{return localStorage.getItem('festasbv_shop_order')||'ref';}catch(e){return 'ref';}})();
+// Ordenação do separador Shop List: 'loja' = pela loja indicada por quem pediu
+// (defeito — é por loja que se fazem as compras; sem lojas indicadas cai
+// sozinha na refeição); 'ref' = agrupado por refeição/tipo; 'art' = lista plana
+// por ordem alfabética de artigo; 'cat' = por categoria de produto.
+// Memorizada no aparelho.
+let SHOP_ORDER=(function(){try{return localStorage.getItem('festasbv_shop_order')||'loja';}catch(e){return 'loja';}})();
 function setShopOrder(o){SHOP_ORDER=o;try{localStorage.setItem('festasbv_shop_order',o);}catch(e){}renderCompras();}
 
 // Sub-separador ativo do Shop List: 'falta' | 'carrinho' | 'hist'. Memorizado
@@ -4797,11 +4803,13 @@ function renderCompras(){
   if(SHOP_TAB!=='hist'){
     // Sem a palavra "Por": com quatro critérios só assim cabem todos numa
     // linha em ecrã de telemóvel (o ícone de ordenação do chip já o diz).
+    // Loja à cabeça (e por defeito): é assim que se fazem as compras — uma
+    // viagem por loja. Sem lojas indicadas o chip não existe e manda a Refeição.
     const chips=[
+      ...(temLojas?[['loja','🏬','Loja',byLoja]]:[]),
       ['ref','📅','Refeição',!(byArt||byCat||byLoja)],
       ['art','🔤','Artigo',byArt],
-      ...(CATS_TABLE?[['cat','🏷️','Categoria',byCat]]:[]),
-      ...(temLojas?[['loja','🏬','Loja',byLoja]]:[])
+      ...(CATS_TABLE?[['cat','🏷️','Categoria',byCat]]:[])
     ];
     h+=`<div class="cmp-sort n${chips.length}">
       ${chips.map(c=>`<span class="sd-chip${c[3]?' on':''}" onclick="setShopOrder('${c[0]}')">${c[1]} ${c[2]}</span>`).join('')}
