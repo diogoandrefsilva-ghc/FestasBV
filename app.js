@@ -8043,8 +8043,7 @@ function cartazHtml(){
         ${rd.prato?`<div class="cz-prato">${escHtml(rd.prato)}</div>`:''}
         ${(mp.entradas||mp.sobremesa)?'<div class="cz-rule-in"></div>':''}
         ${mp.entradas?`<div class="cz-linha"><span class="cz-lk">Entradas</span>${escHtml(mp.entradas)}</div>`:''}
-        ${mp.sobremesa?`<div class="cz-linha"><span class="cz-lk">Sobremesa</span>${escHtml(mp.sobremesa)}</div>`:''}
-        ${(mp.sobremesa&&mp.sobrenotas)?`<div class="cz-obs cz-obs-sub">${escHtml(mp.sobrenotas)}</div>`:''}
+        ${mp.sobremesa?`<div class="cz-linha"><span class="cz-lk">Sobremesa</span>${escHtml(mp.sobremesa)}${mp.sobrenotas?`<span class="cz-obs cz-obs-in">${escHtml(mp.sobrenotas)}</span>`:''}</div>`:''}
         ${temMenu?'':'<div class="cz-porvir">Ementa por definir</div>'}
       </div>`;
     });
@@ -8197,24 +8196,27 @@ function czRender(ctx,draw,cards){
         if(!val)return;
         cy+=4;
         const fL=czFont({px:12.5,peso:600}),fV=czFont({px:15,peso:500,fam:CZI.SANS});
+        const fN=czFont(CZS.obs);
+        // Notas da sobremesa (o "by Chef X") — à frente dela, na última linha
+        const nota=(lbl==='Sobremesa'&&mp.sobrenotas)?mp.sobrenotas:'';
         ctx.font=fL;const wL=czTrackW(ctx,lbl.toUpperCase(),1.6)+9;
+        ctx.font=fN;const wN=nota?ctx.measureText(nota).width+7:0;
         ctx.font=fV;
-        const lns=czWrap(ctx,val,inner-24-wL);
-        const wV=Math.max(...lns.map(l=>ctx.measureText(l).width));
-        const lx=cx-(wL+wV)/2;
+        const lns=czWrap(ctx,val,inner-24-wL-wN);
+        const wid=lns.map((l,i)=>ctx.measureText(l).width+(i===lns.length-1?wN:0));
+        const lx=cx-(wL+Math.max(...wid))/2;
         if(draw){
           ctx.font=fL;ctx.fillStyle=CZI.GOLD;
           let px=lx;for(const ch of lbl.toUpperCase()){ctx.fillText(ch,px,cy+2);px+=ctx.measureText(ch).width+1.6;}
           ctx.font=fV;ctx.fillStyle=CZI.INK;
           lns.forEach((l,i)=>ctx.fillText(l,lx+wL,cy+i*18));
+          if(nota){
+            const last=lns.length-1;
+            ctx.font=fN;ctx.fillStyle=CZI.MUTED;
+            ctx.fillText(nota,lx+wL+(wid[last]-wN)+7,cy+last*18+2);
+          }
         }
         cy+=lns.length*18;
-        // Notas da sobremesa (o "by Chef X") logo por baixo dela
-        if(lbl==='Sobremesa'&&mp.sobrenotas){
-          cy+=2;
-          ctx.font=czFont(CZS.obs);
-          czWrap(ctx,mp.sobrenotas,inner-24).forEach(ln=>{cy+=linha(ln,CZS.obs,cy)+1;});
-        }
       });
       if(!(rd.prato||mp.entradas||mp.sobremesa||mp.outras))
         cy+=linha('Ementa por definir',CZS.porvir,cy)+2;

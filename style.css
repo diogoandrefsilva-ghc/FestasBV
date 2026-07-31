@@ -727,8 +727,8 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 /* Tracinho a separar o prato das entradas/sobremesa (igual ao .em-rule da app) */
 .cz-rule-in{height:1px;max-width:180px;margin:7px auto 4px;background:linear-gradient(90deg,transparent,rgba(110,75,25,.45) 22%,rgba(110,75,25,.45) 78%,transparent)}
 .cz-linha{font-size:12px;font-weight:500;color:var(--ink);line-height:1.4;margin-top:3px}
-/* Notas da sobremesa (o "by Chef X") — por baixo dela */
-.cz-obs-sub{display:block;margin-top:1px;font-style:italic}
+/* Notas da sobremesa (o "by Chef X") — à frente dela, como as do prato */
+.cz-obs-in{margin-left:6px;font-style:italic}
 .cz-lk{font-family:var(--display);font-size:10.5px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:#7A5A0E;margin-right:6px}
 .cz-porvir{font-size:11px;color:var(--faint);font-style:italic;margin-top:2px}
 .cz-empty{font-size:12.5px;color:var(--muted);margin:14px 0 4px;font-style:italic}
