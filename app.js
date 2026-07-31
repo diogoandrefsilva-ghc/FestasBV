@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v151 · 2026-07-31 · Lista de compras da refeição redesenhada (B · talão do mercado)';
+const APP_BUILD = 'v152 · 2026-07-31 · Talão do mercado: tabuleta da loja a dourado + ＋🛒 da Shop List';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -4677,7 +4677,7 @@ function mealShopSection(rd){
     const st=done?''
       :it.tratadoPor?mslWho(it.tratadoPor)
       :past?'<span class="msl-st falta">por tratar</span>'
-      :`<button class="cmp-mini cart write-action msl-claim" title="Pôr no meu carrinho" aria-label="Pôr no meu carrinho" onclick="event.stopPropagation();claimItem(${it._id})"><i class="cmp-plus">＋</i><i class="msl-ic-cart"></i></button>`;
+      :`<button class="cmp-mini cart write-action msl-claim" title="Pôr no meu carrinho" aria-label="Pôr no meu carrinho" onclick="event.stopPropagation();claimItem(${it._id})"><i class="cmp-plus">＋</i>🛒</button>`;
     // Dica de stock: quanto está coberto, ou stock livre por alocar (botão de um
     // toque para alocar o livre a esta refeição). Ver shopStockHint/shopHintHtml.
     const hint=(!done&&!past)?shopHintHtml(it,'msl-hint'):'';
