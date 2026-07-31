@@ -892,6 +892,11 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
    lê-se com ela, não misturada no "pedido por" */
 .cmp-loja-row{font-size:12px;line-height:1.3;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .cmp-loja{color:#9A6E0E;font-weight:700}
+/* Refeição/tipo em linha própria por baixo (era um badge à direita): a coluna
+   do artigo passa a ter a largura toda, que é onde os nomes compridos fazem
+   falta. Aqui é um dado de destino, não de leitura rápida → mais pequeno. */
+.cmp-badge-row{margin-top:3px;line-height:1}
+.cmp-badge-row .cmp-badge{display:inline-block;font-size:10px;padding:2px 6px}
 /* Linha própria da dica de stock, por baixo do resto do cartão (largura toda,
    sem colidir com o badge da refeição nem com o botão do carrinho) */
 .cmp-hint-row{flex:0 0 100%;width:100%;min-width:0;margin-top:1px}
