@@ -896,7 +896,11 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
    do artigo passa a ter a largura toda, que é onde os nomes compridos fazem
    falta. Aqui é um dado de destino, não de leitura rápida → mais pequeno. */
 .cmp-badge-row{margin-top:3px;line-height:1}
-.cmp-badge-row .cmp-badge{display:inline-block;font-size:10px;padding:2px 6px}
+/* Um só tamanho de chip de refeição na lista: o do cartão normal (linha
+   própria) e o das linhas-refeição de um artigo agrupado, que herdava o 13px
+   do rótulo e ficava maior que os vizinhos. */
+.cmp-badge-row .cmp-badge,
+.cmp-item.cmp-sub .cmp-artigo .cmp-badge{display:inline-block;font-size:10px;padding:2px 6px}
 /* Linha própria da dica de stock, por baixo do resto do cartão (largura toda,
    sem colidir com o badge da refeição nem com o botão do carrinho) */
 .cmp-hint-row{flex:0 0 100%;width:100%;min-width:0;margin-top:1px}
@@ -935,7 +939,8 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 /* Linha-refeição dentro do grupo: rótulo principal é a refeição, mais leve */
 .cmp-item.cmp-sub .cmp-artigo{font-size:13px;font-weight:600;color:var(--muted)}
 /* A refeição vai à cabeça da linha com o MESMO chip dos cartões normais (aqui
-   é inline, dentro do rótulo — não é filho do flex do cartão) */
+   é inline, dentro do rótulo — não é filho do flex do cartão). O tamanho vem
+   da regra partilhada .cmp-badge-row/.cmp-sub, para os dois lerem igual. */
 .cmp-item.cmp-sub .cmp-artigo .cmp-badge{display:inline-block;vertical-align:middle}
 /* Lista de compras dentro do cartão da refeição (tab Refeições) */
 .msl{cursor:default}
