@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v149 · 2026-07-31 · Cartaz: notas do prato e da sobremesa em itálico, na mesma linha';
+const APP_BUILD = 'v150 · 2026-07-31 · Cartaz PNG: notas do prato na mesma linha + imagem a 3×';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -8070,7 +8070,9 @@ function closeCartaz(){
    Tudo síncrono de propósito — o Safari só deixa chamar navigator.share() no
    mesmo "tick" do toque, e um await pelo meio perde essa autorização.        */
 const CZI={
-  W:600,SC:2,                       // largura lógica; o PNG sai ao dobro
+  W:600,SC:3,MAXPX:14e6,            // largura lógica; PNG ao triplo (1800px), com
+                                    // teto de píxeis — o iOS recusa canvas enormes
+                                    // e um ano com muitas refeições dá cartaz alto
   MARG:18,PADX:28,                  // margem do pergaminho · respiro na moldura
   FUNDO:'#E9DCBB',
   INK:'#2C1F12',RED:'#6E2012',GOLD:'#7A5A0E',MUTED:'#6F5C42',FAINT:'#9A8765',
@@ -8167,11 +8169,29 @@ function czRender(ctx,draw,cards){
         ctx.strokeStyle='rgba(168,123,20,.34)';ctx.lineWidth=1;ctx.stroke();
       }
       let cy=y+13;
-      // Refeição (ícone em emoji — o canvas desenha-o sem precisar do SVG)
-      cy+=linha(czEmoji(rd.ref)+'  '+rd.ref.toUpperCase(),CZS.ref,cy)+1;
-      if(mp.outras){                         // notas do menu (onde vai o chef)
-        ctx.font=czFont(CZS.obs);
-        czWrap(ctx,mp.outras,inner-20).forEach(ln=>{cy+=linha(ln,CZS.obs,cy)+1;});
+      // Refeição (ícone em emoji — o canvas desenha-o sem precisar do SVG) com as
+      // notas do menu (onde vai o chef) à frente, na mesma linha como no modal.
+      // Só quebram para baixo se não couberem ao lado.
+      const refTxt=czEmoji(rd.ref)+'  '+rd.ref.toUpperCase();
+      ctx.font=czFont(CZS.ref);const wR=czTrackW(ctx,refTxt,CZS.ref.tr);
+      ctx.font=czFont(CZS.obs);
+      const obs1=(mp.outras&&mp.outras.indexOf('\n')<0)?mp.outras:'';
+      const wO=obs1?ctx.measureText(obs1).width:Infinity;
+      if(obs1&&wR+7+wO<=inner-20){
+        const sx=cx-(wR+7+wO)/2;
+        if(draw){
+          ctx.font=czFont(CZS.ref);ctx.fillStyle=CZS.ref.cor();
+          let px=sx;for(const ch of refTxt){ctx.fillText(ch,px,cy);px+=ctx.measureText(ch).width+CZS.ref.tr;}
+          ctx.font=czFont(CZS.obs);ctx.fillStyle=CZS.obs.cor();
+          ctx.fillText(obs1,sx+wR+7,cy+3);
+        }
+        cy+=CZS.ref.px*1.16+1;
+      } else {
+        cy+=linha(refTxt,CZS.ref,cy)+1;
+        if(mp.outras){
+          ctx.font=czFont(CZS.obs);
+          czWrap(ctx,mp.outras,inner-20).forEach(ln=>{cy+=linha(ln,CZS.obs,cy)+1;});
+        }
       }
       if(rd.prato){
         cy+=3;
@@ -8237,9 +8257,13 @@ function cartazCanvas(){
   const cards=[];                       // altura de cada cartão, medida à frente
   const H=czRender(medida,false,cards);
   const cv=document.createElement('canvas');
-  cv.width=CZI.W*CZI.SC;cv.height=Math.ceil(H)*CZI.SC;
+  const Hp=Math.ceil(H);
+  // Cartaz alto → escala vai descendo do 3× até ao 2× de sempre, para não passar
+  // o teto de píxeis (canvas grande de mais devolve imagem vazia no iOS).
+  const sc=Math.max(2,Math.min(CZI.SC,Math.sqrt(CZI.MAXPX/(CZI.W*Hp))));
+  cv.width=Math.round(CZI.W*sc);cv.height=Math.round(Hp*sc);
   const ctx=cv.getContext('2d');
-  ctx.scale(CZI.SC,CZI.SC);
+  ctx.scale(cv.width/CZI.W,cv.height/Hp);
   ctx.fillStyle=CZI.FUNDO;ctx.fillRect(0,0,CZI.W,H);
   // Pergaminho dourado + as riscas finas do resto da app
   ctx.save();
