@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v145 · 2026-07-30 · Shop List: refeição por baixo do artigo, ordenação por loja por defeito, separador antes do Cash-Flow';
+const APP_BUILD = 'v146 · 2026-07-31 · Shop List: loja só a dourado (sem ícone) no cartão do artigo';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -4495,7 +4495,7 @@ function shopItemCard(it,mineView,noBadge,grouped,noLoja){
   // menos importante do cartão, e por isso mais pequeno). Na vista agrupada por
   // loja o cabeçalho já a diz → noLoja.
   const lojaTxt=noLoja?'':shopLojaTxt(it);
-  const lojaRow=lojaTxt?`<div class="cmp-loja-row"><span class="cmp-loja">🏬 ${escHtml(lojaTxt)}</span></div>`:'';
+  const lojaRow=lojaTxt?`<div class="cmp-loja-row"><span class="cmp-loja">${escHtml(lojaTxt)}</span></div>`:'';
   if(it.criadoPor)sub=`<div class="cmp-sub">pedido por ${escHtml(it.criadoPor)}</div>`;
   if(covered){
     right='<span class="cmp-chip stock">🧺 em stock</span>';
