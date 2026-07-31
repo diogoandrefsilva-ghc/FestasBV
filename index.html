@@ -449,6 +449,30 @@ setTimeout(function(){ if (window.fbvEsconderSplash) window.fbvEsconderSplash();
       <button class="btn danger write-action admin-only" id="rd-del" onclick="deleteRefdefFromModal()" style="display:none">Eliminar</button>
       <button class="btn prim write-action admin-only" id="rd-save" onclick="saveRefdef()">Guardar</button>
     </div>
+    <div id="rd-swap-bar" style="display:none">
+      <div class="mbtns" style="margin-top:9px">
+        <button class="btn ghost write-action admin-only" id="rd-swap" onclick="openSwapFromRefdef()">🔄 Trocar de dia</button>
+      </div>
+      <div class="note">Leva o prato para outro dia com tudo o que é dele — ementa, responsáveis, lista de compras, despesas e stock. As presenças ficam no dia.</div>
+    </div>
+  </div>
+</div>
+
+<!-- Troca de refeições (o prato muda de dia; o slot fica) -->
+<div class="modal-bg" id="swap-bg">
+  <div class="modal" id="swap-modal">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <h3 style="margin-bottom:0">🔄 Trocar Refeições</h3>
+      <button onclick="closeSwapModal()" style="background:var(--panel2);border:1px solid var(--line);color:var(--muted);border-radius:9px;width:32px;height:32px;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0">✕</button>
+    </div>
+    <div id="swap-origem"></div>
+    <label style="margin-top:12px;display:block">Trocar com</label>
+    <div class="swp-list" id="swap-list"></div>
+    <div id="swap-preview"></div>
+    <div class="mbtns">
+      <button class="btn ghost" onclick="closeSwapModal()">Cancelar</button>
+      <button class="btn prim write-action admin-only" id="swap-go" onclick="confirmarTroca()" disabled>Trocar</button>
+    </div>
   </div>
 </div>
 
