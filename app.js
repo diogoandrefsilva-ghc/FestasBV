@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v154 · 2026-07-31 · Trocar refeições: o prato muda de dia e leva lista, despesas e stock atrás';
+const APP_BUILD = 'v155 · 2026-07-31 · Normalizar da Shop List também trata as categorias (AI) no mesmo passo';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -3591,12 +3591,40 @@ async function admCatDelete(){
    fatura-ocr o modo só-texto, e mostra as sugestões num modal para rever
    antes de gravar — cada linha pode ser corrigida no próprio modal. */
 let _catSug=null;   // [{artigo,key,catId}]
-function catNamesPorCategorizar(){
+// Nomes em uso ainda sem categoria. soCompras=true limita à lista/carrinho
+// (é o âmbito do 🔤 Normalizar da Shop List); sem isso apanha também o stock.
+function catNamesPorCategorizar(soCompras){
   const seen={};
   const add=n=>{const k=shopArtKey(n);if(!k||seen[k]||ART_CATS[k])return;seen[k]=n;};
-  stockArr().filter(stockBacked).forEach(l=>add(l.artigo));
+  if(!soCompras)stockArr().filter(stockBacked).forEach(l=>add(l.artigo));
   shopArr().filter(x=>!shopIsRemoved(x)).forEach(x=>add(x.artigo));
   return Object.values(seen);
+}
+// Resposta da AI ([{artigo,categoria}]) → {artigo_key: nome da categoria}
+function catSugMap(sugestoes){
+  const sug={};
+  (Array.isArray(sugestoes)?sugestoes:[]).forEach(s=>{if(s&&s.artigo&&s.categoria)sug[shopArtKey(s.artigo)]=s.categoria;});
+  return sug;
+}
+// Pede ao fatura-ocr (modo só-texto) a categoria de cada nome
+async function catSugFetch(nomes){
+  const r=await sbFetch(`${SB_URL}/functions/v1/fatura-ocr`,{
+    method:'POST',
+    headers:{'Content-Type':'application/json','apikey':SB_KEY},
+    body:JSON.stringify({artigos:nomes.slice(0,200),categorias:catPromptList()})
+  });
+  if(!r.ok){const e=await r.json().catch(()=>({}));throw new Error(e.error||('HTTP '+r.status));}
+  const d=await r.json();
+  return catSugMap(d&&d.sugestoes);
+}
+// Abre o modal de revisão: uma linha por nome, com a sugestão da AI pré-escolhida
+function catSugOpen(nomes,sug){
+  const byNome={};CATEGORIAS.forEach(c=>{byNome[shopArtKey(c.nome)]=c.id;});
+  _catSug=nomes.map(n=>{const k=shopArtKey(n);return{artigo:n,key:k,catId:byNome[shopArtKey((sug||{})[k]||'')]||null};})
+    .sort((a,b)=>(a.catId?0:1)-(b.catId?0:1)||a.artigo.localeCompare(b.artigo,'pt'));
+  catSugRender();
+  document.getElementById('catsug-bg').classList.add('show');
+  document.body.classList.add('no-scroll');
 }
 async function catSugerir(){
   if(!CATS_TABLE||!isAdmin())return;
@@ -3605,23 +3633,8 @@ async function catSugerir(){
   if(!nomes.length){toast('Está tudo categorizado 🎉','ok');return;}
   const btn=document.getElementById('stk-catsug-btn');
   if(btn){btn.disabled=true;btn.textContent='⏳ A pensar…';}
-  try{
-    const r=await sbFetch(`${SB_URL}/functions/v1/fatura-ocr`,{
-      method:'POST',
-      headers:{'Content-Type':'application/json','apikey':SB_KEY},
-      body:JSON.stringify({artigos:nomes.slice(0,200),categorias:catPromptList()})
-    });
-    if(!r.ok){const e=await r.json().catch(()=>({}));throw new Error(e.error||('HTTP '+r.status));}
-    const d=await r.json();
-    const sug={};
-    (d&&Array.isArray(d.sugestoes)?d.sugestoes:[]).forEach(s=>{if(s&&s.artigo)sug[shopArtKey(s.artigo)]=s.categoria||null;});
-    const byNome={};CATEGORIAS.forEach(c=>{byNome[shopArtKey(c.nome)]=c.id;});
-    _catSug=nomes.map(n=>{const k=shopArtKey(n);return{artigo:n,key:k,catId:byNome[shopArtKey(sug[k]||'')]||null};})
-      .sort((a,b)=>(a.catId?0:1)-(b.catId?0:1)||a.artigo.localeCompare(b.artigo,'pt'));
-    catSugRender();
-    document.getElementById('catsug-bg').classList.add('show');
-    document.body.classList.add('no-scroll');
-  }catch(e){toast('Sugestões falharam: '+(e.message||e),'bad');}
+  try{catSugOpen(nomes,await catSugFetch(nomes));}
+  catch(e){toast('Sugestões falharam: '+(e.message||e),'bad');}
   finally{if(btn){btn.disabled=false;btn.textContent='✨ Categorias';}}
 }
 function catSugRender(){
@@ -3670,9 +3683,15 @@ async function catSugApply(){
    estão. Ao aplicar, reescreve-se o nome nos pedidos da lista e, por arrasto,
    nos lotes: lista_artigo (a ligação do lote ao pedido) e, só nos lotes sem
    nome de talão, o próprio artigo — para a cobertura continuar a casar.
-   É puro cliente (offline, sem redeploy) — a revisão do admin é a rede de segurança. */
+   A aplicação é puro cliente — a revisão do admin é a rede de segurança.
+   CATEGORIAS: o botão não fica pelos nomes. Como a memória artigo→categoria
+   tem o NOME por chave, arrumar grafias sem tratar categorias deixava-as para
+   trás; por isso o mesmo pedido à AI traz também a categoria de cada nome e,
+   depois de juntar, o nome final herda a categoria das grafias antigas e abre-se
+   o modal ✨ (o mesmo do Stock) para rever o que ficou por categorizar. */
 let _normGroups=null;   // [{variants:[{name,count}],canon,apply}]
 let _normViaAI=false;   // sugestões vieram da AI (true) ou da heurística local (false)
+let _normCats=null;     // {artigo_key: nome de categoria} sugerido no mesmo pedido
 // Chave "solta" para agrupar grafias do mesmo produto: sem acentos/maiúsculas,
 // unidades embutidas em forma canónica (1000ml→1l, 500gr→500g), sem pontuação e
 // com plurais simples reduzidos ao singular (batatas→batata, chouriços→chouriço).
@@ -3759,16 +3778,24 @@ async function shopNormOpen(){
   const btn=document.getElementById('shop-norm-btn');
   if(btn){btn.disabled=true;btn.textContent='⏳ A analisar…';}
   let groups=null,viaAI=false,aiErr='';
+  _normCats=null;
+  const comCats=CATS_TABLE&&CATEGORIAS.length>0;
   try{
-    // AI primeiro: agrupa por significado (marca vs genérico, sinónimos…)
+    // AI primeiro: agrupa por significado (marca vs genérico, sinónimos…) e,
+    // se houver dicionário de categorias, classifica os nomes no mesmo pedido
+    const req={normalizar:nomes.slice(0,200)};
+    if(comCats)req.categorias=catPromptList();
     const r=await sbFetch(`${SB_URL}/functions/v1/fatura-ocr`,{
       method:'POST',
       headers:{'Content-Type':'application/json','apikey':SB_KEY},
-      body:JSON.stringify({normalizar:nomes.slice(0,200)})
+      body:JSON.stringify(req)
     });
     if(!r.ok){const e=await r.json().catch(()=>({}));throw new Error(e.error||('HTTP '+r.status));}
     const d=await r.json();
     groups=shopNormFromAI(d&&d.grupos,stats);
+    // Função antiga (ainda sem categorias na normalização) → fica vazio e o
+    // passo das categorias pede-as num segundo pedido
+    if(comCats)_normCats=catSugMap(d&&d.sugestoes);
     viaAI=true;
   }catch(e){
     // Sem AI (offline/erro) → heurística local (plurais, unidades, pontuação)
@@ -3776,12 +3803,16 @@ async function shopNormOpen(){
     groups=shopNormGroups();
   }
   if(btn){btn.disabled=false;btn.textContent='🔤 Normalizar';}
+  _normViaAI=viaAI;
   if(!groups||!groups.length){
-    toast(viaAI?'Nada a normalizar — as grafias já batem certo 🎉'
+    _normGroups=null;
+    // Nomes já arrumados: salta o passo dos nomes e vai direto às categorias
+    if(viaAI&&shopCatPendentes()){shopCatStep();return;}
+    toast(viaAI?'Nada a arrumar — grafias e categorias em dia 🎉'
       :('Sugestões AI falharam ('+aiErr+') e nada básico a juntar'),viaAI?'ok':'bad');
-    _normGroups=null;return;
+    return;
   }
-  _normGroups=groups;_normViaAI=viaAI;
+  _normGroups=groups;
   if(!viaAI)toast('AI indisponível — sugestões básicas (offline)','bad');
   shopNormRender();
   document.getElementById('shopnorm-bg').classList.add('show');
@@ -3795,7 +3826,7 @@ function shopNormRender(){
   if(!_normGroups)return;
   const nTot=_normGroups.length;
   const info=document.getElementById('shopnorm-info');
-  if(info)info.textContent=`${nTot} grupo${nTot===1?'':'s'} de grafias parecidas na lista de compras${_normViaAI?', sugerido'+(nTot===1?'':'s')+' pela AI':' (deteção básica)'}. Confirma o nome final de cada grupo — ou desliga os que devem ficar como estão.`;
+  if(info)info.textContent=`${nTot} grupo${nTot===1?'':'s'} de grafias parecidas na lista de compras${_normViaAI?', sugerido'+(nTot===1?'':'s')+' pela AI':' (deteção básica)'}. Confirma o nome final de cada grupo — ou desliga os que devem ficar como estão.${shopCatPendentes()?' A seguir revês as categorias em falta.':''}`;
   const bar=`<div class="norm-bar">
     <span class="norm-bar-n" id="shopnorm-count"></span>
     <button type="button" class="norm-bar-btn" id="shopnorm-all" onclick="shopNormAll()"></button>
@@ -3880,11 +3911,13 @@ async function shopNormApply(){
   if(contasFechadas()){toast('Contas fechadas','bad');return;}
   const shopTo={};                 // shoplist _id → nome final
   const loteArt=[],loteList=[];    // {id,l,canon}
+  const juntados=[];               // {canonKey,keys:[grafias antigas]} — p/ as categorias
   let nGroups=0;
   _normGroups.forEach(g=>{
     const canon=(g.canon||'').trim();
     if(!g.apply||!canon)return;
     const aks=new Set(g.variants.map(v=>shopArtKey(v.name)));
+    juntados.push({canonKey:shopArtKey(canon),keys:[...aks]});
     let touched=false;
     shopArr().forEach(it=>{
       if(it._id==null||shopIsRemoved(it))return;
@@ -3902,7 +3935,14 @@ async function shopNormApply(){
     if(touched)nGroups++;
   });
   const ids=Object.keys(shopTo);
-  if(!ids.length&&!loteArt.length&&!loteList.length){toast('Nada mudou — os nomes finais já estavam aplicados','ok');shopNormClose();return;}
+  if(!ids.length&&!loteArt.length&&!loteList.length){
+    // Nomes já estavam certos — segue-se na mesma para as categorias
+    await catHerdarNormalizacao(juntados);
+    shopNormClose();
+    if(shopCatPendentes())shopCatStep(juntados);
+    else toast('Nada mudou — os nomes finais já estavam aplicados','ok');
+    return;
+  }
   const btn=document.getElementById('shopnorm-save');if(btn)btn.disabled=true;
   setSync('load','a guardar…');
   try{
@@ -3917,13 +3957,62 @@ async function shopNormApply(){
     }
     for(const p of loteArt){await queueWrite(()=>sbReq('PATCH',`stock_lotes?id=eq.${p.id}`,{artigo:p.canon}));p.l.artigo=p.canon;}
     for(const p of loteList){await queueWrite(()=>sbReq('PATCH',`stock_lotes?id=eq.${p.id}`,{lista_artigo:p.canon}));p.l._listArt=p.canon;}
+    const nHerd=await catHerdarNormalizacao(juntados);
     syncMirror();marcaGuardado();
     if(CALC)CALC=calcular(JSON.parse(JSON.stringify(DATA)));
     shopNormClose();
-    toast(`${nItems} artigo(s) normalizados em ${nGroups} grupo(s) ✓`,'ok');
+    toast(`${nItems} artigo(s) normalizados em ${nGroups} grupo(s) ✓${nHerd?` · ${nHerd} categoria(s) seguiram o nome`:''}`,'ok');
     renderShopViews();
     if(STOCK_TABLE&&TAB==='stock')renderStock();
+    shopCatStep(juntados);   // 2.ª metade do botão: categorias em falta
   }catch(e){setSync('err','erro ao guardar');toast(permErrorMsg(e),'bad');if(btn)btn.disabled=false;}
+}
+/* ── Categorias no seguimento da normalização ──
+   Depois de juntar grafias, a memória artigo→categoria (chave = nome) tem de
+   seguir o nome final: se o nome final ainda não tem categoria e alguma das
+   grafias juntas tinha, herda-a. As antigas ficam — se alguém voltar a
+   escrever assim, continua categorizado. */
+async function catHerdarNormalizacao(juntados){
+  if(!CATS_TABLE||!juntados||!juntados.length)return 0;
+  const rows=[];
+  juntados.forEach(j=>{
+    if(!j.canonKey||ART_CATS[j.canonKey])return;
+    const k=j.keys.find(k=>ART_CATS[k]);if(!k)return;
+    rows.push({artigo_key:j.canonKey,categoria_id:ART_CATS[k].catId,origem:ART_CATS[k].origem||'ai'});
+  });
+  if(!rows.length)return 0;
+  try{
+    await queueWrite(()=>sbReq('POST','artigo_categorias?on_conflict=artigo_key',rows,{Prefer:'resolution=ignore-duplicates'}));
+    rows.forEach(r=>{ART_CATS[r.artigo_key]={catId:r.categoria_id,origem:r.origem};});
+    return rows.length;
+  }catch(_){return 0;}
+}
+// Há artigos da lista por categorizar? (é o que decide se o passo ✨ corre)
+function shopCatPendentes(){
+  if(!CATS_TABLE||!CATEGORIAS.length||!isAdmin())return 0;
+  return catNamesPorCategorizar(true).length;
+}
+/* 2.ª metade do botão 🔤 Normalizar: com os nomes já arrumados, propõe as
+   categorias que faltam no mesmo modal ✨ do Stock. As sugestões vieram de
+   borla no pedido da normalização; só se não vierem (função fatura-ocr ainda
+   antiga) é que se faz um segundo pedido. */
+async function shopCatStep(juntados){
+  const sug=_normCats;_normCats=null;
+  if(!shopCatPendentes())return;
+  // As sugestões estão pela grafia antiga — o nome final herda-as
+  if(sug&&juntados)juntados.forEach(j=>{
+    if(!j.canonKey||sug[j.canonKey])return;
+    const k=j.keys.find(k=>sug[k]);if(k)sug[j.canonKey]=sug[k];
+  });
+  const nomes=catNamesPorCategorizar(true);
+  let map=sug;
+  if(!map||!Object.keys(map).length){
+    if(!_normViaAI)return;   // AI indisponível: normaliza-se na mesma, categorias ficam para depois
+    toast('A categorizar…','ok');
+    try{map=await catSugFetch(nomes);}
+    catch(e){toast('Categorias: sugestões falharam ('+(e.message||e)+')','bad');return;}
+  }
+  catSugOpen(nomes,map);
 }
 
 /* ═══ COMPRAS / SHOPLIST ═══
@@ -4805,7 +4894,7 @@ function renderCompras(){
   h+=`<div class="cmp-hdr">
     <div class="cmp-hdr-title sf">🛒 Shop List</div>
     <div class="cmp-hdr-acts">
-      ${isAdmin()?`<button class="btn write-action" id="shop-norm-btn" onclick="shopNormOpen()" title="Juntar grafias do mesmo artigo (chouriço/chouriços…)">🔤 Normalizar</button>`:''}
+      ${isAdmin()?`<button class="btn write-action" id="shop-norm-btn" onclick="shopNormOpen()" title="Juntar grafias do mesmo artigo (chouriço/chouriços…) e categorizar o que falta">🔤 Normalizar</button>`:''}
       <button class="btn prim write-action" onclick="openShopItemModal()" ${canW?'':'disabled'}>＋ Artigo</button>
     </div>
   </div>`;

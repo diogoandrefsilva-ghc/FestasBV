@@ -2,8 +2,9 @@
 // FestasBV — Lê uma fotografia de fatura/talão com o Gemini e devolve JSON
 // estruturado (loja, data, total, linhas artigo a artigo) para a app
 // pré-preencher o Registar Compra. Se a app mandar `categorias`, cada linha
-// vem também com a categoria de produto sugerida; e há um modo só-texto
-// (`artigos` sem `image`) que classifica artigos existentes em lote.
+// vem também com a categoria de produto sugerida; e há dois modos só-texto:
+// `artigos` (classifica artigos existentes em lote) e `normalizar` (agrupa
+// grafias do mesmo produto — com `categorias`, classifica-os na mesma resposta).
 // Chamada pelo browser com o JWT do
 // utilizador (verify_jwt fica LIGADO no deploy — é o gateway que valida).
 //
@@ -170,7 +171,9 @@ Regras:
 // mesmo produto de formas diferentes — este modo agrupa os nomes que são o
 // mesmo produto e sugere um nome final por grupo. A app mostra as sugestões
 // para o admin rever e aprovar antes de gravar.
-const promptNormalizar = (artigos: string[]) => `Tens nomes de artigos de compras
+// Com `categorias`, aproveita-se a mesma chamada para classificar os nomes (o
+// botão da app faz as duas coisas de seguida) — evita um segundo pedido.
+const promptNormalizar = (artigos: string[], cats: Cat[]) => `Tens nomes de artigos de compras
 (Portugal), escritos por pessoas diferentes. Alguns referem-se AO MESMO produto
 mas estão escritos de forma diferente: singular/plural ("chouriço"/"chouriços"),
 unidades equivalentes (1000ml = 1L, 500gr = 500g), abreviaturas, acentos,
@@ -186,13 +189,22 @@ Nomes:
 ${artigos.map((a) => `  - ${a}`).join("\n")}
 
 Responde APENAS com um objeto JSON com esta forma exata:
-{"grupos": [{"nome": string, "variantes": [string, string, ...]}]}
+{"grupos": [{"nome": string, "variantes": [string, string, ...]}]${
+  cats.length ? `,
+ "sugestoes": [{"artigo": string, "categoria": string|null}]` : ""
+}}
 
 Regras:
 - Inclui só grupos com 2 OU MAIS variantes distintas. Se não houver nada para
   juntar, devolve {"grupos": []}.
 - "variantes": os nomes EXATAMENTE como aparecem na lista (copia tal e qual).
-- "nome": o nome final sugerido para todo o grupo.`;
+- "nome": o nome final sugerido para todo o grupo.${cats.length ? `
+- "sugestoes": além dos grupos, classifica os artigos em categorias. Uma entrada
+  por CADA nome da lista acima (com "artigo" exatamente igual ao nome dado) e
+  ainda uma por cada "nome" final que sugerires nos grupos. "categoria" é
+  EXATAMENTE um destes nomes (copia tal e qual), ou null se nenhum encaixar com
+  confiança — não inventes categorias novas:
+${catsLista(cats)}` : ""}`;
 
 async function emailAutorizado(auth: string): Promise<boolean> {
   // 1) quem é o utilizador deste token?
@@ -247,13 +259,14 @@ Deno.serve(async (req) => {
 
     // Três utilizações: OCR de fatura (image), classificação só-texto
     // (artigos + categorias — o "✨ Categorias") e normalização de grafias
-    // (normalizar — o "🔤 Normalizar" da Shop List). As duas de texto não levam
+    // (normalizar — o "🔤 Normalizar" da Shop List, que com `categorias` traz
+    // as sugestões de categoria na mesma resposta). As duas de texto não levam
     // imagem.
     let parts: unknown[];
     if (!image && Array.isArray(normalizar)) {
       const nomes = limparNomes(normalizar as unknown[]);
       if (nomes.length < 2) return json({ error: "poucos artigos para normalizar" }, 400);
-      parts = [{ text: promptNormalizar(nomes) }];
+      parts = [{ text: promptNormalizar(nomes, cats) }];
     } else if (!image && Array.isArray(artigos)) {
       const nomes = limparNomes(artigos as unknown[]);
       if (!nomes.length || !cats.length) {
