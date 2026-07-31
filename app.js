@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v153 · 2026-07-31 · Talão do mercado: botão ＋🛒 a cheio + dica de stock sem o 🧺';
+const APP_BUILD = 'v154 · 2026-07-31 · Trocar refeições: o prato muda de dia e leva lista, despesas e stock atrás';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -1850,6 +1850,11 @@ function fraseHistorico(tipo,accao,alvo,autor,d){
   const diaStr=`${dn.prep} ${dn.nome}`;       // "na sexta"
   const refDia=`${rn.noun} de ${dn.nome}`;     // "jantar de sexta"
   if(tipo==='refeicao'){
+    if(accao==='trocou'){
+      const dn2=_diaNat(d.diaOutro), rn2=_refNat(d.refOutro);
+      const prato=alvo?` — passa a ser ${alvo}`:'';
+      return `${A} trocou o ${refDia} com o ${rn2.noun} de ${dn2.nome}${prato}`;
+    }
     if(accao==='retirou')return `${A} retirou ${alvo} de responsável do ${refDia}`;
     const outros=_listaNat(d.acompanha);
     return `${A} nomeou ${alvo} responsável pelo ${refDia}`+(outros?` — em conjunto com ${outros}`:'');
@@ -7853,6 +7858,10 @@ function openRefdefModal(editIdx){
 
   _respCount();
   document.getElementById('rd-del').style.display=(isEdit&&!ro)?'':'none';
+  // Trocar só faz sentido a partir de uma refeição existente e havendo outra
+  // (esconde-se a barra toda, para a nota não ficar sozinha a ocupar espaço)
+  const swp=document.getElementById('rd-swap-bar');
+  if(swp)swp.style.display=(isEdit&&!ro&&(DATA.refeicoesDef||[]).length>1)?'':'none';
   const save=document.getElementById('rd-save');
   if(save)save.style.display=ro?'none':'';
   applyRoFields(document.getElementById('refdef-modal'),ro);
@@ -8004,6 +8013,260 @@ async function deleteRefdef(idx){
     renderAll();
     toast('Refeição removida ✓','ok');
   }
+}
+
+/* ═══ TROCA DE REFEIÇÕES ═══
+   Trocar dois pratos de dia (a bolonhesa passa de sábado para domingo e a
+   açorda faz o caminho inverso) sem ter de refazer nada à mão.
+
+   O SLOT não se mexe: data, dia e tipo continuam onde estavam, e com eles o
+   peso da quota e os mínimos de convidado — esses são do dia, não do prato.
+   Presenças, filhos e convidados também ficam: quem se inscreveu para sábado à
+   noite continua inscrito para sábado à noite e come o que se servir.
+
+   O que viaja com o prato:
+     · ementa (prato, entradas, sobremesa, notas) e responsáveis da cozinha;
+     · pedidos da lista de compras da refeição (tipo + data_valor);
+     · despesas já lançadas com data-valor daquela refeição;
+     · alocações de stock àquela refeição.
+
+   Escrita em dois tempos, porque as tabelas não se gravam do mesmo modo: a
+   shoplist e os stock_lotes levam PATCH direto (têm id próprio e ficam fora do
+   snapshot); as refeições e as despesas vão no pushToGitHub. Se o snapshot
+   falhar, desfaz-se o PATCH — e o inverso de uma troca é a própria troca. */
+let swapFrom=null;   // índice da refeição de origem (a que se abriu)
+let swapTo=null;     // índice da escolhida para trocar
+
+// O que está agarrado a uma refeição — para o resumo do que vai atrás.
+// Só Almoço/Jantar têm lista/stock/despesa por refeição (ver shopIsMeal); num
+// Lanche isto dá tudo a zero e a troca move só a ementa, que é o correto.
+function trocaConteudo(rd){
+  const k=rd.ref+'|'+rd.data;
+  const shop=shopArr().filter(it=>!shopIsRemoved(it)&&it.tipo+'|'+(it.dataValor||'')===k).length;
+  const desp=(DATA.despesas||[]).filter(d=>d.tipo+'|'+(d.dataValor||'')===k).length;
+  let stock=0;
+  stockArr().forEach(l=>(l.alocacoes||[]).forEach(a=>{if(a.tipo===rd.ref&&a.data===rd.data&&+a.qtd>0)stock++;}));
+  return {shop,desp,stock};
+}
+
+/* Plano de escrita das tabelas com id próprio (shoplist + stock_lotes), tirado
+   do estado ANTES de mexer na memória. Cada entrada guarda o antes e o depois,
+   para se poder desfazer sem ter de reconstruir nada. */
+function trocaPlano(A,B){
+  const kA=A.ref+'|'+A.data, kB=B.ref+'|'+B.data;
+  const idsA=[],idsB=[];
+  shopArr().forEach(it=>{
+    if(it._id==null)return;
+    const k=it.tipo+'|'+(it.dataValor||'');
+    if(k===kA)idsA.push(it._id);else if(k===kB)idsB.push(it._id);
+  });
+  const shop=[];
+  if(idsA.length)shop.push({ids:idsA,de:{tipo:A.ref,data:A.data},para:{tipo:B.ref,data:B.data}});
+  if(idsB.length)shop.push({ids:idsB,de:{tipo:B.ref,data:B.data},para:{tipo:A.ref,data:A.data}});
+  const lotes=[];
+  stockArr().forEach(l=>{
+    if(l._id==null)return;
+    const al=l.alocacoes||[];
+    if(!al.some(a=>(a.tipo===A.ref&&a.data===A.data)||(a.tipo===B.ref&&a.data===B.data)))return;
+    // Object.assign preserva o resto da entrada (a `marca`, quando existe)
+    const para=al.map(a=>{
+      if(a.tipo===A.ref&&a.data===A.data)return Object.assign({},a,{tipo:B.ref,data:B.data});
+      if(a.tipo===B.ref&&a.data===B.data)return Object.assign({},a,{tipo:A.ref,data:A.data});
+      return a;
+    });
+    lotes.push({id:l._id,de:al,para});
+  });
+  return {shop,lotes};
+}
+
+/* Executa o plano na BD. `inverso` grava o lado "de" (é assim que se desfaz).
+   Devolve null se correu tudo bem, ou o erro depois de ter reposto o que já
+   tinha passado. */
+async function trocaEscrever(plano,inverso){
+  const feitoShop=[],feitoLotes=[];
+  const lado=o=>inverso?o.de:o.para;
+  try{
+    for(const g of plano.shop){
+      const d=lado(g);
+      await queueWrite(()=>sbReq('PATCH',`shoplist?id=in.(${g.ids.join(',')})`,{tipo:d.tipo,data_valor:d.data}));
+      feitoShop.push(g);
+    }
+    for(const l of plano.lotes){
+      await queueWrite(()=>sbReq('PATCH',`stock_lotes?id=eq.${l.id}`,{alocacoes:lado(l)}));
+      feitoLotes.push(l);
+    }
+    return null;
+  }catch(e){
+    for(const g of feitoShop){
+      const d=inverso?g.para:g.de;
+      try{await queueWrite(()=>sbReq('PATCH',`shoplist?id=in.(${g.ids.join(',')})`,{tipo:d.tipo,data_valor:d.data}));}catch(_){}
+    }
+    for(const l of feitoLotes){
+      try{await queueWrite(()=>sbReq('PATCH',`stock_lotes?id=eq.${l.id}`,{alocacoes:inverso?l.para:l.de}));}catch(_){}
+    }
+    return e;
+  }
+}
+
+/* A troca em memória. É o seu próprio inverso: chamar outra vez com o mesmo par
+   repõe tudo — é assim que se desfaz quando a gravação falha.
+   Cada linha é visitada uma só vez e a chave é lida antes de se lhe mexer, por
+   isso nada é trocado duas vezes. */
+function trocaMemoria(A,B){
+  const kA=A.ref+'|'+A.data, kB=B.ref+'|'+B.data;
+  // 1) a ementa e os responsáveis mudam de sítio; o slot e os parâmetros da
+  //    conta (peso, minMEO, minConv, extraConv) ficam colados ao dia
+  ['prato','menu','responsaveis'].forEach(k=>{const t=A[k];A[k]=B[k];B[k]=t;});
+  // 2) pedidos da lista de compras
+  shopArr().forEach(it=>{
+    const k=it.tipo+'|'+(it.dataValor||'');
+    if(k===kA){it.tipo=B.ref;it.dataValor=B.data;}
+    else if(k===kB){it.tipo=A.ref;it.dataValor=A.data;}
+  });
+  // 3) despesas já lançadas para a refeição
+  (DATA.despesas||[]).forEach(d=>{
+    const k=d.tipo+'|'+(d.dataValor||'');
+    if(k===kA){d.tipo=B.ref;d.dataValor=B.data;}
+    else if(k===kB){d.tipo=A.ref;d.dataValor=A.data;}
+  });
+  // 4) alocações de stock
+  stockArr().forEach(l=>(l.alocacoes||[]).forEach(a=>{
+    if(a.tipo===A.ref&&a.data===A.data){a.tipo=B.ref;a.data=B.data;}
+    else if(a.tipo===B.ref&&a.data===B.data){a.tipo=A.ref;a.data=A.data;}
+  }));
+}
+
+/* ── Modal ── */
+function refLabelCurto(rd){return `${diaAbrev(rd.data)||rd.dia} ${fmtDiaMes(rd.data)} · ${rd.ref}`;}
+
+function swapCardHtml(rd,cls){
+  const c=trocaConteudo(rd);
+  const tags=[];
+  if(c.shop)tags.push(`🛒 ${c.shop} ${c.shop===1?'pedido':'pedidos'}`);
+  if(c.desp)tags.push(`💶 ${c.desp} ${c.desp===1?'despesa':'despesas'}`);
+  if(c.stock)tags.push(`🧺 ${c.stock} ${c.stock===1?'alocação':'alocações'}`);
+  const resp=(rd.responsaveis||[]).length?`<div class="swp-resp">👨‍🍳 ${escHtml(rd.responsaveis.join(' · '))}</div>`:'';
+  return `<div class="swp-card${cls?' '+cls:''}">
+    <div class="swp-top"><span class="swp-ico">${mealIco(rd.ref,17)}</span><span class="swp-slot">${escHtml(refLabelCurto(rd))}</span></div>
+    <div class="swp-prato">${rd.prato?escHtml(rd.prato):'<i>sem prato definido</i>'}</div>
+    ${resp}
+    ${tags.length?`<div class="swp-tags">${tags.map(t=>`<span class="swp-tag">${t}</span>`).join('')}</div>`:''}
+  </div>`;
+}
+
+function openSwapModal(idx){
+  if(!isAdmin()){toast('Só o admin troca refeições','bad');return;}
+  if(bloqueadoPorFecho())return;
+  const meals=DATA.refeicoesDef||[];
+  if(!meals[idx])return;
+  if(meals.length<2){toast('É preciso haver pelo menos duas refeições','bad');return;}
+  swapFrom=idx;swapTo=null;
+  document.getElementById('swap-origem').innerHTML=swapCardHtml(meals[idx]);
+  renderSwapList();
+  renderSwapPreview();
+  document.getElementById('swap-bg').classList.add('show');
+  document.body.classList.add('no-scroll');
+}
+function closeSwapModal(){
+  document.getElementById('swap-bg').classList.remove('show');
+  document.body.classList.remove('no-scroll');
+  swapFrom=null;swapTo=null;
+}
+// Abre a troca a partir do detalhe da refeição (fecha-o primeiro — só um modal
+// aberto de cada vez, senão o no-scroll do body fica preso)
+function openSwapFromRefdef(){
+  const idx=editingRefdef;
+  if(idx===null)return;
+  closeRefdefModal();
+  openSwapModal(idx);
+}
+
+function renderSwapList(){
+  const el=document.getElementById('swap-list');if(!el)return;
+  const meals=DATA.refeicoesDef||[];
+  el.innerHTML=meals.map((rd,i)=>i===swapFrom?'':
+    `<div class="swp-opt${i===swapTo?' on':''}" onclick="pickSwap(${i})">
+      <span class="swp-ico">${mealIco(rd.ref,16)}</span>
+      <span class="swp-opt-txt"><b>${escHtml(refLabelCurto(rd))}</b><small>${rd.prato?escHtml(rd.prato):'sem prato'}</small></span>
+      <span class="swp-opt-dot"></span>
+    </div>`).join('');
+}
+function pickSwap(i){
+  swapTo=(swapTo===i)?null:i;
+  renderSwapList();
+  renderSwapPreview();
+}
+
+function renderSwapPreview(){
+  const el=document.getElementById('swap-preview');if(!el)return;
+  const go=document.getElementById('swap-go');
+  const meals=DATA.refeicoesDef||[];
+  const A=meals[swapFrom],B=(swapTo!=null)?meals[swapTo]:null;
+  if(go)go.disabled=!B;
+  if(!A||!B){el.innerHTML='<div class="note">Escolhe a refeição com que queres trocar.</div>';return;}
+  const cA=trocaConteudo(A),cB=trocaConteudo(B);
+  const linha=(de,para)=>`<div class="swp-mv"><span class="swp-mv-p">${de.prato?escHtml(de.prato):'<i>sem prato</i>'}</span><span class="swp-arrow">→</span><span class="swp-mv-d">${escHtml(refLabelCurto(para))}</span></div>`;
+  const tot={shop:cA.shop+cB.shop,desp:cA.desp+cB.desp,stock:cA.stock+cB.stock};
+  const bits=[];
+  if(tot.shop)bits.push(`<li>🛒 <b>${tot.shop}</b> ${tot.shop===1?'pedido da lista muda':'pedidos da lista mudam'} de refeição</li>`);
+  if(tot.desp)bits.push(`<li>💶 <b>${tot.desp}</b> ${tot.desp===1?'despesa passa':'despesas passam'} para a outra refeição — os custos por pessoa são recalculados</li>`);
+  if(tot.stock)bits.push(`<li>🧺 <b>${tot.stock}</b> ${tot.stock===1?'alocação de stock segue':'alocações de stock seguem'} o prato</li>`);
+  el.innerHTML=`
+    <div class="swp-moves">${linha(A,B)}${linha(B,A)}</div>
+    <div class="swp-blk">
+      <div class="swp-blk-hd">Vai atrás</div>
+      <ul class="swp-ul">
+        <li>🍽 ementa (prato, entradas, sobremesa e notas)</li>
+        <li>👨‍🍳 responsáveis da cozinha</li>
+        ${bits.join('')}
+      </ul>
+    </div>
+    <div class="swp-blk swp-fica">
+      <div class="swp-blk-hd">Fica onde está</div>
+      <ul class="swp-ul">
+        <li>✋ presenças, crianças e convidados — quem se inscreveu para um dia continua nesse dia</li>
+        <li>⚖️ peso da quota e mínimos de convidado — são do dia, não do prato</li>
+      </ul>
+    </div>`;
+}
+
+async function confirmarTroca(){
+  if(!isAdmin()){toast('Só o admin troca refeições','bad');return;}
+  if(bloqueadoPorFecho())return;
+  if(swapFrom==null||swapTo==null||swapFrom===swapTo){toast('Escolhe a refeição com que queres trocar','bad');return;}
+  const A=DATA.refeicoesDef[swapFrom],B=DATA.refeicoesDef[swapTo];
+  if(!A||!B)return;
+  const btn=document.getElementById('swap-go');if(btn)btn.disabled=true;
+  setSync('load','a guardar…');
+
+  // 1) linhas com id próprio (lista + stock) — desfaz-se sozinho se falhar a meio
+  const plano=trocaPlano(A,B);
+  const err=await trocaEscrever(plano,false);
+  if(err){setSync('err','erro ao guardar');if(btn)btn.disabled=false;toast(permErrorMsg(err),'bad');return;}
+
+  // 2) refeições + despesas vão no snapshot do ano
+  const antesA=JSON.parse(JSON.stringify(A)),antesB=JSON.parse(JSON.stringify(B));
+  trocaMemoria(A,B);
+  const ok=await pushToGitHub(`Trocar refeições: ${A.dia} ${A.ref} ↔ ${B.dia} ${B.ref}`);
+  if(btn)btn.disabled=false;
+  if(!ok){
+    trocaMemoria(A,B);                  // a troca é o seu próprio inverso
+    await trocaEscrever(plano,true);    // repõe a lista e o stock
+    return;                             // o pushToGitHub já avisou do erro
+  }
+
+  // Responsáveis mudaram de dia → cada um leva o seu aviso (histórico/Telegram)
+  logNomeacoes(antesA,A);
+  logNomeacoes(antesB,B);
+  sbLog('refeicao','trocou',A.prato||'',{dia:A.dia,ref:A.ref,diaOutro:B.dia,refOutro:B.ref});
+
+  syncMirror();marcaGuardado();
+  closeSwapModal();
+  CALC=calcular(JSON.parse(JSON.stringify(DATA)));
+  renderAll();
+  if(TAB!=='compras')renderCompras();
+  if(STOCK_TABLE&&TAB!=='stock')renderStock();
+  toast('Refeições trocadas ✓','ok');
 }
 
 /* ═══ CARTAZ DAS EMENTAS ═══

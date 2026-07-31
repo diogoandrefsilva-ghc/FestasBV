@@ -577,6 +577,41 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .em-notas{font-size:10.5px;color:#EFC9A8;opacity:.85;margin-top:4px;white-space:pre-line;line-height:1.35;font-style:italic}
 /* Notas da sobremesa — logo por baixo dela, sem o respiro das notas do prato */
 .em-notas-sub{margin-top:1px}
+/* ═══ Troca de refeições — o prato muda de dia, o slot fica ═══ */
+.swp-card{background:var(--panel2);border:1px solid var(--line);border-radius:11px;padding:10px 12px}
+.swp-top{display:flex;align-items:center;gap:7px;font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+.swp-ico{flex:none;display:inline-flex;align-items:center}
+.swp-prato{font-family:var(--display);font-size:21px;font-weight:600;color:var(--gold);line-height:1.2;margin-top:3px}
+.swp-prato i{font-size:14px;font-family:inherit;color:var(--faint)}
+.swp-resp{font-size:11.5px;color:var(--faint);margin-top:2px}
+.swp-tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:7px}
+.swp-tag{background:var(--panel);border:1px solid var(--line);color:var(--muted);font-size:10.5px;font-weight:600;border-radius:7px;padding:2px 6px;white-space:nowrap}
+/* Lista das outras refeições — uma escolhe-se de cada vez */
+.swp-list{display:flex;flex-direction:column;gap:5px;margin-top:6px;max-height:34vh;overflow-y:auto;-webkit-overflow-scrolling:touch}
+.swp-opt{display:flex;align-items:center;gap:8px;padding:8px 11px;border:1.5px solid var(--line);border-radius:10px;background:#FFFDF6;cursor:pointer;transition:.14s;user-select:none}
+.swp-opt:active{transform:scale(.985)}
+.swp-opt.on{border-color:var(--barrete);background:rgba(30,122,77,.09)}
+.swp-opt-txt{flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.25}
+.swp-opt-txt b{font-size:12.5px;font-weight:700;color:var(--ink)}
+.swp-opt-txt small{font-size:11px;color:var(--faint);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.swp-opt-dot{flex:none;width:15px;height:15px;border-radius:50%;border:1.5px solid var(--line);background:transparent;transition:.14s}
+.swp-opt.on .swp-opt-dot{border-color:var(--barrete);background:var(--barrete);box-shadow:inset 0 0 0 3px #FFFDF6}
+/* Pré-visualização: para onde vai cada prato + o que vem atrás / o que fica */
+.swp-moves{margin-top:14px;display:flex;flex-direction:column;gap:5px}
+.swp-mv{display:flex;align-items:center;gap:7px;padding:7px 10px;background:var(--panel2);border:1px dashed var(--line);border-radius:9px;font-size:12px}
+.swp-mv-p{flex:1;min-width:0;font-weight:700;color:var(--gold);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.swp-mv-p i{font-weight:600;color:var(--faint)}
+.swp-arrow{flex:none;color:var(--faint);font-weight:700}
+.swp-mv-d{flex:none;font-weight:600;color:var(--ink)}
+.swp-blk{margin-top:11px;border:1px solid var(--line);border-radius:10px;padding:9px 11px;background:var(--panel)}
+.swp-blk.swp-fica{background:transparent;border-style:dashed}
+.swp-blk-hd{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);margin-bottom:5px}
+.swp-fica .swp-blk-hd{color:var(--faint)}
+.swp-ul{list-style:none;display:flex;flex-direction:column;gap:4px}
+.swp-ul li{font-size:11.5px;color:var(--muted);line-height:1.45}
+.swp-fica .swp-ul li{color:var(--faint)}
+.swp-ul b{color:var(--ink)}
+
 /* Detalhe "quem vai" por agregado (casal + convidados em tom apagado) */
 .rdc-ppl.casais{flex-direction:column;align-items:stretch;gap:7px}
 .rdc-casal-n{font-size:11.5px;font-weight:700;color:var(--ink)}
