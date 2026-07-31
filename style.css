@@ -7,6 +7,10 @@
   --sal:#FBF6E8;--campino:#9C2F1D;--campino-escuro:#6E2012;--campino-tinta:#85291A;--barrete:#1E7A4D;
   --display:'Barlow Condensed',-apple-system,sans-serif;
   --shadow:0 6px 22px rgba(80,55,20,.14);
+  /* Ícones desenhados (usados como máscara → herdam a cor de quem os usa).
+     Emoji não alinha, não herda cor e muda de aparelho para aparelho. */
+  --ic-cart:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M1.6 3.2h2.7l2.5 10.6h10.6'/%3E%3Cpath d='M6.2 6.4h16l-2.3 7.4'/%3E%3Ccircle cx='9.4' cy='19.2' r='1.6' fill='%23000' stroke='none'/%3E%3Ccircle cx='17.6' cy='19.2' r='1.6' fill='%23000' stroke='none'/%3E%3C/svg%3E");
+  --ic-loja:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 10.4V20h16v-9.6'/%3E%3Cpath d='M2.2 9.4 4.2 4h15.6l2 5.4a2.9 2.9 0 0 1-5 2 2.9 2.9 0 0 1-5 0 2.9 2.9 0 0 1-5 0 2.9 2.9 0 0 1-4.6-2Z'/%3E%3Cpath d='M9.6 20v-5.6h4.8V20'/%3E%3C/svg%3E");
 }
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 /* iOS Safari "text autosizing" inflava labels soltas (ex.: Descritivo no
@@ -948,33 +952,76 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
    é inline, dentro do rótulo — não é filho do flex do cartão). O tamanho vem
    da regra partilhada .cmp-badge-row/.cmp-sub, para os dois lerem igual. */
 .cmp-item.cmp-sub .cmp-artigo .cmp-badge{display:inline-block;vertical-align:middle}
-/* Lista de compras dentro do cartão da refeição (tab Refeições) */
-.msl{cursor:default}
+/* ═══════════════════════════════════════════════════════════════════════
+   Lista de compras dentro do cartão da refeição (tab Refeições)
+   VARIANTE B · "Talão do mercado" — a lista assume-se como um talão,
+   na linha do redesenho do separador Compras (ver fim do ficheiro).
+   Três ideias:
+   1) Linha de pontos entre o nome e a quantidade (talão/ementa): as
+      quantidades passam a ler-se todas na mesma coluna à direita, seja
+      qual for o comprimento do nome — o que a lista nunca teve.
+   2) Cada loja é uma tabuleta: banda escura de bordo a bordo com o nome
+      em tipo de display. Vê-se logo onde acaba uma paragem e começa a
+      seguinte, mesmo a passar o dedo depressa.
+   3) Quem trata do artigo passa a carimbo inclinado em vez de mais uma
+      linha de texto igual às outras.
+   ═══════════════════════════════════════════════════════════════════════ */
+.msl{cursor:default;background:#FFFDF6;border-color:rgba(110,75,25,.22);padding:11px 11px 12px;overflow:hidden}
 .msl-det{margin-top:0;border-top:none;padding-top:0}
-/* Dois blocos no mesmo cartão (Lista de compras + Comprado): separador entre eles */
-.msl-det+.msl-det{margin-top:8px;border-top:1px solid rgba(110,75,25,.14);padding-top:8px}
+/* Dois blocos no mesmo cartão (Lista de compras + Comprado): separador entre
+   eles — picotado, como quem destaca a parte de baixo do talão */
+.msl-det+.msl-det{margin-top:12px;border-top:1.5px dashed rgba(110,75,25,.3);padding-top:11px}
 .msl-det>summary{gap:8px}
-.msl-count{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:1px 7px;font-size:10.5px;font-weight:700;color:var(--muted);margin-left:auto}
-.msl-it{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:5px 0;font-size:12.5px;border-bottom:1px solid rgba(110,75,25,.08);cursor:pointer}
-.msl-it:last-of-type{border-bottom:none}
-.msl-art{min-width:0;color:var(--ink)}
-.msl-art i{font-style:normal;color:var(--faint);font-size:11px;margin-left:4px}
-/* Cabeçalho de loja dentro da lista da refeição: a indicação sai das linhas
-   (onde quebrava numas e noutras não) e passa a arrumar a lista por sítio */
-.msl-grp{display:flex;align-items:center;gap:6px;font-size:10.5px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;color:#9A6E0E;margin:9px 0 1px;white-space:nowrap;overflow:hidden}
-.msl-grp:first-child{margin-top:1px}
-.msl-grp::after{content:'';flex:1;height:0;border-top:1px dashed rgba(154,110,14,.35)}
-.msl-st{font-size:11px;color:var(--muted);white-space:nowrap;flex:0 0 auto}
-/* ＋🛒 na lista da refeição: o mesmo botão da Shop List, mas bem mais pequeno —
-   esta lista é densa (dezenas de ingredientes) e um botão alto empurrava as
-   linhas todas para longe umas das outras. */
-.cmp-mini.cart.msl-claim{height:19px;border-radius:12px;font-size:9.5px;padding:0 6px;border-width:1.2px}
+.msl-det>summary .rdc-lbl{font-size:14.5px;letter-spacing:.13em}
+/* Contagem carimbada, como no separador Compras */
+.msl-count{background:transparent;border:1.5px solid rgba(133,41,26,.5);border-radius:20px;padding:0 8px;font-size:10.5px;font-weight:800;color:var(--campino-tinta);margin-left:auto;transform:rotate(-4deg);font-variant-numeric:tabular-nums}
+/* Linha do talão: nome · pontinhos · quantidade · quem trata. A dica de stock
+   quebra para a linha de baixo (flex-basis 100%) sem desalinhar o resto. */
+.msl-it{display:flex;align-items:center;flex-wrap:wrap;padding:5px 3px;margin:0 -3px;font-size:12.5px;cursor:pointer;border-radius:6px}
+.msl-it:active{background:rgba(110,75,25,.06)}
+/* Nome · pontinhos · quantidade num bloco só: assim o carimbo/botão da direita
+   nunca é empurrado para a linha de baixo por um nome comprido — o nome é que
+   quebra, dentro do seu bloco. */
+/* flex-basis 0 (e não auto): num flex que quebra linha, os itens são
+   distribuídos pelas linhas ANTES de encolherem — com basis auto um nome
+   comprido atirava sozinho o carimbo/botão para a linha de baixo. */
+.msl-row{flex:1 1 0;min-width:0;display:flex;align-items:baseline}
+/* Nome em condensado: cabe mais texto na largura do telemóvel e a lista ganha
+   a voz do resto da app (é o tipo dos títulos) */
+.msl-nm{flex:0 1 auto;min-width:0;font-family:var(--display);font-size:15px;font-weight:600;line-height:1.2;letter-spacing:.005em;color:var(--ink)}
+.msl-lead{flex:1 1 auto;min-width:8px;margin:0 5px;transform:translateY(-3.5px);border-bottom:1.5px dotted rgba(110,75,25,.32)}
+.msl-q{flex:0 0 auto;font-size:11px;color:var(--muted);white-space:nowrap;font-variant-numeric:tabular-nums}
+.msl-st{flex:0 0 auto;margin-left:7px;font-size:11px;color:var(--muted);white-space:nowrap}
+/* Tabuleta da loja: banda escura de bordo a bordo (as margens negativas casam
+   com o padding do .msl) com a ponta direita recortada em bandeirola. */
+.msl-grp{display:flex;align-items:center;gap:7px;margin:16px -11px 4px;padding:6px 24px 6px 11px;background:var(--campino-escuro);color:#F4DFBE;font-family:var(--display);font-size:14px;font-weight:600;letter-spacing:.13em;text-transform:uppercase;white-space:nowrap;overflow:hidden;clip-path:polygon(0 0,100% 0,calc(100% - 11px) 50%,100% 100%,0 100%)}
+.msl-grp:first-child{margin-top:2px}
+.msl-grp-t{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis}
+/* Ícone desenhado (montra / carrinho) em vez do emoji: alinha à altura-x e
+   herda a cor da tabuleta, o que o emoji nunca faz. */
+.msl-grp-ic{flex:0 0 auto;width:15px;height:15px;background:currentColor;opacity:.85;-webkit-mask:var(--ic-loja) center/contain no-repeat;mask:var(--ic-loja) center/contain no-repeat}
+.msl-grp.none .msl-grp-ic{-webkit-mask-image:var(--ic-cart);mask-image:var(--ic-cart)}
+.msl-grp-n{margin-left:auto;flex:0 0 auto;font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:10px;font-weight:800;letter-spacing:0;color:#F3D9A8;background:rgba(0,0,0,.28);border-radius:20px;padding:1px 7px;font-variant-numeric:tabular-nums}
+/* Carimbo de quem trata: inclinado, como o carimbo do talão */
+.msl-who{flex:0 0 auto;margin-left:7px;display:inline-flex;align-items:center;gap:3px;font-size:9.5px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--barrete);background:rgba(30,122,77,.08);border:1.5px solid rgba(30,122,77,.5);border-radius:4px;padding:2px 5px;transform:rotate(-2.5deg);white-space:nowrap;align-self:center}
+.msl-ic-cart{width:10px;height:10px;flex:0 0 auto;background:currentColor;-webkit-mask:var(--ic-cart) center/contain no-repeat;mask:var(--ic-cart) center/contain no-repeat}
+/* Reclamar o artigo: botão de talão (cantos vivos, a tracejado enquanto está
+   por tratar), com o ＋ e o carrinho desenhado. */
+.cmp-mini.cart.msl-claim{align-self:center;margin-left:7px;height:21px;border-radius:4px;border-width:1.5px;border-style:dashed;padding:0 5px;gap:2px;font-size:10px}
 .cmp-mini.cart.msl-claim .cmp-plus{font-size:10.5px}
+.cmp-mini.cart.msl-claim .msl-ic-cart{width:11px;height:11px}
+.cmp-mini.cart.msl-claim:active{background:var(--barrete);border-style:solid;color:#fff}
 .msl-st.ok{color:var(--green)}
-.msl-st.falta{color:#9A6E0E}
-.msl-empty{font-size:12px;color:var(--faint);padding:4px 0}
-.msl-add{width:100%;margin-top:8px;justify-content:center}
-.msl-hint{font-size:10.5px;color:#9A6E0E;margin-top:1px}
+.msl-st.falta{color:#9A6E0E;font-style:italic}
+.msl-empty{font-size:12px;color:var(--faint);padding:6px 0}
+/* Fecho do talão: o total por extenso, entre picotados */
+.msl-foot{display:flex;justify-content:center;margin-top:9px;padding-top:8px;border-top:1.5px dashed rgba(110,75,25,.3);font-family:var(--display);font-size:12.5px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--faint)}
+/* Acrescentar ingrediente é a ação MENOS usada desta lista (lê-se dezenas de
+   vezes, acrescenta-se uma) — deixa de ser a mancha verde mais pesada do ecrã
+   e passa a ser o pé do talão, a tracejado. */
+.cmp-mini.prim.msl-add{width:100%;margin-top:9px;justify-content:center;background:transparent;border:1.5px dashed rgba(30,122,77,.45);color:var(--barrete);font-family:var(--display);font-size:14.5px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;padding:8px;border-radius:6px}
+.cmp-mini.prim.msl-add:active{background:rgba(30,122,77,.09)}
+.msl-hint{flex:0 0 100%;width:100%;min-width:0;font-size:10.5px;color:#9A6E0E;margin-top:2px}
 .msl-hint.ok{color:var(--green)}
 /* Dica-ação "alocar o livre" (um toque) — botão pequeno (na sua própria linha) */
 .msl-hint.alloc,.cmp-hint.alloc{display:flex;width:fit-content;max-width:100%;align-items:center;gap:2px;margin-top:3px;padding:2px 9px;border:1px solid rgba(30,122,77,.35);background:rgba(30,122,77,.08);color:var(--green);border-radius:20px;font-weight:600;cursor:pointer;font-family:inherit;text-align:left}

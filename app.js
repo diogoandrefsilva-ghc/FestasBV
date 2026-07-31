@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v150 · 2026-07-31 · Cartaz PNG: notas do prato na mesma linha + imagem a 3×';
+const APP_BUILD = 'v151 · 2026-07-31 · Lista de compras da refeição redesenhada (B · talão do mercado)';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -4634,6 +4634,17 @@ function shopLojaGroupedList(list,mineView){
    os artigos da shoplist ligados a ela (tipo Almoço/Jantar + data). É a MESMA
    lista do separador Compras: adicionar aqui ou lá dá exatamente no mesmo. */
 const MEAL_SHOP_OPEN={};   // aberto/fechado por refeição (sobrevive a re-renders)
+/* Nome ─ ─ ─ ─ quantidade: a linha de pontos (talão/ementa) liga os dois lados
+   e dá à lista uma coluna de quantidades a direito, seja qual for o nome.
+   Vai num bloco próprio para o que vem a seguir (carimbo/botão) nunca ser
+   empurrado para a linha de baixo por um nome comprido. */
+function mslLead(artigo,t){return `<span class="msl-row"><span class="msl-nm">${escHtml(artigo)}</span><i class="msl-lead"></i><span class="msl-q">${t?escHtml(t):''}</span></span>`;}
+/* Carimbo de quem trata do artigo. Só o primeiro nome — é o que se lê de
+   relance e mantém o carimbo curto; o nome inteiro fica no title. */
+function mslWho(nome){
+  const n=String(nome||'').trim();if(!n)return '';
+  return `<span class="msl-who" title="No carrinho de ${escHtml(n)}"><i class="msl-ic-cart"></i>${escHtml(n.split(/\s+/)[0])}</span>`;
+}
 function mealShopSection(rd){
   if(!shopIsMeal(rd.ref))return '';
   const items=shopArr().filter(it=>it.tipo===rd.ref&&it.dataValor===rd.data&&!shopIsRemoved(it))
@@ -4654,24 +4665,24 @@ function mealShopSection(rd){
   if(!items.length&&!alocs.length&&!canAdd)return '';
   const key=rd.data+'|'+rd.ref;
   const alocLines=alocs.map(x=>`<div class="msl-it stk" onclick="openLoteModal(${x.l._id})">
-      <span class="msl-art">${escHtml(x.l.artigo)} <i>${escHtml(loteQtdLabel(x.l,x.qtd))}</i></span><span class="msl-st ok">${x.org?x.org.ic+' '+escHtml(x.org.lbl):eur(x.val)}</span></div>`).join('');
+      ${mslLead(x.l.artigo,loteQtdLabel(x.l,x.qtd))}<span class="msl-st ok">${x.org?x.org.ic+' '+escHtml(x.org.lbl):eur(x.val)}</span></div>`).join('');
   const lineOf=(it,dim)=>{
     const done=shopIsBought(it);
     const qtdTxt=shopQtyLabel(it);
     // Sem "riscado": um artigo comprado é uma linha normal do bloco Comprado,
     // igual às dos lotes — o bloco onde está já diz tudo
     // Sem dono: em vez de dizer "falta quem trate", dá-se logo o botão de o
-    // resolver — o mesmo ＋🛒 da Shop List, um toque e o artigo é meu. Em
-    // refeições passadas não há nada a tratar: fica só a constatação.
+    // resolver — o ＋🛒 da Shop List em botão de talão, um toque e o artigo é
+    // meu. Em refeições passadas não há nada a tratar: fica só a constatação.
     const st=done?''
-      :it.tratadoPor?`<span class="msl-st">🛒 ${escHtml(it.tratadoPor)}</span>`
-      :past?'<span class="msl-st falta">falta quem trate</span>'
-      :`<button class="cmp-mini cart write-action msl-claim" title="Pôr no carrinho" aria-label="Pôr no carrinho" onclick="event.stopPropagation();claimItem(${it._id})"><i class="cmp-plus">＋</i>🛒</button>`;
+      :it.tratadoPor?mslWho(it.tratadoPor)
+      :past?'<span class="msl-st falta">por tratar</span>'
+      :`<button class="cmp-mini cart write-action msl-claim" title="Pôr no meu carrinho" aria-label="Pôr no meu carrinho" onclick="event.stopPropagation();claimItem(${it._id})"><i class="cmp-plus">＋</i><i class="msl-ic-cart"></i></button>`;
     // Dica de stock: quanto está coberto, ou stock livre por alocar (botão de um
     // toque para alocar o livre a esta refeição). Ver shopStockHint/shopHintHtml.
     const hint=(!done&&!past)?shopHintHtml(it,'msl-hint'):'';
     return `<div class="msl-it${dim?' msl-dim':''}" onclick="openShopItemModal(${it._id})">
-      <span class="msl-art">${escHtml(it.artigo)}${qtdTxt?` <i>${escHtml(qtdTxt)}</i>`:''}${hint}</span>${st}</div>`;
+      ${mslLead(it.artigo,qtdTxt)}${st}${hint}</div>`;
   };
   /* A loja NÃO vai em cada linha: nesta lista estreita a etiqueta caía para
      baixo numas linhas e não noutras (leitura aos solavancos). Vai antes como
@@ -4686,7 +4697,7 @@ function mealShopSection(rd){
       g[k].items.push(it);
     });
     order.sort((a,b)=>(a==='none'?1:0)-(b==='none'?1:0)||g[a].nome.localeCompare(g[b].nome,'pt'));
-    return order.map(k=>`<div class="msl-grp">${k==='none'?'🛒 '+SHOP_SEM_LOJA:'🏬 '+escHtml(g[k].nome)}</div>`
+    return order.map(k=>`<div class="msl-grp${k==='none'?' none':''}"><i class="msl-grp-ic"></i><span class="msl-grp-t">${k==='none'?SHOP_SEM_LOJA:escHtml(g[k].nome)}</span><span class="msl-grp-n">${g[k].items.length}</span></div>`
       +g[k].items.map(it=>lineOf(it,past)).join('')).join('');
   };
   // Dois blocos independentes: 📝 a lista (pendentes) e 🧺 o que já foi comprado
@@ -4709,8 +4720,11 @@ function mealShopSection(rd){
       <div class="rdc-det-body">${body}</div>
     </details>`;
   };
+  // Fecho de talão: o total da lista dito por extenso, como num recibo — dá
+  // fim ao rolo de artigos em vez de o deixar a cair no botão de acrescentar.
+  const foot=pend.length?`<div class="msl-foot"><span>${pend.length} ${pend.length===1?'artigo':'artigos'} por comprar</span></div>`:'';
   const listaDet=(pend.length||canAdd)?det('|l',past?'📝 Não comprado':'🛒 Lista de compras',pend.length||'',
-    (pend.length?listaHtml(pend):'<div class="msl-empty">Ainda sem ingredientes nesta lista.</div>')+
+    (pend.length?listaHtml(pend)+foot:'<div class="msl-empty">Ainda sem ingredientes nesta lista.</div>')+
     (canAdd?`<button class="cmp-mini prim write-action msl-add" onclick="openShopItemModal(null,'${rd.ref}','${rd.data}')">＋ Ingrediente</button>`:'')):'';
   const compDet=nComp?det('|c','🧺 Comprado',nComp,alocLines+bought.map(it=>lineOf(it,false)).join('')):'';
   return `<div class="rdc sf msl" onclick="event.stopPropagation()">${past?compDet+listaDet:listaDet+compDet}</div>`;
