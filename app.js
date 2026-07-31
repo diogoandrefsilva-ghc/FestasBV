@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v147 · 2026-07-31 · Shop List: chip da refeição do mesmo tamanho nos artigos com várias refeições';
+const APP_BUILD = 'v148 · 2026-07-31 · Cartaz: tracinho antes da sobremesa + campo "Notas da sobremesa"';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -1045,6 +1045,7 @@ function renderAll(){
         ${(mp.entradas||mp.sobremesa)?'<div class="em-rule"></div>':''}
         ${mp.entradas?`<div class="em-linha"><span class="em-lk">Entradas</span>${escHtml(mp.entradas)}</div>`:''}
         ${mp.sobremesa?`<div class="em-linha"><span class="em-lk">Sobremesa</span>${escHtml(mp.sobremesa)}</div>`:''}
+        ${(mp.sobremesa&&mp.sobrenotas)?`<div class="em-notas em-notas-sub">${escHtml(mp.sobrenotas)}</div>`:''}
       </div>`:'';
       r+=`<div class="refmeal" data-i="${rd._idx}" style="${rd._idx===sel?'':'display:none'}">
         <div class="refdef-day-hdr sf">${diaExtenso(rd.data)||rd.dia} · ${rd.data}</div>
@@ -7721,23 +7722,26 @@ async function toggleFilhoPresenca(fid,slotKey,btn){
 let editingRefdef=null;
 
 /* Menu estruturado dentro da coluna `menu` (sem migração de BD):
-   linhas "Entradas: …" e "Sobremesa: …" + notas livres no resto. */
+   linhas "Entradas: …", "Sobremesa: …" e "Nota sobremesa: …" (o "by Chef X" da
+   sobremesa) + notas livres no resto. */
 function parseMenuParts(menu){
-  const out={entradas:'',sobremesa:'',outras:[]};
+  const out={entradas:'',sobremesa:'',sobrenotas:'',outras:[]};
   (menu||'').split('\n').forEach(l=>{
     const t=l.trim();if(!t)return;
-    const m=t.match(/^(entradas?|sobremesas?)\s*:\s*(.*)$/i);
+    const m=t.match(/^(entradas?|sobremesas?|notas?\s*(?:da\s*)?sobremesa)\s*:\s*(.*)$/i);
     if(m&&m[2]){
-      const k=m[1].toLowerCase().startsWith('entrada')?'entradas':'sobremesa';
+      const p=m[1].toLowerCase();
+      const k=p.startsWith('entrada')?'entradas':p.startsWith('nota')?'sobrenotas':'sobremesa';
       out[k]=out[k]?out[k]+' · '+m[2].trim():m[2].trim();
     } else out.outras.push(t);
   });
-  return {entradas:out.entradas,sobremesa:out.sobremesa,outras:out.outras.join('\n')};
+  return {entradas:out.entradas,sobremesa:out.sobremesa,sobrenotas:out.sobrenotas,outras:out.outras.join('\n')};
 }
-function buildMenu(entradas,sobremesa,outras){
+function buildMenu(entradas,sobremesa,outras,sobrenotas){
   const L=[];
   if(entradas)L.push('Entradas: '+entradas);
   if(sobremesa)L.push('Sobremesa: '+sobremesa);
+  if(sobrenotas)L.push('Nota sobremesa: '+sobrenotas);
   if(outras)L.push(outras);
   return L.join('\n');
 }
@@ -7806,6 +7810,7 @@ function openRefdefModal(editIdx){
     const mp=parseMenuParts(rd.menu||'');
     document.getElementById('rd-entradas').value=mp.entradas;
     document.getElementById('rd-sobremesa').value=mp.sobremesa;
+    document.getElementById('rd-sobremesa-notas').value=mp.sobrenotas;
     document.getElementById('rd-menu').value=mp.outras;
     document.getElementById('rd-data').value=rd.data||'';
     document.getElementById('rd-ref').value=rd.ref||'Jantar';
@@ -7818,6 +7823,7 @@ function openRefdefModal(editIdx){
     document.getElementById('rd-resp-chips').innerHTML=_respChips([]);
     document.getElementById('rd-entradas').value='';
     document.getElementById('rd-sobremesa').value='';
+    document.getElementById('rd-sobremesa-notas').value='';
     document.getElementById('rd-menu').value='';
     document.getElementById('rd-data').value='';
     document.getElementById('rd-ref').value='Jantar';
@@ -7890,7 +7896,8 @@ async function saveRefdef(){
   const menu=REFDEF_RESP_COLS?buildMenu(
     (document.getElementById('rd-entradas').value||'').trim(),
     (document.getElementById('rd-sobremesa').value||'').trim(),
-    (document.getElementById('rd-menu').value||'').trim()
+    (document.getElementById('rd-menu').value||'').trim(),
+    (document.getElementById('rd-sobremesa-notas').value||'').trim()
   ):((anterior&&anterior.menu)||'');
   const entry={data,dia,ref,prato:prato||'',peso:ref==='Lanche'?null:peso,minMEO,minConv,extraConv,responsaveis,menu};
 
@@ -8034,8 +8041,10 @@ function cartazHtml(){
       h+=`<div class="cz-meal">
         <div class="cz-meal-hd">${mealIco(rd.ref,15)}<span class="cz-meal-ref">${escHtml(rd.ref)}</span>${mp.outras?`<span class="cz-obs">${escHtml(mp.outras)}</span>`:''}</div>
         ${rd.prato?`<div class="cz-prato">${escHtml(rd.prato)}</div>`:''}
+        ${(mp.entradas||mp.sobremesa)?'<div class="cz-rule-in"></div>':''}
         ${mp.entradas?`<div class="cz-linha"><span class="cz-lk">Entradas</span>${escHtml(mp.entradas)}</div>`:''}
         ${mp.sobremesa?`<div class="cz-linha"><span class="cz-lk">Sobremesa</span>${escHtml(mp.sobremesa)}</div>`:''}
+        ${(mp.sobremesa&&mp.sobrenotas)?`<div class="cz-obs cz-obs-sub">${escHtml(mp.sobrenotas)}</div>`:''}
         ${temMenu?'':'<div class="cz-porvir">Ementa por definir</div>'}
       </div>`;
     });
@@ -8171,6 +8180,18 @@ function czRender(ctx,draw,cards){
         czWrap(ctx,rd.prato,inner-20).forEach(ln=>{cy+=linha(ln,CZS.prato,cy)-3;});
         cy+=3;
       }
+      // Tracinho a separar o prato das entradas/sobremesa (igual ao da app)
+      if(mp.entradas||mp.sobremesa){
+        cy+=5;
+        if(draw){
+          const rw=Math.min(180,inner-40),rx=cx-rw/2;
+          const gr=ctx.createLinearGradient(rx,0,rx+rw,0);
+          gr.addColorStop(0,'rgba(110,75,25,0)');gr.addColorStop(.22,'rgba(110,75,25,.45)');
+          gr.addColorStop(.78,'rgba(110,75,25,.45)');gr.addColorStop(1,'rgba(110,75,25,0)');
+          ctx.fillStyle=gr;ctx.fillRect(rx,cy,rw,1);
+        }
+        cy+=5;
+      }
       // Entradas / Sobremesa: etiqueta + valor na mesma linha, centrados
       [['Entradas',mp.entradas],['Sobremesa',mp.sobremesa]].forEach(([lbl,val])=>{
         if(!val)return;
@@ -8188,6 +8209,12 @@ function czRender(ctx,draw,cards){
           lns.forEach((l,i)=>ctx.fillText(l,lx+wL,cy+i*18));
         }
         cy+=lns.length*18;
+        // Notas da sobremesa (o "by Chef X") logo por baixo dela
+        if(lbl==='Sobremesa'&&mp.sobrenotas){
+          cy+=2;
+          ctx.font=czFont(CZS.obs);
+          czWrap(ctx,mp.sobrenotas,inner-24).forEach(ln=>{cy+=linha(ln,CZS.obs,cy)+1;});
+        }
       });
       if(!(rd.prato||mp.entradas||mp.sobremesa||mp.outras))
         cy+=linha('Ementa por definir',CZS.porvir,cy)+2;
