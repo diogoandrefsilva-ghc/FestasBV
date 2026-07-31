@@ -1005,13 +1005,13 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 /* Carimbo de quem trata: inclinado, como o carimbo do talão */
 .msl-who{flex:0 0 auto;margin-left:7px;display:inline-flex;align-items:center;gap:3px;font-size:9.5px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--barrete);background:rgba(30,122,77,.08);border:1.5px solid rgba(30,122,77,.5);border-radius:4px;padding:2px 5px;transform:rotate(-2.5deg);white-space:nowrap;align-self:center}
 .msl-ic-cart{width:10px;height:10px;flex:0 0 auto;background:currentColor;-webkit-mask:var(--ic-cart) center/contain no-repeat;mask:var(--ic-cart) center/contain no-repeat}
-/* Reclamar o artigo: botão de talão (cantos vivos, a tracejado enquanto está
-   por tratar), com o mesmo ＋🛒 do botão equivalente da Shop List.
+/* Reclamar o artigo: botão de talão (cantos vivos, contorno a cheio) com o
+   mesmo ＋🛒 do botão equivalente da Shop List.
    A altura é FIXA (21px, menos que a caixa de linha do nome) para o botão
    nunca ser ele a mandar na altura da linha — a lista não se abre. */
-.cmp-mini.cart.msl-claim{align-self:center;margin-left:7px;height:21px;border-radius:4px;border-width:1.5px;border-style:dashed;padding:0 5px;gap:1px;font-size:10.5px;line-height:1}
+.cmp-mini.cart.msl-claim{align-self:center;margin-left:7px;height:21px;border-radius:4px;border-width:1.5px;padding:0 5px;gap:1px;font-size:10.5px;line-height:1}
 .cmp-mini.cart.msl-claim .cmp-plus{font-size:10.5px}
-.cmp-mini.cart.msl-claim:active{background:var(--barrete);border-style:solid;color:#fff}
+.cmp-mini.cart.msl-claim:active{background:var(--barrete);color:#fff}
 .msl-st.ok{color:var(--green)}
 .msl-st.falta{color:#9A6E0E;font-style:italic}
 .msl-empty{font-size:12px;color:var(--faint);padding:6px 0}
