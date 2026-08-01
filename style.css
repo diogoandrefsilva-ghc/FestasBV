@@ -1476,6 +1476,22 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .norm-opt-n{flex:1;min-width:0;font-size:13.5px;font-weight:600;line-height:1.3;overflow-wrap:anywhere}
 .norm-opt-c{flex:0 0 auto;font-size:11px;font-weight:800;color:var(--faint);background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:2px 6px}
 
+/* Pedidos repetidos (2.º passo do 🔤 Normalizar) — reaproveita o cartão do
+   .norm-card. Uma linha por pedido: [qtd] × [tamanho] + quem pediu/refeição. */
+.rep-art{font-size:15.5px;font-weight:800;color:var(--ink);margin:0 0 9px;line-height:1.25;overflow-wrap:anywhere}
+.rep-rows{display:flex;flex-direction:column;gap:9px}
+.rep-row{display:grid;grid-template-columns:78px 14px minmax(0,1fr);align-items:center;gap:5px 6px}
+.modal .rep-row input{width:100%;box-sizing:border-box;margin-top:0;font-size:14px;padding:9px 10px;border:1px solid var(--line);border-radius:9px;background:#FFFDF6}
+.modal .rep-row .rep-q{text-align:center;font-weight:700}
+.rep-x{text-align:center;font-size:12px;font-weight:800;color:var(--faint)}
+.rep-meta{grid-column:1/-1;font-size:11px;font-weight:600;color:var(--faint);padding-left:3px;overflow-wrap:anywhere}
+.rep-row.off{opacity:.5}
+.modal .rep-row.off input{background:var(--panel2);text-decoration:line-through}
+.modal .rep-card .rep-merge{width:100%;margin-top:10px;padding:9px 10px;font-size:12px}
+.modal .rep-card .rep-merge:disabled{opacity:.45;cursor:default}
+.modal .rep-card .rep-merge.on{background:rgba(30,122,77,.10);border-color:var(--barrete);color:var(--ink)}
+.rep-hint{margin-top:5px;font-size:11px;font-weight:700;color:var(--barrete);text-align:center;overflow-wrap:anywhere}
+
 /* ═══════════════════════════════════════════════════════════════════════
    REDESIGN Compras & Stock — VARIANTE A · "Talão de Mercado"
    A lista é um talão de mercearia: papel-sal com perfuração, linhas

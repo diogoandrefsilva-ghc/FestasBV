@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v155 · 2026-07-31 · Normalizar da Shop List também trata as categorias (AI) no mesmo passo';
+const APP_BUILD = 'v156 · 2026-08-01 · Normalizar em 3 passos: nomes → pedidos repetidos (tamanhos) → categorias';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -1861,6 +1861,8 @@ function fraseHistorico(tipo,accao,alvo,autor,d){
   }
   if(tipo==='compras'){
     const q=d.quantidade?` (${d.quantidade})`:'';
+    // Arrumação da lista: juntou pedidos repetidos do mesmo artigo num só
+    if(accao==='juntou')return `${A} juntou ${d.n} pedido${d.n===1?'':'s'} repetido${d.n===1?'':'s'} na lista de compras — ${alvo}`;
     const dest=d.dataValor?` para o ${refDia}`:'';
     const loja=d.loja?` · 🏬 ${d.loja}`:'';
     return `${A} pôs "${alvo}"${q} na lista de compras${dest}${loja}${d.tratoEu?` — trata ${A}`:' — falta quem trate'}`;
@@ -3806,8 +3808,8 @@ async function shopNormOpen(){
   _normViaAI=viaAI;
   if(!groups||!groups.length){
     _normGroups=null;
-    // Nomes já arrumados: salta o passo dos nomes e vai direto às categorias
-    if(viaAI&&shopCatPendentes()){shopCatStep();return;}
+    // Nomes já arrumados: salta o passo dos nomes e segue para repetidos → categorias
+    if(viaAI&&(shopRepGrupos().length||shopCatPendentes())){shopFluxoDepoisDosNomes(null);return;}
     toast(viaAI?'Nada a arrumar — grafias e categorias em dia 🎉'
       :('Sugestões AI falharam ('+aiErr+') e nada básico a juntar'),viaAI?'ok':'bad');
     return;
@@ -3939,7 +3941,7 @@ async function shopNormApply(){
     // Nomes já estavam certos — segue-se na mesma para as categorias
     await catHerdarNormalizacao(juntados);
     shopNormClose();
-    if(shopCatPendentes())shopCatStep(juntados);
+    if(shopRepGrupos().length||shopCatPendentes())shopFluxoDepoisDosNomes(juntados);
     else toast('Nada mudou — os nomes finais já estavam aplicados','ok');
     return;
   }
@@ -3964,7 +3966,7 @@ async function shopNormApply(){
     toast(`${nItems} artigo(s) normalizados em ${nGroups} grupo(s) ✓${nHerd?` · ${nHerd} categoria(s) seguiram o nome`:''}`,'ok');
     renderShopViews();
     if(STOCK_TABLE&&TAB==='stock')renderStock();
-    shopCatStep(juntados);   // 2.ª metade do botão: categorias em falta
+    shopFluxoDepoisDosNomes(juntados);   // passos seguintes: repetidos → categorias
   }catch(e){setSync('err','erro ao guardar');toast(permErrorMsg(e),'bad');if(btn)btn.disabled=false;}
 }
 /* ── Categorias no seguimento da normalização ──
@@ -4013,6 +4015,230 @@ async function shopCatStep(juntados){
     catch(e){toast('Categorias: sugestões falharam ('+(e.message||e)+')','bad');return;}
   }
   catSugOpen(nomes,map);
+}
+
+/* ═══ PEDIDOS REPETIDOS (2.º passo do 🔤 Normalizar) ═══
+   Com os nomes já unificados, o mesmo artigo aparece muitas vezes na lista —
+   pedido por pessoas diferentes, cada uma com a sua ideia de embalagem ("lata
+   250 ml", "garrafa 1,5 L", ou nada). Quem vai às compras vê três linhas de
+   Coca-Cola e não sabe o que levar. Este passo põe os pedidos do mesmo artigo
+   LADO A LADO, com quem pediu e para que refeição, e deixa acertar tamanho e
+   quantidade ali mesmo. Não usa AI: é contar e agrupar (offline, determinístico).
+   O que o modelo de dados impõe, e que se respeita à risca:
+   · `tipo`+`data_valor` são por linha — dois pedidos para refeições diferentes
+     NÃO são duplicados (é procura de dias diferentes); só se juntam pedidos do
+     mesmo tipo e da mesma refeição.
+   · `quantidade` é texto — só se soma quando as unidades casam (qtyParse/uKey).
+   · cada linha tem dono e estado — só entram pedidos pendentes e fora do
+     carrinho, e um pedido reclamado ("eu trato") nunca é absorvido.
+   Juntar é sempre OPCIONAL e é um soft-delete (estado='removido'): o pedido
+   fica no histórico de Removidos e pode ser reposto. */
+let _repGrupos=null;   // [{artigo,key,itens:[…],fundir,divergem}]
+let _repCont=null;     // grupos juntados no passo dos nomes (segue p/ as categorias)
+// Soma de quantidades em texto. null = não somável (unidades diferentes ou
+// alguma sem número); '' = ninguém indicou quantidade.
+function shopRepSoma(qs){
+  if(qs.every(q=>!(q||'').trim()))return '';
+  const ps=qs.map(q=>qtyParse((q||'').trim()));
+  if(ps.some(p=>!p))return null;
+  const us=new Set(ps.map(p=>uKey(p.u)));
+  if(us.size>1)return null;
+  return fmtQty(ps.reduce((s,p)=>s+p.n,0),[...us][0]);
+}
+// Pedidos pendentes agrupados por artigo; só os que aparecem mais do que uma vez
+function shopRepGrupos(){
+  const map={};
+  shopArr().forEach(it=>{
+    if(it._id==null||!shopIsPending(it)||it.noCarrinho)return;
+    const k=shopArtKey(it.artigo);if(!k)return;
+    (map[k]=map[k]||{artigo:it.artigo,key:k,fundir:false,itens:[]}).itens.push({
+      id:it._id,
+      qtd:normalizeQty(it.quantidade||''),tam:normalizeTamTxt(it.tamanho||''),
+      qtd0:it.quantidade||'',tam0:it.tamanho||'',   // como está na BD (deteta o que mudou)
+      tipo:it.tipo,dataValor:it.dataValor||'',quem:it.criadoPor||'',tratadoPor:it.tratadoPor||''
+    });
+  });
+  const out=Object.values(map).filter(g=>g.itens.length>1);
+  // Divergentes ao cimo: são os que precisam mesmo de olhos
+  out.forEach(g=>{g.divergem=new Set(g.itens.map(i=>shopTamKey(i.tam))).size>1;});
+  out.sort((a,b)=>(b.divergem?1:0)-(a.divergem?1:0)||b.itens.length-a.itens.length||a.artigo.localeCompare(b.artigo,'pt'));
+  return out;
+}
+/* Subgrupos que podem MESMO ser fundidos: mesmo tipo+refeição, mesma embalagem
+   (pela chave solta), ninguém a tratar deles e quantidades somáveis. */
+function shopRepFusiveis(g){
+  const sub={};
+  g.itens.forEach((it,j)=>{
+    if(it.tratadoPor)return;
+    const k=it.tipo+'|'+it.dataValor+'|'+shopTamKey(it.tam);
+    (sub[k]=sub[k]||[]).push(j);
+  });
+  const out=[];
+  Object.keys(sub).forEach(k=>{
+    const idx=sub[k];if(idx.length<2)return;
+    const soma=shopRepSoma(idx.map(j=>g.itens[j].qtd));
+    if(soma===null)return;
+    out.push({idx,soma});
+  });
+  return out;
+}
+// Abre o passo. Devolve false se não houver nada repetido (o fluxo segue em frente).
+function shopRepStep(juntados){
+  _repCont=juntados||null;
+  if(!isAdmin()||contasFechadas())return false;
+  const gs=shopRepGrupos();
+  if(!gs.length)return false;
+  _repGrupos=gs;
+  shopRepRender();
+  document.getElementById('shoprep-bg').classList.add('show');
+  document.body.classList.add('no-scroll');
+  return true;
+}
+// Encadeamento do botão: nomes → repetidos → categorias (cada passo só aparece
+// se tiver alguma coisa para mostrar)
+function shopFluxoDepoisDosNomes(juntados){
+  if(!shopRepStep(juntados))shopCatStep(juntados);
+}
+function shopRepRender(){
+  if(!_repGrupos)return;
+  const n=_repGrupos.length,nDiv=_repGrupos.filter(g=>g.divergem).length;
+  const info=document.getElementById('shoprep-info');
+  if(info)info.textContent=`${n} artigo${n===1?'':'s'} pedido${n===1?'':'s'} mais do que uma vez${nDiv?` — ${nDiv} com tamanhos diferentes`:''}. Acerta o tamanho e a quantidade onde fizer sentido; juntar pedidos é opcional.`;
+  document.getElementById('shoprep-list').innerHTML=_repGrupos.map((g,i)=>{
+    const rows=g.itens.map((it,j)=>{
+      const meta=[it.quem||'alguém',shopGroupLabel(it.tipo,it.dataValor)];
+      if(it.tratadoPor)meta.push(`✋ ${it.tratadoPor}`);
+      return `<div class="rep-row">
+        <input class="rep-q" value="${escHtml(it.qtd)}" maxlength="20" placeholder="qtd"
+          oninput="shopRepEdit(${i},${j},'qtd',this.value)" onblur="shopRepBlur(${i},${j},'qtd',this)">
+        <span class="rep-x">×</span>
+        <input class="rep-t" value="${escHtml(it.tam)}" maxlength="20" placeholder="tamanho / embalagem"
+          oninput="shopRepEdit(${i},${j},'tam',this.value)" onblur="shopRepBlur(${i},${j},'tam',this)">
+        <div class="rep-meta">${meta.map(m=>escHtml(m)).join(' · ')}</div>
+      </div>`;
+    }).join('');
+    return `<div class="norm-card rep-card">
+      <div class="norm-card-hd"><span class="norm-card-lbl">${g.itens.length} pedidos${g.divergem?' · tamanhos diferentes':''}</span></div>
+      <div class="rep-art">${escHtml(g.artigo)}</div>
+      <div class="rep-rows">${rows}</div>
+      <button type="button" class="norm-bar-btn rep-merge" onclick="shopRepFundir(${i})"></button>
+      <div class="rep-hint"></div>
+    </div>`;
+  }).join('');
+  _repGrupos.forEach((g,i)=>shopRepCardUpd(i));
+}
+function shopRepCard(i){return document.querySelectorAll('#shoprep-list .rep-card')[i]||null;}
+function shopRepEdit(i,j,campo,val){
+  const g=_repGrupos&&_repGrupos[i];if(!g||!g.itens[j])return;
+  g.itens[j][campo]=val;   // sem re-render: o campo está a ser escrito
+}
+/* Ao sair do campo arruma-se a escrita e recalcula-se o que dá para juntar.
+   A atualização é feita NO SÍTIO (texto/estado dos nós que já existem) e nunca
+   por innerHTML: substituir o botão de juntar entre o blur e o toque fazia
+   perder o clique no telemóvel. */
+function shopRepBlur(i,j,campo,el){
+  const g=_repGrupos&&_repGrupos[i];if(!g||!g.itens[j])return;
+  const v=campo==='qtd'?normalizeQty(el.value||''):normalizeTamTxt(el.value||'');
+  el.value=v;g.itens[j][campo]=v;
+  shopRepCardUpd(i);
+}
+function shopRepCardUpd(i){
+  const g=_repGrupos&&_repGrupos[i],card=shopRepCard(i);if(!g||!card)return;
+  const fus=shopRepFusiveis(g);
+  const nJunta=fus.reduce((s,f)=>s+f.idx.length,0);
+  if(!nJunta)g.fundir=false;
+  const btn=card.querySelector('.rep-merge');
+  if(btn){
+    btn.disabled=!nJunta;
+    btn.classList.toggle('on',!!nJunta&&g.fundir);
+    btn.textContent=!nJunta?'Nada igual para juntar'
+      :g.fundir?`✓ Juntar ${nJunta} pedidos num só`:`Juntar ${nJunta} pedidos iguais num só`;
+  }
+  const abs=new Set();
+  if(g.fundir)fus.forEach(f=>f.idx.slice(1).forEach(j=>abs.add(j)));
+  card.querySelectorAll('.rep-row').forEach((r,j)=>r.classList.toggle('off',abs.has(j)));
+  const hint=card.querySelector('.rep-hint');
+  if(hint)hint.textContent=g.fundir?fus.map(f=>`fica ${f.soma?f.soma:'sem quantidade'} × ${g.itens[f.idx[0]].tam||'—'}`).join(' · '):'';
+  shopRepBarUpd();
+}
+function shopRepFundir(i){
+  const g=_repGrupos&&_repGrupos[i];if(!g)return;
+  if(!shopRepFusiveis(g).length)return;
+  g.fundir=!g.fundir;
+  shopRepCardUpd(i);
+}
+// Conta o que vai ser gravado (alterações de escrita + pedidos absorvidos)
+function shopRepTotais(){
+  let nEd=0,nFu=0;
+  (_repGrupos||[]).forEach(g=>{
+    const abs=new Set();
+    if(g.fundir)shopRepFusiveis(g).forEach(f=>f.idx.slice(1).forEach(j=>abs.add(j)));
+    nFu+=abs.size;
+    g.itens.forEach((it,j)=>{if(!abs.has(j)&&(it.qtd!==it.qtd0||it.tam!==it.tam0))nEd++;});
+  });
+  return{nEd,nFu};
+}
+function shopRepBarUpd(){
+  const save=document.getElementById('shoprep-save');if(!save)return;
+  const {nEd,nFu}=shopRepTotais();
+  save.disabled=!nEd&&!nFu;
+  const alt=n=>`${n} ${n===1?'alteração':'alterações'}`;
+  save.textContent=!nEd&&!nFu?'Sem alterações'
+    :nFu?`Guardar${nEd?` ${alt(nEd)} ·`:''} ${nFu} a juntar`
+    :`Guardar ${alt(nEd)}`;
+}
+function shopRepClose(){
+  document.getElementById('shoprep-bg').classList.remove('show');
+  document.body.classList.remove('no-scroll');
+  _repGrupos=null;
+  const cont=_repCont;_repCont=null;
+  shopCatStep(cont);   // último passo do fluxo
+}
+async function shopRepApply(){
+  if(!_repGrupos)return;
+  if(!isAdmin()){toast('Só o admin arruma os pedidos','bad');return;}
+  if(contasFechadas()){toast('Contas fechadas','bad');return;}
+  const edits=[];    // {id,patch,local}
+  const absorv=[];   // {id,artigo}
+  const nomesFundidos=[];
+  _repGrupos.forEach(g=>{
+    const abs=new Set();
+    if(g.fundir)shopRepFusiveis(g).forEach(f=>{
+      const surv=g.itens[f.idx[0]];
+      f.idx.slice(1).forEach(j=>{abs.add(j);absorv.push({id:g.itens[j].id,artigo:g.artigo});});
+      // O sobrevivente fica com a soma das quantidades e a embalagem do grupo
+      edits.push({id:surv.id,qtd:f.soma,tam:surv.tam});
+      if(nomesFundidos.indexOf(g.artigo)<0)nomesFundidos.push(g.artigo);
+    });
+    g.itens.forEach((it,j)=>{
+      if(abs.has(j))return;
+      if(edits.some(e=>e.id===it.id))return;             // já tratado como sobrevivente
+      if(it.qtd!==it.qtd0||it.tam!==it.tam0)edits.push({id:it.id,qtd:it.qtd,tam:it.tam});
+    });
+  });
+  if(!edits.length&&!absorv.length){shopRepClose();return;}
+  const btn=document.getElementById('shoprep-save');if(btn)btn.disabled=true;
+  setSync('load','a guardar…');
+  try{
+    for(const e of edits){
+      await queueWrite(()=>sbReq('PATCH',`shoplist?id=eq.${e.id}`,{quantidade:e.qtd,tamanho:e.tam||null}));
+      const it=shopArr().find(x=>x._id===e.id);
+      if(it){it.quantidade=e.qtd;it.tamanho=e.tam;}
+    }
+    if(absorv.length){
+      const quem=myPrimaryName()||(isAdmin()?'Admin':'');
+      const ids=absorv.map(a=>a.id);
+      await queueWrite(()=>sbReq('PATCH',`shoplist?id=in.(${ids.join(',')})`,{estado:'removido',cf_desc:quem}));
+      ids.forEach(id=>{const it=shopArr().find(x=>x._id===id);if(it){it.estado='removido';it.cfDesc=quem;}});
+      // Juntar apaga o pedido de outra pessoa da lista ativa — fica registado
+      sbLog('compras','juntou',nomesFundidos.slice(0,3).join(', ')+(nomesFundidos.length>3?'…':''),{n:absorv.length});
+    }
+    syncMirror();marcaGuardado();
+    if(CALC)CALC=calcular(JSON.parse(JSON.stringify(DATA)));
+    toast(`${edits.length?`${edits.length} pedido(s) acertado(s)`:''}${edits.length&&absorv.length?' · ':''}${absorv.length?`${absorv.length} juntado(s)`:''} ✓`,'ok');
+    renderShopViews();
+    shopRepClose();
+  }catch(e){setSync('err','erro ao guardar');toast(permErrorMsg(e),'bad');if(btn)btn.disabled=false;}
 }
 
 /* ═══ COMPRAS / SHOPLIST ═══
@@ -4089,11 +4315,59 @@ const _QTY_UNITS={
   fatia:['fatia','fatias'],
   molho:['molho','molhos']
 };
+/* ── Medidas dentro de texto livre ──────────────────────────────────
+   O campo Tamanho/embalagem raramente começa por número ("lata 250ML",
+   "pack 6 x 33cl"), e por isso escapava todo ao normalizeQty (que só olha para
+   um número À CABEÇA). Isto arruma a NOTAÇÃO onde quer que ela apareça, sem
+   tocar nas palavras: cl/dl→ml, ml≥1000→L, g≥1000→kg, espaço entre número e
+   unidade, unidade em forma canónica. É o que faz "Lata 250ML" e "lata 250 ml"
+   convergirem para a mesma escrita — sem isso o ecrã dos pedidos repetidos
+   acusava como divergência o que é só maneira de escrever.
+   O lookahead impede "1 lata" de ser lido como 1 litro. */
+const _MED_RE=/(\d+(?:[.,]\d+)?)\s*(mililitros?|mls?|litros?|lts?|l|quilogramas?|quilos?|kgs?|gramas?|grs?|g|cls?|dls?)(?![a-zà-ü])/gi;
+function normalizeMedidas(s){
+  return (s||'').replace(_MED_RE,(orig,num,u)=>{
+    let n=parseFloat(String(num).replace(',','.'));
+    const k=u.toLowerCase();
+    let unit;
+    if(/^(ml|mls|mililitro)/.test(k))unit='ml';
+    else if(/^cl/.test(k)){n*=10;unit='ml';}
+    else if(/^dl/.test(k)){n*=100;unit='ml';}
+    else if(/^(l|lt|lts|litro)/.test(k))unit='L';
+    else if(/^(kg|kgs|quilo)/.test(k))unit='kg';
+    else if(/^(g|gr|grs|grama)/.test(k))unit='g';
+    else return orig;
+    if(unit==='ml'&&n>=1000){n/=1000;unit='L';}
+    else if(unit==='g'&&n>=1000){n/=1000;unit='kg';}
+    return String(Math.round(n*1000)/1000).replace('.',',')+' '+unit;
+  });
+}
+// Recipientes conhecidos em minúsculas ("Lata"→"lata"). Só estas palavras: as
+// unidades de medida ficam de fora para o "L" dos litros não virar "l".
+const _CONT_SET=new Set(['duzia','pacote','lata','garrafa','caixa','saco','grade','fatia','molho']
+  .reduce((a,k)=>a.concat(_QTY_UNITS[k]),[])
+  .concat(['garrafao','garrafoes','frasco','frascos','barril','barris','cuvete','cuvetes','tabuleiro','tabuleiros','bidon','bidons','tetra','copo','copos','tubo','tubos','rolo','rolos','bisnaga','bisnagas']));
+// Arruma um texto de embalagem: medidas canónicas + recipiente em minúsculas
+function normalizeTamTxt(raw){
+  return normalizeMedidas((raw||'').trim().replace(/\s+/g,' ')).split(' ').map(w=>{
+    const k=w.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+    return _CONT_SET.has(k)?w.toLowerCase():w;
+  }).join(' ');
+}
+/* Chave de COMPARAÇÃO de embalagens (não é para mostrar): ignora ordem das
+   palavras, plurais, acentos e pontuação — "250 ml lata" == "Latas 250ML".
+   Serve para o passo dos repetidos só assinalar divergências a sério. */
+function shopTamKey(raw){
+  const t=normalizeMedidas(raw||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .replace(/[^a-z0-9,.]+/g,' ').trim();
+  if(!t)return '';
+  return t.split(' ').map(w=>w.length>3&&w.endsWith('s')?w.slice(0,-1):w).sort().join(' ');
+}
 function normalizeQty(raw){
   let s=(raw||'').trim().replace(/\s+/g,' ');
   if(!s)return '';
   const m=s.match(/^(\d+(?:[.,]\d+)?)\s*(.*)$/);   // número + resto
-  if(!m)return s;                                   // sem número → deixa como está
+  if(!m)return normalizeTamTxt(s);                  // sem número à cabeça → é texto de embalagem
   let num=parseFloat(m[1].replace(',','.'));
   let rest=(m[2]||'').trim();
   const norm=rest.toLowerCase().replace(/\.$/,'').normalize('NFD').replace(/[\u0300-\u036f]/g,'');
@@ -4108,7 +4382,10 @@ function normalizeQty(raw){
     return pl[u]?(n===1?pl[u][0]:pl[u][1]):u;
   };
   if(unit)return `${fmt(num)} ${label(unit,num)}`;
-  if(rest)return `${fmt(num)} ${rest}`;   // unidade desconhecida → nº normalizado + texto original
+  // Unidade desconhecida ("6 x 33cl", "2 packs 250ML") → número normalizado e o
+  // resto arrumado como texto de embalagem (medidas canónicas, recipiente em
+  // minúsculas), em vez de ficar exatamente como veio
+  if(rest)return `${fmt(num)} ${normalizeTamTxt(rest)}`;
   return fmt(num);                        // só número
 }
 // Primeira letra maiúscula, e só essa — "feijão preto" → "Feijão preto". Não
