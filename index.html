@@ -347,6 +347,26 @@ setTimeout(function(){ if (window.fbvEsconderSplash) window.fbvEsconderSplash();
   </div>
 </div>
 
+<!-- 📷 Foto → Lista: artigos lidos de uma foto da lista de compras, por confirmar -->
+<div class="modal-bg" id="shoplista-bg">
+  <div class="modal" id="shoplista-modal">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <h3 style="margin-bottom:0">📷 Artigos da Foto</h3>
+      <button onclick="listaFotoClose()" style="background:var(--panel2);border:1px solid var(--line);color:var(--muted);border-radius:9px;width:32px;height:32px;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0">✕</button>
+    </div>
+    <div class="note" id="shoplista-info" style="margin-top:0"></div>
+    <div id="shoplista-dest"></div>
+    <div id="shoplista-list"></div>
+    <datalist id="lif-art-list"></datalist>
+    <div class="mbtns">
+      <button class="btn ghost" onclick="listaFotoClose()">Cancelar</button>
+      <button class="btn prim" id="shoplista-save" onclick="listaFotoApply()">Adicionar</button>
+    </div>
+    <div class="note">Nada entra na lista sem passares por aqui. Corrige os nomes e as quantidades antes de adicionar — a foto é só um atalho para não escrever tudo à mão.</div>
+  </div>
+</div>
+<input type="file" id="lista-file" accept="image/*,application/pdf" style="display:none" onchange="listaFotoChosen(this)">
+
 <!-- 🔤 Normalizar grafias de artigos (juntar chouriço/chouriços, 1000ml/1L, …) -->
 <div class="modal-bg" id="shopnorm-bg">
   <div class="modal" id="shopnorm-modal">
