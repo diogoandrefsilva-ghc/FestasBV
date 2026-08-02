@@ -699,13 +699,25 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .rdc-costs-hdr.open .rdc-fold-arrow{transform:rotate(90deg)}
 .rdc-costs-body{margin-top:2px}
 .rdc-costs-body>.rdc{background:var(--panel);border-color:rgba(110,75,25,.18)}
-/* Swipe entre refeições: o cartão novo entra do lado de onde veio o dedo */
-@keyframes refSwIn{from{opacity:.3}to{opacity:1}}
-@keyframes refSwR{from{opacity:.3;transform:translateX(20px)}to{opacity:1;transform:none}}
-@keyframes refSwL{from{opacity:.3;transform:translateX(-20px)}to{opacity:1;transform:none}}
-.refmeal.sw-r{animation:refSwR .18s ease-out}
-.refmeal.sw-l{animation:refSwL .18s ease-out}
-@media (prefers-reduced-motion:reduce){.refmeal.sw-r,.refmeal.sw-l{animation:refSwIn .18s ease-out}}
+/* ═══ Swipe entre refeições ═══
+   Durante o gesto os dois cartões (o que sai e o que entra) saem do fluxo e
+   ficam sobrepostos no .refdef-cards, que trava a altura e corta o que sobra;
+   o JS trata dos transforms. A altura acompanha a troca, para o cartão novo
+   crescer/encolher em vez de saltar. */
+.refdef-cards.sw-live{position:relative;overflow:hidden;touch-action:pan-y}
+.refdef-cards.sw-live>.refmeal.sw-card{position:absolute;top:0;left:0;right:0;margin:0;will-change:transform,opacity;backface-visibility:hidden}
+.refdef-cards.sw-anim{transition:height .28s cubic-bezier(.22,.75,.3,1)}
+.refdef-cards.sw-anim>.refmeal.sw-card{transition:transform .28s cubic-bezier(.22,.75,.3,1),opacity .28s ease-out}
+/* Troca sem dedo (chips da barra): o cartão novo entra do lado certo */
+@keyframes refSwIn{from{opacity:0}to{opacity:1}}
+@keyframes refSwR{from{opacity:0;transform:translateX(38px) scale(.985)}to{opacity:1;transform:none}}
+@keyframes refSwL{from{opacity:0;transform:translateX(-38px) scale(.985)}to{opacity:1;transform:none}}
+.refmeal.sw-r{animation:refSwR .26s cubic-bezier(.22,.75,.3,1)}
+.refmeal.sw-l{animation:refSwL .26s cubic-bezier(.22,.75,.3,1)}
+@media (prefers-reduced-motion:reduce){
+  .refmeal.sw-r,.refmeal.sw-l{animation:refSwIn .18s ease-out}
+  .refdef-cards.sw-anim,.refdef-cards.sw-anim>.refmeal.sw-card{transition-duration:.12s}
+}
 .rdc-hdr{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
 .rdc-lbl{font-family:var(--display);font-size:13.5px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--campino)}
 .rdc-lbl-green{color:var(--green)}

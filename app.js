@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v167 · 2026-08-02 · Refeições passadas: "Quem foi?" em vez de "Quem vai?"';
+const APP_BUILD = 'v168 · 2026-08-02 · Swipe entre refeições em qualquer zona, cartão a seguir o dedo';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -812,44 +812,166 @@ function updateFabs(){
 // Alias retrocompatível
 function updateGuestFab(){updateFabs();}
 let REF_SEL=0;
-// dir (opcional): +1 veio de um swipe para a esquerda (refeição seguinte),
-// -1 do contrário — serve só para a animação de entrada do cartão.
-function setRefMeal(i,dir){REF_SEL=i;lsSet('fbv_refmeal',String(i));
+// dir (opcional): +1 → o cartão novo entra pela direita (refeição seguinte),
+// -1 pela esquerda. Se não vier, deduz-se de onde estávamos (assim os chips da
+// barra também animam). dir=0 desliga a animação — é o que o swipe usa no fim,
+// que já animou o cartão à mão.
+function setRefMeal(i,dir){
+  if(dir===undefined)dir=i===REF_SEL?0:(i>REF_SEL?1:-1);
+  REF_SEL=i;lsSet('fbv_refmeal',String(i));
   document.querySelectorAll('.refnav-chip').forEach(e=>e.classList.toggle('on',+e.dataset.i===i));
-  document.querySelectorAll('.refmeal').forEach(e=>{const on=+e.dataset.i===i;e.style.display=on?'':'none';
-    e.classList.remove('sw-l','sw-r');if(on&&dir)e.classList.add(dir>0?'sw-r':'sw-l');});}
-/* Swipe horizontal sobre os cartões: ← seguinte, → anterior. Não dá a volta
-   (parar na primeira/última é mais previsível do que saltar para a outra ponta). */
-function stepRefMeal(d){
-  const n=(DATA&&DATA.refeicoesDef)?DATA.refeicoesDef.length:0;
-  const i=REF_SEL+d;
-  if(n<2||i<0||i>=n)return false;
-  setRefMeal(i,d);
-  // Se o cartão anterior era comprido, podemos estar abaixo do topo da lista
-  const cards=document.querySelector('.refdef-cards');
-  if(cards){const top=cards.getBoundingClientRect().top;if(top<0)window.scrollTo({top:window.scrollY+top-10});}
+  document.querySelectorAll('.refmeal').forEach(e=>{
+    const on=+e.dataset.i===i;e.style.display=on?'':'none';
+    e.classList.remove('sw-l','sw-r');
+    // reflow no meio, senão reentrar na mesma classe não reinicia a animação
+    if(on&&dir){void e.offsetWidth;e.classList.add(dir>0?'sw-r':'sw-l');}
+  });
+}
+function refMealCount(){return (DATA&&DATA.refeicoesDef)?DATA.refeicoesDef.length:0;}
+function refMealEl(i){return document.querySelector('.refmeal[data-i="'+i+'"]');}
+// Se o cartão anterior era comprido, podemos ficar abaixo do topo da lista
+function refCardsInView(smooth){
+  const cards=document.querySelector('.refdef-cards');if(!cards)return;
+  const top=cards.getBoundingClientRect().top;
+  if(top<0)window.scrollTo({top:window.scrollY+top-10,behavior:smooth?'smooth':'auto'});
+}
+/* ═══ Swipe entre refeições ═══════════════════════════════════════════
+   O dedo pega no cartão em qualquer ponto do ecrã (Refeições › Calendário)
+   e a refeição vizinha vem atrás dele: durante o gesto os dois cartões ficam
+   absolutos dentro do .refdef-cards (que fixa a altura), seguem o dedo, e ao
+   levantar ou a troca completa ou o cartão volta ao sítio. Nas pontas da lista
+   não há vizinho — o cartão cede um pouco e volta (elástico).            */
+const SWG={armed:false,axis:0,live:false,anim:false,x0:0,y0:0,t0:0,dx:0,dir:0,w:0,gap:16,
+           cards:null,cur:null,inc:null,clickAt:0,fin:null,timer:0};
+const SW_MS=280;   // tem de bater certo com a transição do .sw-anim no CSS
+
+// Há algum contentor com scroll horizontal por baixo do dedo? Esse manda.
+function swHScroll(el){
+  for(let n=el;n&&n!==document.body;n=n.parentElement){
+    if(n.scrollWidth-n.clientWidth>4){
+      const ox=getComputedStyle(n).overflowX;
+      if(ox==='auto'||ox==='scroll')return true;
+    }
+  }
+  return false;
+}
+function swReady(t){
+  if(TAB!=='refeicoes'||REF_SUB!=='calendario')return false;
+  if(SWG.anim||refMealCount()<2)return false;
+  if(document.querySelector('.modal-bg.show,.sheet-bg.show,.dsheet-bg.show'))return false;
+  if(!t||!t.closest)return false;
+  if(t.closest('input,textarea,select,.fabs'))return false;
+  return !swHScroll(t);
+}
+// Prepara o palco: altura travada, cartão atual solto do fluxo
+function swBegin(){
+  const cards=document.querySelector('.refdef-cards'),cur=refMealEl(REF_SEL);
+  if(!cards||!cur)return false;
+  SWG.cards=cards;SWG.cur=cur;SWG.inc=null;SWG.dir=0;SWG.dx=0;
+  SWG.w=cards.clientWidth||window.innerWidth;
+  cards.style.height=cur.offsetHeight+'px';
+  cards.classList.add('sw-live');
+  cur.classList.add('sw-card');
+  SWG.live=true;window.__refSwipeLock=true;   // trava o pull-to-refresh
   return true;
 }
-let _swX=0,_swY=0,_swOk=false;
+// O vizinho muda se o dedo inverter o sentido a meio do gesto
+function swInc(dir){
+  if(SWG.dir===dir)return;
+  if(SWG.inc){const o=SWG.inc;o.classList.remove('sw-card');o.style.transform='';o.style.opacity='';o.style.display='none';}
+  SWG.dir=dir;SWG.inc=null;
+  const i=REF_SEL+dir;
+  if(!dir||i<0||i>=refMealCount())return;
+  const el=refMealEl(i);if(!el)return;
+  el.style.display='';el.classList.add('sw-card');
+  el.style.transform='translate3d('+swOff(dir)+'px,0,0)';
+  el.style.opacity='.5';
+  SWG.inc=el;
+}
+const swOff=dir=>(SWG.w+SWG.gap)*(dir>0?1:-1);   // onde o vizinho espera
+function swMove(raw){
+  const dir=raw<0?1:-1;
+  swInc(dir);
+  // Sem vizinho (primeira/última refeição) o cartão só cede um bocadinho
+  let dx=SWG.inc?raw:Math.sign(raw)*Math.min(Math.abs(raw)*.32,SWG.w*.12);
+  dx=Math.max(-SWG.w,Math.min(SWG.w,dx));
+  SWG.dx=dx;
+  const p=Math.min(1,Math.abs(dx)/SWG.w);
+  SWG.cur.style.transform='translate3d('+dx+'px,0,0)';
+  SWG.cur.style.opacity=String(1-p*.5);
+  if(SWG.inc){
+    SWG.inc.style.transform='translate3d('+(swOff(dir)+dx)+'px,0,0)';
+    SWG.inc.style.opacity=String(.5+p*.5);
+  }
+}
+function swEnd(){
+  if(!SWG.live){SWG.armed=false;SWG.axis=0;return;}
+  const {cards,cur,inc,dir,dx}=SWG;
+  const dt=Date.now()-SWG.t0,vel=Math.abs(dx)/Math.max(dt,1);
+  // Passa com um quarto do ecrã ou com um flick curto mas rápido
+  const go=!!inc&&(Math.abs(dx)>SWG.w*.25||(vel>.45&&Math.abs(dx)>30));
+  SWG.live=false;SWG.anim=true;SWG.axis=0;SWG.armed=false;
+  if(Math.abs(dx)>6)SWG.clickAt=Date.now();
+  const tgt=REF_SEL+dir;
+  cards.classList.add('sw-anim');
+  if(go){
+    cards.style.height=inc.offsetHeight+'px';
+    cur.style.transform='translate3d('+(-swOff(dir))+'px,0,0)';cur.style.opacity='0';
+    inc.style.transform='translate3d(0,0,0)';inc.style.opacity='1';
+    // O chip acende já, para viajar com o cartão em vez de saltar no fim
+    document.querySelectorAll('.refnav-chip').forEach(e=>e.classList.toggle('on',+e.dataset.i===tgt));
+    refCardsInView(true);
+  }else{
+    cur.style.transform='translate3d(0,0,0)';cur.style.opacity='1';
+    if(inc){inc.style.transform='translate3d('+swOff(dir)+'px,0,0)';inc.style.opacity='.5';}
+  }
+  SWG.fin=()=>{swCleanup();setRefMeal(go?tgt:REF_SEL,0);};
+  SWG.timer=setTimeout(swSettle,SW_MS+20);
+}
+// Fecha a animação — no fim dela ou já a meio, se entretanto vier outro gesto
+// (quem passa refeições depressa não pode perder swipes)
+function swSettle(){
+  if(!SWG.fin)return;
+  const f=SWG.fin;SWG.fin=null;clearTimeout(SWG.timer);SWG.timer=0;f();
+}
+function swCleanup(){
+  const {cards,cur,inc}=SWG;
+  if(cards){cards.classList.remove('sw-live','sw-anim');cards.style.height='';}
+  [cur,inc].forEach(el=>{if(el){el.classList.remove('sw-card');el.style.transform='';el.style.opacity='';}});
+  SWG.cards=SWG.cur=SWG.inc=null;SWG.dir=0;SWG.dx=0;SWG.live=false;SWG.anim=false;
+  window.__refSwipeLock=false;
+}
 function initRefSwipe(){
   if(initRefSwipe._on)return;initRefSwipe._on=true;
   document.addEventListener('touchstart',e=>{
-    _swOk=false;
-    if(e.touches.length!==1)return;
-    const t=e.target;
-    if(!t||!t.closest||!t.closest('.refdef-cards'))return;
-    if(t.closest('input,textarea,select'))return;
-    _swOk=true;_swX=e.touches[0].clientX;_swY=e.touches[0].clientY;
+    SWG.armed=false;SWG.axis=0;
+    if(SWG.anim)swSettle();
+    if(e.touches.length!==1||!swReady(e.target))return;
+    SWG.armed=true;SWG.x0=e.touches[0].clientX;SWG.y0=e.touches[0].clientY;SWG.t0=Date.now();
   },{passive:true});
-  document.addEventListener('touchend',e=>{
-    if(!_swOk)return;_swOk=false;
-    const t=e.changedTouches&&e.changedTouches[0];if(!t)return;
-    const dx=t.clientX-_swX,dy=t.clientY-_swY;
-    if(Math.abs(dx)<60||Math.abs(dx)<Math.abs(dy)*1.8)return;
-    // Gesto engolido: sem o preventDefault o dedo ainda acabava por "clicar"
-    // no que estava por baixo (abrir um artigo, o modal da refeição…)
-    if(stepRefMeal(dx<0?1:-1))e.preventDefault();
+  document.addEventListener('touchmove',e=>{
+    if(!SWG.armed||e.touches.length!==1)return;
+    const x=e.touches[0].clientX,y=e.touches[0].clientY,dx=x-SWG.x0,dy=y-SWG.y0;
+    if(!SWG.axis){
+      // Quem decidir primeiro fica com o gesto: ou é scroll vertical, ou é nosso
+      if(Math.abs(dy)>10&&Math.abs(dy)>=Math.abs(dx)){SWG.armed=false;return;}
+      if(Math.abs(dx)<10||Math.abs(dx)<Math.abs(dy)*1.2)return;
+      if(!swBegin()){SWG.armed=false;return;}
+      // Recomeça a contar aqui, senão o cartão salta os 10px do arranque
+      SWG.axis=1;SWG.x0=x;SWG.t0=Date.now();
+      e.preventDefault();return;
+    }
+    e.preventDefault();   // o gesto é nosso: nada de scroll por baixo
+    swMove(dx);
   },{passive:false});
+  const end=()=>{if(SWG.live)swEnd();SWG.armed=false;SWG.axis=0;};
+  document.addEventListener('touchend',end);
+  document.addEventListener('touchcancel',end);
+  // Arrastar não é tocar: mata o clique fantasma que vinha a seguir (abria o
+  // modal da refeição, um artigo da lista…)
+  document.addEventListener('click',e=>{
+    if(SWG.clickAt&&Date.now()-SWG.clickAt<500){SWG.clickAt=0;e.stopPropagation();e.preventDefault();}
+  },true);
 }
 /* Estado dos containers de cada refeição (sobrevive aos re-renders) */
 const MEAL_QUEM_OPEN={},MEAL_COST_OPEN={};
