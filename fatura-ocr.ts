@@ -5,6 +5,9 @@
 // vem também com a categoria de produto sugerida; e há dois modos só-texto:
 // `artigos` (classifica artigos existentes em lote) e `normalizar` (agrupa
 // grafias do mesmo produto — com `categorias`, classifica-os na mesma resposta).
+// Com `lista: true` a imagem é lida ao contrário: não é um talão do que já se
+// comprou, é a LISTA do que falta comprar (folha da cozinha, quadro, print do
+// telemóvel) → devolve artigos com quantidade/embalagem, sem preços.
 // Chamada pelo browser com o JWT do
 // utilizador (verify_jwt fica LIGADO no deploy — é o gateway que valida).
 //
@@ -149,6 +152,42 @@ ${pedidos.map((p) => `  · ${p}`).join("\n")}` : ""}
 - Se algo não se ler com confiança, usa null nesse campo em vez de adivinhar.
 Responde só com o JSON.`;
 
+/* ── Modo FOTO → LISTA (`lista: true`) ──
+   O oposto do talão: a foto é a lista do que FALTA comprar. Não há preços nem
+   loja — há artigos, quantidades e embalagens. `conhecidos` são os nomes já em
+   uso no grupo (stock + shop list): reaproveitá-los é o que impede a lista de
+   ganhar uma grafia nova por cada foto ("chouriço"/"chouriços"/"Chouriço"). */
+const promptLista = (cats: Cat[], conhecidos: string[]) => `A imagem (ou PDF) é uma LISTA DE
+COMPRAS ou uma lista de ingredientes, em português de Portugal. Pode estar
+escrita à mão, impressa, num quadro, num caderno, ou ser a captura de ecrã de
+uma nota ou de uma conversa.
+
+Extrai APENAS um objeto JSON com esta forma exata:
+{"artigos": [{"artigo": string, "qtd": string|null, "tamanho": string|null${cats.length ? ', "categoria": string|null' : ""}}]}
+
+Regras:
+- Uma entrada por produto a comprar, pela ordem em que aparecem. Ignora
+  títulos, datas, recados, totais, preços e tudo o que não seja um produto.
+- Inclui na mesma os artigos riscados ou com visto (a app deixa desmarcá-los).
+- "artigo": só o NOME do produto, sem quantidade nem embalagem lá dentro
+  (ex.: "2 latas de atum" -> artigo "Atum"). Expande abreviaturas óbvias
+  ("azt" -> "Azeite") mas não inventes o que não se lê.
+- "qtd": quantas unidades ou que medida se pede — "4", "2 kg", "1,5 L".
+  null se a lista não disser.
+- "tamanho": a embalagem/formato, quando indicada — "lata 250 ml", "pack 6",
+  "garrafa 1,5 L". null se não houver.
+- Não repitas o mesmo produto: se aparecer duas vezes, junta as quantidades.${conhecidos.length ? `
+- Se o produto for o MESMO de um destes nomes já usados pelo grupo, devolve
+  EXATAMENTE esse nome (copia tal e qual) em vez de uma grafia nova. Se for
+  outro produto, escreve o nome normalmente — não forces a correspondência.
+  Nomes já em uso:
+${conhecidos.map((n) => `  · ${n}`).join("\n")}` : ""}${cats.length ? `
+- "categoria": a categoria que melhor descreve o artigo, EXATAMENTE um destes
+  nomes (copia o nome tal e qual), ou null se nenhum encaixar com confiança:
+${catsLista(cats)}` : ""}
+- Se algo não se ler com confiança, usa null nesse campo em vez de adivinhar.
+Responde só com o JSON.`;
+
 // Modo só-texto: classificar nomes de artigos já existentes (sem imagem)
 const promptClassificar = (artigos: string[], cats: Cat[]) => `Classifica artigos de compras de
 supermercado (Portugal) em categorias.
@@ -244,20 +283,27 @@ Deno.serve(async (req) => {
       return json({ error: "não autorizado" }, 403);
     }
 
-    const { image, mime, categorias, artigos, normalizar, pedidos } = await req.json();
+    const { image, mime, categorias, artigos, normalizar, pedidos, lista, conhecidos } =
+      await req.json();
     const cats = lerCategorias(categorias);
     // Pedidos genéricos da lista (para a fatura ligar marca -> pedido)
     const pedidosLista = (Array.isArray(pedidos) ? pedidos : [])
       .filter((p) => typeof p === "string" && p.trim())
       .slice(0, 80)
       .map((p) => String(p).replace(/\s+/g, " ").trim().slice(0, 60));
+    // Nomes já em uso no grupo (modo `lista`, para não nascerem grafias novas)
+    const nomesConhecidos = (Array.isArray(conhecidos) ? conhecidos : [])
+      .filter((n) => typeof n === "string" && n.trim())
+      .slice(0, 150)
+      .map((n) => String(n).replace(/\s+/g, " ").trim().slice(0, 60));
     const limparNomes = (arr: unknown[]) =>
       arr
         .filter((a) => typeof a === "string" && (a as string).trim())
         .slice(0, 200)
         .map((a) => String(a).replace(/\s+/g, " ").trim().slice(0, 60));
 
-    // Três utilizações: OCR de fatura (image), classificação só-texto
+    // Quatro utilizações: OCR de fatura (image), OCR de lista de compras
+    // (image + lista — o "📷 Foto" da Shop List), classificação só-texto
     // (artigos + categorias — o "✨ Categorias") e normalização de grafias
     // (normalizar — o "🔤 Normalizar" da Shop List, que com `categorias` traz
     // as sugestões de categoria na mesma resposta). As duas de texto não levam
@@ -279,7 +325,7 @@ Deno.serve(async (req) => {
       }
       parts = [
         { inline_data: { mime_type: mime || "image/jpeg", data: image } },
-        { text: promptFatura(cats, pedidosLista) },
+        { text: lista ? promptLista(cats, nomesConhecidos) : promptFatura(cats, pedidosLista) },
       ];
     }
 
@@ -321,7 +367,7 @@ Deno.serve(async (req) => {
     const candidatos = await candidatosModelo();
     // Marcador de versão + lista de candidatos: se este log não aparecer, é a
     // versão ANTIGA que está a correr (o deploy não pegou).
-    console.log("FATURA-OCR build=pedidos-v3 candidatos:", candidatos.join(", "));
+    console.log("FATURA-OCR build=lista-v1 candidatos:", candidatos.join(", "));
     let model = candidatos[0] ?? "gemini-flash-latest";
     let g: Response | null = null;
 
@@ -359,7 +405,7 @@ Deno.serve(async (req) => {
       // Sobrecarga esgotou todos os modelos → mensagem amiga (não o texto cru).
       if (transitorio(status)) {
         return json({
-          error: "o serviço de leitura de faturas está com muita procura agora — espera um minuto e tenta outra vez",
+          error: "o serviço de leitura está com muita procura agora — espera um minuto e tenta outra vez",
         }, 503);
       }
       let msg = "";
@@ -389,7 +435,7 @@ Deno.serve(async (req) => {
     // Estoirou o nosso timeout antes de o modelo responder.
     if (err.name === "AbortError") {
       return json({
-        error: "o modelo demorou demasiado a ler a fatura — tenta uma foto mais nítida ou um PDF com menos páginas",
+        error: "o modelo demorou demasiado a ler a imagem — tenta uma foto mais nítida ou um PDF com menos páginas",
       }, 504);
     }
     return json({ error: err.message }, 500);

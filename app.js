@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v160 · 2026-08-02 · Presenças: avatar da criança centrado com o do adulto';
+const APP_BUILD = 'v161 · 2026-08-02 · Shop List: foto da lista → artigos (Gemini) com ecrã de confirmação';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -1865,7 +1865,14 @@ function fraseHistorico(tipo,accao,alvo,autor,d){
     if(accao==='juntou')return `${A} juntou ${d.n} pedido${d.n===1?'':'s'} repetido${d.n===1?'':'s'} na lista de compras — ${alvo}`;
     const dest=d.dataValor?` para o ${refDia}`:'';
     const loja=d.loja?` · 🏬 ${d.loja}`:'';
-    return `${A} pôs "${alvo}"${q} na lista de compras${dest}${loja}${d.tratoEu?` — trata ${A}`:' — falta quem trate'}`;
+    const trato=d.tratoEu?` — trata ${A}`:' — falta quem trate';
+    // Lote (foto da lista): uma linha só para os N artigos — senão eram N
+    // notificações no Telegram por uma única fotografia
+    if(d.n>1){
+      const destN=d.nRef?` (${d.nRef} refeições)`:dest;
+      return `${A} pôs ${d.n} artigos na lista de compras${d.foto?' a partir de uma foto':''}${destN}${loja} — ${alvo}${trato}`;
+    }
+    return `${A} pôs "${alvo}"${q} na lista de compras${dest}${loja}${trato}`;
   }
   if(tipo==='convidado'){
     const dono=(d.membro&&d.membro!==autor)?` (convidado de ${d.membro})`:'';
@@ -5099,7 +5106,10 @@ function mealShopSection(rd){
   const foot=pend.length?`<div class="msl-foot"><span>${pend.length} ${pend.length===1?'artigo':'artigos'} por comprar</span></div>`:'';
   const listaDet=(pend.length||canAdd)?det('|l',past?'📝 Não comprado':'🛒 Lista de compras',pend.length||'',
     (pend.length?listaHtml(pend)+foot:'<div class="msl-empty">Ainda sem ingredientes nesta lista.</div>')+
-    (canAdd?`<button class="cmp-mini prim write-action msl-add" onclick="openShopItemModal(null,'${rd.ref}','${rd.data}')">＋ Ingrediente</button>`:'')):'';
+    (canAdd?`<div class="msl-add-row">
+      <button class="cmp-mini prim write-action msl-add" onclick="openShopItemModal(null,'${rd.ref}','${rd.data}')">＋ Ingrediente</button>
+      <button class="cmp-mini prim write-action msl-add lfoto-btn" title="Ler uma foto da lista" onclick="listaFotoPick('${rd.ref}','${rd.data}')">📷 Foto</button>
+    </div>`:'')):'';
   const compDet=nComp?det('|c','🧺 Comprado',nComp,alocLines+bought.map(it=>lineOf(it,false)).join('')):'';
   return `<div class="rdc sf msl" onclick="event.stopPropagation()">${past?compDet+listaDet:listaDet+compDet}</div>`;
 }
@@ -5172,6 +5182,7 @@ function renderCompras(){
     <div class="cmp-hdr-title sf">🛒 Shop List</div>
     <div class="cmp-hdr-acts">
       ${isAdmin()?`<button class="btn write-action" id="shop-norm-btn" onclick="shopNormOpen()" title="Juntar grafias do mesmo artigo (chouriço/chouriços…) e categorizar o que falta">🔤 Normalizar</button>`:''}
+      <button class="btn write-action lfoto-btn" onclick="listaFotoPick()" title="Ler uma foto da lista (câmara ou galeria) e adicionar os artigos de uma vez" ${canW&&!fechadas?'':'disabled'}>📷 Foto</button>
       <button class="btn prim write-action" onclick="openShopItemModal()" ${canW?'':'disabled'}>＋ Artigo</button>
     </div>
   </div>`;
@@ -6182,6 +6193,261 @@ function compraAddLote(){
   compraRenderLotes();
 }
 function compraDelLote(i){const l=compraEdit.lotes[i];if(!l||!l.free)return;compraEdit.lotes.splice(i,1);compraRenderLotes();}
+
+/* ═══ FOTO → LISTA (foto da lista de compras → Gemini → artigos) ═══
+   Irmão do Importar Fatura, do outro lado do processo: em vez de ler o talão
+   do que já se comprou, lê a lista do que FALTA comprar — a folha da cozinha,
+   o quadro, o print do telemóvel — e propõe os artigos já com quantidade e
+   embalagem. Reaproveita a compressão da foto e a Edge Function da fatura
+   (modo `lista`, sem preços nem loja).
+   Nada entra na lista sem passar pelo ecrã de confirmação: desmarcar, corrigir
+   nomes/quantidades e escolher o destino. O destino é UM só para toda a foto —
+   uma lista fotografada é uma lista, não seis destinos diferentes.
+   A partir do cartão de uma refeição o destino já vem trancado (como o
+   ＋ Ingrediente); a partir da Shop List escolhe-se aqui. */
+let _listaFotoCtx=null;   // contexto trancado, guardado enquanto o seletor de ficheiro está aberto
+let _listaFoto=null;      // {ctx,itens,tipo,datas,loja,tratoEu} enquanto o ecrã está aberto
+function listaFotoPick(tipo,data){
+  if(!shopCanWrite()){toast('Sem permissão','bad');return;}
+  if(contasFechadas()){toast('Contas fechadas','bad');return;}
+  _listaFotoCtx=(tipo&&shopIsMeal(tipo)&&data)?{tipo,data}:null;
+  const i=document.getElementById('lista-file');if(i)i.click();
+}
+/* Os botões 📷 vivem em sítios que se re-desenham (cabeçalho da Shop List e
+   cartão de cada refeição) — em vez de guardar um id, mexe-se em todos os que
+   tiverem a classe. */
+function _listaFotoBusy(on){
+  document.querySelectorAll('.lfoto-btn').forEach(b=>{
+    if(on){b.dataset.lbl=b.innerHTML;b.disabled=true;b.innerHTML='⏳ A ler…';}
+    else if(b.dataset.lbl!=null){b.innerHTML=b.dataset.lbl;b.disabled=false;delete b.dataset.lbl;}
+  });
+}
+async function listaFotoChosen(inp){
+  const f=inp.files&&inp.files[0];inp.value='';
+  if(!f)return;
+  _listaFotoBusy(true);
+  try{
+    const isPdf=f.type==='application/pdf'||/\.pdf$/i.test(f.name||'');
+    if(isPdf&&f.size>4*1024*1024)throw new Error('PDF demasiado grande (máx. 4 MB)');
+    const {b64,mime}=isPdf?await faturaLerPdf(f):await faturaComprime(f);
+    const body={image:b64,mime,lista:true};
+    if(CATS_TABLE&&CATEGORIAS.length)body.categorias=catPromptList();
+    // Nomes já em uso (stock + lista): a AI devolve o nome existente em vez de
+    // inventar grafia nova — é o mesmo serviço que o datalist faz a quem escreve
+    const nomes=stkAddNomes();
+    if(nomes.length)body.conhecidos=nomes.slice(0,150);
+    const r=await sbFetch(`${SB_URL}/functions/v1/fatura-ocr`,{
+      method:'POST',
+      headers:{'Content-Type':'application/json','apikey':SB_KEY},
+      body:JSON.stringify(body)
+    });
+    if(!r.ok){const e=await r.json().catch(()=>({}));throw new Error(e.error||('HTTP '+r.status));}
+    listaFotoAbrir(await r.json());
+  }catch(e){
+    // Mesmo tratamento da fatura: "Load failed" é o erro genérico do browser
+    // quando o pedido é cortado por timeout (~60s no iOS) ou a ligação cai.
+    const m=String(e&&e.message||e);
+    const rede=/load failed|failed to fetch|networkerror|timed? ?out/i.test(m);
+    toast(rede
+      ?'A leitura demorou demasiado ou falhou a ligação. Tenta uma foto mais nítida ou volta a tentar.'
+      :'Não consegui ler a lista: '+m,'bad');
+  }finally{_listaFotoBusy(false);}
+}
+function listaFotoAbrir(d){
+  const arr=(d&&Array.isArray(d.artigos))?d.artigos:[];
+  const itens=[],vistos=new Set();
+  arr.forEach(a=>{
+    if(!a||typeof a.artigo!=='string')return;
+    const artigo=shopCapArtigo(a.artigo).slice(0,60);
+    if(!artigo)return;
+    const k=shopArtKey(artigo);if(vistos.has(k))return;vistos.add(k);   // a foto repetiu o artigo
+    itens.push({
+      artigo,
+      qtd:a.qtd?normalizeQty(String(a.qtd)).slice(0,20):'',
+      tam:a.tamanho?normalizeQty(String(a.tamanho)).slice(0,20):'',
+      categoria:a.categoria?String(a.categoria).slice(0,40):null,
+      on:true
+    });
+  });
+  if(!itens.length){toast('Não encontrei artigos legíveis na foto','bad');return;}
+  const ctx=_listaFotoCtx;
+  _listaFoto={ctx,itens,tipo:ctx?ctx.tipo:'Gerais',datas:ctx?[ctx.data]:[],loja:'',tratoEu:false};
+  // Sugestões: nomes já em uso e lojas já usadas (as mesmas do formulário
+  // normal — este ecrã pode ser o primeiro a abrir, daí preenchê-las aqui)
+  const dl=document.getElementById('lif-art-list');
+  if(dl)dl.innerHTML=stkAddNomes().map(n=>`<option value="${escHtml(n)}">`).join('');
+  const ll=document.getElementById('shop-loja-list');
+  if(ll&&SHOP_LOJA_COL)ll.innerHTML=shopLojaNomes().map(n=>`<option value="${escHtml(n)}">`).join('');
+  listaFotoRenderDest();listaFotoRenderList();
+  document.getElementById('shoplista-bg').classList.add('show');
+  document.body.classList.add('no-scroll');
+}
+function listaFotoClose(){
+  document.getElementById('shoplista-bg').classList.remove('show');
+  document.body.classList.remove('no-scroll');
+  _listaFoto=null;_listaFotoCtx=null;
+}
+/* Destino de TODOS os artigos da foto. Trancado quando a foto foi tirada de
+   dentro de uma refeição; senão tipo (+ refeições, que aceitam várias como na
+   criação normal), loja opcional e o "vai já para o meu carrinho". */
+function listaFotoRenderDest(){
+  const S=_listaFoto;const el=document.getElementById('shoplista-dest');if(!S||!el)return;
+  const loja=SHOP_LOJA_COL?`<label style="margin-top:12px">Loja 🏬 <i style="font-weight:400;color:var(--faint)">(opcional, para todos)</i></label>
+    <input type="text" id="lif-loja" maxlength="40" placeholder="Ex: Continente" list="shop-loja-list" autocomplete="off" value="${escHtml(S.loja)}" oninput="listaFotoSet('loja',this.value)">`:'';
+  const trato=`<label class="cmp-pick-row" style="margin-top:12px"><input type="checkbox" ${S.tratoEu?'checked':''} onchange="listaFotoSet('tratoEu',this.checked)">
+    <span>🛒 Vão já para o meu carrinho</span></label>`;
+  if(S.ctx){
+    el.innerHTML=`<div class="shop-ctx-lock"><span class="scl-ico">🔒</span><span>${escHtml(shopGroupLabel(S.ctx.tipo,S.ctx.data))}</span></div>${loja}${trato}`;
+    return;
+  }
+  el.innerHTML=`<label style="margin-top:12px">Tipo de despesa <i style="font-weight:400;color:var(--faint)">(para todos)</i></label>
+    <select id="lif-tipo" onchange="listaFotoTipo(this.value)">${SHOP_TIPOS.map(t=>`<option value="${t}"${S.tipo===t?' selected':''}>${t}</option>`).join('')}</select>
+    ${shopIsMeal(S.tipo)?`<label style="margin-top:12px">Refeições a que se destinam (podes marcar várias)</label>
+      <div id="lif-refs">${listaFotoRefsHtml()}</div>`:''}${loja}${trato}`;
+}
+function listaFotoSet(campo,val){if(_listaFoto)_listaFoto[campo]=val;}
+function listaFotoRefsHtml(){
+  const S=_listaFoto;
+  const meals=(DATA.refeicoesDef||[]).filter(r=>r.ref===S.tipo).slice().sort((a,b)=>(a.data||'').localeCompare(b.data||''));
+  if(!meals.length)return `<div class="note">Sem ${S.tipo.toLowerCase()}s definidos — adiciona a refeição primeiro no separador Refeições.</div>`;
+  return meals.map(r=>`<label class="cmp-pick-row"><input type="checkbox" value="${r.data}"${S.datas.includes(r.data)?' checked':''} onchange="listaFotoRefs()"><span>${fmtDiaMes(r.data)}${r.prato?' · '+escHtml(r.prato):''}</span></label>`).join('');
+}
+function listaFotoTipo(v){
+  const S=_listaFoto;if(!S)return;
+  S.tipo=v;S.datas=[];
+  listaFotoRenderDest();listaFotoRenderList();
+}
+function listaFotoRefs(){
+  const S=_listaFoto;if(!S)return;
+  S.datas=[...document.querySelectorAll('#lif-refs input:checked')].map(c=>c.value);
+  listaFotoRenderList();   // o aviso de repetido depende do destino
+}
+/* Já está na lista? Compara com os pedidos pendentes do(s) destino(s)
+   escolhido(s) — é o engano mais fácil de cometer com uma foto (fotografar a
+   mesma folha duas vezes, ou uma folha que já foi metida a meio). */
+function listaFotoDests(){
+  const S=_listaFoto;
+  if(S.ctx)return [[S.ctx.tipo,S.ctx.data]];
+  if(shopIsMeal(S.tipo))return S.datas.map(d=>[S.tipo,d]);
+  return [[S.tipo,null]];
+}
+function listaFotoDup(it){
+  return listaFotoDests().some(([t,d])=>shopArr().some(x=>
+    !shopIsRemoved(x)&&!shopIsBought(x)&&x.tipo===t&&(x.dataValor||null)===(d||null)&&shopSameArtigo(x.artigo,it.artigo)));
+}
+function listaFotoRenderList(){
+  const S=_listaFoto;const el=document.getElementById('shoplista-list');if(!S||!el)return;
+  el.innerHTML=S.itens.map((it,i)=>{
+    const dup=listaFotoDup(it);
+    // Desmarca-se sozinho da PRIMEIRA vez que se descobre repetido; se o
+    // utilizador o voltar a marcar, fica marcado (o aviso é conselho, não lei)
+    if(dup&&!it._dupVisto){it._dupVisto=true;it.on=false;}
+    return `<div class="lif-row${it.on?'':' off'}">
+      <input type="checkbox" class="lif-ck" ${it.on?'checked':''} onchange="listaFotoToggle(${i},this.checked)">
+      <input class="lif-art" value="${escHtml(it.artigo)}" maxlength="60" placeholder="artigo" list="lif-art-list" autocomplete="off"
+        oninput="listaFotoEdit(${i},'artigo',this.value)" onblur="listaFotoBlur(${i},'artigo',this)">
+      <div class="lif-sub">
+        <input class="lif-q" value="${escHtml(it.qtd)}" maxlength="20" placeholder="qtd"
+          oninput="listaFotoEdit(${i},'qtd',this.value)" onblur="listaFotoBlur(${i},'qtd',this)">
+        <input class="lif-t" value="${escHtml(it.tam)}" maxlength="20" placeholder="tamanho / embalagem"
+          oninput="listaFotoEdit(${i},'tam',this.value)" onblur="listaFotoBlur(${i},'tam',this)">
+      </div>
+      ${dup?'<div class="lif-meta dup">⚠️ já está na lista deste destino</div>':''}
+    </div>`;
+  }).join('');
+  listaFotoBarUpd();
+}
+function listaFotoToggle(i,on){
+  const S=_listaFoto;if(!S||!S.itens[i])return;
+  S.itens[i].on=!!on;
+  const row=document.querySelectorAll('#shoplista-list .lif-row')[i];
+  if(row)row.classList.toggle('off',!on);
+  listaFotoBarUpd();
+}
+function listaFotoEdit(i,campo,val){
+  const S=_listaFoto;if(!S||!S.itens[i])return;
+  S.itens[i][campo]=val;   // sem re-render: o campo está a ser escrito
+  if(campo==='artigo')listaFotoBarUpd();
+}
+// Ao sair do campo arruma-se a escrita (a mesma que o formulário normal aplica).
+// Só se mexe NESTA linha — um re-render aqui apanhava o toque a caminho do
+// campo seguinte e roubava-lhe o foco.
+function listaFotoBlur(i,campo,el){
+  const S=_listaFoto;if(!S||!S.itens[i])return;
+  const v=campo==='artigo'?shopCapArtigo(el.value):normalizeQty(el.value);
+  S.itens[i][campo]=v;el.value=v;
+  if(campo==='artigo')listaFotoRowUpd(i);   // o aviso de repetido segue o nome
+}
+// Refresca só o aviso "já está na lista" de uma linha (sem re-render)
+function listaFotoRowUpd(i){
+  const S=_listaFoto;if(!S||!S.itens[i])return;
+  const row=document.querySelectorAll('#shoplista-list .lif-row')[i];if(!row)return;
+  const dup=listaFotoDup(S.itens[i]);
+  let m=row.querySelector('.lif-meta');
+  if(dup&&!m){m=document.createElement('div');m.className='lif-meta dup';row.appendChild(m);}
+  if(m){m.textContent=dup?'⚠️ já está na lista deste destino':'';m.style.display=dup?'':'none';}
+}
+function listaFotoBarUpd(){
+  const S=_listaFoto;if(!S)return;
+  const n=S.itens.filter(x=>x.on&&(x.artigo||'').trim()).length;
+  const info=document.getElementById('shoplista-info');
+  if(info)info.textContent=`Li ${S.itens.length} artigo${S.itens.length===1?'':'s'} na foto. Desmarca o que não quiseres e corrige o que for preciso antes de adicionar.`;
+  const btn=document.getElementById('shoplista-save');
+  if(btn){btn.textContent=n?`Adicionar ${n}`:'Adicionar';btn.disabled=!n;}
+}
+async function listaFotoApply(){
+  const S=_listaFoto;if(!S)return;
+  if(!DATA._sbId){toast('Sem ligação — recarrega a página','bad');return;}
+  if(contasFechadas()){toast('Contas fechadas','bad');return;}
+  const sel=S.itens.filter(x=>x.on&&(x.artigo||'').trim());
+  if(!sel.length){toast('Marca pelo menos um artigo','bad');return;}
+  const tipo=S.ctx?S.ctx.tipo:S.tipo;
+  let datas=[null];
+  if(shopIsMeal(tipo)){
+    datas=S.ctx?[S.ctx.data]:S.datas.slice();
+    if(!datas.length){toast('Marca pelo menos uma refeição (ou define-a em Refeições)','bad');return;}
+  }
+  const loja=SHOP_LOJA_COL?shopCapArtigo(S.loja).slice(0,40):'';
+  const btn=document.getElementById('shoplista-save');btn.disabled=true;
+  setSync('load','a guardar…');
+  try{
+    const criadoPor=myPrimaryName()||(isAdmin()?'Admin':'');
+    // Uma refeição = um registo (igual à criação normal): marcar várias
+    // refeições cria um artigo por refeição
+    const rows=[];
+    sel.forEach(it=>{
+      const artigo=shopCapArtigo(it.artigo).slice(0,60);
+      const qtd=normalizeQty(it.qtd),tam=normalizeQty(it.tam);
+      datas.forEach(dv=>{
+        const r={evento_id:DATA._sbId,artigo,quantidade:qtd,tamanho:tam||null,tipo,data_valor:dv,estado:'pendente',criado_por:criadoPor};
+        if(SHOP_LOJA_COL)r.loja=loja||null;
+        if(S.tratoEu)r.tratado_por=criadoPor;
+        rows.push(r);
+      });
+    });
+    const ins=await queueWrite(()=>sbReq('POST','shoplist',rows,{Prefer:'return=representation'}));
+    rows.forEach((r,i)=>{
+      shopArr().push({_id:ins&&ins[i]?ins[i].id:null,artigo:r.artigo,quantidade:r.quantidade,tamanho:r.tamanho||'',loja,tipo,dataValor:r.data_valor,estado:'pendente',tratadoPor:S.tratoEu?criadoPor:null,noCarrinho:false,compraId:null,cfDesc:null,valor:null,criadoPor,criadoEm:new Date().toISOString(),compradoEm:null});
+    });
+    // UMA entrada de histórico para o lote todo — e, por consequência, UM aviso
+    // no Telegram. Doze artigos de uma foto não são doze notificações.
+    const nomes=sel.map(x=>shopCapArtigo(x.artigo));
+    sbLog('compras','adicionou',nomes.slice(0,8).join(', ')+(nomes.length>8?` e mais ${nomes.length-8}`:''),{
+      n:nomes.length,foto:true,tratoEu:S.tratoEu,loja:loja||undefined,tipoDesp:tipo,
+      // Um artigo só: a frase é a mesma da adição manual, logo leva a quantidade
+      quantidade:sel.length===1?(shopQtyLabel({quantidade:normalizeQty(sel[0].qtd),tamanho:normalizeQty(sel[0].tam)})||undefined):undefined,
+      dataValor:datas.length===1?datas[0]:undefined,
+      dia:(datas.length===1&&datas[0])?dataToDia(datas[0]):undefined,
+      ref:shopIsMeal(tipo)?tipo:undefined,
+      nRef:datas.length>1?datas.length:undefined
+    });
+    // Categorias sugeridas pela AI: gravam-se onde ainda não havia associação
+    if(CATS_TABLE)catAIMappings(sel.filter(x=>x.categoria).map(x=>({artigo:x.artigo,categoria:x.categoria})));
+    syncMirror();marcaGuardado();
+    btn.disabled=false;listaFotoClose();renderShopViews();
+    toast(`${rows.length} artigo${rows.length===1?'':'s'} adicionado${rows.length===1?'':'s'} ✓`,'ok');
+  }catch(e){setSync('err','erro ao guardar');btn.disabled=false;toast(permErrorMsg(e),'bad');}
+}
 
 /* ═══ IMPORTAR FATURA (foto → Gemini via Edge Function fatura-ocr) ═══
    Só em compras NOVAS: tira-se/escolhe-se a foto do talão, a Edge Function
