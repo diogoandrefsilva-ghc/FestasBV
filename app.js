@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v165 · 2026-08-02 · Refeições: containers "Quem vai?" e Custos separados + swipe entre refeições';
+const APP_BUILD = 'v166 · 2026-08-02 · Convidados: dia/refeição já pré-selecionados pelo filtro (ou a refeição mais próxima)';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -8182,6 +8182,26 @@ function myMemberOptions(sel){
   return names.map(n=>`<option value="${n}"${sel===n?' selected':''}>${n}</option>`).join('');
 }
 
+/* Refeição a pré-selecionar no modal do convidado:
+   — se o filtro das refeições estiver num dia/refeição, é esse (é lá que a pessoa está a trabalhar);
+   — em "Todas", a refeição mais próxima de acontecer (as de hoje ainda contam até à hora a que
+     costumam acabar) e, se as festas já passaram todas, a primeira do ano. */
+function guestDefaultMeal(){
+  const defs=(DATA&&DATA.refeicoesDef||[]).slice();
+  if(!defs.length)return null;
+  if(guestFilterMeal&&guestFilterMeal!=='all'){
+    const [d,r]=guestFilterMeal.split('|');
+    const hit=defs.find(x=>x.dia===d&&x.ref===r);
+    if(hit)return{dia:hit.dia,ref:hit.ref};
+  }
+  const refOrd={'Almoço':0,'Lanche':1,'Jantar':2};
+  defs.sort((a,b)=>(a.data||'').localeCompare(b.data||'')||((refOrd[a.ref]??9)-(refOrd[b.ref]??9)));
+  const hoje=hojeISO(),hora=new Date().getHours(),fim={'Almoço':15,'Lanche':18,'Jantar':23};
+  const prox=defs.find(r=>r.data>hoje||(r.data===hoje&&hora<(fim[r.ref]??23)));
+  const alvo=prox||defs[0];
+  return{dia:alvo.dia,ref:alvo.ref};
+}
+
 function openGuestModal(){
   if(bloqueadoPorFecho())return;
   // Build a simple modal for adding guests
@@ -8189,6 +8209,10 @@ function openGuestModal(){
   const days=isAdmin()?allDays:allDays.filter(d=>diaEditavel(d));
   if(!days.length){toast('Já não há dias abertos para registar convidados','bad');return;}
   const refs=[...new Set((DATA.refeicoesDef||[]).map(r=>r.ref))];
+  // Dia/refeição já escolhidos: o do filtro, senão a refeição mais próxima (ver guestDefaultMeal)
+  const pre=guestDefaultMeal()||{};
+  const preDia=days.includes(pre.dia)?pre.dia:days[0];
+  const preRef=refs.includes(pre.ref)?pre.ref:refs[0];
   let html=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
     <h3 style="margin-bottom:0">Adicionar Convidado</h3>
     <button onclick="this.closest('.modal-bg').classList.remove('show');document.body.classList.remove('no-scroll')" style="background:var(--panel2);border:1px solid var(--line);color:var(--muted);border-radius:9px;width:32px;height:32px;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0">✕</button>
@@ -8199,10 +8223,10 @@ function openGuestModal(){
   <select id="guest-membro">${isAdmin()?memberOptions():myMemberOptions()}</select>
   <div class="inline-row" style="margin-top:14px">
     <div><label>Dia</label>
-      <select id="guest-dia">${days.map(d=>`<option value="${d}">${d}</option>`).join('')}</select>
+      <select id="guest-dia">${days.map(d=>`<option value="${d}"${d===preDia?' selected':''}>${d}</option>`).join('')}</select>
     </div>
     <div><label>Refeição</label>
-      <select id="guest-ref">${refs.map(r=>`<option value="${r}">${r}</option>`).join('')}</select>
+      <select id="guest-ref">${refs.map(r=>`<option value="${r}"${r===preRef?' selected':''}>${r}</option>`).join('')}</select>
     </div>
   </div>
   ${CONV_CRIANCA_COL?`<label>Criança?</label>
