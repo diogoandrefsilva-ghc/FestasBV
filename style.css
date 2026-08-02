@@ -567,8 +567,8 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .pres-row-filho .pres-name{white-space:normal}
 /* display:block porque max-width não se aplica a elementos inline (é um span) */
 .pres-row-filho .pres-name-txt{display:block;font-size:11px;white-space:normal;max-width:96px;overflow-wrap:anywhere}
-.pres-name-av.pres-av-filho{width:21px;height:21px;border-radius:6px;background:var(--panel2);color:var(--muted);border:1px dashed var(--line);font-size:8px}
-.pres-tag-filho{display:block;font-size:7.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--faint);line-height:1.1;margin-top:1px}
+.pres-name-av.pres-av-filho{width:21px;height:21px;border-radius:6px;background:var(--panel2);color:var(--muted);border:1px solid var(--line);font-size:8px}
+.pres-tag-filho{display:block;font-size:6.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--faint);line-height:1.1;margin-top:1px}
 .pres-btn-filho{width:26px;height:26px;border-radius:7px}
 /* Presença de criança também em verde — porque também come — mas num verde um
    ponto mais claro que o dos adultos: distingue-se lado a lado sem partir a
@@ -581,7 +581,7 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
   .pres-row-filho .pres-name-inner{padding-left:4px}
   .pres-row-filho .pres-name-txt{font-size:9.5px;max-width:78px}
   .pres-name-av.pres-av-filho{width:17px;height:17px;border-radius:5px;font-size:6.5px}
-  .pres-tag-filho{font-size:7px}
+  .pres-tag-filho{font-size:6px}
   .pres-btn-filho{width:23px;height:23px}
 }
 @media(max-width:360px){
