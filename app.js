@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v168 · 2026-08-02 · Swipe entre refeições em qualquer zona, cartão a seguir o dedo';
+const APP_BUILD = 'v169 · 2026-08-02 · Swipe também nos Convidados (mesmo gesto das refeições)';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -829,20 +829,34 @@ function setRefMeal(i,dir){
 }
 function refMealCount(){return (DATA&&DATA.refeicoesDef)?DATA.refeicoesDef.length:0;}
 function refMealEl(i){return document.querySelector('.refmeal[data-i="'+i+'"]');}
-// Se o cartão anterior era comprido, podemos ficar abaixo do topo da lista
-function refCardsInView(smooth){
-  const cards=document.querySelector('.refdef-cards');if(!cards)return;
-  const top=cards.getBoundingClientRect().top;
+/* ═══ Swipe entre painéis ═════════════════════════════════════════════
+   O dedo pega no painel em qualquer ponto do ecrã e o vizinho vem atrás
+   dele: durante o gesto os dois painéis ficam absolutos dentro do baralho
+   (que fixa a altura), seguem o dedo, e ao levantar ou a troca completa ou
+   o painel volta ao sítio. Nas pontas não há vizinho — o painel cede um
+   pouco e volta (elástico).
+   Cada "baralho" diz onde está (box + painéis irmãos, só um à vista), quem
+   está escolhido e como se muda de escolha. Hoje: refeições e convidados. */
+const SW_DECKS=[
+  {on:()=>TAB==='refeicoes'&&REF_SUB==='calendario',
+   box:'.refdef-cards',n:()=>refMealCount(),sel:()=>REF_SEL,el:i=>refMealEl(i),
+   lit:i=>document.querySelectorAll('.refnav-chip').forEach(e=>e.classList.toggle('on',+e.dataset.i===i)),
+   set:(i,dir)=>setRefMeal(i,dir)},
+  {on:()=>TAB==='refeicoes'&&REF_SUB==='convidados',
+   box:'.guest-lists',n:()=>GUEST_KEYS.length,sel:()=>guestMealIdx(),
+   el:i=>document.querySelector('.guest-list[data-gi="'+i+'"]'),
+   lit:i=>document.querySelectorAll('.guest-meal-chip').forEach(e=>e.classList.toggle('on',+e.dataset.gi===i)),
+   set:(i,dir)=>setGuestMealIdx(i,dir)}
+];
+function swDeck(){return SW_DECKS.find(d=>d.on())||null;}
+// Se o painel anterior era comprido, podemos ficar abaixo do topo do baralho
+function swInView(box,smooth){
+  if(!box)return;
+  const top=box.getBoundingClientRect().top;
   if(top<0)window.scrollTo({top:window.scrollY+top-10,behavior:smooth?'smooth':'auto'});
 }
-/* ═══ Swipe entre refeições ═══════════════════════════════════════════
-   O dedo pega no cartão em qualquer ponto do ecrã (Refeições › Calendário)
-   e a refeição vizinha vem atrás dele: durante o gesto os dois cartões ficam
-   absolutos dentro do .refdef-cards (que fixa a altura), seguem o dedo, e ao
-   levantar ou a troca completa ou o cartão volta ao sítio. Nas pontas da lista
-   não há vizinho — o cartão cede um pouco e volta (elástico).            */
 const SWG={armed:false,axis:0,live:false,anim:false,x0:0,y0:0,t0:0,dx:0,dir:0,w:0,gap:16,
-           cards:null,cur:null,inc:null,clickAt:0,fin:null,timer:0};
+           d:null,cards:null,cur:null,inc:null,clickAt:0,fin:null,timer:0};
 const SW_MS=280;   // tem de bater certo com a transição do .sw-anim no CSS
 
 // Há algum contentor com scroll horizontal por baixo do dedo? Esse manda.
@@ -856,18 +870,19 @@ function swHScroll(el){
   return false;
 }
 function swReady(t){
-  if(TAB!=='refeicoes'||REF_SUB!=='calendario')return false;
-  if(SWG.anim||refMealCount()<2)return false;
+  const d=swDeck();
+  if(!d||SWG.anim||d.n()<2)return false;
   if(document.querySelector('.modal-bg.show,.sheet-bg.show,.dsheet-bg.show'))return false;
   if(!t||!t.closest)return false;
   if(t.closest('input,textarea,select,.fabs'))return false;
   return !swHScroll(t);
 }
-// Prepara o palco: altura travada, cartão atual solto do fluxo
+// Prepara o palco: altura travada, painel atual solto do fluxo
 function swBegin(){
-  const cards=document.querySelector('.refdef-cards'),cur=refMealEl(REF_SEL);
+  const d=swDeck();if(!d)return false;
+  const cards=document.querySelector(d.box),cur=d.el(d.sel());
   if(!cards||!cur)return false;
-  SWG.cards=cards;SWG.cur=cur;SWG.inc=null;SWG.dir=0;SWG.dx=0;
+  SWG.d=d;SWG.cards=cards;SWG.cur=cur;SWG.inc=null;SWG.dir=0;SWG.dx=0;
   SWG.w=cards.clientWidth||window.innerWidth;
   cards.style.height=cur.offsetHeight+'px';
   cards.classList.add('sw-live');
@@ -880,9 +895,9 @@ function swInc(dir){
   if(SWG.dir===dir)return;
   if(SWG.inc){const o=SWG.inc;o.classList.remove('sw-card');o.style.transform='';o.style.opacity='';o.style.display='none';}
   SWG.dir=dir;SWG.inc=null;
-  const i=REF_SEL+dir;
-  if(!dir||i<0||i>=refMealCount())return;
-  const el=refMealEl(i);if(!el)return;
+  const i=SWG.d.sel()+dir;
+  if(!dir||i<0||i>=SWG.d.n())return;
+  const el=SWG.d.el(i);if(!el)return;
   el.style.display='';el.classList.add('sw-card');
   el.style.transform='translate3d('+swOff(dir)+'px,0,0)';
   el.style.opacity='.5';
@@ -906,26 +921,25 @@ function swMove(raw){
 }
 function swEnd(){
   if(!SWG.live){SWG.armed=false;SWG.axis=0;return;}
-  const {cards,cur,inc,dir,dx}=SWG;
+  const {d,cards,cur,inc,dir,dx}=SWG;
   const dt=Date.now()-SWG.t0,vel=Math.abs(dx)/Math.max(dt,1);
   // Passa com um quarto do ecrã ou com um flick curto mas rápido
   const go=!!inc&&(Math.abs(dx)>SWG.w*.25||(vel>.45&&Math.abs(dx)>30));
   SWG.live=false;SWG.anim=true;SWG.axis=0;SWG.armed=false;
   if(Math.abs(dx)>6)SWG.clickAt=Date.now();
-  const tgt=REF_SEL+dir;
+  const sel=d.sel(),tgt=sel+dir;
   cards.classList.add('sw-anim');
   if(go){
     cards.style.height=inc.offsetHeight+'px';
     cur.style.transform='translate3d('+(-swOff(dir))+'px,0,0)';cur.style.opacity='0';
     inc.style.transform='translate3d(0,0,0)';inc.style.opacity='1';
-    // O chip acende já, para viajar com o cartão em vez de saltar no fim
-    document.querySelectorAll('.refnav-chip').forEach(e=>e.classList.toggle('on',+e.dataset.i===tgt));
-    refCardsInView(true);
+    d.lit(tgt);   // o chip acende já, para viajar com o painel em vez de saltar no fim
+    swInView(cards,true);
   }else{
     cur.style.transform='translate3d(0,0,0)';cur.style.opacity='1';
     if(inc){inc.style.transform='translate3d('+swOff(dir)+'px,0,0)';inc.style.opacity='.5';}
   }
-  SWG.fin=()=>{swCleanup();setRefMeal(go?tgt:REF_SEL,0);};
+  SWG.fin=()=>{swCleanup();d.set(go?tgt:sel,0);};
   SWG.timer=setTimeout(swSettle,SW_MS+20);
 }
 // Fecha a animação — no fim dela ou já a meio, se entretanto vier outro gesto
@@ -938,7 +952,7 @@ function swCleanup(){
   const {cards,cur,inc}=SWG;
   if(cards){cards.classList.remove('sw-live','sw-anim');cards.style.height='';}
   [cur,inc].forEach(el=>{if(el){el.classList.remove('sw-card');el.style.transform='';el.style.opacity='';}});
-  SWG.cards=SWG.cur=SWG.inc=null;SWG.dir=0;SWG.dx=0;SWG.live=false;SWG.anim=false;
+  SWG.d=SWG.cards=SWG.cur=SWG.inc=null;SWG.dir=0;SWG.dx=0;SWG.live=false;SWG.anim=false;
   window.__refSwipeLock=false;
 }
 function initRefSwipe(){
@@ -1143,7 +1157,7 @@ function renderAll(){
     let sel=REF_SEL;if(sel<0||sel>=meals.length)sel=0;REF_SEL=sel;
     // Barra de navegação horizontal — um chip por refeição (dá a volta, sem scroll lateral)
     r+='<div class="refnav sf">'+meals.map(m=>`<button class="refnav-chip${m._idx===sel?' on':''}" data-i="${m._idx}" onclick="setRefMeal(${m._idx})"><span class="rn-ico">${icoOf(m.ref)}</span><span class="rn-txt"><span class="rn-day">${m.dia}</span><span class="rn-ref">${m.ref}</span></span></button>`).join('')+'</div>';
-    r+='<div class="refdef-cards">';
+    r+='<div class="refdef-cards sw-deck">';
     meals.forEach(rd=>{
       const icon=icoOf(rd.ref);
       const calcRef=CALC.refeicoes.find(x=>x.data===rd.data&&x.ref===rd.ref);
@@ -8216,10 +8230,33 @@ function renderPresencaGrid(){
 /* ═══ GUEST SECTION IN PRESENÇAS ═══ */
 let guestFilterMember='all';
 let guestFilterMeal='all';
-function setGuestMeal(k){guestFilterMeal=(guestFilterMeal===k?'all':k);renderAll();}
+// Chaves dos filtros pela ordem em que aparecem nos chips ('all' + uma por
+// refeição) — é também a ordem por que o swipe passa.
+let GUEST_KEYS=['all'];
+function guestMealIdx(){const i=GUEST_KEYS.indexOf(guestFilterMeal);return i<0?0:i;}
+// Toque no chip: repetir o chip ativo volta a "Todas" (como era)
+function setGuestMeal(k){
+  const alvo=guestFilterMeal===k?'all':k;
+  const i=GUEST_KEYS.indexOf(alvo);
+  if(i>=0)setGuestMealIdx(i);
+}
+// dir: ver setRefMeal — mesma lógica de animação de entrada
+function setGuestMealIdx(i,dir){
+  if(i<0||i>=GUEST_KEYS.length)return;
+  const de=guestMealIdx();
+  if(dir===undefined)dir=i===de?0:(i>de?1:-1);
+  guestFilterMeal=GUEST_KEYS[i];
+  document.querySelectorAll('.guest-meal-chip').forEach(e=>e.classList.toggle('on',+e.dataset.gi===i));
+  document.querySelectorAll('.guest-list').forEach(e=>{
+    const on=+e.dataset.gi===i;e.style.display=on?'':'none';
+    e.classList.remove('sw-l','sw-r');
+    if(on&&dir){void e.offsetWidth;e.classList.add(dir>0?'sw-r':'sw-l');}
+  });
+}
 
 function renderGuestSection(){
   if(!DATA||!DATA.convidados)return'';
+  GUEST_KEYS=['all'];   // sem convidados não há chips nem swipe
   let h='<div class="pres-guest-section">';
   h+='<div class="sec-title sf" style="margin-top:18px">Convidados</div>';
   if(!DATA.convidados.length){
@@ -8242,13 +8279,10 @@ function renderGuestSection(){
     // Se o filtro de refeição apontar para algo sem convidados (ex: mudou o membro), volta a "Todas"
     if(guestFilterMeal!=='all' && !mealChips.some(x=>x.key===guestFilterMeal)) guestFilterMeal='all';
 
-    let filtered=baseGuests.map(g=>({...g,_idx:DATA.convidados.indexOf(g)}));
-    if(guestFilterMeal!=='all') filtered=filtered.filter(g=>g.dia+'|'+g.ref===guestFilterMeal);
-
     // Sort by date then meal order (Almoço < Lanche < Jantar)
     const diaToDate={};
     (DATA.refeicoesDef||[]).forEach(rd=>{diaToDate[rd.dia]=rd.data;});
-    filtered.sort((a,b)=>{
+    const ordenados=baseGuests.map(g=>({...g,_idx:DATA.convidados.indexOf(g)})).sort((a,b)=>{
       const dateA=diaToDate[a.dia]||a.dia;
       const dateB=diaToDate[b.dia]||b.dia;
       const dc=dateA.localeCompare(dateB);
@@ -8256,13 +8290,17 @@ function renderGuestSection(){
       return(refOrd[a.ref]||0)-(refOrd[b.ref]||0);
     });
 
+    // Ordem dos filtros: "Todas" + uma por refeição. É por aqui que o swipe anda.
+    GUEST_KEYS=['all',...mealChips.map(x=>x.key)];
+    const gi=guestMealIdx();
+
     // Cards de refeição (filtro) — uma linha. Todas as refeições, mesmo as de 0 convidados.
     if(mealChips.length){
       h+='<div class="guest-meal-chips sf">';
-      h+=`<button class="guest-meal-chip gmc-all${guestFilterMeal==='all'?' on':''}" onclick="setGuestMeal('all')"><span class="gmc-dia">Todas</span><span class="gmc-ref gmc-all-ref">Total</span><span class="gmc-badge">${baseGuests.length}</span></button>`;
-      mealChips.forEach(({rd,key,n})=>{
+      h+=`<button class="guest-meal-chip gmc-all${gi===0?' on':''}" data-gi="0" onclick="setGuestMeal('all')"><span class="gmc-dia">Todas</span><span class="gmc-ref gmc-all-ref">Total</span><span class="gmc-badge">${baseGuests.length}</span></button>`;
+      mealChips.forEach(({rd,key,n},j)=>{
         const rc={'Almoço':'almoco','Lanche':'lanche','Jantar':'jantar'}[rd.ref]||'';
-        h+=`<button class="guest-meal-chip${guestFilterMeal===key?' on':''}${n===0?' empty':''}" onclick="setGuestMeal('${key}')">
+        h+=`<button class="guest-meal-chip${gi===j+1?' on':''}${n===0?' empty':''}" data-gi="${j+1}" onclick="setGuestMeal('${key}')">
           <span class="gmc-dia">${rd.dia}</span>
           <span class="gmc-ref r-${rc}">${rd.ref}</span>
           <span class="gmc-badge">${n}</span>
@@ -8271,32 +8309,46 @@ function renderGuestSection(){
       h+='</div>';
     }
 
-    // Group by day/ref
-    let currentGroup='';
-    filtered.forEach(g=>{
-      const groupKey=`${g.dia} · ${g.ref}`;
-      if(groupKey!==currentGroup){
-        currentGroup=groupKey;
-        const icon=mealIco(g.ref,14);
-        h+=`<div style="font-size:11px;color:var(--gold);font-weight:700;letter-spacing:.1em;text-transform:uppercase;margin:12px 0 6px;display:flex;align-items:center;gap:6px" class="sf"><span>${icon}</span>${diaExtenso(diaToDate[g.dia]||g.data)||g.dia} · ${g.ref}</div>`;
-      }
-      // Criança manda sobre "Oferta": não paga por ser criança, não por ser oferta
-      const paysBadge=g.crianca?'<span class="pg-badge kid sf">Criança</span>'
-        :(g.pagante==='Sim'?'':'<span class="pg-badge free sf">Oferta</span>');
-      h+=`<div class="pres-guest-card">
-        <div class="pg-info sf">
-          <span class="pg-name">${g.nome}</span>
-          <span class="pg-meta">convidado por ${g.membro}</span>
-        </div>
-        ${paysBadge}
-        ${(isAdmin()||(MY_NAMES.includes(g.membro)&&diaEditavel(g.dia)))?`<div class="card-actions">
-          <button class="card-act edit write-action" onclick="editGuest(${g._idx})" title="Editar"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>
-          <button class="card-act del write-action" onclick="deleteGuest(${g._idx})" title="Remover">✕</button>
-        </div>`:''}
-      </div>`;
+    // Um painel por filtro (só um à vista) — é o que o swipe faz deslizar
+    h+='<div class="guest-lists sw-deck">';
+    GUEST_KEYS.forEach((k,i)=>{
+      const lst=k==='all'?ordenados:ordenados.filter(g=>g.dia+'|'+g.ref===k);
+      h+=`<div class="guest-list" data-gi="${i}" style="${i===gi?'':'display:none'}">`;
+      h+=lst.length?guestCardsHtml(lst,diaToDate)
+                   :`<div class="empty sf">Sem convidados ${k==='all'?'para este membro':'nesta refeição'}</div>`;
+      h+='</div>';
     });
+    h+='</div>';
   }
   h+='</div>';
+  return h;
+}
+
+/* Convidados de um painel, agrupados por dia/refeição */
+function guestCardsHtml(lista,diaToDate){
+  let h='',currentGroup='';
+  lista.forEach(g=>{
+    const groupKey=`${g.dia} · ${g.ref}`;
+    if(groupKey!==currentGroup){
+      currentGroup=groupKey;
+      const icon=mealIco(g.ref,14);
+      h+=`<div style="font-size:11px;color:var(--gold);font-weight:700;letter-spacing:.1em;text-transform:uppercase;margin:12px 0 6px;display:flex;align-items:center;gap:6px" class="sf"><span>${icon}</span>${diaExtenso(diaToDate[g.dia]||g.data)||g.dia} · ${g.ref}</div>`;
+    }
+    // Criança manda sobre "Oferta": não paga por ser criança, não por ser oferta
+    const paysBadge=g.crianca?'<span class="pg-badge kid sf">Criança</span>'
+      :(g.pagante==='Sim'?'':'<span class="pg-badge free sf">Oferta</span>');
+    h+=`<div class="pres-guest-card">
+      <div class="pg-info sf">
+        <span class="pg-name">${g.nome}</span>
+        <span class="pg-meta">convidado por ${g.membro}</span>
+      </div>
+      ${paysBadge}
+      ${(isAdmin()||(MY_NAMES.includes(g.membro)&&diaEditavel(g.dia)))?`<div class="card-actions">
+        <button class="card-act edit write-action" onclick="editGuest(${g._idx})" title="Editar"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>
+        <button class="card-act del write-action" onclick="deleteGuest(${g._idx})" title="Remover">✕</button>
+      </div>`:''}
+    </div>`;
+  });
   return h;
 }
 
