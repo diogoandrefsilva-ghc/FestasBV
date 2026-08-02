@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v161 · 2026-08-02 · Shop List: foto da lista → artigos (Gemini) com ecrã de confirmação';
+const APP_BUILD = 'v162 · 2026-08-02 · Shop List: 📷 Foto e ＋ Ingrediente lado a lado, sem sobreposição';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -5182,7 +5182,7 @@ function renderCompras(){
     <div class="cmp-hdr-title sf">🛒 Shop List</div>
     <div class="cmp-hdr-acts">
       ${isAdmin()?`<button class="btn write-action" id="shop-norm-btn" onclick="shopNormOpen()" title="Juntar grafias do mesmo artigo (chouriço/chouriços…) e categorizar o que falta">🔤 Normalizar</button>`:''}
-      <button class="btn write-action lfoto-btn" onclick="listaFotoPick()" title="Ler uma foto da lista (câmara ou galeria) e adicionar os artigos de uma vez" ${canW&&!fechadas?'':'disabled'}>📷 Foto</button>
+      <button class="btn write-action lfoto-btn hdr-ico" data-busy="⏳" aria-label="Adicionar artigos a partir de uma foto da lista" onclick="listaFotoPick()" title="Ler uma foto da lista (câmara ou galeria) e adicionar os artigos de uma vez" ${canW&&!fechadas?'':'disabled'}>📷</button>
       <button class="btn prim write-action" onclick="openShopItemModal()" ${canW?'':'disabled'}>＋ Artigo</button>
     </div>
   </div>`;
@@ -6215,10 +6215,11 @@ function listaFotoPick(tipo,data){
 }
 /* Os botões 📷 vivem em sítios que se re-desenham (cabeçalho da Shop List e
    cartão de cada refeição) — em vez de guardar um id, mexe-se em todos os que
-   tiverem a classe. */
+   tiverem a classe. O `data-busy` deixa o botão só-ícone do cabeçalho manter-se
+   estreito enquanto lê (senão a barra crescia e quebrava de linha a meio). */
 function _listaFotoBusy(on){
   document.querySelectorAll('.lfoto-btn').forEach(b=>{
-    if(on){b.dataset.lbl=b.innerHTML;b.disabled=true;b.innerHTML='⏳ A ler…';}
+    if(on){b.dataset.lbl=b.innerHTML;b.disabled=true;b.innerHTML=b.dataset.busy||'⏳ A ler…';}
     else if(b.dataset.lbl!=null){b.innerHTML=b.dataset.lbl;b.disabled=false;delete b.dataset.lbl;}
   });
 }
