@@ -4,6 +4,9 @@
   --bg:#E9DCBB;--panel:#FBF6E8;--panel2:#F1E7CF;--line:#D8C8A3;
   --ink:#2C1F12;--muted:#6F5C42;--faint:#9A8765;
   --gold:#A87B14;--green:#1E7A4D;--red:#B3402F;--blue:#2E6FA8;
+  /* Verde mais claro das crianças: comem como os adultos (daí ser verde), mas
+     lê-se à primeira que é outra coisa (dose de criança, não paga quota). */
+  --green-cri:#4E9E70;
   --sal:#FBF6E8;--campino:#9C2F1D;--campino-escuro:#6E2012;--campino-tinta:#85291A;--barrete:#1E7A4D;
   --display:'Barlow Condensed',-apple-system,sans-serif;
   --shadow:0 6px 22px rgba(80,55,20,.14);
@@ -274,7 +277,11 @@ body.no-write .write-action{display:none!important}
 .pres-btn.locked{opacity:.4;cursor:default;pointer-events:none}
 .pres-day-hdr.past{opacity:.55}
 .pres-day-hdr.today{color:var(--campino)}
-.pres-cell.today{background:rgba(168,123,20,.08)}
+/* Coluna de hoje. O background-clip é preciso porque a forma abreviada
+   `background` repõe o clip em border-box — sem isto o tom de hoje pintava
+   também o respiro entre agregados e fazia uma risca vertical a atravessar
+   a grelha toda. */
+.pres-cell.today{background:rgba(168,123,20,.055);background-clip:padding-box}
 .mine-dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--gold);margin-left:5px;box-shadow:0 0 6px rgba(168,123,20,.6);flex-shrink:0}
 .perm-hint{font-size:12px;color:var(--muted);background:var(--panel);border:1px dashed var(--line);border-radius:10px;padding:10px 12px;margin:12px 0 4px;line-height:1.5}
 .lig-row{display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;margin-bottom:6px}
@@ -433,9 +440,14 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .pres-date{font-size:8px;font-weight:500;letter-spacing:0;text-transform:none;margin-top:1px}
 .pres-lock{font-size:8px;opacity:.7}
 /* Linha-resumo: total que come por refeição, fixa junto ao cabeçalho */
-.pres-sum{font-size:11.5px;font-weight:700;color:var(--faint);padding:3px 2px!important;border-top:1px solid var(--line);border-bottom:1px solid var(--line);white-space:nowrap}
+/* vertical-align:top para os totais ficarem todos alinhados pelo cimo — as
+   colunas sem crianças não têm a linha de baixo e, ao centro, saíam tortas */
+.pres-sum{font-size:11.5px;font-weight:700;color:var(--faint);padding:3px 2px!important;border-top:1px solid var(--line);border-bottom:1px solid var(--line);white-space:nowrap;line-height:1.15;vertical-align:top}
 .pres-sum.has{color:var(--green)}
-.pres-sum-corner{text-align:right!important;padding:3px 5px 3px 0!important;font-size:8.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+/* Repartição adultos+crianças, por baixo do total e bem mais discreta */
+.pres-sum-sub{font-size:8px;font-weight:600;color:var(--faint);letter-spacing:-.02em;line-height:1;margin-top:1px;font-variant-numeric:tabular-nums}
+.pres-sum-corner{text-align:right!important;padding:3px 5px 3px 0!important;font-size:8.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);border-top:1px solid var(--line);border-bottom:1px solid var(--line);line-height:1.15;vertical-align:top}
+.pres-sum-hint{font-size:7px;font-weight:600;letter-spacing:0;text-transform:none;color:var(--faint);line-height:1;margin-top:1px}
 /* Espaço entre os totais e o início da grelha de pessoas */
 .pres-gap td{height:10px;padding:0!important;border:none!important;background:var(--bg)}
 .pres-name{position:sticky;left:0;z-index:1;background:var(--bg);text-align:left!important;padding:0 10px 0 0!important;white-space:nowrap;border-bottom:1px solid rgba(168,140,90,.35)}
@@ -458,36 +470,42 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
   .pres-sum{font-size:10px;padding:3px 1px!important}
   .pres-sum-corner{font-size:8px;padding:3px 3px 3px 0!important}
   .pres-cell{padding:2px 1px!important}
-  .pres-btn{width:28px;height:28px;border-radius:7px}
-  .pres-btn.on::after{font-size:12px}
-  .pres-btn .beer-ic{width:18px;height:18px}
   .pres-count{font-size:9px}
-  .pres-member-count{min-width:24px;font-size:10px}
 }
 @media (max-width:360px){
   .pres-name-txt{font-size:10.5px}
   .pres-foot-h{font-size:8.5px}
   .pres-foot-sub{font-size:8.5px}
-  .pres-btn{width:27px;height:27px}
   .pres-name-av{width:20px;height:20px}
   .pres-name-inner{gap:4px}
 }
 .pres-cell{padding:3px 2px!important;border-bottom:1px solid rgba(168,140,90,.35)}
-.pres-btn{width:32px;height:32px;border-radius:8px;border:1.5px solid var(--line);background:var(--panel);cursor:pointer;transition:.15s;display:flex;align-items:center;justify-content:center;margin:0 auto;position:relative;overflow:hidden}
+/* Fundo mais claro que o do bloco da família (que já é pergaminho), senão a
+   casa por marcar desaparecia contra a linha */
+.pres-btn{width:32px;height:32px;border-radius:8px;border:1.5px solid var(--line);background:#FFFDF6;cursor:pointer;transition:.15s;display:flex;align-items:center;justify-content:center;margin:0 auto;position:relative;overflow:hidden}
 .pres-btn:active{transform:scale(.88)}
 .pres-btn.on{border-color:var(--green);background:rgba(30,122,77,.12)}
 .pres-btn.on::after{content:"✓";color:var(--green);font-size:14px;font-weight:800}
 .pres-btn:not(.on):not(.bebe)::after{content:"";display:block;width:8px;height:8px;border-radius:50%;background:var(--line)}
-.pres-btn.bebe{border-color:var(--blue);background:rgba(46,111,168,.12)}
-.pres-btn .beer-ic{width:21px;height:21px;color:var(--blue);display:block}
+/* Só bebe: dourado. O verde ficou reservado a quem come — adultos e crianças */
+.pres-btn.bebe{border-color:var(--gold);background:rgba(168,123,20,.13)}
+.pres-btn .beer-ic{width:21px;height:21px;color:var(--gold);display:block}
 .pres-btn.saving{pointer-events:none;opacity:.5}
 .pres-btn.on.saving::after{content:"";border:2px solid var(--green);border-top-color:transparent;border-radius:50%;width:12px;height:12px;background:none;animation:sp .5s linear infinite}
+/* Telemóveis pequenos: a casa encolhe para a semana caber sem scroll lateral.
+   Isto TEM de vir depois da regra base do .pres-btn — as media queries lá em
+   cima têm a mesma especificidade e, empatadas, ganha a que vem por último no
+   ficheiro (era por isso que as medidas de lá nunca chegavam a aplicar-se). */
+@media (max-width:380px){
+  .pres-btn{width:28px;height:28px;border-radius:7px}
+  .pres-btn.on::after{font-size:12px}
+  .pres-btn .beer-ic{width:18px;height:18px}
+  .pres-btn-filho{width:23px;height:23px}
+}
 .pres-sub{font-size:8.5px;color:var(--faint);font-weight:400;opacity:.8}
 .rc-bebe{background:rgba(46,111,168,.12);color:var(--blue);padding:1px 4px;border-radius:4px}
 .pres-count{font-size:10px;font-weight:700;color:var(--faint);text-align:center;padding:4px 0;border-top:1px solid var(--line);line-height:1}
 .pres-count.has{color:var(--green)}
-.pres-member-count{font-size:11px;font-weight:700;color:var(--muted);padding:3px 0;text-align:right;min-width:30px;white-space:nowrap;border-bottom:1px solid rgba(168,140,90,.35)}
-.pres-member-count.full{color:var(--green)}
 .pres-foot-h{font-size:10px;font-weight:700;color:var(--muted);padding-left:2px;letter-spacing:.02em;line-height:1;display:inline-block;vertical-align:middle}
 .pres-foot-sub{font-size:10px;color:var(--faint);line-height:1;display:inline-block;vertical-align:middle}
 .pres-name.pres-foot-cell{text-align:right!important;padding-right:5px!important}
@@ -496,21 +514,39 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .pres-table tfoot tr:last-child .pres-name.pres-foot-cell::after{content:"";position:absolute;bottom:0;left:16px;right:0;border-bottom:1px solid var(--line)}
 .pres-foot-top,.pres-foot-topcell{border-top:2px solid var(--line)}
 .pres-foot-midcell{border-top:1px solid var(--line)}
-.pres-row-self>td{border-top:2px solid var(--line)}
-.pres-row-other1>td{border-top:1.5px solid var(--line)}
 
-/* ── Agregados: blocos alternados ──
-   As linhas de cada agregado (casal + filhos) formam um bloco com fundo
-   alternado (pergaminho base / pergaminho claro), sem cores novas — a
-   alternância garante que dois agregados vizinhos nunca ficam iguais.
-   O 1º de cada agregado leva ainda um separador mais forte por cima. */
-.pres-fam-first>td{border-top:2px solid var(--line)}
-/* O traço entre famílias é a soma de dois: o border-bottom fininho da linha
-   de cima + estes 2px. À cabeça da grelha não há linha acima (só o espaçador),
-   logo o separador ficava mais magro — aqui vale por os dois. */
-.pres-fam-head>td{border-top:3px solid var(--line)}
+/* ── Agregados: cada família é um bloco ──
+   Antes era só um fundo alternado com um traço por cima. Agora cada agregado
+   (casal + filhos) sai como um bloco fechado: fundo próprio — os dois tons de
+   pergaminho da app, alternados, para dois vizinhos nunca ficarem iguais —,
+   cantos redondos em cima e em baixo, e um respiro a separá-lo do seguinte.
+   O respiro faz-se com uma borda transparente + background-clip:padding-box:
+   o fundo do bloco não pinta a zona da borda, e o que passa é a areia da
+   página. Sai mais barato (e mais limpo) do que linhas separadoras. */
+.pres-famz-0>td{background:var(--panel)}
+.pres-famz-0>.pres-name{background:var(--panel)}
 .pres-famz-1>td{background:var(--panel2)}
 .pres-famz-1>.pres-name{background:var(--panel2)}
+/* Todas as células do corpo cortam o fundo na padding-box. Tem de ser aqui, e
+   com especificidade suficiente para ganhar às regras que pintam o fundo (a
+   forma abreviada `background` repõe sempre o clip em border-box) — senão o
+   fundo do bloco pintava por cima do respiro e as famílias voltavam a ficar
+   coladas umas às outras. */
+.pres-table tbody td.pres-name,.pres-table tbody td.pres-cell{background-clip:padding-box}
+.pres-fam-first>td{border-top:7px solid transparent}
+.pres-fam-first>.pres-name{border-top-left-radius:10px}
+.pres-fam-first>td:last-child{border-top-right-radius:10px}
+/* Última linha do agregado: fecha o bloco — sem o fio que separa as pessoas
+   lá dentro, que ficaria por cima do canto redondo. */
+.pres-fam-last>td{border-bottom:none}
+.pres-fam-last>.pres-name{border-bottom-left-radius:10px}
+.pres-fam-last>td:last-child{border-bottom-right-radius:10px}
+/* À cabeça da grelha já há o espaçador do cabeçalho: não leva respiro em cima */
+.pres-fam-head>td{border-top-width:0}
+.pres-row-self>td{border-top-width:0}
+/* Onde acaba o meu agregado e começa o resto do plantel: em vez de um traço,
+   um respiro maior — a mesma linguagem dos blocos. */
+.pres-row-other1>td{border-top-width:15px}
 
 /* Linhas de filhos (crianças): pendem do pai/mãe acima — nome recuado, avatar
    apagado e etiqueta. O botão é binário (come / não conta): nunca fica azul.
@@ -527,11 +563,13 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .pres-name-av.pres-av-filho{width:21px;height:21px;border-radius:6px;background:var(--panel2);color:var(--muted);border:1px dashed var(--line);font-size:8px}
 .pres-tag-filho{display:block;font-size:7.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--faint);line-height:1.1;margin-top:1px}
 .pres-btn-filho{width:26px;height:26px;border-radius:7px}
-/* Presença de criança em dourado: o verde é dos adultos que comem e o azul quer
-   dizer "só bebe" — que é justamente o que uma criança não pode ser. */
-.pres-btn-filho.on{border-color:var(--gold);background:rgba(168,123,20,.14)}
-.pres-btn-filho.on::after{color:var(--gold)}
-.pres-btn-filho.on.saving::after{border-color:var(--gold);border-top-color:transparent}
+/* Presença de criança também em verde — porque também come — mas num verde
+   mais claro e de traço interrompido, a condizer com o avatar tracejado: vê-se
+   à primeira que é criança sem ter de se ler a etiqueta. O dourado passou a
+   ser do "só bebe", que é justamente o que uma criança não pode ser. */
+.pres-btn-filho.on{border-color:var(--green-cri);border-style:dashed;background:rgba(78,158,112,.15)}
+.pres-btn-filho.on::after{color:var(--green-cri);font-size:13px}
+.pres-btn-filho.on.saving::after{border:2px solid var(--green-cri);border-top-color:transparent}
 @media(max-width:420px){
   .pres-row-filho .pres-name-inner{padding-left:4px}
   .pres-row-filho .pres-name-txt{font-size:9.5px;max-width:78px}
@@ -682,7 +720,9 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .refnav-chip.on{border-color:var(--barrete);background:var(--panel2);box-shadow:0 0 0 1px var(--barrete) inset}
 .refnav-chip.on .rn-ref{color:var(--ink)}
 /* Nota "= custo para quem só bebe" no card dos indiretos */
-.rdc-note{font-size:10px;color:var(--blue);font-weight:600;letter-spacing:.01em}
+/* "custo p/ quem só bebe" — dourado, a condizer com o novo código de cores
+   das presenças (o azul deixou de querer dizer "só bebe") */
+.rdc-note{font-size:10px;color:var(--gold);font-weight:600;letter-spacing:.01em}
 .rdc-cell-btn{cursor:pointer;transition:.12s}
 .rdc-cell-btn:active{transform:scale(.97)}
 .rdc-cell-arrow{font-size:11px;color:var(--faint);transition:transform .2s}

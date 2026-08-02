@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v156 · 2026-08-01 · Normalizar em 3 passos: nomes → pedidos repetidos (tamanhos) → categorias';
+const APP_BUILD = 'v157C · 2026-08-02 · Presenças: sem contador, agregados em blocos, crianças a verde, só bebe a dourado';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -7533,7 +7533,7 @@ function renderPresencaGrid(){
     const isPast=d.data<hoje;
     h+=`<th class="pres-day-hdr sf${isToday?' today':''}${isPast&&!adm?' past':''}" colspan="${d.slots.length}">${d.dia}<div class="pres-date" style="color:${isToday?'var(--gold)':'var(--faint)'}">${isToday?'hoje':fmtDiaMes(d.data)}</div></th>`;
   });
-  h+='<th class="pres-day-hdr sf"></th></tr>';
+  h+='</tr>';
 
   // Header row 2: ref names
   h+='<tr><th class="pres-corner"></th>';
@@ -7542,10 +7542,12 @@ function renderPresencaGrid(){
       h+=`<th class="pres-ref-hdr sf">${mealIco(s.ref,16)}</th>`;
     });
   });
-  h+='<th class="pres-ref-hdr sf" style="color:var(--muted)"></th></tr>';
+  h+='</tr>';
 
-  // Linha-resumo: total de bocas (membros + convidados + crianças) por refeição
-  h+='<tr><th class="pres-corner pres-sum-corner sf">Total</th>';
+  // Linha-resumo: total de bocas (membros + convidados + crianças) por refeição.
+  // Por baixo, em miúdo, a mesma conta repartida em adultos+crianças — é o que
+  // interessa a quem cozinha (as crianças comem, mas comem dose de criança).
+  h+='<tr><th class="pres-corner pres-sum-corner sf">Total<div class="pres-sum-hint">ad+cr</div></th>';
   let sumComeAll=0;
   days.forEach(d=>{
     d.slots.forEach(s=>{
@@ -7554,19 +7556,22 @@ function renderPresencaGrid(){
       const slotDia=parts[0];
       const slotRef=parts[1]==='Tarde'?'Lanche':parts[1];
       const gCount=(DATA.convidados||[]).filter(g=>g.dia===slotDia&&g.ref===slotRef&&!g.crianca).length;
-      const total=memCome+gCount+criancasNoSlot(s.key);
+      const nCri=criancasNoSlot(s.key);
+      const adultos=memCome+gCount;
+      const total=adultos+nCri;
       sumComeAll+=total;
-      h+=`<th class="pres-sum sf${total>0?' has':''}">${total||'—'}</th>`;
+      // A repartição só aparece quando há crianças à mesa: sem elas, o número
+      // de cima já é o de adultos e um "13+0" era só ruído.
+      h+=`<th class="pres-sum sf${total>0?' has':''}">${total||'—'}${nCri>0?`<div class="pres-sum-sub">${adultos}+${nCri}</div>`:''}</th>`;
     });
   });
-  h+='<th class="pres-sum sf"></th>';
   h+='</tr>';
 
   h+='</thead>';
 
   // Member rows
   h+='<tbody>';
-  h+='<tr class="pres-gap"><td colspan="'+(totalSlots+2)+'"></td></tr>';
+  h+='<tr class="pres-gap"><td colspan="'+(totalSlots+1)+'"></td></tr>';
   // Ordem das linhas: por AGREGADO (casal junto), com os filhos logo a seguir
   // aos pais. O meu agregado vem primeiro; dentro dele eu antes do/a cônjuge.
   // Preserva-se o índice original (oi) porque togglePresenca/data-member dependem dele.
@@ -7611,18 +7616,20 @@ function renderPresencaGrid(){
     // Paridade do agregado: o CSS pinta os ímpares para as famílias saírem em
     // blocos alternados (casal + filhos ficam com o mesmo fundo).
     const famCls='pres-famz-'+(ci%2);
+    // Primeira e última linha do agregado: é nelas que o CSS arredonda o bloco
+    // e abre o respiro que separa uma família da seguinte.
+    const _ultimaLinha=casa.filhos.length?-1:casa.membros.length-1;
     casa.membros.forEach(({m,oi},fi)=>{
       const mi=oi;
       const _r=_rankP(m.nome);
       const _rowCls=[famCls];
       if(fi===0)_rowCls.push('pres-fam-first');
+      if(fi===_ultimaLinha)_rowCls.push('pres-fam-last');
       // A 1ª linha da grelha não tem linha por cima que lhe some o traço fino,
       // por isso leva o separador cheio de uma vez (ver CSS).
       if(ci===0&&fi===0)_rowCls.push('pres-fam-head');
       if(_hasMine&&!_selfDone&&_r<2){_rowCls.push('pres-row-self');_selfDone=true;}
       if(_hasMine&&!_sepDone&&_r===2){_rowCls.push('pres-row-other1');_sepDone=true;}
-      const pres=m.presencas||[];
-      const memberCount=pres.length;
       h+=`<tr class="${_rowCls.join(' ')}">`;
       const meu=MY_NAMES.includes(m.nome);
       h+=`<td class="pres-name"><div class="pres-name-inner"><div class="pres-name-av" style="background:${AVCOL[mi%AVCOL.length]}">${m.nome.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase()}</div><span class="pres-name-txt sf">${m.nome}</span></div></td>`;
@@ -7635,13 +7642,11 @@ function renderPresencaGrid(){
           h+=`<td class="pres-cell${isToday?' today':''}"><button class="pres-btn${cls}${pode?'':' locked'}" data-member="${mi}" data-slot="${s.key}"${pode?` onclick="togglePresenca(${mi},'${s.key}',this)"`:''}>${modo==='bebe'?BEER_SVG:''}</button></td>`;
         });
       });
-      h+=`<td class="pres-member-count sf${memberCount===totalSlots?' full':''}">${memberCount}/${totalSlots}</td>`;
       h+='</tr>';
     });
     // Filhos do agregado: linha mais discreta, ciclo binário (come / não conta)
-    casa.filhos.forEach(f=>{
-      const nComeu=filhoPresKeys(f.id).length;
-      h+=`<tr class="pres-row-filho ${famCls}">`;
+    casa.filhos.forEach((f,fj)=>{
+      h+=`<tr class="pres-row-filho ${famCls}${fj===casa.filhos.length-1?' pres-fam-last':''}">`;
       h+=`<td class="pres-name"><div class="pres-name-inner"><div class="pres-name-av pres-av-filho">${f.nome.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase()}</div><span class="pres-name-txt sf">${escHtml(f.nome)}<span class="pres-tag-filho sf">criança</span></span></div></td>`;
       days.forEach(d=>{
         const isToday=d.data===hoje;
@@ -7651,10 +7656,11 @@ function renderPresencaGrid(){
           h+=`<td class="pres-cell${isToday?' today':''}"><button class="pres-btn pres-btn-filho${come?' on':''}${pode?'':' locked'}" data-filho="${f.id}" data-slot="${s.key}"${pode?` onclick="toggleFilhoPresenca(${f.id},'${s.key}',this)"`:''}></button></td>`;
         });
       });
-      h+=`<td class="pres-member-count sf${nComeu===totalSlots?' full':''}">${nComeu}/${totalSlots}</td>`;
       h+='</tr>';
     });
   });
+  // Respiro antes dos totalizadores, igual ao que separa os agregados
+  h+='<tr class="pres-gap"><td colspan="'+(totalSlots+1)+'"></td></tr>';
   h+='</tbody>';
 
   // ── Rodapé: totalizadores agrupados (que comem · só bebem) ──
@@ -7662,26 +7668,26 @@ function renderPresencaGrid(){
   h+='<tfoot>';
   h+='<tr><td class="pres-name pres-foot-top" style="border-bottom:none"><span class="sf pres-foot-h">Que comem</span></td>';
   days.forEach(d=>d.slots.forEach(()=>{h+='<td class="pres-count sf pres-foot-topcell"></td>';}));
-  h+='<td class="pres-count sf pres-foot-topcell"></td></tr>';
+  h+='</tr>';
 
   // Membros que comem
   h+='<tr><td class="pres-name pres-foot-cell" style="border-bottom:none"><span class="sf pres-foot-sub">Membros</span></td>';
   days.forEach(d=>{d.slots.forEach(s=>{const count=mbrs.filter(m=>presModo(m,s.key)==='come').length;h+=`<td class="pres-count sf${count>0?' has':''}">${count}</td>`;});});
-  h+='<td class="pres-count sf"></td></tr>';
+  h+='</tr>';
 
   // Convidados adultos (também comem) — os convidados-criança contam na linha "Crianças"
   let totalGuestAll=0;
   h+='<tr><td class="pres-name pres-foot-cell" style="border-bottom:none"><span class="sf pres-foot-sub">Convidados</span></td>';
   days.forEach(d=>{d.slots.forEach(s=>{const parts=s.key.split('|');const slotDia=parts[0];const slotRef=parts[1]==='Tarde'?'Lanche':parts[1];const guestCount=(DATA.convidados||[]).filter(g=>g.dia===slotDia&&g.ref===slotRef&&!g.crianca).length;totalGuestAll+=guestCount;h+=`<td class="pres-count sf${guestCount>0?' has':''}" style="${guestCount>0?'color:var(--gold)':''}">${guestCount||'—'}</td>`;});});
-  h+='<td class="pres-count sf"></td></tr>';
+  h+='</tr>';
 
   // Crianças (filhos dos membros + convidados-criança): comem, não pagam.
   // A linha só aparece quando há crianças parametrizadas ou convidadas.
   const temCriancas=FILHOS.length>0||(DATA.convidados||[]).some(g=>g.crianca);
   if(temCriancas){
     h+='<tr><td class="pres-name pres-foot-cell" style="border-bottom:none"><span class="sf pres-foot-sub">Crianças</span></td>';
-    days.forEach(d=>{d.slots.forEach(s=>{const c=criancasNoSlot(s.key);h+=`<td class="pres-count sf${c>0?' has':''}" style="${c>0?'color:var(--gold)':''}">${c||'—'}</td>`;});});
-    h+='<td class="pres-count sf"></td></tr>';
+    days.forEach(d=>{d.slots.forEach(s=>{const c=criancasNoSlot(s.key);h+=`<td class="pres-count sf${c>0?' has':''}" style="${c>0?'color:var(--green-cri)':''}">${c||'—'}</td>`;});});
+    h+='</tr>';
   }
 
   // Grupo "Só bebem" — linha leve de separação por cima
@@ -7689,13 +7695,13 @@ function renderPresencaGrid(){
   const bebeRow=days.map(d=>d.slots.map(s=>{const c=mbrs.filter(m=>presModo(m,s.key)==='bebe').length;totalBebeAll+=c;return c;})).flat();
   h+='<tr><td class="pres-name pres-foot-mid" style="border-bottom:none"><span class="sf pres-foot-h">Só bebem</span></td>';
   days.forEach(d=>d.slots.forEach(()=>{h+='<td class="pres-count sf pres-foot-midcell"></td>';}));
-  h+='<td class="pres-count sf pres-foot-midcell"></td></tr>';
+  h+='</tr>';
 
   // Membros que só bebem
   let bi=0;
   h+='<tr><td class="pres-name pres-foot-cell" style="border-bottom:none"><span class="sf pres-foot-sub">Membros</span></td>';
-  days.forEach(d=>{d.slots.forEach(()=>{const c=bebeRow[bi++];h+=`<td class="pres-count sf${c>0?' has':''}" style="${c>0?'color:var(--blue)':''}">${c||'—'}</td>`;});});
-  h+='<td class="pres-count sf"></td></tr>';
+  days.forEach(d=>{d.slots.forEach(()=>{const c=bebeRow[bi++];h+=`<td class="pres-count sf${c>0?' has':''}" style="${c>0?'color:var(--gold)':''}">${c||'—'}</td>`;});});
+  h+='</tr>';
 
   h+='</tfoot></table></div>';
   h+='</div>';
