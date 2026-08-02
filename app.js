@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v157C · 2026-08-02 · Presenças: sem contador, agregados em blocos, crianças a verde, só bebe a dourado';
+const APP_BUILD = 'v157 · 2026-08-02 · Presenças: agregados em blocos, sem contador, crianças a verde e só bebe a dourado';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -7547,7 +7547,7 @@ function renderPresencaGrid(){
   // Linha-resumo: total de bocas (membros + convidados + crianças) por refeição.
   // Por baixo, em miúdo, a mesma conta repartida em adultos+crianças — é o que
   // interessa a quem cozinha (as crianças comem, mas comem dose de criança).
-  h+='<tr><th class="pres-corner pres-sum-corner sf">Total<div class="pres-sum-hint">ad+cr</div></th>';
+  h+='<tr><th class="pres-corner pres-sum-corner sf">Total<div class="pres-sum-hint">adultos + crianças</div></th>';
   let sumComeAll=0;
   days.forEach(d=>{
     d.slots.forEach(s=>{

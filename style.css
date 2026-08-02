@@ -6,7 +6,7 @@
   --gold:#A87B14;--green:#1E7A4D;--red:#B3402F;--blue:#2E6FA8;
   /* Verde mais claro das crianças: comem como os adultos (daí ser verde), mas
      lê-se à primeira que é outra coisa (dose de criança, não paga quota). */
-  --green-cri:#4E9E70;
+  --green-cri:#3B8B5E;
   --sal:#FBF6E8;--campino:#9C2F1D;--campino-escuro:#6E2012;--campino-tinta:#85291A;--barrete:#1E7A4D;
   --display:'Barlow Condensed',-apple-system,sans-serif;
   --shadow:0 6px 22px rgba(80,55,20,.14);
@@ -447,10 +447,15 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 /* Repartição adultos+crianças, por baixo do total e bem mais discreta */
 .pres-sum-sub{font-size:8px;font-weight:600;color:var(--faint);letter-spacing:-.02em;line-height:1;margin-top:1px;font-variant-numeric:tabular-nums}
 .pres-sum-corner{text-align:right!important;padding:3px 5px 3px 0!important;font-size:8.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);border-top:1px solid var(--line);border-bottom:1px solid var(--line);line-height:1.15;vertical-align:top}
-.pres-sum-hint{font-size:7px;font-weight:600;letter-spacing:0;text-transform:none;color:var(--faint);line-height:1;margin-top:1px}
+.pres-sum-hint{font-size:6.5px;font-weight:600;letter-spacing:0;text-transform:none;color:var(--faint);line-height:1;margin-top:2px;white-space:nowrap}
 /* Espaço entre os totais e o início da grelha de pessoas */
 .pres-gap td{height:10px;padding:0!important;border:none!important;background:var(--bg)}
-.pres-name{position:sticky;left:0;z-index:1;background:var(--bg);text-align:left!important;padding:0 10px 0 0!important;white-space:nowrap;border-bottom:1px solid rgba(168,140,90,.35)}
+/* O padding-left é o respiro do bloco do agregado à esquerda (o direito está
+   na última coluna, mais abaixo). Vai em todas as linhas da tabela, cabeçalho
+   incluído, para as colunas continuarem alinhadas com os dias. */
+.pres-name{position:sticky;left:0;z-index:1;background:var(--bg);text-align:left!important;padding:0 10px 0 9px!important;white-space:nowrap;border-bottom:1px solid rgba(168,140,90,.35)}
+.pres-corner{padding-left:9px!important}
+.pres-table tr>*:last-child{padding-right:9px!important}
 .pres-name-inner{display:flex;align-items:center;gap:8px;padding:5px 0}
 .pres-name-av{width:26px;height:26px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:10px;color:#241600;flex-shrink:0}
 .pres-name-txt{font-size:12.5px;font-weight:600;white-space:nowrap;line-height:1.12}
@@ -533,7 +538,8 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
    fundo do bloco pintava por cima do respiro e as famílias voltavam a ficar
    coladas umas às outras. */
 .pres-table tbody td.pres-name,.pres-table tbody td.pres-cell{background-clip:padding-box}
-.pres-fam-first>td{border-top:7px solid transparent}
+.pres-fam-first>td{border-top:7px solid transparent;padding-top:6px!important}
+.pres-fam-last>td{padding-bottom:6px!important}
 .pres-fam-first>.pres-name{border-top-left-radius:10px}
 .pres-fam-first>td:last-child{border-top-right-radius:10px}
 /* Última linha do agregado: fecha o bloco — sem o fio que separa as pessoas
@@ -563,11 +569,11 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .pres-name-av.pres-av-filho{width:21px;height:21px;border-radius:6px;background:var(--panel2);color:var(--muted);border:1px dashed var(--line);font-size:8px}
 .pres-tag-filho{display:block;font-size:7.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--faint);line-height:1.1;margin-top:1px}
 .pres-btn-filho{width:26px;height:26px;border-radius:7px}
-/* Presença de criança também em verde — porque também come — mas num verde
-   mais claro e de traço interrompido, a condizer com o avatar tracejado: vê-se
-   à primeira que é criança sem ter de se ler a etiqueta. O dourado passou a
-   ser do "só bebe", que é justamente o que uma criança não pode ser. */
-.pres-btn-filho.on{border-color:var(--green-cri);border-style:dashed;background:rgba(78,158,112,.15)}
+/* Presença de criança também em verde — porque também come — mas num verde um
+   ponto mais claro que o dos adultos: distingue-se lado a lado sem partir a
+   leitura da coluna. O dourado passou a ser do "só bebe", que é justamente o
+   que uma criança não pode ser. */
+.pres-btn-filho.on{border-color:var(--green-cri);background:rgba(59,139,94,.11)}
 .pres-btn-filho.on::after{color:var(--green-cri);font-size:13px}
 .pres-btn-filho.on.saving::after{border:2px solid var(--green-cri);border-top-color:transparent}
 @media(max-width:420px){
