@@ -1554,7 +1554,9 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .rep-hint{margin-top:5px;font-size:11px;font-weight:700;color:var(--barrete);text-align:center;overflow-wrap:anywhere}
 
 /* 📷 Foto → Lista: uma linha por artigo lido. [✓] [nome] em cima,
-   [qtd] [tamanho] por baixo — cabe em ecrã de telemóvel sem cortar o nome. */
+   [qtd] [tamanho] por baixo, [loja] no fim — cabe em ecrã de telemóvel sem
+   cortar o nome. A loja é por artigo (a lista é que manda: "camarão do LIDL"):
+   fica discreta em branco, e ganha o tom dourado das lojas quando tem valor. */
 .lif-row{display:grid;grid-template-columns:20px minmax(0,1fr);align-items:center;gap:7px 9px;padding:11px 0;border-bottom:1px solid var(--line)}
 .lif-row:last-child{border-bottom:none}
 .modal .lif-row input.lif-ck{grid-column:1;grid-row:1;width:19px!important;height:19px;margin:0;padding:0;-webkit-appearance:checkbox;appearance:checkbox;accent-color:var(--barrete);flex:0 0 auto}
@@ -1562,6 +1564,8 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .modal .lif-row .lif-art{grid-column:2;font-weight:700}
 .lif-sub{grid-column:2;display:grid;grid-template-columns:78px minmax(0,1fr);gap:6px}
 .modal .lif-sub .lif-q{text-align:center;font-weight:700}
+.modal .lif-row .lif-l{grid-column:2;font-size:13px;padding:7px 10px}
+.modal .lif-row .lif-l.has{font-weight:700;color:#9A6E0E;border-color:rgba(154,110,14,.45);background:rgba(154,110,14,.06)}
 .lif-meta{grid-column:2;font-size:11px;font-weight:700;color:var(--faint);overflow-wrap:anywhere}
 .lif-meta.dup{color:var(--gold)}
 .lif-row.off{opacity:.5}
