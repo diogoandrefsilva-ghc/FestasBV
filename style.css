@@ -558,16 +558,20 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 /* Linhas de filhos (crianças): pendem do pai/mãe acima — nome recuado, avatar
    apagado e etiqueta. O botão é binário (come / não conta): nunca fica azul.
    A coluna dos nomes é sticky e manda na largura da tabela, por isso tudo aqui
-   é medido para NÃO alargar essa coluna e provocar scroll horizontal:
-   adiantamento curto, avatar e letra mais pequenos que os dos adultos. */
-.pres-row-filho .pres-name-inner{padding-left:6px}
+   é medido para NÃO alargar essa coluna e provocar scroll horizontal: avatar e
+   letra mais pequenos que os dos adultos. */
 /* Um nome de criança comprido não pode alargar a coluna (e com ela a tabela
    toda): quebra em duas linhas em vez de empurrar. Sem reticências — o nome
    fica sempre inteiro, só ocupa mais uma linha. */
 .pres-row-filho .pres-name{white-space:normal}
 /* display:block porque max-width não se aplica a elementos inline (é um span) */
 .pres-row-filho .pres-name-txt{display:block;font-size:11px;white-space:normal;max-width:96px;overflow-wrap:anywhere}
-.pres-name-av.pres-av-filho{width:21px;height:21px;border-radius:6px;background:var(--panel2);color:var(--muted);border:1px solid var(--line);font-size:8px}
+/* O avatar da criança é mais pequeno que o do adulto, mas fica centrado com
+   ele: a margem de cada lado é metade da diferença dos dois tamanhos. Como o
+   conjunto (margem + avatar + margem) mede o mesmo que o avatar do adulto, o
+   nome da criança cai exatamente por baixo do nome dos pais — sem contas à
+   parte. Se um dos tamanhos mudar, é esta margem que tem de acompanhar. */
+.pres-name-av.pres-av-filho{width:21px;height:21px;margin:0 2.5px;border-radius:6px;background:var(--panel2);color:var(--muted);border:1px solid var(--line);font-size:8px}
 .pres-tag-filho{display:block;font-size:6.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--faint);line-height:1.1;margin-top:1px}
 .pres-btn-filho{width:26px;height:26px;border-radius:7px}
 /* Presença de criança também em verde — porque também come — mas num verde um
@@ -577,15 +581,19 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .pres-btn-filho.on{border-color:var(--green-cri);background:rgba(51,128,84,.15)}
 .pres-btn-filho.on::after{color:var(--green-cri);font-size:13px}
 .pres-btn-filho.on.saving::after{border:2px solid var(--green-cri);border-top-color:transparent}
-@media(max-width:420px){
-  .pres-row-filho .pres-name-inner{padding-left:4px}
+/* Mesmo corte dos 430px do avatar dos adultos (era 420): se os dois não
+   encolherem ao mesmo tempo, num telemóvel de 430pt o avatar da criança
+   deixava de estar centrado com o do pai. Adulto 21 - criança 17 → 2px. */
+@media(max-width:430px){
   .pres-row-filho .pres-name-txt{font-size:9.5px;max-width:78px}
-  .pres-name-av.pres-av-filho{width:17px;height:17px;border-radius:5px;font-size:6.5px}
+  .pres-name-av.pres-av-filho{width:17px;height:17px;margin:0 2px;border-radius:5px;font-size:6.5px}
   .pres-tag-filho{font-size:6px}
   .pres-btn-filho{width:23px;height:23px}
 }
 @media(max-width:360px){
   .pres-row-filho .pres-name-txt{font-size:9px;max-width:68px}
+  /* Aqui o avatar do adulto desce a 20px: metade da diferença dá 1,5px */
+  .pres-name-av.pres-av-filho{margin:0 1.5px}
   .pres-btn-filho{width:22px;height:22px}
 }
 
