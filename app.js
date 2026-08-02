@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v166 · 2026-08-02 · Convidados: dia/refeição já pré-selecionados pelo filtro (ou a refeição mais próxima)';
+const APP_BUILD = 'v167 · 2026-08-02 · Refeições passadas: "Quem foi?" em vez de "Quem vai?"';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -1100,10 +1100,12 @@ function renderAll(){
           ${memPanel}${guestPanel}${kidPanel}
           <div class="rdc-costs-body" id="${cid}"${cOpen?'':' style="display:none"'}>${costDet}</div>
         </div>`;
-        // "Quem vai?" — toda a gente da refeição, agrupada por agregado
+        // "Quem vai?" — toda a gente da refeição, agrupada por agregado.
+        // Refeição já passada: no passado é "Quem foi?" (igual à shoplist, que
+        // também troca "Lista de compras" por "Não comprado")
         const nBocas=totalComeRefeicao(rd.dia,rd.ref==='Lanche'?'Tarde':rd.ref);
         quemBox=nBocas?`<details class="rdc rdc-fold rdc-quem sf"${MEAL_QUEM_OPEN[mkey]?' open':''} ontoggle="MEAL_QUEM_OPEN['${mkey}']=this.open">
-          <summary class="rdc-hdr"><span class="rdc-lbl">👥 Quem vai?</span><span class="msl-count">${nBocas}</span><span class="rdc-fold-arrow">›</span></summary>
+          <summary class="rdc-hdr"><span class="rdc-lbl">👥 ${rd.data<hojeISO()?'Quem foi?':'Quem vai?'}</span><span class="msl-count">${nBocas}</span><span class="rdc-fold-arrow">›</span></summary>
           <div class="rdc-ppl casais">${casaisPanelHtml(membrosCome,guestsAll,rkey)}</div>
         </details>`:'';
       }
