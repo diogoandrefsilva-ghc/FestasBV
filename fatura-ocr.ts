@@ -153,17 +153,20 @@ ${pedidos.map((p) => `  · ${p}`).join("\n")}` : ""}
 Responde só com o JSON.`;
 
 /* ── Modo FOTO → LISTA (`lista: true`) ──
-   O oposto do talão: a foto é a lista do que FALTA comprar. Não há preços nem
-   loja — há artigos, quantidades e embalagens. `conhecidos` são os nomes já em
-   uso no grupo (stock + shop list): reaproveitá-los é o que impede a lista de
-   ganhar uma grafia nova por cada foto ("chouriço"/"chouriços"/"Chouriço"). */
-const promptLista = (cats: Cat[], conhecidos: string[]) => `A imagem (ou PDF) é uma LISTA DE
+   O oposto do talão: a foto é a lista do que FALTA comprar. Não há preços — há
+   artigos, quantidades e embalagens. A loja é POR ARTIGO e só quando a lista a
+   pede em cima do produto ("2 kg de camarão (do LIDL)"): quem escreve a lista
+   marca a loja no artigo que a exige, não na folha toda.
+   `conhecidos` são os nomes já em uso no grupo (stock + shop list) e `lojas` as
+   lojas já usadas: reaproveitá-los é o que impede a lista de ganhar uma grafia
+   nova por cada foto ("chouriço"/"chouriços"/"Chouriço", "Lidl"/"LIDL"). */
+const promptLista = (cats: Cat[], conhecidos: string[], lojas: string[]) => `A imagem (ou PDF) é uma LISTA DE
 COMPRAS ou uma lista de ingredientes, em português de Portugal. Pode estar
 escrita à mão, impressa, num quadro, num caderno, ou ser a captura de ecrã de
 uma nota ou de uma conversa.
 
 Extrai APENAS um objeto JSON com esta forma exata:
-{"artigos": [{"artigo": string, "qtd": string|null, "tamanho": string|null${cats.length ? ', "categoria": string|null' : ""}}]}
+{"artigos": [{"artigo": string, "qtd": string|null, "tamanho": string|null, "loja": string|null${cats.length ? ', "categoria": string|null' : ""}}]}
 
 Regras:
 - Uma entrada por produto a comprar, pela ordem em que aparecem. Ignora
@@ -176,7 +179,17 @@ Regras:
   null se a lista não disser.
 - "tamanho": a embalagem/formato, quando indicada — "lata 250 ml", "pack 6",
   "garrafa 1,5 L". null se não houver.
-- Não repitas o mesmo produto: se aparecer duas vezes, junta as quantidades.${conhecidos.length ? `
+- "loja": SÓ quando a linha desse artigo indicar onde o comprar — "(do LIDL)",
+  "no Continente", "comprar no talho", "Pingo Doce". Tira essa indicação de
+  dentro de "artigo" e põe-na aqui (ex.: "2 kg de camarão 20/30 (do LIDL)" ->
+  artigo "Camarão 20/30", qtd "2 kg", loja "LIDL"). null se a linha não disser
+  nada — NÃO adivinhes a loja pelo tipo de produto nem repitas a loja de outra
+  linha. Se a lista tiver um título/cabeçalho com uma loja para todos os
+  artigos que vêm abaixo, usa-a nesses artigos.
+- Não repitas o mesmo produto: se aparecer duas vezes, junta as quantidades.${lojas.length ? `
+- Se a loja indicada for uma destas já usadas pelo grupo, devolve EXATAMENTE
+  esse nome (copia tal e qual) em vez de uma grafia nova:
+${lojas.map((l) => `  · ${l}`).join("\n")}` : ""}${conhecidos.length ? `
 - Se o produto for o MESMO de um destes nomes já usados pelo grupo, devolve
   EXATAMENTE esse nome (copia tal e qual) em vez de uma grafia nova. Se for
   outro produto, escreve o nome normalmente — não forces a correspondência.
@@ -283,7 +296,7 @@ Deno.serve(async (req) => {
       return json({ error: "não autorizado" }, 403);
     }
 
-    const { image, mime, categorias, artigos, normalizar, pedidos, lista, conhecidos } =
+    const { image, mime, categorias, artigos, normalizar, pedidos, lista, conhecidos, lojas } =
       await req.json();
     const cats = lerCategorias(categorias);
     // Pedidos genéricos da lista (para a fatura ligar marca -> pedido)
@@ -296,6 +309,11 @@ Deno.serve(async (req) => {
       .filter((n) => typeof n === "string" && n.trim())
       .slice(0, 150)
       .map((n) => String(n).replace(/\s+/g, " ").trim().slice(0, 60));
+    // Lojas já usadas (modo `lista`, para a loja por artigo não ganhar grafias novas)
+    const lojasConhecidas = (Array.isArray(lojas) ? lojas : [])
+      .filter((l) => typeof l === "string" && l.trim())
+      .slice(0, 40)
+      .map((l) => String(l).replace(/\s+/g, " ").trim().slice(0, 40));
     const limparNomes = (arr: unknown[]) =>
       arr
         .filter((a) => typeof a === "string" && (a as string).trim())
@@ -325,7 +343,11 @@ Deno.serve(async (req) => {
       }
       parts = [
         { inline_data: { mime_type: mime || "image/jpeg", data: image } },
-        { text: lista ? promptLista(cats, nomesConhecidos) : promptFatura(cats, pedidosLista) },
+        {
+          text: lista
+            ? promptLista(cats, nomesConhecidos, lojasConhecidas)
+            : promptFatura(cats, pedidosLista),
+        },
       ];
     }
 
@@ -367,7 +389,7 @@ Deno.serve(async (req) => {
     const candidatos = await candidatosModelo();
     // Marcador de versão + lista de candidatos: se este log não aparecer, é a
     // versão ANTIGA que está a correr (o deploy não pegou).
-    console.log("FATURA-OCR build=lista-v1 candidatos:", candidatos.join(", "));
+    console.log("FATURA-OCR build=lista-v2 candidatos:", candidatos.join(", "));
     let model = candidatos[0] ?? "gemini-flash-latest";
     let g: Response | null = null;
 

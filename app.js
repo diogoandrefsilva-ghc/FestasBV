@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v162 · 2026-08-02 · Shop List: 📷 Foto e ＋ Ingrediente lado a lado, sem sobreposição';
+const APP_BUILD = 'v163 · 2026-08-02 · Foto → Lista: loja por artigo (a foto pede o Lidl, só esse vai para o Lidl)';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -6199,14 +6199,27 @@ function compraDelLote(i){const l=compraEdit.lotes[i];if(!l||!l.free)return;comp
    do que já se comprou, lê a lista do que FALTA comprar — a folha da cozinha,
    o quadro, o print do telemóvel — e propõe os artigos já com quantidade e
    embalagem. Reaproveita a compressão da foto e a Edge Function da fatura
-   (modo `lista`, sem preços nem loja).
+   (modo `lista`, sem preços).
    Nada entra na lista sem passar pelo ecrã de confirmação: desmarcar, corrigir
    nomes/quantidades e escolher o destino. O destino é UM só para toda a foto —
    uma lista fotografada é uma lista, não seis destinos diferentes.
+   A LOJA é a exceção: vai por artigo, porque é assim que as listas se escrevem
+   ("2 kg de camarão (do LIDL)" — só aquele é que tem de ser lá). A AI lê o que
+   estiver ao lado de cada artigo; a loja em cima do ecrã é só o valor por
+   omissão, aplicado a quem ficou sem nenhuma.
    A partir do cartão de uma refeição o destino já vem trancado (como o
    ＋ Ingrediente); a partir da Shop List escolhe-se aqui. */
 let _listaFotoCtx=null;   // contexto trancado, guardado enquanto o seletor de ficheiro está aberto
 let _listaFoto=null;      // {ctx,itens,tipo,datas,loja,tratoEu} enquanto o ecrã está aberto
+/* Loja lida na foto: se o grupo já escreve essa loja de certa maneira, fica a
+   grafia do grupo ("LIDL" na folha → "Lidl" na lista). Senão, capitaliza-se
+   como qualquer outro texto escrito à mão. */
+function listaFotoLojaNorm(v){
+  const t=(v==null?'':String(v)).replace(/\s+/g,' ').trim().slice(0,40);
+  if(!t)return '';
+  const k=shopLojaKey(t);
+  return shopLojaNomes().find(n=>shopLojaKey(n)===k)||shopCapArtigo(t).slice(0,40);
+}
 function listaFotoPick(tipo,data){
   if(!shopCanWrite()){toast('Sem permissão','bad');return;}
   if(contasFechadas()){toast('Contas fechadas','bad');return;}
@@ -6237,6 +6250,9 @@ async function listaFotoChosen(inp){
     // inventar grafia nova — é o mesmo serviço que o datalist faz a quem escreve
     const nomes=stkAddNomes();
     if(nomes.length)body.conhecidos=nomes.slice(0,150);
+    // Lojas já usadas: o mesmo serviço para a loja por artigo ("do LIDL" → "Lidl"
+    // se for assim que o grupo a escreve)
+    if(SHOP_LOJA_COL){const lj=shopLojaNomes();if(lj.length)body.lojas=lj.slice(0,40);}
     const r=await sbFetch(`${SB_URL}/functions/v1/fatura-ocr`,{
       method:'POST',
       headers:{'Content-Type':'application/json','apikey':SB_KEY},
@@ -6267,6 +6283,7 @@ function listaFotoAbrir(d){
       qtd:a.qtd?normalizeQty(String(a.qtd)).slice(0,20):'',
       tam:a.tamanho?normalizeQty(String(a.tamanho)).slice(0,20):'',
       categoria:a.categoria?String(a.categoria).slice(0,40):null,
+      loja:SHOP_LOJA_COL?listaFotoLojaNorm(a.loja):'',
       on:true
     });
   });
@@ -6290,11 +6307,13 @@ function listaFotoClose(){
 }
 /* Destino de TODOS os artigos da foto. Trancado quando a foto foi tirada de
    dentro de uma refeição; senão tipo (+ refeições, que aceitam várias como na
-   criação normal), loja opcional e o "vai já para o meu carrinho". */
+   criação normal), loja por omissão e o "vai já para o meu carrinho".
+   A loja daqui NÃO manda nos artigos que já trazem loja da foto — só preenche
+   os que ficaram em branco. */
 function listaFotoRenderDest(){
   const S=_listaFoto;const el=document.getElementById('shoplista-dest');if(!S||!el)return;
-  const loja=SHOP_LOJA_COL?`<label style="margin-top:12px">Loja 🏬 <i style="font-weight:400;color:var(--faint)">(opcional, para todos)</i></label>
-    <input type="text" id="lif-loja" maxlength="40" placeholder="Ex: Continente" list="shop-loja-list" autocomplete="off" value="${escHtml(S.loja)}" oninput="listaFotoSet('loja',this.value)">`:'';
+  const loja=SHOP_LOJA_COL?`<label style="margin-top:12px">Loja 🏬 <i style="font-weight:400;color:var(--faint)">(opcional, para os artigos sem loja)</i></label>
+    <input type="text" id="lif-loja" maxlength="40" placeholder="Ex: Continente" list="shop-loja-list" autocomplete="off" value="${escHtml(S.loja)}" oninput="listaFotoSet('loja',this.value)" onblur="listaFotoLojaBlur(this)">`:'';
   const trato=`<label class="cmp-pick-row" style="margin-top:12px"><input type="checkbox" ${S.tratoEu?'checked':''} onchange="listaFotoSet('tratoEu',this.checked)">
     <span>🛒 Vão já para o meu carrinho</span></label>`;
   if(S.ctx){
@@ -6307,6 +6326,16 @@ function listaFotoRenderDest(){
       <div id="lif-refs">${listaFotoRefsHtml()}</div>`:''}${loja}${trato}`;
 }
 function listaFotoSet(campo,val){if(_listaFoto)_listaFoto[campo]=val;}
+// A loja por omissão aparece como sugestão (placeholder) em cada linha sem
+// loja — ao sair do campo arruma-se a escrita e refrescam-se essas sugestões
+function listaFotoLojaBlur(el){
+  const S=_listaFoto;if(!S)return;
+  const v=listaFotoLojaNorm(el.value);
+  S.loja=v;el.value=v;
+  document.querySelectorAll('#shoplista-list .lif-l').forEach(inp=>{
+    if(!inp.value)inp.placeholder=v?`🏬 ${v}`:'loja (opcional)';
+  });
+}
 function listaFotoRefsHtml(){
   const S=_listaFoto;
   const meals=(DATA.refeicoesDef||[]).filter(r=>r.ref===S.tipo).slice().sort((a,b)=>(a.data||'').localeCompare(b.data||''));
@@ -6353,6 +6382,9 @@ function listaFotoRenderList(){
         <input class="lif-t" value="${escHtml(it.tam)}" maxlength="20" placeholder="tamanho / embalagem"
           oninput="listaFotoEdit(${i},'tam',this.value)" onblur="listaFotoBlur(${i},'tam',this)">
       </div>
+      ${SHOP_LOJA_COL?`<input class="lif-l${it.loja?' has':''}" value="${escHtml(it.loja||'')}" maxlength="40"
+        placeholder="${escHtml(S.loja?'🏬 '+S.loja:'loja (opcional)')}" list="shop-loja-list" autocomplete="off"
+        oninput="listaFotoEdit(${i},'loja',this.value)" onblur="listaFotoBlur(${i},'loja',this)">`:''}
       ${dup?'<div class="lif-meta dup">⚠️ já está na lista deste destino</div>':''}
     </div>`;
   }).join('');
@@ -6375,9 +6407,12 @@ function listaFotoEdit(i,campo,val){
 // campo seguinte e roubava-lhe o foco.
 function listaFotoBlur(i,campo,el){
   const S=_listaFoto;if(!S||!S.itens[i])return;
-  const v=campo==='artigo'?shopCapArtigo(el.value):normalizeQty(el.value);
+  const v=campo==='artigo'?shopCapArtigo(el.value)
+    :campo==='loja'?listaFotoLojaNorm(el.value)
+    :normalizeQty(el.value);
   S.itens[i][campo]=v;el.value=v;
   if(campo==='artigo')listaFotoRowUpd(i);   // o aviso de repetido segue o nome
+  if(campo==='loja')el.classList.toggle('has',!!v);
 }
 // Refresca só o aviso "já está na lista" de uma linha (sem re-render)
 function listaFotoRowUpd(i){
@@ -6408,7 +6443,8 @@ async function listaFotoApply(){
     datas=S.ctx?[S.ctx.data]:S.datas.slice();
     if(!datas.length){toast('Marca pelo menos uma refeição (ou define-a em Refeições)','bad');return;}
   }
-  const loja=SHOP_LOJA_COL?shopCapArtigo(S.loja).slice(0,40):'';
+  // Loja por omissão: só entra onde o artigo não trouxe a sua
+  const lojaDef=SHOP_LOJA_COL?listaFotoLojaNorm(S.loja):'';
   const btn=document.getElementById('shoplista-save');btn.disabled=true;
   setSync('load','a guardar…');
   try{
@@ -6419,22 +6455,26 @@ async function listaFotoApply(){
     sel.forEach(it=>{
       const artigo=shopCapArtigo(it.artigo).slice(0,60);
       const qtd=normalizeQty(it.qtd),tam=normalizeQty(it.tam);
+      const lj=SHOP_LOJA_COL?(listaFotoLojaNorm(it.loja)||lojaDef):'';
       datas.forEach(dv=>{
         const r={evento_id:DATA._sbId,artigo,quantidade:qtd,tamanho:tam||null,tipo,data_valor:dv,estado:'pendente',criado_por:criadoPor};
-        if(SHOP_LOJA_COL)r.loja=loja||null;
+        if(SHOP_LOJA_COL)r.loja=lj||null;
         if(S.tratoEu)r.tratado_por=criadoPor;
         rows.push(r);
       });
     });
     const ins=await queueWrite(()=>sbReq('POST','shoplist',rows,{Prefer:'return=representation'}));
     rows.forEach((r,i)=>{
-      shopArr().push({_id:ins&&ins[i]?ins[i].id:null,artigo:r.artigo,quantidade:r.quantidade,tamanho:r.tamanho||'',loja,tipo,dataValor:r.data_valor,estado:'pendente',tratadoPor:S.tratoEu?criadoPor:null,noCarrinho:false,compraId:null,cfDesc:null,valor:null,criadoPor,criadoEm:new Date().toISOString(),compradoEm:null});
+      shopArr().push({_id:ins&&ins[i]?ins[i].id:null,artigo:r.artigo,quantidade:r.quantidade,tamanho:r.tamanho||'',loja:r.loja||'',tipo,dataValor:r.data_valor,estado:'pendente',tratadoPor:S.tratoEu?criadoPor:null,noCarrinho:false,compraId:null,cfDesc:null,valor:null,criadoPor,criadoEm:new Date().toISOString(),compradoEm:null});
     });
     // UMA entrada de histórico para o lote todo — e, por consequência, UM aviso
     // no Telegram. Doze artigos de uma foto não são doze notificações.
     const nomes=sel.map(x=>shopCapArtigo(x.artigo));
+    // A loja no histórico só faz sentido se for a mesma para o lote todo — com
+    // lojas por artigo, uma delas escrita lá em cima seria mentira
+    const lojasLote=[...new Set(rows.map(r=>r.loja||''))];
     sbLog('compras','adicionou',nomes.slice(0,8).join(', ')+(nomes.length>8?` e mais ${nomes.length-8}`:''),{
-      n:nomes.length,foto:true,tratoEu:S.tratoEu,loja:loja||undefined,tipoDesp:tipo,
+      n:nomes.length,foto:true,tratoEu:S.tratoEu,loja:(lojasLote.length===1&&lojasLote[0])||undefined,tipoDesp:tipo,
       // Um artigo só: a frase é a mesma da adição manual, logo leva a quantidade
       quantidade:sel.length===1?(shopQtyLabel({quantidade:normalizeQty(sel[0].qtd),tamanho:normalizeQty(sel[0].tam)})||undefined):undefined,
       dataValor:datas.length===1?datas[0]:undefined,
