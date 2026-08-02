@@ -690,6 +690,22 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .refdef-indireto .rc.g{background:rgba(111,92,66,.12);color:var(--muted)}
 /* Sub-cards do card de refeição: indiretos · diretos · custo da refeição */
 .rdc{width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:11px;padding:9px 11px;margin-top:5px}
+/* Containers irmãos do cartão principal (ementa + compras): "Quem vai?" e custos */
+.refmeal>.rdc{margin-top:6px}
+.rdc-quem>summary{cursor:pointer}
+.rdc-quem .rdc-ppl{margin-top:8px;padding-top:8px}
+.rdc-costs-hdr{cursor:pointer;user-select:none}
+.rdc-costs-hdr .rdc-fold-arrow{align-self:center;transition:transform .2s}
+.rdc-costs-hdr.open .rdc-fold-arrow{transform:rotate(90deg)}
+.rdc-costs-body{margin-top:2px}
+.rdc-costs-body>.rdc{background:var(--panel);border-color:rgba(110,75,25,.18)}
+/* Swipe entre refeições: o cartão novo entra do lado de onde veio o dedo */
+@keyframes refSwIn{from{opacity:.3}to{opacity:1}}
+@keyframes refSwR{from{opacity:.3;transform:translateX(20px)}to{opacity:1;transform:none}}
+@keyframes refSwL{from{opacity:.3;transform:translateX(-20px)}to{opacity:1;transform:none}}
+.refmeal.sw-r{animation:refSwR .18s ease-out}
+.refmeal.sw-l{animation:refSwL .18s ease-out}
+@media (prefers-reduced-motion:reduce){.refmeal.sw-r,.refmeal.sw-l{animation:refSwIn .18s ease-out}}
 .rdc-hdr{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
 .rdc-lbl{font-family:var(--display);font-size:13.5px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--campino)}
 .rdc-lbl-green{color:var(--green)}

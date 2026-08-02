@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v164 · 2026-08-02 · Refeições: lista de compras logo a seguir à ementa, antes dos custos';
+const APP_BUILD = 'v165 · 2026-08-02 · Refeições: containers "Quem vai?" e Custos separados + swipe entre refeições';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -221,6 +221,19 @@ function criancasNoSlot(slotKey){
   const dia=parts[0],ref=parts[1]==='Tarde'?'Lanche':parts[1];
   const gc=((DATA&&DATA.convidados)||[]).filter(g=>g.dia===dia&&g.ref===ref&&g.crianca).length;
   return filhosComemNoSlot(slotKey)+gc;
+}
+// As mesmas crianças, mas por nome (com o agregado/quem convidou) — para as
+// listar no cartão da refeição. {nome, de}
+function criancasNoSlotNomes(slotKey){
+  if(!DATA)return[];
+  const parts=(slotKey||'').split('|');
+  const dia=parts[0],ref=parts[1]==='Tarde'?'Lanche':parts[1];
+  const nomes=new Set((DATA.membros||[]).map(m=>m.nome));
+  const out=FILHOS.filter(f=>paisDoFilho(f).some(p=>nomes.has(p))&&filhoCome(f.id,slotKey))
+    .map(f=>({nome:f.nome,de:paisDoFilho(f).join(' / ')}));
+  (DATA.convidados||[]).filter(g=>g.dia===dia&&g.ref===ref&&g.crianca)
+    .forEach(g=>out.push({nome:g.nome,de:g.membro||''}));
+  return out.sort((a,b)=>a.nome.localeCompare(b.nome,'pt'));
 }
 // Amigos que o admin pode validar: membros sem utilizador no agregado, fora do próprio agregado do admin.
 function amigosSemUtilizador(){
@@ -799,9 +812,53 @@ function updateFabs(){
 // Alias retrocompatível
 function updateGuestFab(){updateFabs();}
 let REF_SEL=0;
-function setRefMeal(i){REF_SEL=i;lsSet('fbv_refmeal',String(i));
+// dir (opcional): +1 veio de um swipe para a esquerda (refeição seguinte),
+// -1 do contrário — serve só para a animação de entrada do cartão.
+function setRefMeal(i,dir){REF_SEL=i;lsSet('fbv_refmeal',String(i));
   document.querySelectorAll('.refnav-chip').forEach(e=>e.classList.toggle('on',+e.dataset.i===i));
-  document.querySelectorAll('.refmeal').forEach(e=>{e.style.display=(+e.dataset.i===i?'':'none');});}
+  document.querySelectorAll('.refmeal').forEach(e=>{const on=+e.dataset.i===i;e.style.display=on?'':'none';
+    e.classList.remove('sw-l','sw-r');if(on&&dir)e.classList.add(dir>0?'sw-r':'sw-l');});}
+/* Swipe horizontal sobre os cartões: ← seguinte, → anterior. Não dá a volta
+   (parar na primeira/última é mais previsível do que saltar para a outra ponta). */
+function stepRefMeal(d){
+  const n=(DATA&&DATA.refeicoesDef)?DATA.refeicoesDef.length:0;
+  const i=REF_SEL+d;
+  if(n<2||i<0||i>=n)return false;
+  setRefMeal(i,d);
+  // Se o cartão anterior era comprido, podemos estar abaixo do topo da lista
+  const cards=document.querySelector('.refdef-cards');
+  if(cards){const top=cards.getBoundingClientRect().top;if(top<0)window.scrollTo({top:window.scrollY+top-10});}
+  return true;
+}
+let _swX=0,_swY=0,_swOk=false;
+function initRefSwipe(){
+  if(initRefSwipe._on)return;initRefSwipe._on=true;
+  document.addEventListener('touchstart',e=>{
+    _swOk=false;
+    if(e.touches.length!==1)return;
+    const t=e.target;
+    if(!t||!t.closest||!t.closest('.refdef-cards'))return;
+    if(t.closest('input,textarea,select'))return;
+    _swOk=true;_swX=e.touches[0].clientX;_swY=e.touches[0].clientY;
+  },{passive:true});
+  document.addEventListener('touchend',e=>{
+    if(!_swOk)return;_swOk=false;
+    const t=e.changedTouches&&e.changedTouches[0];if(!t)return;
+    const dx=t.clientX-_swX,dy=t.clientY-_swY;
+    if(Math.abs(dx)<60||Math.abs(dx)<Math.abs(dy)*1.8)return;
+    // Gesto engolido: sem o preventDefault o dedo ainda acabava por "clicar"
+    // no que estava por baixo (abrir um artigo, o modal da refeição…)
+    if(stepRefMeal(dx<0?1:-1))e.preventDefault();
+  },{passive:false});
+}
+/* Estado dos containers de cada refeição (sobrevive aos re-renders) */
+const MEAL_QUEM_OPEN={},MEAL_COST_OPEN={};
+function toggleCosts(hdr,id,key){
+  const e=document.getElementById(id);if(!e)return;
+  const show=e.style.display==='none';
+  e.style.display=show?'':'none';MEAL_COST_OPEN[key]=show;
+  if(hdr)hdr.classList.toggle('open',show);
+}
 function togglePeople(id){const e=document.getElementById(id);if(!e)return;const show=(e.style.display==='none'||!e.style.display);e.style.display=show?'flex':'none';const c=document.querySelector('[data-tgt="'+id+'"]');if(c)c.classList.toggle('open',show);}
 
 /* Detalhe "quem vai" agrupado por agregado (casal): os membros que comem numa
@@ -969,8 +1026,10 @@ function renderAll(){
       const icon=icoOf(rd.ref);
       const calcRef=CALC.refeicoes.find(x=>x.data===rd.data&&x.ref===rd.ref);
       const pesoDisplay=rd.peso!=null?(Number(((rd.peso||0)*100).toFixed(2)).toLocaleString('pt-PT',{maximumFractionDigits:2})+'%'):'—';
-      // Três sub-cards: custos indiretos · custos diretos · custo da refeição
-      let costCards='';
+      // Dois containers próprios, a seguir ao cartão principal: "Quem vai?" e os
+      // custos (o custo da refeição sempre à vista, o detalhe indiretos/diretos
+      // só quando se toca no cabeçalho).
+      let costBox='',quemBox='';
       if(calcRef){
         const indTot=calcRef.I||0;
         const dirTot=calcRef.dirRef||0;
@@ -990,7 +1049,7 @@ function renderAll(){
         const pesoHtml=rd.peso!=null?`<div class="rdc-peso"><span class="rdc-peso-lbl">Peso <b>${pesoDisplay}</b></span><span class="rdc-peso-rule"></span></div>`:'';
         const notaBebe=calcRef.temBebe?' <span class="rdc-note">= custo p/ quem só bebe</span>':'';
         // Colapsados por defeito (só label + total); toque expande o detalhe
-        costCards+=`<details class="rdc rdc-fold sf" onclick="event.stopPropagation()">
+        let costDet=`<details class="rdc rdc-fold sf">
           <summary class="rdc-hdr"><span class="rdc-lbl">Custos indiretos</span><span class="rdc-tot">${eur(indTot)}</span>${ppTag(indPP)}<span class="rdc-fold-arrow">›</span></summary>
           ${pesoHtml}${chipsHtml?`<div class="rdc-chips">${chipsHtml}</div>`:''}
           <div class="rdc-unit"><span>Por pessoa${notaBebe}</span><span class="rdc-unit-v">${eur(indPP)}</span></div>
@@ -1006,7 +1065,7 @@ function renderAll(){
           const drChip=`<div class="rdc-chips"><span class="rc cv">Despesa Refeição ${eur(dirTot)}</span></div>`;
           dirChipsRow=dirItems.length?`<details class="rdc-det rdc-det-chips" onclick="event.stopPropagation()"><summary>${drChip}<span class="rdc-det-arrow">›</span></summary>${dirDetBody}</details>`:drChip;
         }
-        costCards+=`<details class="rdc rdc-fold sf" onclick="event.stopPropagation()">
+        costDet+=`<details class="rdc rdc-fold sf">
           <summary class="rdc-hdr"><span class="rdc-lbl">Custos diretos</span><span class="rdc-tot">${eur(dirTot)}</span>${ppTag(dirPP)}<span class="rdc-fold-arrow">›</span></summary>
           <div class="rdc-peso"><span class="rdc-peso-lbl">Compras</span><span class="rdc-peso-rule"></span></div>
           ${dirChipsRow}
@@ -1017,24 +1076,36 @@ function renderAll(){
         const membrosCome=(DATA.membros||[]).filter(m=>(m.presencas||[]).some(p=>p.k===rkey&&p.modo==='come')).map(m=>m.nome).sort((a,b)=>a.localeCompare(b,'pt'));
         const guestsAll=(DATA.convidados||[]).filter(g=>g.dia===rd.dia&&g.ref===rd.ref);
         const guestsPay=guestsAll.filter(g=>g.pagante==='Sim');
-        const nCriancas=criancasNoSlot(rkey);   // filhos inscritos + convidados-criança
+        const kidsList=criancasNoSlotNomes(rkey);   // filhos inscritos + convidados-criança
+        const nCriancas=kidsList.length;
         const pid='rdp'+rd._idx;
-        const temDetM=membrosCome.length>0||guestsAll.length>0||nCriancas>0;
-        const memPanel=temDetM?`<div class="rdc-ppl casais" id="${pid}m" style="display:none" onclick="event.stopPropagation()">${casaisPanelHtml(membrosCome,guestsAll,rkey)}</div>`:'';
-        const guestPanel=guestsPay.length?`<div class="rdc-ppl" id="${pid}g" style="display:none" onclick="event.stopPropagation()">${guestsPay.map(g=>`<span class="rdc-ppl-it">${escHtml(g.nome)}${g.membro?`<small> · ${escHtml(g.membro)}</small>`:''}</span>`).join('')}</div>`:'';
-        const memAttrs=temDetM?`class="rdc-cell rdc-cell-btn" data-tgt="${pid}m" onclick="event.stopPropagation();togglePeople('${pid}m')"`:'class="rdc-cell"';
-        const guestAttrs=guestsPay.length?`class="rdc-cell rdc-cell-btn" data-tgt="${pid}g" onclick="event.stopPropagation();togglePeople('${pid}g')"`:'class="rdc-cell"';
-        const membroCell=`<div ${memAttrs}><div class="rdc-cell-k">Membro${membrosCount?`<span class="rdc-cell-n">${membrosCount}</span>`:''}${temDetM?'<span class="rdc-cell-arrow">›</span>':''}</div><div class="rdc-cell-v rdc-cell-v-gold">${calcRef.D>0?eur(calcRef.P):'<span class="rdc-na">N/A</span>'}</div></div>`;
-        const convCell=`<div ${guestAttrs}><div class="rdc-cell-k">Convidado${calcRef.E?`<span class="rdc-cell-n">${calcRef.E}</span>`:''}${guestsPay.length?'<span class="rdc-cell-arrow">›</span>':''}</div><div class="rdc-cell-v">${calcRef.E?eur(calcRef.Q):'<span class="rdc-na">N/A</span>'}</div></div>`;
+        // Cada botão lista só o seu grupo — a vista de conjunto (por agregado)
+        // é o container "Quem vai?", não se repete aqui.
+        const pplPanel=(sfx,html)=>`<div class="rdc-ppl" id="${pid}${sfx}" style="display:none">${html}</div>`;
+        const memPanel=membrosCome.length?pplPanel('m',membrosCome.map(n=>`<span class="rdc-ppl-it">${escHtml(n)}</span>`).join('')):'';
+        const guestPanel=guestsPay.length?pplPanel('g',guestsPay.map(g=>`<span class="rdc-ppl-it">${escHtml(g.nome)}${g.membro?`<small> · ${escHtml(g.membro)}</small>`:''}</span>`).join('')):'';
+        const kidPanel=nCriancas?pplPanel('k',kidsList.map(k=>`<span class="rdc-ppl-it">${escHtml(k.nome)}${k.de?`<small> · ${escHtml(k.de)}</small>`:''}</span>`).join('')):'';
+        const cellAttrs=(sfx,has)=>has?`class="rdc-cell rdc-cell-btn" data-tgt="${pid}${sfx}" onclick="togglePeople('${pid}${sfx}')"`:'class="rdc-cell"';
+        const arrow=has=>has?'<span class="rdc-cell-arrow">›</span>':'';
+        const membroCell=`<div ${cellAttrs('m',membrosCome.length)}><div class="rdc-cell-k">Membro${membrosCount?`<span class="rdc-cell-n">${membrosCount}</span>`:''}${arrow(membrosCome.length)}</div><div class="rdc-cell-v rdc-cell-v-gold">${calcRef.D>0?eur(calcRef.P):'<span class="rdc-na">N/A</span>'}</div></div>`;
+        const convCell=`<div ${cellAttrs('g',guestsPay.length)}><div class="rdc-cell-k">Convidado${calcRef.E?`<span class="rdc-cell-n">${calcRef.E}</span>`:''}${arrow(guestsPay.length)}</div><div class="rdc-cell-v">${calcRef.E?eur(calcRef.Q):'<span class="rdc-na">N/A</span>'}</div></div>`;
         // Crianças: só bocas para a cozinha/compras — não pagam nada
-        const kidsCell=nCriancas?`<div class="rdc-cell"><div class="rdc-cell-k">Criança<span class="rdc-cell-n">${nCriancas}</span></div><div class="rdc-cell-v"><span class="rdc-na">não paga</span></div></div>`:'';
+        const kidsCell=nCriancas?`<div ${cellAttrs('k',nCriancas)}><div class="rdc-cell-k">Criança<span class="rdc-cell-n">${nCriancas}</span>${arrow(1)}</div><div class="rdc-cell-v"><span class="rdc-na">não paga</span></div></div>`:'';
         const presNota=calcRef.D>0?'':'<div class="rdc-sempres">Sem presenças marcadas</div>';
-        costCards+=`<div class="rdc rdc-hero sf">
-          <div class="rdc-hdr"><span class="rdc-lbl rdc-lbl-green">Custo da refeição</span><span class="rdc-tot">${eur(calcRef.custoTotal)}</span>${ppTag(rnd(indPP+dirPP,2))}<span class="rdc-fold-arrow" style="visibility:hidden">›</span></div>
+        const mkey=rd.data+'|'+rd.ref,cid='rdcb'+rd._idx,cOpen=!!MEAL_COST_OPEN[mkey];
+        costBox=`<div class="rdc rdc-hero rdc-costs sf">
+          <div class="rdc-hdr rdc-costs-hdr${cOpen?' open':''}" onclick="toggleCosts(this,'${cid}','${mkey}')"><span class="rdc-lbl rdc-lbl-green">Custo da refeição</span><span class="rdc-tot">${eur(calcRef.custoTotal)}</span>${ppTag(rnd(indPP+dirPP,2))}<span class="rdc-fold-arrow">›</span></div>
           ${presNota}
           <div class="rdc-cells">${membroCell}${convCell}${kidsCell}</div>
-          ${memPanel}${guestPanel}
+          ${memPanel}${guestPanel}${kidPanel}
+          <div class="rdc-costs-body" id="${cid}"${cOpen?'':' style="display:none"'}>${costDet}</div>
         </div>`;
+        // "Quem vai?" — toda a gente da refeição, agrupada por agregado
+        const nBocas=totalComeRefeicao(rd.dia,rd.ref==='Lanche'?'Tarde':rd.ref);
+        quemBox=nBocas?`<details class="rdc rdc-fold rdc-quem sf"${MEAL_QUEM_OPEN[mkey]?' open':''} ontoggle="MEAL_QUEM_OPEN['${mkey}']=this.open">
+          <summary class="rdc-hdr"><span class="rdc-lbl">👥 Quem vai?</span><span class="msl-count">${nBocas}</span><span class="rdc-fold-arrow">›</span></summary>
+          <div class="rdc-ppl casais">${casaisPanelHtml(membrosCome,guestsAll,rkey)}</div>
+        </details>`:'';
       }
       // Ementa do dia — card campino em destaque: prato grande + entradas/sobremesa em linha
       const mp=parseMenuParts(rd.menu);
@@ -1056,8 +1127,10 @@ function renderAll(){
           </div>
           ${isAdmin()?'<span class="refdef-chevron sf">›</span>':''}
           ${ementa}
-          ${mealShopSection(rd)}${costCards}
+          ${mealShopSection(rd)}
         </div>
+        ${quemBox}
+        ${costBox}
       </div>`;
     });
     r+='</div>';
@@ -1087,6 +1160,7 @@ function renderAll(){
   r+='</div>';
 
   document.getElementById('view-refeicoes').innerHTML=r;
+  initRefSwipe();
 
   // CASH-FLOWS — merge all 5 types into one list
   renderCashFlows();
