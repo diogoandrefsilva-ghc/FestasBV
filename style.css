@@ -6,7 +6,7 @@
   --gold:#A87B14;--green:#1E7A4D;--red:#B3402F;--blue:#2E6FA8;
   /* Verde mais claro das crianças: comem como os adultos (daí ser verde), mas
      lê-se à primeira que é outra coisa (dose de criança, não paga quota). */
-  --green-cri:#3B8B5E;
+  --green-cri:#338054;
   --sal:#FBF6E8;--campino:#9C2F1D;--campino-escuro:#6E2012;--campino-tinta:#85291A;--barrete:#1E7A4D;
   --display:'Barlow Condensed',-apple-system,sans-serif;
   --shadow:0 6px 22px rgba(80,55,20,.14);
@@ -440,14 +440,15 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .pres-date{font-size:8px;font-weight:500;letter-spacing:0;text-transform:none;margin-top:1px}
 .pres-lock{font-size:8px;opacity:.7}
 /* Linha-resumo: total que come por refeição, fixa junto ao cabeçalho */
-/* vertical-align:top para os totais ficarem todos alinhados pelo cimo — as
-   colunas sem crianças não têm a linha de baixo e, ao centro, saíam tortas */
-.pres-sum{font-size:11.5px;font-weight:700;color:var(--faint);padding:3px 2px!important;border-top:1px solid var(--line);border-bottom:1px solid var(--line);white-space:nowrap;line-height:1.15;vertical-align:top}
+/* line-height em px (e não em múltiplo) no total e no canto: com tamanhos de
+   letra diferentes, um line-height relativo dava primeiras linhas de alturas
+   diferentes e a legenda ficava mais acima do que os "12+4" das colunas. */
+.pres-sum{font-size:11.5px;font-weight:700;color:var(--faint);padding:3px 2px!important;border-top:1px solid var(--line);border-bottom:1px solid var(--line);white-space:nowrap;line-height:14px;vertical-align:top}
 .pres-sum.has{color:var(--green)}
 /* Repartição adultos+crianças, por baixo do total e bem mais discreta */
-.pres-sum-sub{font-size:8px;font-weight:600;color:var(--faint);letter-spacing:-.02em;line-height:1;margin-top:1px;font-variant-numeric:tabular-nums}
-.pres-sum-corner{text-align:right!important;padding:3px 5px 3px 0!important;font-size:8.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);border-top:1px solid var(--line);border-bottom:1px solid var(--line);line-height:1.15;vertical-align:top}
-.pres-sum-hint{font-size:6.5px;font-weight:600;letter-spacing:0;text-transform:none;color:var(--faint);line-height:1;margin-top:2px;white-space:nowrap}
+.pres-sum-sub{font-size:8px;font-weight:600;color:var(--faint);letter-spacing:-.02em;line-height:8px;margin-top:1px;font-variant-numeric:tabular-nums}
+.pres-sum-corner{text-align:right!important;padding:3px 5px 3px 0!important;font-size:8.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);border-top:1px solid var(--line);border-bottom:1px solid var(--line);line-height:14px;vertical-align:top}
+.pres-sum-hint{font-size:6.5px;font-weight:600;letter-spacing:0;text-transform:none;color:var(--faint);line-height:8px;margin-top:1px;white-space:nowrap}
 /* Espaço entre os totais e o início da grelha de pessoas */
 .pres-gap td{height:10px;padding:0!important;border:none!important;background:var(--bg)}
 /* O padding-left é o respiro do bloco do agregado à esquerda (o direito está
@@ -485,9 +486,9 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
   .pres-name-inner{gap:4px}
 }
 .pres-cell{padding:3px 2px!important;border-bottom:1px solid rgba(168,140,90,.35)}
-/* Fundo mais claro que o do bloco da família (que já é pergaminho), senão a
-   casa por marcar desaparecia contra a linha */
-.pres-btn{width:32px;height:32px;border-radius:8px;border:1.5px solid var(--line);background:#FFFDF6;cursor:pointer;transition:.15s;display:flex;align-items:center;justify-content:center;margin:0 auto;position:relative;overflow:hidden}
+/* Casa por marcar: branco translúcido, para se disfarçar no fundo do bloco da
+   família em vez de saltar dele. O rebordo é que a define. */
+.pres-btn{width:32px;height:32px;border-radius:8px;border:1.5px solid var(--line);background:rgba(255,255,255,.4);cursor:pointer;transition:.15s;display:flex;align-items:center;justify-content:center;margin:0 auto;position:relative;overflow:hidden}
 .pres-btn:active{transform:scale(.88)}
 .pres-btn.on{border-color:var(--green);background:rgba(30,122,77,.12)}
 .pres-btn.on::after{content:"✓";color:var(--green);font-size:14px;font-weight:800}
@@ -573,7 +574,7 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
    ponto mais claro que o dos adultos: distingue-se lado a lado sem partir a
    leitura da coluna. O dourado passou a ser do "só bebe", que é justamente o
    que uma criança não pode ser. */
-.pres-btn-filho.on{border-color:var(--green-cri);background:rgba(59,139,94,.11)}
+.pres-btn-filho.on{border-color:var(--green-cri);background:rgba(51,128,84,.15)}
 .pres-btn-filho.on::after{color:var(--green-cri);font-size:13px}
 .pres-btn-filho.on.saving::after{border:2px solid var(--green-cri);border-top-color:transparent}
 @media(max-width:420px){

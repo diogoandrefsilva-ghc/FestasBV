@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v157 · 2026-08-02 · Presenças: agregados em blocos, sem contador, crianças a verde e só bebe a dourado';
+const APP_BUILD = 'v158 · 2026-08-02 · Presenças: afinação de tons (crianças, casas por marcar) e alinhamento dos totais';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -7560,9 +7560,9 @@ function renderPresencaGrid(){
       const adultos=memCome+gCount;
       const total=adultos+nCri;
       sumComeAll+=total;
-      // A repartição só aparece quando há crianças à mesa: sem elas, o número
-      // de cima já é o de adultos e um "13+0" era só ruído.
-      h+=`<th class="pres-sum sf${total>0?' has':''}">${total||'—'}${nCri>0?`<div class="pres-sum-sub">${adultos}+${nCri}</div>`:''}</th>`;
+      // A repartição aparece sempre, mesmo a zeros: com todas as colunas a ter
+      // duas linhas, os totais ficam alinhados e lê-se logo que não há crianças.
+      h+=`<th class="pres-sum sf${total>0?' has':''}">${total||'—'}<div class="pres-sum-sub">${adultos}+${nCri}</div></th>`;
     });
   });
   h+='</tr>';
