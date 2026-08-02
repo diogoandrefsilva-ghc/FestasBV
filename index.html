@@ -881,6 +881,8 @@ async function __ptrDoRefresh(){
 
   window.addEventListener('touchmove', e => {
     if (!pulling || busy) return;
+    // O swipe entre refeições ficou com o gesto — largamos o pull-to-refresh
+    if (window.__refSwipeLock){ pulling = false; hideBadge(); return; }
     dist = e.touches[0].clientY - startY;
     if (dist > 0 && atTop()){
       const h = Math.min(dist * 0.5, MAX);
