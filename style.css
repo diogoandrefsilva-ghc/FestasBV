@@ -869,7 +869,10 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .cf-desc-count.full{color:#B5453B}
 
 /* ═══ COMPRAS / SHOPLIST ═══ */
-.cmp-hdr{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:14px 0 8px}
+/* Com o 📷 são três ações no cabeçalho da Shop List (Normalizar · Foto ·
+   ＋ Artigo): em telemóvel estreito deixam de caber ao lado do título, por isso
+   a barra quebra de linha em vez de empurrar o ＋ Artigo para fora do ecrã. */
+.cmp-hdr{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:14px 0 8px;flex-wrap:wrap}
 .cmp-hdr-title{font-family:var(--display);font-size:19px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--campino-escuro);display:flex;align-items:center;gap:8px}
 .cmp-hdr .btn{flex:0 0 auto;padding:10px 14px;font-size:13px}
 .cmp-count{background:var(--panel2);border:1px solid var(--line);color:var(--muted);font-family:-apple-system,sans-serif;font-size:12px;font-weight:700;border-radius:20px;padding:1px 9px;letter-spacing:0}
@@ -1492,7 +1495,10 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .catsug-row select{flex:0 0 46%;max-width:46%;margin-top:0}
 
 /* Cabeçalho da Shop List com duas ações (Normalizar + ＋ Artigo) */
-.cmp-hdr-acts{display:flex;align-items:center;gap:8px;flex:0 0 auto}
+.cmp-hdr-acts{display:flex;align-items:center;gap:8px;flex:0 1 auto;flex-wrap:wrap;justify-content:flex-end}
+/* Ação secundária só com ícone (o 📷 da Shop List): quadrado, sem o texto que
+   não caberia ao lado do 🔤 Normalizar e do ＋ Artigo. */
+.cmp-hdr-acts .btn.hdr-ico{padding-left:10px;padding-right:10px;letter-spacing:0}
 #shop-norm-btn{background:var(--panel2);border:1px solid var(--line);color:var(--muted);white-space:nowrap}
 
 /* ── Normalizar artigos — um cartão por grupo de grafias ──
@@ -1561,10 +1567,15 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .lif-row.off{opacity:.5}
 .modal .lif-row.off input:not(.lif-ck){background:var(--panel2);text-decoration:line-through}
 
-/* ＋ Ingrediente e 📷 Foto lado a lado no rodapé da lista da refeição */
-.msl-add-row{display:flex;gap:7px;align-items:stretch}
-.msl-add-row .msl-add{flex:1;min-width:0}
-.msl-add-row .lfoto-btn{flex:0 0 auto;width:auto;letter-spacing:.04em;padding-left:12px;padding-right:12px}
+/* ＋ Ingrediente e 📷 Foto lado a lado no rodapé da lista da refeição — dois
+   botões distintos, o principal a ocupar o resto da linha e a foto do tamanho
+   do seu texto. A especificidade tem de bater a do .cmp-mini.prim.msl-add
+   (0,3,0), que impõe width:100% a ambos: com menos, os dois pedem a linha
+   inteira e sobrepõem-se. A margem sobe para a linha, para os botões ficarem
+   com a mesma altura. */
+.msl-add-row{display:flex;gap:7px;align-items:stretch;margin-top:9px}
+.msl-add-row .cmp-mini.prim.msl-add{flex:1 1 auto;width:auto;min-width:0;margin-top:0}
+.msl-add-row .cmp-mini.prim.msl-add.lfoto-btn{flex:0 0 auto;letter-spacing:.06em;padding-left:13px;padding-right:13px}
 
 /* ═══════════════════════════════════════════════════════════════════════
    REDESIGN Compras & Stock — VARIANTE A · "Talão de Mercado"
