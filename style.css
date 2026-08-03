@@ -1614,6 +1614,35 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .modal .rep-card .rep-merge.on{background:rgba(30,122,77,.10);border-color:var(--barrete);color:var(--ink)}
 .rep-hint{margin-top:5px;font-size:11px;font-weight:700;color:var(--barrete);text-align:center;overflow-wrap:anywhere}
 
+/* 🫙 Artigos de despensa (3.º passo do 🔤 Normalizar): uma linha por artigo,
+   com o interruptor à cabeça (é a decisão) e o motivo por baixo do nome — o
+   admin lê a lista de cima a baixo e só desliga o que a deteção apanhou mal. */
+.desp-row{display:flex;align-items:center;gap:11px;padding:11px 2px;border-bottom:1px solid var(--line)}
+.desp-row:last-child{border-bottom:none}
+.desp-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.desp-art{font-size:14.5px;font-weight:700;color:var(--faint);line-height:1.25;overflow-wrap:anywhere}
+.desp-row.on .desp-art{color:var(--ink)}
+.desp-why{font-size:11px;font-weight:600;color:var(--faint);line-height:1.3;overflow-wrap:anywhere}
+.desp-n{flex:0 0 auto;font-size:11px;font-weight:800;color:var(--faint);background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:2px 6px}
+/* Interruptor no detalhe do artigo — mesmo desenho do passo, em caixa própria */
+.shop-desp-wrap{margin-top:12px;border:1px solid var(--line);border-radius:11px;padding:10px 12px;background:var(--panel2)}
+.shop-desp-wrap.on{border-color:var(--barrete);background:rgba(30,122,77,.07)}
+.shop-desp-hd{display:flex;align-items:center;gap:10px}
+.shop-desp-lbl{flex:1;min-width:0;font-size:13px;font-weight:700;color:var(--ink)}
+.shop-desp-wrap .norm-sw:disabled{opacity:.5;cursor:default}
+.shop-desp-wrap .note{margin-top:6px}
+/* Bloco de despensa na Shop List: cabeçalho próprio, com a razão de existir
+   escrita ao lado — quem chega à lista tem de perceber num relance porque é
+   que o azeite aparece uma vez só. */
+.cmp-desp-hdr{font-family:var(--display);font-size:13px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);margin:14px 0 8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.cmp-desp-hdr i{flex:1 0 100%;font-family:-apple-system,sans-serif;font-size:11px;font-style:normal;font-weight:600;letter-spacing:0;text-transform:none;color:var(--faint)}
+/* Cartão colapsado: fita 🫙 à esquerda para se distinguir dos cartões normais */
+.cmp-item.cmp-desp{border-left:3px solid rgba(30,122,77,.45)}
+.cmp-artigo .desp-ic{font-style:normal;margin-right:5px}
+.cmp-desp-refs{display:flex;flex-wrap:wrap;gap:4px}
+/* Marca na lista da refeição: o artigo continua lá, só assinalado */
+.msl-nm .desp-ic{font-style:normal;font-size:12px;margin-right:4px;opacity:.8}
+
 /* 📷 Foto → Lista: uma linha por artigo lido. [✓] [nome] em cima,
    [qtd] [tamanho] por baixo, [loja] no fim — cabe em ecrã de telemóvel sem
    cortar o nome. A loja é por artigo (a lista é que manda: "camarão do LIDL"):

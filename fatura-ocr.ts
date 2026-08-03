@@ -4,7 +4,8 @@
 // pré-preencher o Registar Compra. Se a app mandar `categorias`, cada linha
 // vem também com a categoria de produto sugerida; e há dois modos só-texto:
 // `artigos` (classifica artigos existentes em lote) e `normalizar` (agrupa
-// grafias do mesmo produto — com `categorias`, classifica-os na mesma resposta).
+// grafias do mesmo produto — com `categorias`, classifica-os na mesma resposta;
+// com `despensa: true`, diz ainda quais se compram uma vez para o evento todo).
 // Com `lista: true` a imagem é lida ao contrário: não é um talão do que já se
 // comprou, é a LISTA do que falta comprar (folha da cozinha, quadro, print do
 // telemóvel) → devolve artigos com quantidade/embalagem, sem preços.
@@ -225,7 +226,11 @@ Regras:
 // para o admin rever e aprovar antes de gravar.
 // Com `categorias`, aproveita-se a mesma chamada para classificar os nomes (o
 // botão da app faz as duas coisas de seguida) — evita um segundo pedido.
-const promptNormalizar = (artigos: string[], cats: Cat[]) => `Tens nomes de artigos de compras
+// Com `despensa`, a mesma chamada devolve ainda quais dos nomes são artigos que
+// se compram UMA vez para o evento todo (a app colapsa os pedidos das várias
+// refeições numa linha só). É só uma sugestão: o admin confirma sempre, e a app
+// tem deteção local própria para quando esta função ainda não responde isto.
+const promptNormalizar = (artigos: string[], cats: Cat[], desp: boolean) => `Tens nomes de artigos de compras
 (Portugal), escritos por pessoas diferentes. Alguns referem-se AO MESMO produto
 mas estão escritos de forma diferente: singular/plural ("chouriço"/"chouriços"),
 unidades equivalentes (1000ml = 1L, 500gr = 500g), abreviaturas, acentos,
@@ -244,7 +249,8 @@ Responde APENAS com um objeto JSON com esta forma exata:
 {"grupos": [{"nome": string, "variantes": [string, string, ...]}]${
   cats.length ? `,
  "sugestoes": [{"artigo": string, "categoria": string|null}]` : ""
-}}
+}${desp ? `,
+ "despensa": [string, string, ...]` : ""}}
 
 Regras:
 - Inclui só grupos com 2 OU MAIS variantes distintas. Se não houver nada para
@@ -256,7 +262,17 @@ Regras:
   ainda uma por cada "nome" final que sugerires nos grupos. "categoria" é
   EXATAMENTE um destes nomes (copia tal e qual), ou null se nenhum encaixar com
   confiança — não inventes categorias novas:
-${catsLista(cats)}` : ""}`;
+${catsLista(cats)}` : ""}${desp ? `
+- "despensa": os nomes (da lista acima, copiados tal e qual, ou os "nome" finais
+  dos grupos) que são artigos de DESPENSA — compra-se UMA embalagem e ela chega
+  para um evento inteiro de várias refeições, porque se usa em pequena
+  quantidade de cada vez e não se estraga: azeite, óleo, sal, pimenta, louro,
+  orégãos, colorau, massa de pimentão, vinagre, açúcar, farinha, alho.
+  NÃO incluas: (a) o que escala com o número de refeições — carne, peixe,
+  batatas, cebolas, ovos, arroz, massa, pão; (b) fresco que se estraga e se
+  compra por refeição — salsa, coentros, hortelã, alface, tomate, natas, leite;
+  (c) bebidas. Na dúvida, deixa de fora — é o admin que confirma.
+  Se nenhum encaixar, devolve [].` : ""}`;
 
 async function emailAutorizado(auth: string): Promise<boolean> {
   // 1) quem é o utilizador deste token?
@@ -296,7 +312,7 @@ Deno.serve(async (req) => {
       return json({ error: "não autorizado" }, 403);
     }
 
-    const { image, mime, categorias, artigos, normalizar, pedidos, lista, conhecidos, lojas } =
+    const { image, mime, categorias, artigos, normalizar, despensa, pedidos, lista, conhecidos, lojas } =
       await req.json();
     const cats = lerCategorias(categorias);
     // Pedidos genéricos da lista (para a fatura ligar marca -> pedido)
@@ -330,7 +346,7 @@ Deno.serve(async (req) => {
     if (!image && Array.isArray(normalizar)) {
       const nomes = limparNomes(normalizar as unknown[]);
       if (nomes.length < 2) return json({ error: "poucos artigos para normalizar" }, 400);
-      parts = [{ text: promptNormalizar(nomes, cats) }];
+      parts = [{ text: promptNormalizar(nomes, cats, despensa === true) }];
     } else if (!image && Array.isArray(artigos)) {
       const nomes = limparNomes(artigos as unknown[]);
       if (!nomes.length || !cats.length) {
