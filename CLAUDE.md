@@ -12,7 +12,7 @@ App pessoal de gestão de despesas das Festas (Barrete Verde e Salinas).
 
 ## Como NÃO gastar tokens à toa (importante)
 - **Não leias o `app.js` inteiro.** Está dividido em secções com comentários `/* ═══ TÍTULO ═══ */`. Para achar algo, faz `grep` pelo título e lê só esse troço. Secções:
-  Sessão/refresh do token · Permissões · Fecho de contas + validação · Fator das quotas · Ícones de refeição · Classificar cash-flow · Histórico (auditoria) · **Cash Flow Modal** · Edit/Delete Cash Flow · Parametrizações · Notificações Telegram · Limpeza · Add New Year · Plantel · Categorias de Artigos (agrupadores + AI) · Normalizar Artigos (nomes, via AI) · Pedidos Repetidos (2.º passo do Normalizar: tamanhos/embalagens) · **Compras/Shoplist** · Separador Stock · Stock sem compra (ofertas / ano anterior) · **Foto → Lista** (foto da lista de compras → Gemini) · Importar Fatura (OCR) · **Presenças Grid** · Convidados · Refeições Def (CRUD) · **Swipe entre painéis** (refeições + convidados) · **Troca de Refeições** · Cartaz das Ementas · Hero sub-totais · **Relatórios/PDF** · Read-only mode · Resumo fundido nos Saldos (despesa por membro + movimentos + saldo) · FABs arrastáveis · **Auth (Supabase)** · Utilizadores↔Membros
+  Sessão/refresh do token · Permissões · Fecho de contas + validação · Fator das quotas · Ícones de refeição · Classificar cash-flow · Histórico (auditoria) · **Cash Flow Modal** · Edit/Delete Cash Flow · Parametrizações · Notificações Telegram · Limpeza · Add New Year · Plantel · Categorias de Artigos (agrupadores + AI) · Normalizar Artigos (nomes, via AI) · Pedidos Repetidos (2.º passo do Normalizar: tamanhos/embalagens) · **Compras/Shoplist** · Separador Stock · Stock sem compra (ofertas / ano anterior) · **Foto → Lista** (foto da lista de compras → Gemini) · Importar Fatura (OCR) · **Presenças Grid** · Convidados · Refeições Def (CRUD) · **Swipe entre painéis** (refeições + convidados) · **Troca de Refeições** · Cartaz das Ementas · Hero sub-totais · **T-shirts** · **Relatórios/PDF** · Read-only mode · Resumo fundido nos Saldos (despesa por membro + movimentos + saldo) · FABs arrastáveis · **Auth (Supabase)** · Utilizadores↔Membros
 
 ## Convidados que levam acompanhantes ("levo 5 comigo")
 Uma linha de `convidados` pode valer **várias bocas**: guarda-se o nome de quem se conhece e a linha diz de que é feita — `adultos` (o próprio incluído, quando é adulto) e `criancas`. Não se inventam linhas "Amigo do João 1/2/3".
@@ -21,6 +21,14 @@ Uma linha de `convidados` pode valer **várias bocas**: guarda-se o nome de quem
 - As crianças de um convidado são como os filhos dos membros: **não entram no `calcular()`**, só na contagem de bocas. Podem vir agarradas a qualquer linha, mesmo com adultos.
 - O flag `crianca` mantém-se mas é **derivado**: `crianca = (adultos === 0)`. Linha sem adultos → sem "Pagante?" (não há nada a pagar).
 - Migração: `db/convidados_acompanhantes.sql`. Tolerante: sem ela, `CONV_AC_COLS=false`, os campos ficam escondidos e cada convidado vale 1 pessoa.
+
+## T-shirts (separador 👕)
+Levantamento das t-shirts a encomendar. **Não entra em nenhuma conta** — quotas, saldos e cash-flows ignoram isto.
+- Uma linha = **uma t-shirt**: nome de quem a veste + tipologia (Homem/Mulher/Criança) + tamanho. Cada um mete quantas quiser; mexe nas suas e nas do cônjuge, o admin em tudo.
+- A **grelha de tamanhos** (`tshirt_tamanhos`) é global e só do admin (Definições › T-shirts); o **preço** é opcional — com tudo a 0 a app não fala em dinheiro.
+- `tamanho` guarda-se como **texto, não FK**: apagar um tamanho da grelha não mexe nas encomendas já feitas (ficam marcadas "fora da grelha").
+- Relatório PDF próprio (`buildTshirtsReport`): pedidos por pessoa + total por tipologia/tamanho.
+- Migração: `db/tshirts.sql`. Tolerante: sem ela, `TSHIRTS_TABLE=false` e o separador nem aparece.
 
 ## Crianças (filhos + convidados-criança)
 **Não pagam nada.** Não entram no `calcular()` — existem só para se saber quantas bocas há por refeição (compras/cozinha). Se mexeres em quotas ou saldos, as crianças não têm de aparecer lá.

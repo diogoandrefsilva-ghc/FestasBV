@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v174 · 2026-08-03 · Convidados: adultos/crianças em combo (0-15) e Pagante? volta a Sim quando há adultos';
+const APP_BUILD = 'v175 · 2026-08-03 · Novo separador 👕 T-shirts: cada um encomenda as suas (nome + tipologia + tamanho), tamanhos/preços no painel do admin e relatório PDF da encomenda';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -817,15 +817,19 @@ function mealIco(ref,px){
 const AVCOL=['#eeb64d','#e0533f','#2f9e77','#7fa8c9','#d98a3d','#43c98a','#c96f8a','#b98cff'];
 function av(nome,i){return`<div class="av" style="background:${AVCOL[i%AVCOL.length]}">${nome.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase()}</div>`;}
 
-function setTab(t){if(t==='stock'&&(!STOCK_TABLE||contasFechadas()))t='compras';if(t==='compras'&&contasFechadas())t='saldos';TAB=t;document.querySelectorAll('.tab').forEach(e=>e.classList.toggle('on',e.dataset.tab===t));
-  if(['saldos','refeicoes','cashflows','compras','stock'].includes(t))lsSet('fbv_tab',t);
-  ['saldos','refeicoes','cashflows','compras','stock'].forEach(v=>{const el=document.getElementById('view-'+v);if(el)el.style.display=v===t?'':'none';});
+function setTab(t){if(t==='stock'&&(!STOCK_TABLE||contasFechadas()))t='compras';if(t==='compras'&&contasFechadas())t='saldos';
+  if(t==='tshirts'&&!TSHIRTS_TABLE)t='saldos';
+  TAB=t;document.querySelectorAll('.tab').forEach(e=>e.classList.toggle('on',e.dataset.tab===t));
+  if(['saldos','refeicoes','cashflows','compras','stock','tshirts'].includes(t))lsSet('fbv_tab',t);
+  ['saldos','refeicoes','cashflows','compras','stock','tshirts'].forEach(v=>{const el=document.getElementById('view-'+v);if(el)el.style.display=v===t?'':'none';});
   // Hero only visible in saldos tab
   const hero=document.getElementById('hero-card');
   if(hero)hero.style.display=t==='saldos'?'':'none';
   if(t==='compras')renderCompras();
   if(t==='stock')renderStock();
+  if(t==='tshirts')renderTshirts();
   updateStockTabVis();
+  updateTshirtTabVis();
   updateGuestFab();
 }
 
@@ -1367,7 +1371,9 @@ function renderAll(){
   updateCfForm();
   if(TAB==='compras')renderCompras();
   if(TAB==='stock')renderStock();
+  if(TAB==='tshirts')renderTshirts();
   updateStockTabVis();
+  updateTshirtTabVis();
   // Mudou-se para um ano de contas fechadas com o separador Stock ativo → sair dele
   if(TAB==='stock'&&(!STOCK_TABLE||contasFechadas()))setTab('saldos');
   updateGuestFab();
@@ -1893,7 +1899,7 @@ async function carregar(){
     const sel='*,membros(*,presencas(*)),refeicoes_def(*),despesas(*),convidados(*),mealheiros(*),pagamentos(*)';
     // shoplist vai numa fetch SEPARADA e tolerante a falha: se a tabela ainda
     // não existir (migração por correr) o resto da app continua a funcionar.
-    const [res,uaRes,cjRes,vlRes,slRes,stRes,ctRes,acRes,npRes,flRes,fpRes,ccRes,sljRes,cpRes,stmRes]=await Promise.all([
+    const [res,uaRes,cjRes,vlRes,slRes,stRes,ctRes,acRes,npRes,flRes,fpRes,ccRes,sljRes,cpRes,stmRes,ttRes,tsRes]=await Promise.all([
       sbFetch(`${SB_URL}/rest/v1/eventos?select=${encodeURIComponent(sel)}&order=ano.asc`,{headers:sbHeaders(),cache:'no-store'}),
       sbFetch(`${SB_URL}/rest/v1/user_amigos?select=email,amigo`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null),
       sbFetch(`${SB_URL}/rest/v1/conjuges?select=amigo_a,amigo_b`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null),
@@ -1919,7 +1925,11 @@ async function carregar(){
       // sonda às colunas convidados.adultos/criancas (db/convidados_acompanhantes.sql)
       sbFetch(`${SB_URL}/rest/v1/convidados?select=adultos,criancas&limit=1`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null),
       // sonda à coluna stock_lotes.tamanho (a embalagem do lote): 200 = já existe
-      sbFetch(`${SB_URL}/rest/v1/stock_lotes?select=tamanho&limit=1`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null)
+      sbFetch(`${SB_URL}/rest/v1/stock_lotes?select=tamanho&limit=1`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null),
+      // t-shirts (db/tshirts.sql): tolerantes — sem a migração, TSHIRTS_TABLE=false
+      // e o separador 👕 fica escondido
+      sbFetch(`${SB_URL}/rest/v1/tshirt_tamanhos?select=*`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null),
+      sbFetch(`${SB_URL}/rest/v1/tshirts?select=*`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null)
     ]);
     if(!res.ok)throw new Error('HTTP '+res.status);
     const rows=await res.json();
@@ -1958,6 +1968,11 @@ async function carregar(){
     const shopByEv={};shopRows.forEach(s=>{(shopByEv[s.evento_id]=shopByEv[s.evento_id]||[]).push(s);});
     computeMyNames();
     const N=v=>v==null?0:Number(v);
+    // T-shirts: a grelha de tamanhos é global, as encomendas são por evento
+    TSHIRTS_TABLE=!!(ttRes&&ttRes.ok&&tsRes&&tsRes.ok);
+    TS_TAMS=TSHIRTS_TABLE?(await ttRes.json()).map(t=>({id:t.id,tipo:t.tipo,tamanho:t.tamanho,ordem:t.ordem||0,preco:N(t.preco)})).sort(tsTamCmp):[];
+    const tsByEv={};
+    if(TSHIRTS_TABLE)(await tsRes.json()).forEach(t=>{(tsByEv[t.evento_id]=tsByEv[t.evento_id]||[]).push(t);});
     ALL_YEARS=rows.map(ev=>({
       _sbId: ev.id,
       evento:{nome:ev.nome,ano:ev.ano,tesoureiro:ev.tesoureiro,arredondaTotal:!!ev.arredonda_total,missaoPoupanca:N(ev.missao_poupanca),fundoReserva:N(ev.fundo_reserva),fatorModo:ev.fator_modo||'fixo',fatorThreshold:ev.fator_threshold!=null?N(ev.fator_threshold):FATOR_THRESHOLD_DEFAULT,dividasPublicas:!!ev.dividas_publicas,dividasPublicasCol:('dividas_publicas' in ev),contasFechadas:!!ev.contas_fechadas,contasFechadasEm:ev.contas_fechadas_em||null,contasFechadasPor:ev.contas_fechadas_por||null},
@@ -1983,20 +1998,23 @@ async function carregar(){
       mealheiros:(ev.mealheiros||[]).map(m=>({quem:m.quem,data:m.data,valor:N(m.valor),subtipo:m.subtipo,desc:m.descricao})),
       pagamentos:(ev.pagamentos||[]).map(p=>({de:p.de,para:p.para,valor:N(p.valor),ref:p.ref,data:p.data,extra:N(p.extra)})),
       shoplist:(shopByEv[ev.id]||[]).map(s=>({_id:s.id,artigo:s.artigo,quantidade:s.quantidade||'',tamanho:s.tamanho||'',loja:s.loja||'',tipo:s.tipo,dataValor:s.data_valor,estado:s.estado||'pendente',tratadoPor:s.tratado_por||null,noCarrinho:!!s.no_carrinho,compraId:s.compra_id||null,cfDesc:s.cf_desc||null,valor:s.valor!=null?N(s.valor):null,criadoPor:s.criado_por||'',criadoEm:s.criado_em,compradoEm:s.comprado_em})),
-      stockLotes:(stockByEv[ev.id]||[]).map(l=>({_id:l.id,compraId:l.compra_id,artigo:l.artigo,qtd:N(l.qtd),unidade:l.unidade||'',tamanho:l.tamanho||'',valor:N(l.valor),alocacoes:Array.isArray(l.alocacoes)?l.alocacoes:[],_listArt:l.lista_artigo||null,criadoEm:l.criado_em}))
+      stockLotes:(stockByEv[ev.id]||[]).map(l=>({_id:l.id,compraId:l.compra_id,artigo:l.artigo,qtd:N(l.qtd),unidade:l.unidade||'',tamanho:l.tamanho||'',valor:N(l.valor),alocacoes:Array.isArray(l.alocacoes)?l.alocacoes:[],_listArt:l.lista_artigo||null,criadoEm:l.criado_em})),
+      tshirts:(tsByEv[ev.id]||[]).map(t=>({_id:t.id,membro:t.membro,nome:t.nome,tipo:t.tipo,tamanho:t.tamanho,criadoPor:t.criado_por||'',criadoEm:t.criado_em}))
     }));
     ALL_YEARS.sort((a,b)=>(a.evento.ano||0)-(b.evento.ano||0));
     // Restaurar onde o utilizador estava (ano + separadores), senão ano mais recente
     const savedAno=parseInt(lsGet('fbv_ano'),10);
     const yi=ALL_YEARS.findIndex(y=>y.evento.ano===savedAno);
     YEAR_IDX=yi>=0?yi:ALL_YEARS.length-1;
+    const savedTs=lsGet('fbv_tstab');
+    if(savedTs==='minhas'||savedTs==='todas')TS_TAB=savedTs;
     const savedSub=lsGet('fbv_refsub');
     if(savedSub==='calendario'||savedSub==='presencas'||savedSub==='convidados')REF_SUB=savedSub;
     const savedMeal=parseInt(lsGet('fbv_refmeal'),10);
     if(Number.isInteger(savedMeal)&&savedMeal>=0)REF_SEL=savedMeal;
     selectYear();
     const savedTab=lsGet('fbv_tab')==='resumo'?'saldos':lsGet('fbv_tab');
-    if(['saldos','refeicoes','cashflows','compras','stock'].includes(savedTab))setTab(savedTab);
+    if(['saldos','refeicoes','cashflows','compras','stock','tshirts'].includes(savedTab))setTab(savedTab);
     setSync('live','sincronizado · '+new Date().toLocaleTimeString('pt-PT',{hour:'2-digit',minute:'2-digit'}));
     updateReadOnlyMode();
   }catch(e){setSync('err','sem ligação');toast('Erro: '+e.message,'bad');}
@@ -3148,7 +3166,7 @@ function openAdmin(){
   if(ver)ver.textContent='Versão '+APP_BUILD.split('·')[0].trim();
   const adm=document.getElementById('adm-pedidos-wrap');
   if(adm)adm.style.display=isAdmin()?'':'none';
-  if(isAdmin()){sbRenderPedidos();sbRenderLigacoes();loadNotif();loadNotifPres();admCatCancel();renderAdmCats();}
+  if(isAdmin()){sbRenderPedidos();sbRenderLigacoes();loadNotif();loadNotifPres();admCatCancel();renderAdmCats();renderAdmTshirts();}
   loadMyNotif();
   loadParams();
   renderPlantel();
@@ -9783,6 +9801,343 @@ function toggleHeroDetail(){
   dets.forEach(d=>d.classList.toggle('open',abrir));
 }
 
+/* ═══ T-SHIRTS ═══
+   Encomenda de t-shirts das Festas (migração db/tshirts.sql). Duas peças:
+   a GRELHA de tamanhos (TS_TAMS — global, parametrizada pelo admin em
+   Definições › T-shirts) e os PEDIDOS (DATA.tshirts — por ano).
+   Uma linha = UMA t-shirt: nome de quem a veste + tipologia + tamanho. Quem
+   encomenda mete quantas quiser; cada um mexe nas suas (e nas do cônjuge), o
+   admin mexe em tudo — o RLS garante o mesmo no servidor.
+   NÃO ENTRA EM NENHUMA CONTA: quotas, saldos e cash-flows ignoram isto por
+   completo. O preço é opcional — enquanto estiver tudo a 0 a app não fala em
+   dinheiro nenhum; assim que o admin puser preços, aparecem os totais.
+   Sem a migração corrida, TSHIRTS_TABLE=false e o separador nem aparece. */
+let TSHIRTS_TABLE=false;   // BD já tem tshirt_tamanhos/tshirts?
+let TS_TAMS=[];            // grelha global [{id,tipo,tamanho,ordem,preco}]
+let TS_TAB='minhas';       // sub-separador do painel: minhas | todas
+const TS_TIPOS=['Homem','Mulher','Criança'];
+function tsIcon(tipo){return{'Homem':'👨','Mulher':'👩','Criança':'🧒'}[tipo]||'👕';}
+function tsTipoIdx(t){const i=TS_TIPOS.indexOf(t);return i<0?TS_TIPOS.length:i;}
+// Ordem da grelha: tipologia (Homem→Mulher→Criança), depois a `ordem` do admin
+// e, em empate, o próprio tamanho (numeric:true para "4 anos" < "10 anos")
+function tsTamCmp(a,b){return tsTipoIdx(a.tipo)-tsTipoIdx(b.tipo)||(a.ordem||0)-(b.ordem||0)||String(a.tamanho).localeCompare(String(b.tamanho),'pt',{numeric:true});}
+function tsArr(){if(DATA&&!DATA.tshirts)DATA.tshirts=[];return (DATA&&DATA.tshirts)||[];}
+function tsTamsDe(tipo){return TS_TAMS.filter(t=>t.tipo===tipo);}
+function tsTiposAtivos(){return TS_TIPOS.filter(t=>tsTamsDe(t).length);}
+function tsPreco(tipo,tamanho){const t=TS_TAMS.find(x=>x.tipo===tipo&&x.tamanho===tamanho);return t?(+t.preco||0):0;}
+function tsTemPrecos(){return TS_TAMS.some(t=>(+t.preco||0)>0);}
+function tsTotalEur(list){return rnd(list.reduce((a,it)=>a+tsPreco(it.tipo,it.tamanho),0),2);}
+// Sufixo " · 12,00 €" — só aparece se estas t-shirts tiverem mesmo preço. Uma
+// grelha meia preenchida (só um tamanho com preço) não enche o ecrã de 0,00 €.
+function tsEurSufixo(list,bold){const v=tsTotalEur(list);if(!tsTemPrecos()||v<=0)return '';return bold?` · <b>${eur(v)}</b>`:` · ${eur(v)}`;}
+// Ordenação dos pedidos: tipologia → posição do tamanho na grelha → nome
+function tsPedidoCmp(a,b){
+  const pos=it=>{const i=TS_TAMS.findIndex(t=>t.tipo===it.tipo&&t.tamanho===it.tamanho);return i<0?9e9:i;};
+  return tsTipoIdx(a.tipo)-tsTipoIdx(b.tipo)||(pos(a)-pos(b))||String(a.nome).localeCompare(String(b.nome),'pt');
+}
+function tsMine(it){return MY_NAMES.includes(it.membro);}
+// Mexer num pedido: o dono (próprio ou cônjuge) ou o admin. Ano fechado tranca tudo.
+function tsCanEdit(it){return !!_sbSession&&!contasFechadas()&&(isAdmin()||tsMine(it));}
+// Encomendar: é preciso estar ligado a um membro e haver tamanhos definidos
+function tsCanWrite(){return !!_sbSession&&!contasFechadas()&&(isAdmin()||MY_NAMES.length>0)&&TS_TAMS.length>0;}
+function updateTshirtTabVis(){const t=document.getElementById('tab-tshirts');if(t)t.style.display=TSHIRTS_TABLE?'':'none';}
+function setTsTab(t){TS_TAB=t;lsSet('fbv_tstab',t);renderTshirts();}
+
+/* ── Painel 👕 ── */
+function renderTshirts(){
+  const el=document.getElementById('view-tshirts');if(!el||!DATA)return;
+  if(!TSHIRTS_TABLE){el.innerHTML='<div class="note">T-shirts indisponíveis — falta correr a migração <b>db/tshirts.sql</b> no Supabase.</div>';return;}
+  const items=tsArr();
+  const mine=items.filter(tsMine).sort(tsPedidoCmp);
+  const canW=tsCanWrite();
+
+  let h=`<div class="cmp-hdr">
+    <div class="cmp-hdr-title sf">👕 T-shirts</div>
+    <div class="cmp-hdr-acts">
+      <button class="btn hdr-ico" onclick="generatePDF('tshirts')" title="Relatório da encomenda em PDF" ${items.length?'':'disabled'}>📄</button>
+      <button class="btn prim write-action" onclick="openTshirtModal()" ${canW?'':'disabled'}>＋ T-shirt</button>
+    </div>
+  </div>`;
+
+  const tabBtn=(id,ico,lbl,n)=>`<button class="cmp-tab${TS_TAB===id?' on':''}" onclick="setTsTab('${id}')"><span class="cmp-tab-ico">${ico}</span><span class="cmp-tab-lbl">${lbl}</span>${n?`<span class="cmp-tab-n">${n}</span>`:''}</button>`;
+  h+=`<div class="cmp-tabs sf">
+    ${tabBtn('minhas','🙋','As minhas',mine.length)}
+    ${tabBtn('todas','📋','Encomenda',items.length)}
+  </div>`;
+
+  if(TS_TAB==='minhas'){
+    if(!TS_TAMS.length){
+      h+='<div class="cmp-empty sf"><span class="cmp-empty-ico">👕</span>O admin ainda não definiu tamanhos — sem isso não dá para encomendar.</div>';
+    }else if(!_sbSession){
+      h+='<div class="cmp-empty sf"><span class="cmp-empty-ico">🔒</span>Inicia sessão para encomendares as tuas t-shirts.</div>';
+    }else if(!isAdmin()&&!MY_NAMES.length){
+      h+='<div class="cmp-empty sf"><span class="cmp-empty-ico">👤</span>A tua conta ainda não está ligada a um membro — pede ao admin.</div>';
+    }else if(!mine.length){
+      h+=`<div class="cmp-empty sf"><span class="cmp-empty-ico">👕</span>Ainda não pediste nenhuma t-shirt.${canW?'<br>Carrega em <b>＋ T-shirt</b> — podes adicionar quantas quiseres.':''}</div>`;
+    }else{
+      h+=tsListaHtml(mine);
+      h+=`<div class="ts-tot sf">${mine.length} t-shirt${mine.length===1?'':'s'}${tsEurSufixo(mine,true)}</div>`;
+    }
+    // O admin também encomenda as dele, mas vê aqui as dos outros ao lado
+    if(isAdmin()&&items.some(it=>!tsMine(it)))
+      h+=`<div class="note">Vês a encomenda toda em <b>📋 Encomenda</b>.</div>`;
+  }else{
+    if(!items.length){
+      h+='<div class="cmp-empty sf"><span class="cmp-empty-ico">📋</span>Ainda ninguém encomendou t-shirts este ano.</div>';
+    }else{
+      h+=tsResumoHtml(items);
+      // Por pessoa (o próprio primeiro, depois por ordem alfabética)
+      const porMembro={};
+      items.forEach(it=>{(porMembro[it.membro]=porMembro[it.membro]||[]).push(it);});
+      const nomes=Object.keys(porMembro).sort((a,b)=>
+        (MY_NAMES.includes(b)?1:0)-(MY_NAMES.includes(a)?1:0)||a.localeCompare(b,'pt'));
+      h+='<div class="ts-sec sf">Por pessoa</div>';
+      nomes.forEach(n=>{
+        const list=porMembro[n].slice().sort(tsPedidoCmp);
+        h+=`<div class="ts-grp">
+          <div class="ts-grp-hdr"><b>${escHtml(n)}</b><span class="cmp-count">${list.length}</span>${tsTotalEur(list)>0?`<span class="ts-grp-eur">${eur(tsTotalEur(list))}</span>`:''}</div>
+          ${tsListaHtml(list)}
+        </div>`;
+      });
+    }
+  }
+  el.innerHTML=h;
+}
+
+// Lista de cartões. Um cartão é clicável (edita) só para quem lhe pode mexer.
+function tsListaHtml(list){
+  const comPrecos=tsTemPrecos();
+  return '<div class="cmp-list">'+list.map(it=>{
+    const ed=tsCanEdit(it);
+    const p=tsPreco(it.tipo,it.tamanho);
+    const orfao=!TS_TAMS.some(t=>t.tipo===it.tipo&&t.tamanho===it.tamanho);
+    return `<div class="ts-item${ed?' ed':''}"${ed?` onclick="openTshirtModal(${it._id})"`:''}>
+      <span class="ts-ava">${tsIcon(it.tipo)}</span>
+      <div class="ts-main">
+        <div class="ts-nome">${escHtml(it.nome)}</div>
+        <div class="ts-sub">${it.tipo} · <b>${escHtml(it.tamanho)}</b>${comPrecos&&p>0?` · ${eur(p)}`:''}${orfao?' · <i class="ts-orfao">fora da grelha</i>':''}</div>
+      </div>
+      ${ed?'<span class="stk-chev">›</span>':''}
+    </div>`;
+  }).join('')+'</div>';
+}
+
+// Resumo: quantas t-shirts por tipologia e tamanho (é o que interessa a quem encomenda)
+function tsResumoHtml(items){
+  const comPrecos=tsTemPrecos();
+  let h='<div class="ts-sec sf">Total por tipologia</div><div class="ts-sums">';
+  tsTipoAgg(items).forEach(g=>{
+    h+=`<div class="ts-sum">
+      <div class="ts-sum-hdr"><span>${tsIcon(g.tipo)} ${g.tipo}</span><span class="cmp-count">${g.total}</span></div>
+      ${g.linhas.map(l=>`<div class="ts-sum-row"><span>${escHtml(l.tamanho)}</span><span class="ts-sum-n">${l.qtd}</span></div>`).join('')}
+      ${comPrecos&&g.valor>0?`<div class="ts-sum-eur">${eur(g.valor)}</div>`:''}
+    </div>`;
+  });
+  h+='</div>';
+  const tot=items.length;
+  h+=`<div class="ts-tot sf">${tot} t-shirt${tot===1?'':'s'} no total${tsEurSufixo(items,true)}</div>`;
+  return h;
+}
+/* Agregação por tipologia+tamanho, partilhada pelo painel e pelo PDF.
+   A ordem segue a grelha do admin; tamanhos entretanto apagados da grelha
+   continuam a aparecer no fim (as encomendas já feitas não se perdem). */
+function tsTipoAgg(items){
+  const byTipo={};
+  items.forEach(it=>{
+    const g=byTipo[it.tipo]=byTipo[it.tipo]||{tipo:it.tipo,total:0,valor:0,map:{}};
+    g.total++;g.valor=rnd(g.valor+tsPreco(it.tipo,it.tamanho),2);
+    g.map[it.tamanho]=(g.map[it.tamanho]||0)+1;
+  });
+  return Object.values(byTipo).sort((a,b)=>tsTipoIdx(a.tipo)-tsTipoIdx(b.tipo)).map(g=>{
+    const ord=tsTamsDe(g.tipo).map(t=>t.tamanho);
+    g.linhas=Object.keys(g.map).sort((a,b)=>{
+      const ia=ord.indexOf(a),ib=ord.indexOf(b);
+      return (ia<0?9e9:ia)-(ib<0?9e9:ib)||a.localeCompare(b,'pt',{numeric:true});
+    }).map(tam=>({tamanho:tam,qtd:g.map[tam],preco:tsPreco(g.tipo,tam)}));
+    return g;
+  });
+}
+
+/* ── Modal: adicionar / editar um pedido ── */
+let _tsEdit=null;   // id em edição · null = novo
+let _tsTipo='Homem';
+let _tsTam='';
+function openTshirtModal(id){
+  if(!TSHIRTS_TABLE)return;
+  if(bloqueadoPorFecho())return;
+  const it=id!=null?tsArr().find(x=>x._id===id):null;
+  if(id!=null&&!it){toast('Pedido não encontrado','bad');return;}
+  if(it&&!tsCanEdit(it)){toast('Só quem encomendou (ou o admin) pode mexer neste pedido','bad');return;}
+  if(!it&&!tsCanWrite()){toast(TS_TAMS.length?'Sem permissão para encomendar':'O admin ainda não definiu tamanhos','bad');return;}
+  _tsEdit=it?it._id:null;
+  _tsTipo=it?it.tipo:(tsTiposAtivos()[0]||TS_TIPOS[0]);
+  _tsTam=it?it.tamanho:'';
+  document.getElementById('ts-title').textContent=it?'Editar T-shirt':'Adicionar T-shirt';
+  document.getElementById('ts-nome').value=it?it.nome:'';
+  document.getElementById('ts-membro').innerHTML=isAdmin()?memberOptions(it?it.membro:meuNomePrincipal()):myMemberOptions(it?it.membro:'');
+  // Só faz sentido escolher "encomendado por" quando há mais que uma hipótese
+  const nOpts=document.getElementById('ts-membro').options.length;
+  document.getElementById('ts-membro-wrap').style.display=nOpts>1?'':'none';
+  document.getElementById('ts-del').style.display=it?'':'none';
+  document.getElementById('ts-save').textContent=it?'Guardar':'Adicionar';
+  document.getElementById('ts-save-more').style.display=it?'none':'';
+  const meta=document.getElementById('ts-meta');
+  if(it&&it.criadoPor){meta.innerHTML=`Registado por <b>${escHtml(it.criadoPor)}</b>${it.criadoEm?' · '+fmtDiaMes(String(it.criadoEm).slice(0,10)):''}`;meta.style.display='';}
+  else meta.style.display='none';
+  tsRenderPicker();
+  document.getElementById('ts-bg').classList.add('show');
+  document.body.classList.add('no-scroll');
+  if(!it)setTimeout(()=>document.getElementById('ts-nome').focus(),60);
+}
+function closeTshirtModal(){
+  document.getElementById('ts-bg').classList.remove('show');
+  document.body.classList.remove('no-scroll');
+  _tsEdit=null;
+}
+function tsPickTipo(t){
+  if(_tsTipo===t)return;
+  _tsTipo=t;
+  // O tamanho é da tipologia anterior: só se mantém se também existir nesta
+  if(!tsTamsDe(t).some(x=>x.tamanho===_tsTam))_tsTam='';
+  tsRenderPicker();
+}
+function tsPickTam(tam){_tsTam=tam;tsRenderPicker();}
+function tsRenderPicker(){
+  const tipos=document.getElementById('ts-tipos');
+  const tams=document.getElementById('ts-tams');
+  if(!tipos||!tams)return;
+  const ativos=tsTiposAtivos();
+  // Uma tipologia sem tamanhos na grelha só aparece se for a do pedido a editar
+  const lista=TS_TIPOS.filter(t=>ativos.includes(t)||t===_tsTipo);
+  tipos.innerHTML=lista.map(t=>`<button type="button" class="ts-chip${_tsTipo===t?' on':''}" onclick="tsPickTipo('${t}')">${tsIcon(t)} ${t}</button>`).join('');
+  const opts=tsTamsDe(_tsTipo).slice();
+  // Tamanho de um pedido antigo que já saiu da grelha: mostra-se à mesma para
+  // não se perder o que a pessoa pediu (marcado como fora da grelha)
+  if(_tsTam&&!opts.some(o=>o.tamanho===_tsTam))opts.push({tamanho:_tsTam,preco:0,_fora:true});
+  tams.innerHTML=opts.length
+    ?opts.map(o=>`<button type="button" class="ts-chip${_tsTam===o.tamanho?' on':''}${o._fora?' fora':''}" onclick="tsPickTam(${JSON.stringify(o.tamanho).replace(/"/g,'&quot;')})">${escHtml(o.tamanho)}${(+o.preco||0)>0?`<i>${eur(o.preco)}</i>`:''}</button>`).join('')
+    :'<div class="note" style="margin:0">Sem tamanhos definidos para esta tipologia.</div>';
+}
+async function tshirtSave(more){
+  if(bloqueadoPorFecho())return;
+  if(!DATA||!DATA._sbId){toast('Ano ainda não sincronizado','bad');return;}
+  const nome=(document.getElementById('ts-nome').value||'').trim();
+  if(!nome){toast('Indica o nome de quem veste a t-shirt','bad');return;}
+  if(!_tsTam){toast('Escolhe o tamanho','bad');return;}
+  const membro=document.getElementById('ts-membro').value;
+  if(!membro){toast('Indica quem encomenda','bad');return;}
+  const tipo=_tsTipo,tamanho=_tsTam;
+  setSync('load','a guardar…');
+  try{
+    if(_tsEdit!=null){
+      await queueWrite(()=>sbReq('PATCH',`tshirts?id=eq.${_tsEdit}`,{membro,nome,tipo,tamanho}));
+      const it=tsArr().find(x=>x._id===_tsEdit);
+      if(it)Object.assign(it,{membro,nome,tipo,tamanho});
+    }else{
+      const email=_sbSession?_sbSession.user.email:null;
+      const ins=await queueWrite(()=>sbReq('POST','tshirts',
+        [{evento_id:DATA._sbId,membro,nome,tipo,tamanho,criado_por:email}],{Prefer:'return=representation'}));
+      if(ins&&ins[0])tsArr().push({_id:ins[0].id,membro,nome,tipo,tamanho,criadoPor:email||'',criadoEm:ins[0].criado_em});
+    }
+    syncMirror();marcaGuardado();renderTshirts();
+    if(more&&_tsEdit==null){
+      // Encomendar várias de seguida: fica tudo escolhido menos o nome
+      toast(`${nome} ✓ — adiciona a próxima`,'ok');
+      const inp=document.getElementById('ts-nome');inp.value='';inp.focus();
+    }else{
+      closeTshirtModal();
+      toast('T-shirt guardada ✓','ok');
+    }
+  }catch(e){setSync('err','erro ao guardar');toast(permErrorMsg(e),'bad');}
+}
+async function tshirtDelete(){
+  if(_tsEdit==null)return;
+  if(bloqueadoPorFecho())return;
+  const it=tsArr().find(x=>x._id===_tsEdit);if(!it)return;
+  if(!confirm(`Eliminar a t-shirt de ${it.nome} (${it.tipo} ${it.tamanho})?`))return;
+  const id=_tsEdit;
+  setSync('load','a guardar…');
+  try{
+    await queueWrite(()=>sbReq('DELETE',`tshirts?id=eq.${id}`));
+    DATA.tshirts=tsArr().filter(x=>x._id!==id);
+    syncMirror();marcaGuardado();closeTshirtModal();renderTshirts();
+    toast('T-shirt eliminada ✓','ok');
+  }catch(e){setSync('err','erro ao guardar');toast(permErrorMsg(e),'bad');}
+}
+
+/* ── Definições › T-shirts (só admin): grelha de tamanhos + preços ── */
+function renderAdmTshirts(){
+  const el=document.getElementById('adm-ts-list');if(!el)return;
+  const form=document.getElementById('adm-ts-form');
+  if(!TSHIRTS_TABLE){
+    el.innerHTML='<div class="note">T-shirts indisponíveis — falta correr a migração <b>db/tshirts.sql</b> no Supabase.</div>';
+    if(form)form.style.display='none';
+    return;
+  }
+  if(form)form.style.display='';
+  const usados={};   // tipo|tamanho → quantos pedidos já o usam (em todos os anos)
+  ALL_YEARS.forEach(y=>(y.tshirts||[]).forEach(t=>{const k=t.tipo+'|'+t.tamanho;usados[k]=(usados[k]||0)+1;}));
+  el.innerHTML=TS_TIPOS.map(tipo=>{
+    const list=tsTamsDe(tipo);
+    return `<div class="adm-ts-grp">
+      <div class="adm-ts-grp-hdr">${tsIcon(tipo)} ${tipo}</div>
+      ${list.length?list.map(t=>`<div class="adm-ts-row">
+        <span class="adm-ts-tam">${escHtml(t.tamanho)}</span>
+        ${usados[tipo+'|'+t.tamanho]?`<span class="cmp-count">${usados[tipo+'|'+t.tamanho]}</span>`:''}
+        <input type="number" class="adm-ts-preco" step="0.5" min="0" placeholder="0" value="${(+t.preco||0)>0?(+t.preco):''}" inputmode="decimal" onchange="admTsPreco(${t.id},this.value)" title="Preço (€) — deixa vazio para não usar preços">
+        <button class="cmp-x" onclick="admTsDel(${t.id})" title="Eliminar tamanho">✕</button>
+      </div>`).join(''):'<div class="note" style="margin:4px 0 0">Sem tamanhos.</div>'}
+    </div>`;
+  }).join('');
+}
+async function admTsAdd(){
+  if(!isAdmin()||!TSHIRTS_TABLE)return;
+  const tipo=document.getElementById('adm-ts-tipo').value;
+  const tam=(document.getElementById('adm-ts-tam').value||'').trim();
+  const preco=parseFloat(String(document.getElementById('adm-ts-preco').value||'').replace(',','.'))||0;
+  if(!tam){toast('Indica o tamanho','bad');return;}
+  if(TS_TAMS.some(t=>t.tipo===tipo&&t.tamanho.toLowerCase()===tam.toLowerCase())){toast('Esse tamanho já existe nessa tipologia','bad');return;}
+  const ordem=tsTamsDe(tipo).reduce((a,t)=>Math.max(a,t.ordem||0),0)+1;
+  setSync('load','a guardar…');
+  try{
+    const ins=await queueWrite(()=>sbReq('POST','tshirt_tamanhos',[{tipo,tamanho:tam,ordem,preco}],{Prefer:'return=representation'}));
+    if(ins&&ins[0])TS_TAMS.push({id:ins[0].id,tipo,tamanho:tam,ordem,preco});
+    TS_TAMS.sort(tsTamCmp);
+    document.getElementById('adm-ts-tam').value='';
+    document.getElementById('adm-ts-preco').value='';
+    marcaGuardado();renderAdmTshirts();
+    if(TAB==='tshirts')renderTshirts();
+    toast('Tamanho adicionado ✓','ok');
+  }catch(e){setSync('err','erro ao guardar');toast(permErrorMsg(e),'bad');}
+}
+async function admTsPreco(id,val){
+  if(!isAdmin())return;
+  const t=TS_TAMS.find(x=>x.id===id);if(!t)return;
+  const preco=Math.max(0,parseFloat(String(val||'').replace(',','.'))||0);
+  if(preco===(+t.preco||0))return;
+  setSync('load','a guardar…');
+  try{
+    await queueWrite(()=>sbReq('PATCH',`tshirt_tamanhos?id=eq.${id}`,{preco}));
+    t.preco=preco;
+    marcaGuardado();
+    if(TAB==='tshirts')renderTshirts();
+  }catch(e){setSync('err','erro ao guardar');toast(permErrorMsg(e),'bad');renderAdmTshirts();}
+}
+async function admTsDel(id){
+  if(!isAdmin())return;
+  const t=TS_TAMS.find(x=>x.id===id);if(!t)return;
+  let n=0;ALL_YEARS.forEach(y=>(y.tshirts||[]).forEach(x=>{if(x.tipo===t.tipo&&x.tamanho===t.tamanho)n++;}));
+  if(!confirm(`Eliminar o tamanho ${t.tipo} ${t.tamanho}?`+(n?`\n\n${n} t-shirt(s) já encomendada(s) com este tamanho mantêm-se — só deixa de estar disponível para novos pedidos.`:'')))return;
+  setSync('load','a guardar…');
+  try{
+    await queueWrite(()=>sbReq('DELETE',`tshirt_tamanhos?id=eq.${id}`));
+    TS_TAMS=TS_TAMS.filter(x=>x.id!==id);
+    marcaGuardado();renderAdmTshirts();
+    if(TAB==='tshirts')renderTshirts();
+    toast('Tamanho eliminado ✓','ok');
+  }catch(e){setSync('err','erro ao guardar');toast(permErrorMsg(e),'bad');}
+}
+
 /* ═══ RELATÓRIOS / PDF ═══ */
 function openReports(){
   let html=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
@@ -9796,6 +10151,11 @@ function openReports(){
       📄 Relatório Geral
     </button>
     <p style="font-size:11px;color:var(--faint);margin-top:-4px">Receitas, despesas, todos os cash-flows e o resumo de gastos por membro.</p>
+${TSHIRTS_TABLE?`
+    <button class="btn prim" onclick="generatePDF('tshirts')" style="display:flex;align-items:center;justify-content:center;gap:8px">
+      👕 Encomenda de T-shirts
+    </button>
+    <p style="font-size:11px;color:var(--faint);margin-top:-4px">As t-shirts pedidas por cada pessoa e o total por tipologia e tamanho.</p>`:''}
 
     <div style="margin-top:6px">
       <label style="font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--faint);font-weight:700;margin-bottom:6px;display:block">Relatório por Pessoa</label>
@@ -9874,6 +10234,8 @@ function generatePDF(type){
 
   if(type==='geral'){
     body=buildGeneralReport();
+  } else if(type==='tshirts'){
+    body=buildTshirtsReport();
   } else {
     body=buildPersonReport(pessoa);
   }
@@ -9900,6 +10262,57 @@ function generatePDF(type){
   frame.srcdoc=docHtml;
   ov.querySelector('#pdfClose').onclick=()=>ov.remove();
   ov.querySelector('#pdfPrint').onclick=()=>{frame.contentWindow.focus();frame.contentWindow.print();};
+}
+
+/* Relatório da encomenda de t-shirts: o que cada pessoa pediu + o total por
+   tipologia/tamanho (é isto que vai para quem trata da encomenda). Só fala em
+   dinheiro se o admin já tiver posto preços na grelha. */
+function buildTshirtsReport(){
+  const ano=DATA.evento.ano||'';
+  const nome=(DATA.evento.nome||'MEO').replace(/\s*\d{4}\s*/g,'').trim()||'MEO';
+  const items=tsArr().slice();
+  const comPrecos=tsTemPrecos();
+  let h=`<h1>${nome} ${ano} — T-shirts</h1>`;
+  h+=`<div class="subtitle">Encomenda de t-shirts · ${items.length} no total${tsEurSufixo(items)}</div>`;
+  if(!items.length){
+    h+='<p>Ainda ninguém encomendou t-shirts este ano.</p>';
+    h+=`<div class="footer">Relatório gerado em ${new Date().toLocaleString('pt-PT')} · ${nome} ${ano}</div>`;
+    return h;
+  }
+  const agg=tsTipoAgg(items);
+  h+='<div class="hero-row">'+agg.map((g,i)=>
+    `<div class="hero-box ${['green','blue','red'][i%3]}"><div class="hb-label">${g.tipo}</div><div class="hb-val">${g.total}</div></div>`).join('')+'</div>';
+
+  // Total por tipologia + tamanho — o quadro que se entrega a quem encomenda
+  h+='<h2>Total por tipologia</h2>';
+  h+=`<table><tr><th>Tipologia</th><th>Tamanho</th><th class="right">Qtd</th>${comPrecos?'<th class="right">Preço</th><th class="right">Subtotal</th>':''}</tr>`;
+  agg.forEach(g=>{
+    g.linhas.forEach((l,i)=>{
+      h+=`<tr><td>${i===0?`<b>${escHtml(g.tipo)}</b>`:''}</td><td>${escHtml(l.tamanho)}</td><td class="right">${l.qtd}</td>`;
+      if(comPrecos)h+=`<td class="right">${l.preco>0?eur(l.preco):'—'}</td><td class="right">${l.preco>0?eur(rnd(l.preco*l.qtd,2)):'—'}</td>`;
+      h+='</tr>';
+    });
+    h+=`<tr style="background:#f4f5f7"><td colspan="2"><b>Subtotal ${escHtml(g.tipo)}</b></td><td class="right"><b>${g.total}</b></td>${comPrecos?`<td></td><td class="right"><b>${g.valor>0?eur(g.valor):'—'}</b></td>`:''}</tr>`;
+  });
+  h+=`<tr style="border-top:2px solid #ddd"><td colspan="2"><b>Total</b></td><td class="right"><b>${items.length}</b></td>${comPrecos?`<td></td><td class="right"><b>${tsTotalEur(items)>0?eur(tsTotalEur(items)):'—'}</b></td>`:''}</tr>`;
+  h+='</table>';
+
+  // Por pessoa — quem pediu o quê
+  h+='<h2>Pedidos por pessoa</h2>';
+  const porMembro={};
+  items.forEach(it=>{(porMembro[it.membro]=porMembro[it.membro]||[]).push(it);});
+  Object.keys(porMembro).sort((a,b)=>a.localeCompare(b,'pt')).forEach(m=>{
+    const list=porMembro[m].slice().sort(tsPedidoCmp);
+    h+=`<h3>${escHtml(m)} — ${list.length} t-shirt${list.length===1?'':'s'}${tsEurSufixo(list)}</h3>`;
+    h+=`<table><tr><th>Nome</th><th>Tipologia</th><th>Tamanho</th>${comPrecos?'<th class="right">Preço</th>':''}</tr>`;
+    list.forEach(it=>{
+      const p=tsPreco(it.tipo,it.tamanho);
+      h+=`<tr><td>${escHtml(it.nome)}</td><td>${escHtml(it.tipo)}</td><td><b>${escHtml(it.tamanho)}</b></td>${comPrecos?`<td class="right">${p>0?eur(p):'—'}</td>`:''}</tr>`;
+    });
+    h+='</table>';
+  });
+  h+=`<div class="footer">Relatório gerado em ${new Date().toLocaleString('pt-PT')} · ${nome} ${ano}</div>`;
+  return h;
 }
 
 function buildGeneralReport(){
@@ -10692,3 +11105,4 @@ document.getElementById('refdef-bg').addEventListener('click',e=>{if(e.target.id
 document.getElementById('cartaz-bg').addEventListener('click',e=>{if(e.target.id==='cartaz-bg')closeCartaz();});
 document.getElementById('shop-item-bg').addEventListener('click',e=>{if(e.target.id==='shop-item-bg')closeShopItemModal();});
 document.getElementById('shop-buy-bg').addEventListener('click',e=>{if(e.target.id==='shop-buy-bg')closeShopBuyModal();});
+document.getElementById('ts-bg').addEventListener('click',e=>{if(e.target.id==='ts-bg')closeTshirtModal();});
