@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v182 · 2026-08-03 · Pagar dívida: cada um regista o seu pagamento e o admin valida antes de entrar nas contas';
+const APP_BUILD = 'v183 · 2026-08-03 · Esqueci-me da password: link por email para definir uma nova, e definir/alterar password em Definições › Conta';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -3465,6 +3465,8 @@ function openAdmin(){
   if(ver)ver.textContent='Versão '+APP_BUILD.split('·')[0].trim();
   const adm=document.getElementById('adm-pedidos-wrap');
   if(adm)adm.style.display=isAdmin()?'':'none';
+  const pbox=document.getElementById('adm-pass-box');
+  if(pbox){pbox.style.display='none';document.getElementById('adm-pass-1').value='';document.getElementById('adm-pass-2').value='';document.getElementById('adm-pass-status').textContent='';}
   if(isAdmin()){sbRenderPedidos();sbRenderLigacoes();loadNotif();loadNotifPres();admCatCancel();renderAdmCats();renderAdmTshirts();renderAdmTsLock();}
   loadMyNotif();
   loadParams();
@@ -11711,7 +11713,65 @@ function saldosMembrosHtml(){
 
 
 /* ═══ AUTH (Supabase — mesmo padrão do SplitBill) ═══ */
+// URL para onde o Supabase devolve o utilizador (login Google e link de
+// recuperação de password). Sem o hash — é lá que os tokens vêm de volta.
+function sbRedirectUrl(){return window.location.href.split('#')[0];}
+function sbLimparHash(){window.history.replaceState({},document.title,window.location.pathname+window.location.search);}
+function sbAuthStatus(id,txt,cor){
+  const s=document.getElementById(id);if(!s)return;
+  s.style.display='block';s.textContent=txt;s.style.color=cor||'var(--muted)';
+}
+
+// Trata o que vem no hash do redirect do Supabase (tokens do login Google e do
+// link de recuperação, ou o erro de um link expirado). Corre ANTES da sessão
+// guardada: quem clica no link de recuperação já costuma ter sessão neste
+// dispositivo e o token de recuperação era ignorado.
+// Devolve true se o hash foi tratado e já não há mais nada a fazer no arranque.
+async function sbTratarHashAuth(){
+  const hash=window.location.hash||'';
+  if(hash.length<2)return false;
+  const p=new URLSearchParams(hash.substring(1));
+  const recovery=p.get('type')==='recovery';
+  if(p.get('error')||p.get('error_code')){
+    const cod=(p.get('error_code')||'')+' '+(p.get('error_description')||'');
+    sbLimparHash();sbMostrarLogin();
+    sbAuthStatus('login-status',/expired|invalid/i.test(cod)
+      ?'O link já expirou ou já foi usado. Pede outro em "Esqueci-me da password".'
+      :(p.get('error_description')||'Não foi possível concluir a autenticação.'),'var(--red)');
+    return true;
+  }
+  const access_token=p.get('access_token');
+  if(!access_token)return false;
+  const refresh_token=p.get('refresh_token');
+  const expires_at=parseInt(p.get('expires_at'))||Math.floor(Date.now()/1000)+(parseInt(p.get('expires_in'))||3600);
+  const r=await fetch(`${SB_URL}/auth/v1/user`,{headers:{'apikey':SB_KEY,'Authorization':`Bearer ${access_token}`}});
+  if(!r.ok){
+    sbLimparHash();sbMostrarLogin();
+    sbAuthStatus('login-status','O link já expirou ou já foi usado. Pede outro em "Esqueci-me da password".','var(--red)');
+    return true;
+  }
+  const u=await r.json();
+  sbSaveSession({access_token,refresh_token,expires_at,user:u});
+  sbLimparHash();
+  // O token de recuperação dá sessão, mas a password continua a ser a antiga —
+  // sem a trocar aqui, ele voltava a ficar de fora no próximo arranque.
+  if(recovery){sbMostrarNovaPass();return true;}
+  await sbAposLogin();
+  return true;
+}
+
 async function sbInit(){
+  // Falhar aqui (rede em baixo a meio do redirect) não pode deixar o arranque
+  // pendurado no splash — cai-se no ecrã de login com o aviso.
+  try{
+    if(await sbTratarHashAuth())return;
+  }catch(e){
+    if(window.location.hash.length>1){
+      sbLimparHash();sbMostrarLogin();
+      sbAuthStatus('login-status','Não foi possível validar o link — sem ligação. Tenta outra vez.','var(--red)');
+      return;
+    }
+  }
   const stored=localStorage.getItem(SESSION_KEY);
   if(stored){
     try{
@@ -11730,33 +11790,19 @@ async function sbInit(){
     _sbSession=null;
     localStorage.removeItem(SESSION_KEY);
   }
-  const hash=window.location.hash;
-  if(hash.includes('access_token')){
-    const params=new URLSearchParams(hash.substring(1));
-    const access_token=params.get('access_token');
-    const refresh_token=params.get('refresh_token');
-    const expires_at=parseInt(params.get('expires_at'))||Math.floor(Date.now()/1000)+(parseInt(params.get('expires_in'))||3600);
-    if(access_token){
-      const r=await fetch(`${SB_URL}/auth/v1/user`,{headers:{'apikey':SB_KEY,'Authorization':`Bearer ${access_token}`}});
-      if(r.ok){
-        const u=await r.json();
-        sbSaveSession({access_token,refresh_token,expires_at,user:u});
-        window.history.replaceState({},document.title,window.location.pathname);
-        await sbAposLogin();return;
-      }
-    }
-  }
   sbMostrarLogin();
 }
 
 function sbMostrarLogin(){
   document.getElementById('page-login').style.display='flex';
   document.getElementById('page-sem-acesso').style.display='none';
+  document.getElementById('page-nova-pass').style.display='none';
   if(window.fbvEsconderSplash)window.fbvEsconderSplash();
 }
 
 async function sbAposLogin(){
   document.getElementById('page-login').style.display='none';
+  document.getElementById('page-nova-pass').style.display='none';
   const email=_sbSession.user.email;
   let data=null;
   try{
@@ -11776,7 +11822,109 @@ async function sbAposLogin(){
 }
 
 async function sbLoginGoogle(){
-  window.location.href=`${SB_URL}/auth/v1/authorize?provider=google&redirect_to=${encodeURIComponent(window.location.href.split('#')[0])}`;
+  window.location.href=`${SB_URL}/auth/v1/authorize?provider=google&redirect_to=${encodeURIComponent(sbRedirectUrl())}`;
+}
+
+/* ── Esqueci-me da password ──
+   O email leva o utilizador de volta à app com #type=recovery (ver
+   sbTratarHashAuth). Instalada como PWA, no iOS o link abre no browser e não na
+   app: a password nova fica na mesma trocada no servidor, mas a sessão fica do
+   lado do browser — por isso o ecrã da password nova diz-lhe para voltar à app
+   e entrar com a password nova. */
+async function sbRecuperarPassword(){
+  const email=document.getElementById('login-email').value.trim();
+  if(!email||!email.includes('@')){
+    sbAuthStatus('login-status','Escreve primeiro o teu email aqui em cima e volta a tocar.','var(--red)');
+    document.getElementById('login-email').focus();return;
+  }
+  sbAuthStatus('login-status','A enviar email…');
+  try{
+    const r=await fetch(`${SB_URL}/auth/v1/recover?redirect_to=${encodeURIComponent(sbRedirectUrl())}`,{
+      method:'POST',headers:{'apikey':SB_KEY,'Content-Type':'application/json'},body:JSON.stringify({email})
+    });
+    if(r.status===429){sbAuthStatus('login-status','Já foi pedido um email há pouco. Espera uns minutos e tenta outra vez.','var(--red)');return;}
+    if(!r.ok){
+      let d={};try{d=await r.json();}catch(_){}
+      sbAuthStatus('login-status',d.error_description||d.msg||d.message||'Não foi possível enviar o email.','var(--red)');return;
+    }
+    // Resposta igual haja ou não conta com este email (é o Supabase que decide
+    // se envia) — não se confirma a estranhos quem está registado.
+    sbAuthStatus('login-status','Se houver conta com esse email, chega já um link para definires uma password nova. Vê também o spam.','var(--green)');
+  }catch(e){sbAuthStatus('login-status','Erro de ligação.','var(--red)');}
+}
+
+function sbMostrarNovaPass(){
+  document.getElementById('page-login').style.display='none';
+  document.getElementById('page-sem-acesso').style.display='none';
+  document.getElementById('page-nova-pass').style.display='flex';
+  const sub=document.getElementById('nova-pass-sub');
+  if(sub&&_sbSession&&_sbSession.user)sub.textContent=`Escolhe uma password nova para ${_sbSession.user.email}.`;
+  if(window.fbvEsconderSplash)window.fbvEsconderSplash();
+}
+
+// Password nova com a sessão que veio do link (recuperação) — sem pedir a antiga
+function sbValidarPass(p1,p2){
+  if(p1.length<6)return 'A password tem de ter pelo menos 6 caracteres.';
+  if(p1!==p2)return 'As duas passwords não são iguais.';
+  return '';
+}
+async function sbTrocarPassword(password){
+  let r;
+  try{
+    r=await sbFetch(`${SB_URL}/auth/v1/user`,{
+      method:'PUT',
+      headers:{'apikey':SB_KEY,'Content-Type':'application/json'},
+      body:JSON.stringify({password})
+    });
+  }catch(e){return 'Erro de ligação — tenta outra vez.';}
+  if(r.ok)return '';
+  let d={};try{d=await r.json();}catch(_){}
+  const msg=d.error_description||d.msg||d.message||('HTTP '+r.status);
+  if(/should be different/i.test(msg))return 'Essa já é a password atual — escolhe outra.';
+  if(r.status===401||r.status===403)return 'A sessão do link já expirou. Pede outro email de recuperação.';
+  return msg;
+}
+
+async function sbDefinirNovaPassword(){
+  const p1=document.getElementById('nova-pass-1').value;
+  const p2=document.getElementById('nova-pass-2').value;
+  const erro=sbValidarPass(p1,p2);
+  if(erro){sbAuthStatus('nova-pass-status',erro,'var(--red)');return;}
+  const btn=document.getElementById('btn-nova-pass');
+  btn.disabled=true;btn.textContent='A guardar…';
+  const falha=await sbTrocarPassword(p1);
+  if(falha){
+    sbAuthStatus('nova-pass-status',falha,'var(--red)');
+    btn.disabled=false;btn.textContent='Guardar password';return;
+  }
+  document.getElementById('nova-pass-1').value='';
+  document.getElementById('nova-pass-2').value='';
+  document.getElementById('nova-pass-campos').style.display='none';
+  document.getElementById('btn-nova-pass-entrar').style.display='';
+  sbAuthStatus('nova-pass-status','Password alterada ✓ Se abriste este link fora da app, volta a abrir a app instalada e entra com o email e a password nova.','var(--green)');
+}
+
+// Definir/alterar password já com sessão iniciada (Definições › Conta)
+function toggleAdmPass(){
+  const box=document.getElementById('adm-pass-box');
+  if(!box)return;
+  box.style.display=box.style.display==='none'?'':'none';
+  const st=document.getElementById('adm-pass-status');
+  if(st)st.textContent='';
+}
+async function sbAlterarPassword(){
+  const st=document.getElementById('adm-pass-status');
+  const p1=document.getElementById('adm-pass-1').value;
+  const p2=document.getElementById('adm-pass-2').value;
+  const erro=sbValidarPass(p1,p2);
+  if(erro){st.style.color='var(--red)';st.textContent=erro;return;}
+  st.style.color='var(--muted)';st.textContent='A guardar…';
+  const falha=await sbTrocarPassword(p1);
+  if(falha){st.style.color='var(--red)';st.textContent=falha;return;}
+  document.getElementById('adm-pass-1').value='';
+  document.getElementById('adm-pass-2').value='';
+  st.style.color='var(--green)';st.textContent='Password alterada ✓';
+  toast('Password alterada ✓','ok');
 }
 
 async function sbLoginEmail(){
