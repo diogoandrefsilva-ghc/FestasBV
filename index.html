@@ -50,6 +50,12 @@ setTimeout(function(){ if (window.fbvEsconderSplash) window.fbvEsconderSplash();
     <button class="auth-btn ghost" onclick="sbRegistarEmail()">Criar conta</button>
     <button class="auth-btn link" onclick="sbRecuperarPassword()">Esqueci-me da password</button>
     <div class="auth-status" id="login-status"></div>
+    <!-- Saída quando o link do email não presta (gasto pelos scanners do email) -->
+    <div id="login-codigo" style="display:none;margin-top:14px;padding-top:14px;border-top:1px solid var(--line)">
+      <label style="margin-top:0">Código do email</label>
+      <input type="text" id="login-cod" inputmode="numeric" autocomplete="one-time-code" maxlength="8" placeholder="000000">
+      <button class="auth-btn prim" id="btn-login-cod" onclick="sbVerificarCodigo()">Confirmar código</button>
+    </div>
   </div>
 </div>
 

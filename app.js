@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v184 · 2026-08-03 · Despensa: o modal do lote diz que refeições pediram o artigo e reparte o custo por elas em partes iguais, num toque';
+const APP_BUILD = 'v185 · 2026-08-03 · Recuperar password: link à prova dos scanners do email (token_hash) e código de 6 dígitos como alternativa';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -11803,41 +11803,72 @@ function saldosMembrosHtml(){
 /* ═══ AUTH (Supabase — mesmo padrão do SplitBill) ═══ */
 // URL para onde o Supabase devolve o utilizador (login Google e link de
 // recuperação de password). Sem o hash — é lá que os tokens vêm de volta.
-function sbRedirectUrl(){return window.location.href.split('#')[0];}
-function sbLimparHash(){window.history.replaceState({},document.title,window.location.pathname+window.location.search);}
+function sbRedirectUrl(){return window.location.href.split('#')[0].split('?')[0];}
+// Limpa da barra de endereço o que veio do email/redirect (hash E query) — o
+// token não fica no histórico nem é reaproveitado num reload.
+function sbLimparHash(){window.history.replaceState({},document.title,window.location.pathname);}
 function sbAuthStatus(id,txt,cor){
   const s=document.getElementById(id);if(!s)return;
   s.style.display='block';s.textContent=txt;s.style.color=cor||'var(--muted)';
 }
+// Link gasto/expirado: mostra a razão (para se perceber o que se passou) e abre
+// já a caixa do código, que é a saída quando o link não presta.
+function sbLinkFalhou(motivo){
+  sbLimparHash();sbMostrarLogin();
+  sbAuthStatus('login-status','O link já expirou ou já tinha sido aberto'+(motivo?' ('+motivo+')':'')+'. Escreve antes o código de 6 dígitos que vem no mesmo email.','var(--red)');
+  sbMostrarCaixaCodigo();
+}
 
-// Trata o que vem no hash do redirect do Supabase (tokens do login Google e do
-// link de recuperação, ou o erro de um link expirado). Corre ANTES da sessão
+// Trata o que o email/redirect do Supabase devolve. Corre ANTES da sessão
 // guardada: quem clica no link de recuperação já costuma ter sessão neste
 // dispositivo e o token de recuperação era ignorado.
-// Devolve true se o hash foi tratado e já não há mais nada a fazer no arranque.
+// Três formas, porque vêm de sítios diferentes:
+//  · ?token_hash=…&type=recovery — link do email de recuperação. Aponta para a
+//    app e só é gasto no POST /verify daqui, logo os scanners de links do email
+//    (Gmail & c.ª) não o queimam antes de o dono lá chegar. É a forma boa.
+//  · #access_token=… — redirect do login Google (e dos links antigos, à
+//    moda do /auth/v1/verify do GoTrue).
+//  · #error=… / ?error=… — link já gasto ou expirado.
+// Devolve true se tratou o link e já não há mais nada a fazer no arranque.
 async function sbTratarHashAuth(){
-  const hash=window.location.hash||'';
-  if(hash.length<2)return false;
-  const p=new URLSearchParams(hash.substring(1));
-  const recovery=p.get('type')==='recovery';
-  if(p.get('error')||p.get('error_code')){
-    const cod=(p.get('error_code')||'')+' '+(p.get('error_description')||'');
+  const hs=new URLSearchParams((window.location.hash||'').substring(1));
+  const qs=new URLSearchParams(window.location.search||'');
+  const g=k=>hs.get(k)||qs.get(k);
+  const recovery=g('type')==='recovery';
+
+  if(g('error')||g('error_code')){
+    const cod=(g('error_code')||'')+' '+(g('error_description')||'');
+    if(/expired|invalid|used/i.test(cod)){sbLinkFalhou(g('error_code')||'');return true;}
     sbLimparHash();sbMostrarLogin();
-    sbAuthStatus('login-status',/expired|invalid/i.test(cod)
-      ?'O link já expirou ou já foi usado. Pede outro em "Esqueci-me da password".'
-      :(p.get('error_description')||'Não foi possível concluir a autenticação.'),'var(--red)');
+    sbAuthStatus('login-status',g('error_description')||'Não foi possível concluir a autenticação.','var(--red)');
     return true;
   }
-  const access_token=p.get('access_token');
+
+  // Link novo: o token só é consumido aqui, por POST
+  const token_hash=g('token_hash');
+  if(token_hash){
+    const r=await fetch(`${SB_URL}/auth/v1/verify`,{
+      method:'POST',headers:{'apikey':SB_KEY,'Content-Type':'application/json'},
+      body:JSON.stringify({type:g('type')||'recovery',token_hash})
+    });
+    if(!r.ok){
+      let d={};try{d=await r.json();}catch(_){}
+      sbLinkFalhou(d.error_code||d.msg||('HTTP '+r.status));return true;
+    }
+    const d=await r.json();
+    sbGuardarSessaoDeVerify(d);
+    sbLimparHash();
+    if(recovery){sbMostrarNovaPass();return true;}
+    await sbAposLogin();
+    return true;
+  }
+
+  const access_token=g('access_token');
   if(!access_token)return false;
-  const refresh_token=p.get('refresh_token');
-  const expires_at=parseInt(p.get('expires_at'))||Math.floor(Date.now()/1000)+(parseInt(p.get('expires_in'))||3600);
+  const refresh_token=g('refresh_token');
+  const expires_at=parseInt(g('expires_at'))||Math.floor(Date.now()/1000)+(parseInt(g('expires_in'))||3600);
   const r=await fetch(`${SB_URL}/auth/v1/user`,{headers:{'apikey':SB_KEY,'Authorization':`Bearer ${access_token}`}});
-  if(!r.ok){
-    sbLimparHash();sbMostrarLogin();
-    sbAuthStatus('login-status','O link já expirou ou já foi usado. Pede outro em "Esqueci-me da password".','var(--red)');
-    return true;
-  }
+  if(!r.ok){sbLinkFalhou('HTTP '+r.status);return true;}
   const u=await r.json();
   sbSaveSession({access_token,refresh_token,expires_at,user:u});
   sbLimparHash();
@@ -11848,13 +11879,22 @@ async function sbTratarHashAuth(){
   return true;
 }
 
+function sbGuardarSessaoDeVerify(d){
+  sbSaveSession({
+    access_token:d.access_token,
+    refresh_token:d.refresh_token,
+    expires_at:d.expires_at||Math.floor(Date.now()/1000)+(d.expires_in||3600),
+    user:d.user
+  });
+}
+
 async function sbInit(){
   // Falhar aqui (rede em baixo a meio do redirect) não pode deixar o arranque
   // pendurado no splash — cai-se no ecrã de login com o aviso.
   try{
     if(await sbTratarHashAuth())return;
   }catch(e){
-    if(window.location.hash.length>1){
+    if(window.location.hash.length>1||window.location.search.length>1){
       sbLimparHash();sbMostrarLogin();
       sbAuthStatus('login-status','Não foi possível validar o link — sem ligação. Tenta outra vez.','var(--red)');
       return;
@@ -11937,8 +11977,49 @@ async function sbRecuperarPassword(){
     }
     // Resposta igual haja ou não conta com este email (é o Supabase que decide
     // se envia) — não se confirma a estranhos quem está registado.
-    sbAuthStatus('login-status','Se houver conta com esse email, chega já um link para definires uma password nova. Vê também o spam.','var(--green)');
+    sbAuthStatus('login-status','Se houver conta com esse email, chega já o link e o código para definires uma password nova. Vê também o spam.','var(--green)');
+    sbMostrarCaixaCodigo();
   }catch(e){sbAuthStatus('login-status','Erro de ligação.','var(--red)');}
+}
+
+/* ── Código de 6 dígitos (o mesmo email traz link e código) ──
+   O link é de uso único e os scanners de segurança do email abrem-no antes do
+   dono — daí o "link já expirou" logo à primeira. O código não se gasta a ser
+   lido, por isso é a saída garantida. */
+function sbMostrarCaixaCodigo(){
+  const box=document.getElementById('login-codigo');
+  if(box)box.style.display='';
+}
+async function sbVerificarCodigo(){
+  const email=document.getElementById('login-email').value.trim();
+  const token=document.getElementById('login-cod').value.replace(/\s/g,'');
+  if(!email||!email.includes('@')){
+    sbAuthStatus('login-status','Escreve também o teu email aqui em cima — o código é confirmado com ele.','var(--red)');
+    document.getElementById('login-email').focus();return;
+  }
+  if(!token){sbAuthStatus('login-status','Escreve o código que veio no email.','var(--red)');return;}
+  const btn=document.getElementById('btn-login-cod');
+  btn.disabled=true;btn.textContent='A confirmar…';
+  try{
+    const r=await fetch(`${SB_URL}/auth/v1/verify`,{
+      method:'POST',headers:{'apikey':SB_KEY,'Content-Type':'application/json'},
+      body:JSON.stringify({type:'recovery',email,token})
+    });
+    if(!r.ok){
+      let d={};try{d=await r.json();}catch(_){}
+      const msg=d.error_description||d.msg||d.message||'';
+      sbAuthStatus('login-status',(!msg||/expired|invalid|token/i.test(msg))
+        ?'Código errado ou já expirado. Confirma os dígitos ou pede outro email.':msg,'var(--red)');
+      btn.disabled=false;btn.textContent='Confirmar código';return;
+    }
+    sbGuardarSessaoDeVerify(await r.json());
+    document.getElementById('login-cod').value='';
+    btn.disabled=false;btn.textContent='Confirmar código';
+    sbMostrarNovaPass();
+  }catch(e){
+    sbAuthStatus('login-status','Erro de ligação.','var(--red)');
+    btn.disabled=false;btn.textContent='Confirmar código';
+  }
 }
 
 function sbMostrarNovaPass(){
