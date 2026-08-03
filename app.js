@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v173 · 2026-08-03 · Cartão do convidado: fica só o badge da composição, sem a nota repetida';
+const APP_BUILD = 'v174 · 2026-08-03 · Convidados: adultos/crianças em combo (0-15) e Pagante? volta a Sim quando há adultos';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -8484,10 +8484,10 @@ function openGuestModal(){
   <input type="text" id="guest-nome" placeholder="Nome">
   ${CONV_AC_COLS?`<div class="inline-row">
     <div><label>Adultos</label>
-      <input type="number" id="guest-adultos" min="0" step="1" value="1" inputmode="numeric" oninput="guestACSync('guest')">
+      <select id="guest-adultos" onchange="guestACSync('guest')">${guestNumOptions(1)}</select>
     </div>
     <div><label>Crianças</label>
-      <input type="number" id="guest-criancas" min="0" step="1" value="0" inputmode="numeric" oninput="guestACSync('guest')">
+      <select id="guest-criancas" onchange="guestACSync('guest')">${guestNumOptions(0)}</select>
     </div>
   </div>
   <div class="field-hint sf" id="guest-ac-hint"></div>`:''}
@@ -8505,7 +8505,7 @@ function openGuestModal(){
   <select id="guest-crianca" onchange="guestCriancaSync('guest')"><option value="0">Não — é adulto</option><option value="1">Sim — é criança</option></select>`:''}
   <div id="guest-pagante-row">
     <label>Pagante?</label>
-    <select id="guest-pagante"><option value="Sim">Sim — paga a quota</option><option value="Não">Não — é oferta</option></select>
+    <select id="guest-pagante"><option value="Sim" selected>Sim — paga a quota</option><option value="Não">Não — é oferta</option></select>
   </div>
   <div class="mbtns"><button class="btn prim" onclick="saveGuest()">Guardar</button></div>`;
   // Reuse a dynamic modal
@@ -8517,7 +8517,8 @@ function openGuestModal(){
     bg.addEventListener('click',e=>{if(e.target===bg){bg.classList.remove('show');document.body.classList.remove('no-scroll');}});
   }
   document.getElementById('guest-modal-inner').innerHTML=html;
-  guestACSync('guest');   // texto de ajuda + "Pagante?" no estado certo
+  delete _guestSemPagar['guest'];   // modal novo: sem memória do anterior
+  guestACSync('guest');             // texto de ajuda + "Pagante?" no estado certo
   bg.classList.add('show');
   document.body.classList.add('no-scroll');
 }
@@ -8538,11 +8539,23 @@ function guestCriancaSync(pref){
    por baixo dos campos diz isso em português, e sem adultos não há nada a
    pagar, por isso o "Pagante?" desaparece. (pref = 'guest' | 'guest-edit') */
 const GUEST_AC_HINT='Só o nome de quem conheces. Os que vêm com ele contam aqui — ex.: ele + 5 amigos = 6 adultos.';
+/* Combos de 0 a 15 (ninguém aparece com mais gente que isso numa linha só).
+   O valor atual entra sempre na lista, mesmo acima do máximo: uma linha
+   antiga com mais gente não pode ser silenciosamente encolhida ao editá-la. */
+const GUEST_MAX_PESSOAS=15;
+function guestNumOptions(atual){
+  const n=Math.max(0,Math.floor(+atual||0));
+  let o='';
+  for(let i=0;i<=Math.max(GUEST_MAX_PESSOAS,n);i++)o+=`<option value="${i}"${i===n?' selected':''}>${i}</option>`;
+  return o;
+}
 function guestACNums(pref){
   const a=document.getElementById(pref+'-adultos');
   const c=document.getElementById(pref+'-criancas');
   return{ad:a?Math.floor(+a.value||0):0,cr:c?Math.floor(+c.value||0):0,temCampos:!!a&&!!c};
 }
+// Estado anterior do "não há adultos", por modal — ver guestACSync
+const _guestSemPagar={};
 function guestACSync(pref){
   const {ad,cr,temCampos}=guestACNums(pref);
   const row=document.getElementById(pref+'-pagante-row');
@@ -8550,7 +8563,14 @@ function guestACSync(pref){
   if(temCampos&&row){
     const semPagar=ad<=0;
     row.style.display=semPagar?'none':'';
-    if(semPagar){const p=row.querySelector('select');if(p)p.value='Não';}
+    const p=row.querySelector('select');
+    if(p){
+      if(semPagar)p.value='Não';
+      // Voltou a haver adultos: assume-se outra vez o normal (paga a quota).
+      // Só na TRANSIÇÃO — senão pisava o "Não" de quem está a editar uma oferta.
+      else if(_guestSemPagar[pref])p.value='Sim';
+    }
+    _guestSemPagar[pref]=semPagar;
   }
   const hint=document.getElementById(pref+'-ac-hint');
   if(!hint)return;
@@ -8673,10 +8693,10 @@ function editGuest(idx){
   <input type="text" id="guest-edit-nome" placeholder="Nome" value="${escHtml(g.nome)}">
   ${CONV_AC_COLS?`<div class="inline-row">
     <div><label>Adultos</label>
-      <input type="number" id="guest-edit-adultos" min="0" step="1" value="${gAdultos(g)}" inputmode="numeric" oninput="guestACSync('guest-edit')">
+      <select id="guest-edit-adultos" onchange="guestACSync('guest-edit')">${guestNumOptions(gAdultos(g))}</select>
     </div>
     <div><label>Crianças</label>
-      <input type="number" id="guest-edit-criancas" min="0" step="1" value="${gCriancas(g)}" inputmode="numeric" oninput="guestACSync('guest-edit')">
+      <select id="guest-edit-criancas" onchange="guestACSync('guest-edit')">${guestNumOptions(gCriancas(g))}</select>
     </div>
   </div>
   <div class="field-hint sf" id="guest-edit-ac-hint"></div>`:''}
@@ -8695,7 +8715,8 @@ function editGuest(idx){
     bg.addEventListener('click',e=>{if(e.target===bg){bg.classList.remove('show');document.body.classList.remove('no-scroll');}});
   }
   document.getElementById('guest-modal-inner').innerHTML=html;
-  guestACSync('guest-edit');   // texto de ajuda já com a composição atual
+  delete _guestSemPagar['guest-edit'];   // não pisar o "Pagante?" gravado
+  guestACSync('guest-edit');             // texto de ajuda já com a composição atual
   bg.classList.add('show');
   document.body.classList.add('no-scroll');
 }
