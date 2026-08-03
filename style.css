@@ -143,8 +143,15 @@ body::before{content:"";position:fixed;top:0;left:0;right:0;height:env(safe-area
    obriga o iOS a recompor o ecrã todo e deixa traços horizontais no scroll. */
 .sheet-bg{position:fixed;inset:0;background:rgba(60,38,15,.45);opacity:0;visibility:hidden;pointer-events:none;transition:opacity .25s,visibility .25s;z-index:50}
 .sheet-bg.show{opacity:1;visibility:visible;pointer-events:auto;-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}
-.sheet{position:fixed;left:0;right:0;bottom:0;max-width:560px;margin:0 auto;background:var(--panel);border-radius:22px 22px 0 0;border:1px solid var(--line);border-bottom:none;z-index:51;transform:translateY(100%);transition:transform .3s cubic-bezier(.3,.8,.3,1);max-height:92vh;display:flex;flex-direction:column;box-shadow:0 -10px 40px rgba(60,38,15,.3)}
-.sheet.show{transform:translateY(0)}
+/* Mesma história do fundo, agora na folha: fixed + transform + uma sombra de
+   40px de desfoque = uma camada composta do tamanho do ecrã que o iOS mantém
+   sempre viva, mesmo com a folha fechada lá em baixo. Durante o scroll a
+   camada fica para trás e a sombra reaparece a meio do ecrã como um traço
+   horizontal (era a sombra da folha, rgba(60,38,15,.3), a esbater para cima).
+   Com visibility:hidden a folha fechada não se pinta de todo — e o visibility
+   entra na transição para o fecho continuar a deslizar como antes. */
+.sheet{position:fixed;left:0;right:0;bottom:0;max-width:560px;margin:0 auto;background:var(--panel);border-radius:22px 22px 0 0;border:1px solid var(--line);border-bottom:none;z-index:51;transform:translateY(100%);visibility:hidden;transition:transform .3s cubic-bezier(.3,.8,.3,1),visibility .3s;max-height:92vh;display:flex;flex-direction:column;box-shadow:0 -10px 40px rgba(60,38,15,.3)}
+.sheet.show{transform:translateY(0);visibility:visible}
 body.no-scroll{overflow:hidden;position:fixed;width:100%;}
 .sheet-header{flex-shrink:0;padding:0 18px 14px;border-bottom:1px solid var(--line);background:var(--panel);border-radius:22px 22px 0 0;position:sticky;top:0;z-index:2}
 .sheet-header-row{display:flex;align-items:center;gap:12px;padding-top:6px}
@@ -263,8 +270,10 @@ body.read-only .fab.green,body.contas-fechadas .fab.green{display:none!important
 .card-act.del:active{background:rgba(179,64,47,.12)}
 
 /* Toast */
-.toast{position:fixed;left:50%;bottom:84px;transform:translateX(-50%) translateY(20px);background:var(--panel);border:1px solid var(--line);color:var(--ink);padding:11px 18px;border-radius:11px;font-size:13px;opacity:0;pointer-events:none;transition:.25s;z-index:80;box-shadow:var(--shadow);max-width:90%;text-align:center}
-.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+/* Idem: fixo, com transform e sombra, e sempre no DOM. Fora de vista fica
+   escondido de verdade para não deixar camada composta pendurada. */
+.toast{position:fixed;left:50%;bottom:84px;transform:translateX(-50%) translateY(20px);background:var(--panel);border:1px solid var(--line);color:var(--ink);padding:11px 18px;border-radius:11px;font-size:13px;opacity:0;visibility:hidden;pointer-events:none;transition:.25s;z-index:80;box-shadow:var(--shadow);max-width:90%;text-align:center}
+.toast.show{opacity:1;visibility:visible;transform:translateX(-50%) translateY(0)}
 .toast.ok{border-color:var(--green)}.toast.bad{border-color:var(--red)}
 
 /* Read-only mode */

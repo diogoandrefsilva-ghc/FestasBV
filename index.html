@@ -834,15 +834,19 @@ async function __ptrDoRefresh(){
 
   const css = document.createElement('style');
   css.textContent = `
-    #ptr-overlay{position:fixed;inset:0;z-index:9998;pointer-events:none;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0);transition:background .25s ease;}
-    #ptr-overlay.dim{background:rgba(0,0,0,.28);backdrop-filter:blur(1.5px);-webkit-backdrop-filter:blur(1.5px);}
+    /* Fora do refresh o overlay fica escondido (não só transparente): é fixo e
+       do tamanho do ecrã, e o spinner tinha uma animação infinita a rodar em
+       permanência — camada composta sempre viva, do género que deixa traços
+       horizontais no scroll do iOS. Agora só existe quando está a puxar. */
+    #ptr-overlay{position:fixed;inset:0;z-index:9998;pointer-events:none;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0);visibility:hidden;transition:background .25s ease,visibility .25s ease;}
+    #ptr-overlay.dim{background:rgba(0,0,0,.28);visibility:visible;backdrop-filter:blur(1.5px);-webkit-backdrop-filter:blur(1.5px);}
     #ptr-badge{position:fixed;left:50%;top:0;z-index:9999;width:42px;height:42px;margin-left:-21px;border-radius:50%;
       background:#fff;box-shadow:0 3px 14px rgba(0,0,0,.22);display:flex;align-items:center;justify-content:center;
       transform:translateY(-56px);opacity:0;pointer-events:none;}
     #ptr-badge svg{width:20px;height:20px;transition:transform .18s ease;}
     #ptr-spinner{width:46px;height:46px;border-radius:50%;border:4px solid rgba(255,255,255,.35);border-top-color:#fff;
-      animation:ptr-spin .8s linear infinite;opacity:0;transition:opacity .2s;}
-    #ptr-overlay.dim #ptr-spinner{opacity:1;}
+      opacity:0;transition:opacity .2s;}
+    #ptr-overlay.dim #ptr-spinner{opacity:1;animation:ptr-spin .8s linear infinite;}
     @keyframes ptr-spin{to{transform:rotate(360deg)}}`;
   document.head.appendChild(css);
 
