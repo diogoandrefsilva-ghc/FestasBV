@@ -324,6 +324,8 @@ setTimeout(function(){ if (window.fbvEsconderSplash) window.fbvEsconderSplash();
          está a alocar — fecha a leitura de cima: comprado · pedido · alocado -->
     <label id="lote-aloc-lbl">🍽️ Alocação</label>
     <div id="lote-alocs"></div>
+    <button class="btn ghost write-action lote-reparte" id="lote-reparte" style="display:none" onclick="loteRepartirDespensa()"></button>
+    <div class="note lote-reparte-nota" id="lote-reparte-nota" style="display:none"></div>
     <button class="btn ghost write-action" id="lote-addline" style="width:100%;margin-top:10px" onclick="loteAddAloc()">＋ Alocar a refeição</button>
     <div class="note" id="lote-resto" style="margin-top:10px"></div>
     <div class="mbtns">
