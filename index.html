@@ -48,7 +48,27 @@ setTimeout(function(){ if (window.fbvEsconderSplash) window.fbvEsconderSplash();
     <input type="password" id="login-password" autocomplete="current-password" placeholder="••••••••">
     <button class="auth-btn prim" onclick="sbLoginEmail()">Entrar</button>
     <button class="auth-btn ghost" onclick="sbRegistarEmail()">Criar conta</button>
+    <button class="auth-btn link" onclick="sbRecuperarPassword()">Esqueci-me da password</button>
     <div class="auth-status" id="login-status"></div>
+  </div>
+</div>
+
+<!-- Nova password (aberto pelo link do email de recuperação: #type=recovery) -->
+<div class="auth-page" id="page-nova-pass">
+  <h2>Nova password</h2>
+  <div class="auth-faixa"></div>
+  <div class="auth-sub" id="nova-pass-sub">Escolhe uma password nova para esta conta.</div>
+  <div class="auth-card">
+    <div id="nova-pass-campos">
+      <label style="margin-top:0">Nova password</label>
+      <input type="password" id="nova-pass-1" autocomplete="new-password" placeholder="••••••••">
+      <label>Repetir password</label>
+      <input type="password" id="nova-pass-2" autocomplete="new-password" placeholder="••••••••">
+      <button class="auth-btn prim" id="btn-nova-pass" onclick="sbDefinirNovaPassword()">Guardar password</button>
+      <button class="auth-btn ghost" onclick="sbLogout()">Cancelar</button>
+    </div>
+    <button class="auth-btn prim" id="btn-nova-pass-entrar" style="display:none" onclick="sbAposLogin()">Entrar na app</button>
+    <div class="auth-status" id="nova-pass-status"></div>
   </div>
 </div>
 
@@ -903,6 +923,18 @@ setTimeout(function(){ if (window.fbvEsconderSplash) window.fbvEsconderSplash();
         <div id="adm-pedidos-wrap" style="display:none;margin-bottom:12px">
           <div style="font-size:12px;font-weight:700;color:var(--gold);letter-spacing:.04em;margin-bottom:6px">PEDIDOS DE ACESSO</div>
           <div id="adm-pedidos-list"><div class="note">A carregar…</div></div>
+        </div>
+        <div style="margin-bottom:12px">
+          <button class="btn" style="width:100%" onclick="toggleAdmPass()">🔑 Definir / alterar password</button>
+          <div id="adm-pass-box" style="display:none;margin-top:10px">
+            <p style="font-size:12px;color:var(--muted);line-height:1.5;margin-bottom:4px">Serve também para quem entra com o Google e quer passar a poder entrar com email e password.</p>
+            <label style="margin-top:6px">Nova password</label>
+            <input type="password" id="adm-pass-1" autocomplete="new-password" placeholder="••••••••">
+            <label>Repetir password</label>
+            <input type="password" id="adm-pass-2" autocomplete="new-password" placeholder="••••••••">
+            <div class="mbtns" style="margin-top:10px"><button class="btn prim" onclick="sbAlterarPassword()">Guardar password</button></div>
+            <div id="adm-pass-status" class="note"></div>
+          </div>
         </div>
         <div class="mbtns">
           <button class="btn" onclick="sbLogout()" style="color:var(--red);border-color:var(--red)">Terminar sessão</button>
