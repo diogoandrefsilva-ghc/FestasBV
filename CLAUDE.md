@@ -15,11 +15,12 @@ App pessoal de gestão de despesas das Festas (Barrete Verde e Salinas).
   Sessão/refresh do token · Permissões · Fecho de contas + validação · Fator das quotas · Ícones de refeição · Classificar cash-flow · Histórico (auditoria) · **Cash Flow Modal** · Edit/Delete Cash Flow · Parametrizações · Notificações Telegram · Limpeza · Add New Year · Plantel · Categorias de Artigos (agrupadores + AI) · Normalizar Artigos (nomes, via AI) · Pedidos Repetidos (2.º passo do Normalizar: tamanhos/embalagens) · **Compras/Shoplist** · Separador Stock · Stock sem compra (ofertas / ano anterior) · **Foto → Lista** (foto da lista de compras → Gemini) · Importar Fatura (OCR) · **Presenças Grid** · Convidados · Refeições Def (CRUD) · **Swipe entre painéis** (refeições + convidados) · **Troca de Refeições** · Cartaz das Ementas · Hero sub-totais · **Relatórios/PDF** · Read-only mode · Resumo fundido nos Saldos (despesa por membro + movimentos + saldo) · FABs arrastáveis · **Auth (Supabase)** · Utilizadores↔Membros
 
 ## Convidados que levam acompanhantes ("levo 5 comigo")
-Uma linha de `convidados` pode valer **várias bocas**: guarda-se o nome de quem se conhece e `pessoas` diz quantas pessoas isso são, **o próprio incluído** (1 = vem só ele, 6 = ele + 5). Não se inventam linhas "Amigo do João 1/2/3".
-- **Toda a contagem passa por `gPessoas(g)` / `gSomaPessoas(lista)`** — nunca contar linhas (`convidados.length`). Se acrescentares sítios que contem convidados, usa estes helpers.
-- Contas: cada pessoa come e, se a linha for pagante, paga a quota `Q` da refeição → `m._convs[i].q = Q × pessoas`. O `Ec`/`E` das refeições é em bocas, logo entra certo nos denominadores.
-- Não-pagante ("oferta") e criança continuam a não pagar nada, por muitas pessoas que a linha tenha — só contam bocas.
-- Migração: `db/convidados_pessoas.sql`. Tolerante: sem ela, `CONV_PESSOAS_COL=false`, o campo fica escondido e cada convidado vale 1.
+Uma linha de `convidados` pode valer **várias bocas**: guarda-se o nome de quem se conhece e a linha diz de que é feita — `adultos` (o próprio incluído, quando é adulto) e `criancas`. Não se inventam linhas "Amigo do João 1/2/3".
+- **Toda a contagem passa pelos helpers `gAdultos(g)` / `gCriancas(g)` / `gPessoas(g)`** (e os `gSoma*(lista)`) — nunca contar linhas (`convidados.length`) nem ler `g.adultos` à mão. Sem a migração os campos não existem e os helpers caem no flag `crianca` (1 pessoa por linha).
+- Contas: **só os adultos pagam**. Cada adulto de uma linha pagante paga a quota `Q` → `m._convs[i].q = Q × adultos`. O `Ec`/`E` da refeição é a soma dos adultos pagantes, logo entra certo nos denominadores.
+- As crianças de um convidado são como os filhos dos membros: **não entram no `calcular()`**, só na contagem de bocas. Podem vir agarradas a qualquer linha, mesmo com adultos.
+- O flag `crianca` mantém-se mas é **derivado**: `crianca = (adultos === 0)`. Linha sem adultos → sem "Pagante?" (não há nada a pagar).
+- Migração: `db/convidados_acompanhantes.sql`. Tolerante: sem ela, `CONV_AC_COLS=false`, os campos ficam escondidos e cada convidado vale 1 pessoa.
 
 ## Crianças (filhos + convidados-criança)
 **Não pagam nada.** Não entram no `calcular()` — existem só para se saber quantas bocas há por refeição (compras/cozinha). Se mexeres em quotas ou saldos, as crianças não têm de aparecer lá.

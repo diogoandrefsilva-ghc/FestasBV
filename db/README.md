@@ -26,8 +26,9 @@ Numa BD limpa, correr por esta ordem (há dependências entre eles):
 7. `notifs.sql` — responsáveis das refeições + avisos Telegram
 8. `filhos.sql` — filhos dos membros (`filhos` + `filho_presencas`) e
    `convidados.crianca`; crianças não pagam, só contam bocas
-9. `convidados_pessoas.sql` — `convidados.pessoas`: uma linha de convidado pode
-   valer várias bocas ("levo 5 comigo"), sem se inventarem nomes
+9. `convidados_acompanhantes.sql` — `convidados.adultos` / `.criancas`: uma linha
+   de convidado pode valer várias bocas ("levo 5 comigo"), sem se inventarem
+   nomes; só os adultos pagam quota
 
 Os passos 4–9 são migrações add-on idempotentes: correr uma vez cada. A app é
 tolerante a qualquer uma delas faltar — sonda a coluna/tabela e esconde o que

@@ -212,6 +212,10 @@ body.read-only .fab.green,body.contas-fechadas .fab.green{display:none!important
 .modal input,.modal select,.modal textarea{width:100%;background:#FFFDF6;border:1px solid var(--line);border-radius:9px;padding:12px;color:var(--ink);font-size:15px;-webkit-appearance:none;appearance:none;font-family:inherit;min-width:0;max-width:100%;box-sizing:border-box}
 .modal textarea{resize:vertical;min-height:44px;max-height:120px;line-height:1.4}
 .modal input:focus,.modal select:focus,.modal textarea:focus{outline:none;border-color:var(--barrete);box-shadow:0 0 0 3px rgba(30,122,77,.13)}
+/* Explicação por baixo de um campo. Os campos não têm margem em baixo (o
+   respiro vem sempre do label seguinte), por isso é aqui que se dá o de cima —
+   nunca margem negativa, senão o texto sobe para cima da caixa. */
+.modal .field-hint{font-size:11.5px;line-height:1.45;color:var(--faint);margin:7px 2px 0}
 .modal select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236F5C42' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;padding-right:34px}
 .mbtns{display:flex;gap:9px;margin-top:18px}
 .btn{flex:1;padding:13px;border-radius:10px;border:none;font-family:var(--display);font-size:16px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;cursor:pointer}
@@ -407,7 +411,9 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 
 /* Guest attendance in presenças */
 .pres-guest-section{margin-top:18px}
-.pres-guest-card{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:6px;display:flex;align-items:center;gap:10px}
+/* flex-wrap: o badge da composição ("3 adultos + 2 crianças") pode ser
+   comprido — em ecrã estreito desce de linha em vez de espremer o nome. */
+.pres-guest-card{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:6px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .pres-guest-card .pg-info{flex:1;min-width:0;display:flex;align-items:baseline;gap:7px;flex-wrap:wrap}
 .pres-guest-card .pg-name{font-size:13px;font-weight:600;color:var(--ink)}
 .pres-guest-card .pg-meta{font-size:11px;font-style:italic;color:var(--faint)}
@@ -415,10 +421,10 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .pres-guest-card .pg-badge.pays{background:rgba(30,122,77,.12);color:var(--green)}
 .pres-guest-card .pg-badge.free{background:rgba(46,111,168,.12);color:var(--blue)}
 .pres-guest-card .pg-badge.kid{background:rgba(168,123,20,.14);color:var(--gold)}
-/* "6 pessoas": a linha do convidado vale mais que uma boca (acompanhantes sem
-   nome). Fica em tinta neutra para não competir com Oferta/Criança, que dizem
-   quem paga o quê. */
-.pres-guest-card .pg-badge.heads{background:var(--panel);border:1px solid var(--line);color:var(--muted);white-space:nowrap}
+/* "3 adultos + 2 crianças": de que é feita a linha do convidado quando vale
+   mais que uma boca. Fica em tinta neutra para não competir com Oferta/Criança,
+   que dizem quem paga o quê. */
+.pres-guest-card .pg-badge.heads{background:var(--panel);border:1px solid var(--line);color:var(--muted)}
 .pres-guest-add{display:flex;align-items:center;gap:6px;padding:10px 16px;border-radius:10px;border:1.5px dashed var(--line);background:transparent;color:var(--barrete);font-size:13px;font-weight:600;cursor:pointer;transition:.15s;width:100%;justify-content:center;margin-top:8px}
 .pres-guest-add:active{background:rgba(30,122,77,.06);transform:scale(.97)}
 
