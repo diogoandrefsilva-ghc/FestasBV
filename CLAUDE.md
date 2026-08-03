@@ -23,7 +23,8 @@ Uma linha de `convidados` pode valer **várias bocas**: guarda-se o nome de quem
 - Migração: `db/convidados_acompanhantes.sql`. Tolerante: sem ela, `CONV_AC_COLS=false`, os campos ficam escondidos e cada convidado vale 1 pessoa.
 
 ## T-shirts (separador 👕)
-Levantamento das t-shirts a encomendar. **Não entra em nenhuma conta** — quotas, saldos e cash-flows ignoram isto.
+Levantamento das t-shirts a encomendar. **Hoje não entra em nenhuma conta** — quotas, saldos e cash-flows ignoram isto.
+> **Previsto (ainda NÃO implementado — não avançar sem o dono decidir):** a fatura das t-shirts vai ser um **cash-flow pago por alguém** e o valor entra no **saldo individual** de cada membro segundo a imputação (`imputadoA`), e não pela fórmula das quotas (fator/presenças). Falta saber como vem a fatura e como se formam os preços — sobretudo o que fazer quando o total faturado não bate certo com a soma da grelha (portes, descontos). A peça de imputação já existe para alimentar isto; o que falta é o canal de imputação direta no `calcular()`.
 - Uma linha = **uma t-shirt**: nome de quem a veste + tipologia (Homem/Mulher/Criança) + tamanho. Cada um mete quantas quiser; mexe nas suas e nas do cônjuge, o admin em tudo.
 - A **grelha de tamanhos** (`tshirt_tamanhos`) é global e só do admin (Definições › T-shirts); o **preço** é opcional — com tudo a 0 a app não fala em dinheiro.
 - `tamanho` guarda-se como **texto, não FK**: apagar um tamanho da grelha não mexe nas encomendas já feitas (ficam marcadas "fora da grelha").
