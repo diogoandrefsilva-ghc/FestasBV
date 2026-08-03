@@ -1798,13 +1798,27 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .ts-orfao{color:var(--campino-tinta);font-style:normal}
 .ts-tot{margin:10px 2px 4px;text-align:right;font-size:13px;color:var(--muted)}
 .ts-tot b{color:var(--ink)}
-/* Resumo por tipologia — cartões lado a lado (um por tipologia) */
-.ts-sums{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px}
-.ts-sum{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 12px;box-shadow:var(--shadow)}
-.ts-sum-hdr{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:13.5px;font-weight:700;color:var(--ink);padding-bottom:6px;border-bottom:1px solid var(--line);margin-bottom:4px}
-.ts-sum-row{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:13px;color:var(--muted);padding:3px 0}
+/* Resumo por tipologia — as três tipologias SEMPRE lado a lado numa linha
+   (com auto-fit a Criança caía para baixo em ecrã de telemóvel). Daí as
+   medidas apertadas: em 390px cada cartão fica com ~124px. */
+.ts-sums{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;align-items:start}
+.ts-sum{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:8px 9px;box-shadow:var(--shadow);min-width:0}
+.ts-sum-hdr{display:flex;align-items:center;justify-content:space-between;gap:4px;font-size:12px;font-weight:700;color:var(--ink);padding-bottom:5px;border-bottom:1px solid var(--line);margin-bottom:2px;white-space:nowrap}
+.ts-sum-hdr>span:first-child{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.ts-sum-hdr .cmp-count{padding:1px 6px;font-size:11px}
+/* Cada tamanho é um botão de filtro: mostra de quem são aquelas t-shirts */
+.ts-sum-row{display:flex;align-items:center;justify-content:space-between;gap:6px;font-size:12.5px;color:var(--muted);padding:4px 5px;margin:0 -5px;border-radius:7px;cursor:pointer;transition:.14s}
+.ts-sum-row:active{background:var(--panel2)}
+.ts-sum-row.on{background:rgba(30,122,77,.13);color:var(--ink);font-weight:600}
+.ts-sum-row.on .ts-sum-n{color:var(--green)}
 .ts-sum-n{font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums}
-.ts-sum-eur{margin-top:6px;padding-top:6px;border-top:1px solid var(--line);text-align:right;font-size:12.5px;font-weight:700;color:var(--green)}
+.ts-sum-eur{margin-top:5px;padding-top:5px;border-top:1px solid var(--line);text-align:right;font-size:11.5px;font-weight:700;color:var(--green)}
+@media (max-width:340px){.ts-sums{gap:4px}.ts-sum{padding:7px}.ts-sum-hdr{font-size:11px}.ts-sum-row{font-size:11.5px}}
+/* Barra do filtro ativo (clica para largar) */
+.ts-filtro{display:flex;align-items:center;gap:8px;margin:14px 0 8px;padding:9px 12px;background:rgba(30,122,77,.1);border:1.5px solid var(--barrete);border-radius:11px;font-size:13.5px;color:var(--ink);cursor:pointer}
+.ts-filtro:active{background:rgba(30,122,77,.18)}
+.ts-filtro>span:first-child{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ts-filtro-x{flex:0 0 auto;color:var(--muted);font-size:13px;font-weight:700}
 /* Bloco por pessoa na vista "Encomenda" */
 .ts-grp{margin-bottom:12px}
 .ts-grp-hdr{display:flex;align-items:center;gap:8px;padding:0 2px 6px;font-size:14px;color:var(--ink)}
@@ -1815,6 +1829,7 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .ts-imput-list{white-space:normal;font-size:11.5px}
 .ts-imput-list i{font-style:normal;color:var(--faint)}
 .ts-imput-tot{flex:0 0 auto;font-size:13px;font-weight:700;color:var(--green);font-variant-numeric:tabular-nums}
+#view-tshirts .cmp-done-hdr{margin-top:14px}
 /* Escolha de tipologia/tamanho no modal — chips grandes, dedo-friendly */
 .ts-tipos,.ts-tams{display:flex;flex-wrap:wrap;gap:7px;margin-top:2px}
 .ts-chip{display:inline-flex;align-items:center;gap:5px;padding:9px 14px;border-radius:20px;border:1.5px solid var(--line);background:var(--panel);color:var(--muted);font-family:inherit;font-size:13.5px;font-weight:600;cursor:pointer;transition:.15s}

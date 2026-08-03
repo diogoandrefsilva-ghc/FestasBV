@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v177 · 2026-08-03 · T-shirts: o admin imputa cada t-shirt à conta de um ou vários membros (divide em partes iguais) — resumo Por conta de no painel e no PDF';
+const APP_BUILD = 'v178 · 2026-08-03 · T-shirts: as 3 tipologias numa linha, clicar num tamanho mostra de quem são, e Por conta de passa para o fim, colapsado';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -9819,6 +9819,8 @@ let TSHIRTS_TABLE=false;   // BD já tem tshirt_tamanhos/tshirts?
 let TS_IMPUT_COL=false;    // BD já tem tshirts.imputado_a? (db/tshirts_imputacao.sql)
 let TS_TAMS=[];            // grelha global [{id,tipo,tamanho,ordem,preco}]
 let TS_TAB='minhas';       // sub-separador do painel: minhas | todas
+let _tsFiltro=null;        // {tipo,tamanho} — linha do resumo em foco (de quem são estas)
+let _tsImputOpen=false;    // secção "Por conta de" (fechada por defeito)
 const TS_TIPOS=['Homem','Mulher','Criança'];
 function tsIcon(tipo){return{'Homem':'👨','Mulher':'👩','Criança':'🧒'}[tipo]||'👕';}
 function tsTipoIdx(t){const i=TS_TIPOS.indexOf(t);return i<0?TS_TIPOS.length:i;}
@@ -9876,7 +9878,14 @@ function tsCanEdit(it){return !!_sbSession&&!contasFechadas()&&(isAdmin()||tsMin
 // Encomendar: é preciso estar ligado a um membro e haver tamanhos definidos
 function tsCanWrite(){return !!_sbSession&&!contasFechadas()&&(isAdmin()||MY_NAMES.length>0)&&TS_TAMS.length>0;}
 function updateTshirtTabVis(){const t=document.getElementById('tab-tshirts');if(t)t.style.display=TSHIRTS_TABLE?'':'none';}
-function setTsTab(t){TS_TAB=t;lsSet('fbv_tstab',t);renderTshirts();}
+function setTsTab(t){TS_TAB=t;lsSet('fbv_tstab',t);_tsFiltro=null;renderTshirts();}
+// Clicar num tamanho do resumo mostra de quem são essas t-shirts; clicar
+// outra vez (ou no ✕) larga o filtro.
+function tsFiltrar(tipo,tamanho){
+  _tsFiltro=(_tsFiltro&&_tsFiltro.tipo===tipo&&_tsFiltro.tamanho===tamanho)?null:{tipo,tamanho};
+  renderTshirts();
+}
+function tsLimparFiltro(){_tsFiltro=null;renderTshirts();}
 
 /* ── Painel 👕 ── */
 function renderTshirts(){
@@ -9921,27 +9930,41 @@ function renderTshirts(){
       h+='<div class="cmp-empty sf"><span class="cmp-empty-ico">📋</span>Ainda ninguém encomendou t-shirts este ano.</div>';
     }else{
       h+=tsResumoHtml(items);
+      if(_tsFiltro){
+        // Foco num tamanho: de quem são estas t-shirts (o tipo/tamanho já está
+        // no cabeçalho, por isso o cartão mostra antes quem a pediu)
+        const f=items.filter(it=>it.tipo===_tsFiltro.tipo&&it.tamanho===_tsFiltro.tamanho)
+          .sort((a,b)=>String(a.nome).localeCompare(String(b.nome),'pt'));
+        h+=`<div class="ts-filtro sf" onclick="tsLimparFiltro()">
+          <span>${tsIcon(_tsFiltro.tipo)} ${escHtml(_tsFiltro.tipo)} · <b>${escHtml(_tsFiltro.tamanho)}</b></span>
+          <span class="cmp-count">${f.length}</span><span class="ts-filtro-x">✕</span></div>`;
+        h+=tsListaHtml(f,{dono:true});
+      }else{
+        // Por pessoa (o próprio primeiro, depois por ordem alfabética)
+        const porMembro={};
+        items.forEach(it=>{(porMembro[it.membro]=porMembro[it.membro]||[]).push(it);});
+        const nomes=Object.keys(porMembro).sort((a,b)=>
+          (MY_NAMES.includes(b)?1:0)-(MY_NAMES.includes(a)?1:0)||a.localeCompare(b,'pt'));
+        h+='<div class="ts-sec sf">Por pessoa</div>';
+        nomes.forEach(n=>{
+          const list=porMembro[n].slice().sort(tsPedidoCmp);
+          h+=`<div class="ts-grp">
+            <div class="ts-grp-hdr"><b>${escHtml(n)}</b><span class="cmp-count">${list.length}</span>${tsTotalEur(list)>0?`<span class="ts-grp-eur">${eur(tsTotalEur(list))}</span>`:''}</div>
+            ${tsListaHtml(list)}
+          </div>`;
+        });
+      }
       h+=tsImputHtml(items);
-      // Por pessoa (o próprio primeiro, depois por ordem alfabética)
-      const porMembro={};
-      items.forEach(it=>{(porMembro[it.membro]=porMembro[it.membro]||[]).push(it);});
-      const nomes=Object.keys(porMembro).sort((a,b)=>
-        (MY_NAMES.includes(b)?1:0)-(MY_NAMES.includes(a)?1:0)||a.localeCompare(b,'pt'));
-      h+='<div class="ts-sec sf">Por pessoa</div>';
-      nomes.forEach(n=>{
-        const list=porMembro[n].slice().sort(tsPedidoCmp);
-        h+=`<div class="ts-grp">
-          <div class="ts-grp-hdr"><b>${escHtml(n)}</b><span class="cmp-count">${list.length}</span>${tsTotalEur(list)>0?`<span class="ts-grp-eur">${eur(tsTotalEur(list))}</span>`:''}</div>
-          ${tsListaHtml(list)}
-        </div>`;
-      });
     }
   }
   el.innerHTML=h;
 }
 
-// Lista de cartões. Um cartão é clicável (edita) só para quem lhe pode mexer.
-function tsListaHtml(list){
+/* Lista de cartões. Um cartão é clicável (edita) só para quem lhe pode mexer.
+   opts.dono: mostra quem PEDIU em vez de tipologia/tamanho — é o que faz falta
+   na lista filtrada, onde o tamanho é o mesmo em todas. */
+function tsListaHtml(list,opts){
+  opts=opts||{};
   const comPrecos=tsTemPrecos();
   return '<div class="cmp-list">'+list.map(it=>{
     const ed=tsCanEdit(it);
@@ -9951,7 +9974,7 @@ function tsListaHtml(list){
       <span class="ts-ava">${tsIcon(it.tipo)}</span>
       <div class="ts-main">
         <div class="ts-nome">${escHtml(it.nome)}</div>
-        <div class="ts-sub">${it.tipo} · <b>${escHtml(it.tamanho)}</b>${comPrecos&&p>0?` · ${eur(p)}`:''}${orfao?' · <i class="ts-orfao">fora da grelha</i>':''}</div>
+        <div class="ts-sub">${opts.dono?`pedida por <b>${escHtml(it.membro)}</b>`:`${it.tipo} · <b>${escHtml(it.tamanho)}</b>`}${comPrecos&&p>0?` · ${eur(p)}`:''}${orfao?' · <i class="ts-orfao">fora da grelha</i>':''}</div>
         ${tsImputExplicita(it)?`<div class="ts-imput">💳 ${escHtml(tsImputados(it).join(' + '))}${comPrecos&&p>0&&tsImputados(it).length>1?` <i>(${eur(rnd(p/tsImputados(it).length,2))} cada)</i>`:''}</div>`:''}
       </div>
       ${ed?'<span class="stk-chev">›</span>':''}
@@ -9959,14 +9982,19 @@ function tsListaHtml(list){
   }).join('')+'</div>';
 }
 
-// Resumo: quantas t-shirts por tipologia e tamanho (é o que interessa a quem encomenda)
+// Resumo: quantas t-shirts por tipologia e tamanho (é o que interessa a quem
+// encomenda). Cada linha é clicável: filtra a lista de baixo para se ver de
+// quem são aquelas t-shirts.
 function tsResumoHtml(items){
   const comPrecos=tsTemPrecos();
   let h='<div class="ts-sec sf">Total por tipologia</div><div class="ts-sums">';
   tsTipoAgg(items).forEach(g=>{
     h+=`<div class="ts-sum">
       <div class="ts-sum-hdr"><span>${tsIcon(g.tipo)} ${g.tipo}</span><span class="cmp-count">${g.total}</span></div>
-      ${g.linhas.map(l=>`<div class="ts-sum-row"><span>${escHtml(l.tamanho)}</span><span class="ts-sum-n">${l.qtd}</span></div>`).join('')}
+      ${g.linhas.map(l=>{
+        const on=_tsFiltro&&_tsFiltro.tipo===g.tipo&&_tsFiltro.tamanho===l.tamanho;
+        return `<div class="ts-sum-row${on?' on':''}" onclick="tsFiltrar('${g.tipo}',${JSON.stringify(l.tamanho).replace(/"/g,'&quot;')})"><span>${escHtml(l.tamanho)}</span><span class="ts-sum-n">${l.qtd}</span></div>`;
+      }).join('')}
       ${comPrecos&&g.valor>0?`<div class="ts-sum-eur">${eur(g.valor)}</div>`:''}
     </div>`;
   });
@@ -10002,7 +10030,11 @@ function tsImputHtml(items){
   if(!TS_IMPUT_COL||!tsTemImputacoes())return '';
   const comPrecos=tsTemPrecos();
   const agg=tsImputAgg(items);
-  let h='<div class="ts-sec sf">Por conta de</div><div class="cmp-list">';
+  // Fechado por defeito e no fim de tudo: é informação de acerto de contas,
+  // não é o que se vem cá ver. Visível para todos — cada um vê o que lhe toca.
+  let h=`<div class="cmp-done-hdr sf${_tsImputOpen?' open':''}" onclick="tsToggleImputSec(this)">
+      <span>💳 Por conta de <span class="cmp-count">${agg.length}</span></span><span class="cmp-chev">▾</span></div>
+    <div class="cmp-done-body${_tsImputOpen?' open':''}"><div class="cmp-list">`;
   h+=agg.map(g=>{
     // Uma t-shirt dividida conta meia (ou um terço) para cada lado — daí o
     // número poder sair com vírgula. O que interessa mesmo é o valor.
@@ -10018,8 +10050,15 @@ function tsImputHtml(items){
       <span class="ts-imput-tot">${comPrecos&&g.valor>0?eur(g.valor):`${nTxt} t-shirt${partes===1?'':'s'}`}</span>
     </div>`;
   }).join('');
-  h+='</div>';
+  h+='</div></div>';
   return h;
+}
+// O estado de aberto/fechado tem de sobreviver aos re-renders do painel
+function tsToggleImputSec(el){
+  _tsImputOpen=!_tsImputOpen;
+  el.classList.toggle('open',_tsImputOpen);
+  const body=el.nextElementSibling;
+  if(body)body.classList.toggle('open',_tsImputOpen);
 }
 
 /* ── Modal: adicionar / editar um pedido ── */
