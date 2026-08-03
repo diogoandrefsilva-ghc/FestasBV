@@ -80,7 +80,7 @@ setTimeout(function(){ if (window.fbvEsconderSplash) window.fbvEsconderSplash();
   <div class="tab" data-tab="compras" onclick="setTab('compras')">Compras</div>
   <div class="tab" data-tab="cashflows" onclick="setTab('cashflows')">Cash</div>
   <div class="tab" data-tab="stock" id="tab-stock" onclick="setTab('stock')" style="display:none">Stock</div>
-  <div class="tab tab-ico" data-tab="tshirts" id="tab-tshirts" onclick="setTab('tshirts')" style="display:none" title="T-shirts">👕</div>
+  <div class="tab tab-ico tab-ts" data-tab="tshirts" id="tab-tshirts" onclick="setTab('tshirts')" style="display:none" title="T-shirts" aria-label="T-shirts">👕</div>
   <div class="tab tab-ico" data-tab="definicoes" onclick="openAdmin()">⚙</div>
 </div>
 <div class="wrap">
@@ -686,7 +686,7 @@ setTimeout(function(){ if (window.fbvEsconderSplash) window.fbvEsconderSplash();
         <span class="sb-arrow sf">▼</span>
       </div>
       <div class="settings-block-body">
-        <p style="font-size:12px;color:var(--muted);margin-bottom:10px;line-height:1.5">Tamanhos que aparecem a quem encomenda, por tipologia. O <b>preço</b> é opcional — deixado a 0, a app nem fala em dinheiro; assim que puseres preços, o resumo e o PDF passam a mostrar os totais. Apagar um tamanho <b>não</b> apaga encomendas já feitas.</p>
+        <p style="font-size:12px;color:var(--muted);margin-bottom:10px;line-height:1.5">Tamanhos que aparecem a quem encomenda, por tipologia — usa <b>▲▼</b> para os pores pela ordem que quiseres (é a mesma no ecrã de encomenda e no PDF). O <b>preço</b> é opcional — deixado a 0, a app nem fala em dinheiro; assim que puseres preços, o resumo e o PDF passam a mostrar os totais. Apagar um tamanho <b>não</b> apaga encomendas já feitas.</p>
         <div id="adm-ts-list"><div class="note">A carregar…</div></div>
         <div id="adm-ts-form" style="margin-top:10px;padding:10px 12px;background:var(--panel2);border:1px solid var(--line);border-radius:10px">
           <label style="margin-top:0">Tipologia</label>

@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v175 · 2026-08-03 · Novo separador 👕 T-shirts: cada um encomenda as suas (nome + tipologia + tamanho), tamanhos/preços no painel do admin e relatório PDF da encomenda';
+const APP_BUILD = 'v176 · 2026-08-03 · T-shirts: ícone da aba passa a t-shirt branca desenhada e o admin manda na ordem dos tamanhos (▲▼)';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -10081,7 +10081,11 @@ function renderAdmTshirts(){
     const list=tsTamsDe(tipo);
     return `<div class="adm-ts-grp">
       <div class="adm-ts-grp-hdr">${tsIcon(tipo)} ${tipo}</div>
-      ${list.length?list.map(t=>`<div class="adm-ts-row">
+      ${list.length?list.map((t,i)=>`<div class="adm-ts-row">
+        <span class="adm-ts-mv-wrap">
+          <button class="adm-ts-mv" onclick="admTsMove(${t.id},-1)" title="Subir" ${i===0?'disabled':''}>▲</button>
+          <button class="adm-ts-mv" onclick="admTsMove(${t.id},1)" title="Descer" ${i===list.length-1?'disabled':''}>▼</button>
+        </span>
         <span class="adm-ts-tam">${escHtml(t.tamanho)}</span>
         ${usados[tipo+'|'+t.tamanho]?`<span class="cmp-count">${usados[tipo+'|'+t.tamanho]}</span>`:''}
         <input type="number" class="adm-ts-preco" step="0.5" min="0" placeholder="0" value="${(+t.preco||0)>0?(+t.preco):''}" inputmode="decimal" onchange="admTsPreco(${t.id},this.value)" title="Preço (€) — deixa vazio para não usar preços">
@@ -10109,6 +10113,30 @@ async function admTsAdd(){
     if(TAB==='tshirts')renderTshirts();
     toast('Tamanho adicionado ✓','ok');
   }catch(e){setSync('err','erro ao guardar');toast(permErrorMsg(e),'bad');}
+}
+/* Mudar a ordem de um tamanho dentro da sua tipologia (▲/▼). É esta ordem que
+   manda em tudo: chips do modal, resumo do painel e PDF.
+   Renumera a tipologia toda de 1..n em vez de trocar só dois valores — assim
+   uma grelha antiga (tudo com ordem=0) fica logo arrumada, e só se gravam as
+   linhas que mudaram mesmo. */
+async function admTsMove(id,dir){
+  if(!isAdmin()||!TSHIRTS_TABLE)return;
+  const t=TS_TAMS.find(x=>x.id===id);if(!t)return;
+  const lista=tsTamsDe(t.tipo);          // cópia filtrada, já pela ordem atual
+  const i=lista.findIndex(x=>x.id===id),j=i+dir;
+  if(i<0||j<0||j>=lista.length)return;
+  lista.splice(j,0,lista.splice(i,1)[0]);
+  const mudados=[];
+  lista.forEach((x,k)=>{if((x.ordem||0)!==k+1){x.ordem=k+1;mudados.push(x);}});
+  TS_TAMS.sort(tsTamCmp);
+  renderAdmTshirts();                    // mexe já, grava a seguir
+  if(!mudados.length)return;
+  setSync('load','a guardar…');
+  try{
+    for(const x of mudados)await queueWrite(()=>sbReq('PATCH',`tshirt_tamanhos?id=eq.${x.id}`,{ordem:x.ordem}));
+    marcaGuardado();
+    if(TAB==='tshirts')renderTshirts();
+  }catch(e){setSync('err','erro ao guardar');toast(permErrorMsg(e),'bad');carregar();}
 }
 async function admTsPreco(id,val){
   if(!isAdmin())return;
