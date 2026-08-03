@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v186 · 2026-08-03 · Password temporária: o admin gera uma na hora para quem não consegue recuperar pelo email';
+const APP_BUILD = 'v187 · 2026-08-03 · Despensa: o custo vai sempre para Despesas Gerais — as refeições que pediram ficam respondidas pela cobertura, sem alocação';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -4344,16 +4344,6 @@ function despRefsQuePedem(artigo){
   out.sort((a,b)=>a.data.localeCompare(b.data)||a.tipo.localeCompare(b.tipo));
   return out;
 }
-/* Reparte uma quantidade em N partes iguais, em que a última leva o resto — a
-   soma bate CERTA com o total. Sem isto o arredondamento deixava cêntimos a
-   escorrer para a bolsa comum (o `resto` do cfStockDestMap). */
-function despPartesIguais(total,n){
-  if(n<=0)return [];
-  const parte=rnd(total/n,3),out=[];
-  for(let i=0;i<n-1;i++)out.push(parte);
-  out.push(rnd(total-parte*(n-1),3));
-  return out;
-}
 /* Linhas do passo: um artigo por linha, com o estado atual e o proposto.
    Entram os nomes pedidos em ≥2 refeições (é aí que há duplicação a resolver) e
    ainda os que JÁ estão marcados e continuam na lista — para se poderem desmarcar
@@ -7092,6 +7082,12 @@ function closeDestPicker(e){if(e&&e.target&&e.target.id!=='dpick-bg')return;docu
    destino que não cobre tudo (a sobra fica por alocar) → split; sem procura →
    refeição pedida (se só uma) ou Gerais. Só para lotes de refeição. */
 function compraProporDestino(l){
+  /* 🫙 Despensa: vai SEMPRE para Gerais, e nunca para uma refeição. Uma
+     embalagem serve o evento todo — pô-la na conta de um jantar só porque foi o
+     único a escrevê-la na lista era o custo a cair no sítio errado (e era o que
+     acontecia: com keys.length===1 o destino colava-se a essa refeição). Os
+     pedidos das refeições ficam respondidos pela cobertura, não pelo custo. */
+  if(isDespensa(l._listArt||l.artigo)){l.splits=null;l.destino='Gerais';return;}
   // A procura casa-se pelo nome da LISTA (se a fatura renomeou o artigo, o
   // pedido continua a chamar-se como na lista); um lote já gravado não se
   // bloqueia a si próprio (skipLotId)
@@ -7735,14 +7731,17 @@ function faturaSubToggle(i,j){
   const ln=l._subs.splice(j,1)[0];
   if(!l._subs.length)delete l._subs;
   const multi=(l.keys||[]).length>1;
-  const destino=l.tipoFix?l.tipoFix:((l.keys||[]).length===1?l.keys[0]:(STOCK_TABLE?'':'Gerais'));
+  // Despensa: outra marca do mesmo artigo de despensa vai a Gerais como o pai
+  const destino=isDespensa(l._listArt||l.artigo)?'Gerais'
+    :l.tipoFix?l.tipoFix:((l.keys||[]).length===1?l.keys[0]:(STOCK_TABLE?'':'Gerais'));
   // Herda a ligação ao pedido da lista (batatas fritas) e as refeições de
   // origem: é outra marca do MESMO pedido, logo cobre-o na mesma.
   (compraEdit.lotes=compraEdit.lotes||[]).push({free:true,artigo:ln.artigo,qtd:ln.qtd,valor:ln.valor,destino,keys:(l.keys||[]).slice(),_listArt:l._listArt||l.artigo,_fat:'ok'});
   (l._impQtds=l._impQtds||[]).push(ln.qtd);
   faturaQtdRecheck(l);
   compraRenderLotes();
-  if(multi&&STOCK_TABLE)toast('Fica em 🧺 Stock por alocar — depois de registares, aloca às refeições no separador Stock','ok');
+  if(isDespensa(l._listArt||l.artigo))toast('🫙 Artigo de despensa — fica em Despesas Gerais','ok');
+  else if(multi&&STOCK_TABLE)toast('Fica em 🧺 Stock por alocar — depois de registares, aloca às refeições no separador Stock','ok');
 }
 /* Extras da fatura (linhas que não estavam no carrinho): checkbox desmarcada
    por defeito; marcar converte em "artigo fora da lista" editável (o ✕ do
@@ -8448,26 +8447,18 @@ function loteRenderAlocs(){
   }).join('');
   document.getElementById('lote-alocs').innerHTML=
     (html?(solo?`<div class="lote-solos">${html}</div>`:html):'<div class="empty sf" style="margin-top:8px">Sem alocações — está tudo na bolsa comum.</div>');
-  /* 🫙 Repartir: só para artigos de despensa e só se alguma refeição os pediu.
-     Fica escondido no resto — num consumível a quantidade é sabida e inventar
-     partes iguais seria falsear a conta, não simplificá-la. */
-  const rep=document.getElementById('lote-reparte');
-  if(rep){
+  /* 🫙 Despensa: aqui não há nada a alocar, e é preciso dizê-lo. O custo de uma
+     embalagem que serve o evento todo fica em Despesas Gerais — repartir 1 L de
+     azeite por três refeições seria inventar uma medição que ninguém fez. E os
+     pedidos das refeições já estão respondidos só por o lote existir
+     (shopIsCovered), sem precisar de alocação nenhuma. */
+  const nota=document.getElementById('lote-desp-nota');
+  if(nota){
     const nome=editingLote.reqLink||editingLote.reqName||editingLote.artigo;
     const refs=isDespensa(nome)?despRefsQuePedem(nome):[];
-    const ja=refs.length&&refs.every(r=>editingLote.alocs.some(a=>alocToDestino(a)===r.key))
-      &&editingLote.alocs.length===refs.length;
-    rep.style.display=(canEdit&&refs.length)?'':'none';
-    rep.textContent=`🫙 Repartir por ${refs.length} ${refs.length===1?'refeição':'refeições'} em partes iguais`;
-    rep.classList.toggle('done',!!ja);
-    // As quantidades de um artigo de despensa não são uma medição — ninguém pesa
-    // o azeite que cada refeição levou. São só a chave de rateio do custo, e é
-    // preciso dizê-lo: senão o "0,333 l" lê-se como um valor apurado.
-    const nota=document.getElementById('lote-reparte-nota');
-    if(nota){
-      nota.style.display=refs.length?'':'none';
-      nota.textContent='Ninguém mede quanto levou cada refeição: estas quantidades servem só para repartir o custo. Podes acertá-las à mão se alguma refeição gastou claramente mais.';
-    }
+    nota.style.display=refs.length?'':'none';
+    nota.innerHTML=`🫙 <b>Artigo de despensa</b> — o custo fica em Despesas Gerais, que é onde faz sentido: uma embalagem serve o evento todo. `+
+      `Os pedidos d${refs.length===1?'a refeição que o pediu':`as ${refs.length} refeições que o pediram`} já contam como respondidos só por isto estar comprado — não é preciso alocar nada.`;
   }
   const tot=editingLote.alocs.reduce((s,a)=>s+(+a.qtd||0),0);
   const livre=rnd(editingLote.totQ-tot,3);
@@ -8565,25 +8556,6 @@ function loteAddAloc(){
   loteRenderAlocs();
 }
 function loteDelAloc(i){if(!editingLote)return;editingLote.alocs.splice(i,1);loteRenderAlocs();}
-/* ── 🫙 Repartir um artigo de despensa pelas refeições que o pediram ──
-   Ninguém mede quanto azeite levou cada refeição, e obrigar a inventar
-   "0,333 l" três vezes é trabalho sem verdade nenhuma por baixo. Um toque
-   substitui as alocações por partes iguais pelas refeições que pediram.
-   Porque é que partes iguais não é uma mentira: num artigo de despensa a
-   quantidade da alocação só serve para repartir o CUSTO (a cobertura já é
-   binária — havendo lote, todos os pedidos ficam cobertos, ver shopIsCovered).
-   Não é uma medição, é uma chave de rateio; e não havendo melhor informação,
-   partes iguais é a chave honesta.
-   Substitui em vez de acrescentar: repartir é uma decisão sobre o lote todo. */
-function loteRepartirDespensa(){
-  if(!isAdmin()||contasFechadas()||!editingLote)return;
-  const refs=despRefsQuePedem(editingLote.reqLink||editingLote.reqName||editingLote.artigo);
-  if(!refs.length){toast('Nenhuma refeição pediu este artigo','bad');return;}
-  const partes=despPartesIguais(editingLote.totQ,refs.length);
-  editingLote.alocs=refs.map((r,i)=>({tipo:r.tipo,data:r.data,qtd:partes[i],marca:''}));
-  loteRenderAlocs();
-  toast(`Repartido por ${refs.length} refeições — confirma e grava`,'ok');
-}
 async function saveLote(){
   if(!isAdmin()){toast('Só o admin ajusta alocações','bad');return;}
   if(contasFechadas()){toast('Contas fechadas — o stock já não se mexe','bad');return;}
