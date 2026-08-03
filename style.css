@@ -1809,12 +1809,21 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .ts-grp{margin-bottom:12px}
 .ts-grp-hdr{display:flex;align-items:center;gap:8px;padding:0 2px 6px;font-size:14px;color:var(--ink)}
 .ts-grp-eur{margin-left:auto;font-size:12.5px;font-weight:700;color:var(--green)}
+/* "Por conta de" — a quem se cobra cada t-shirt (imputação do admin) */
+.ts-imput{font-size:11.5px;color:var(--green);line-height:1.35;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ts-imput i{font-style:normal;color:var(--faint)}
+.ts-imput-list{white-space:normal;font-size:11.5px}
+.ts-imput-list i{font-style:normal;color:var(--faint)}
+.ts-imput-tot{flex:0 0 auto;font-size:13px;font-weight:700;color:var(--green);font-variant-numeric:tabular-nums}
 /* Escolha de tipologia/tamanho no modal — chips grandes, dedo-friendly */
 .ts-tipos,.ts-tams{display:flex;flex-wrap:wrap;gap:7px;margin-top:2px}
 .ts-chip{display:inline-flex;align-items:center;gap:5px;padding:9px 14px;border-radius:20px;border:1.5px solid var(--line);background:var(--panel);color:var(--muted);font-family:inherit;font-size:13.5px;font-weight:600;cursor:pointer;transition:.15s}
 .ts-chip:active{transform:scale(.96)}
 .ts-chip.on{border-color:var(--barrete);background:rgba(30,122,77,.12);color:var(--ink)}
 .ts-chip.fora{border-style:dashed;color:var(--campino-tinta)}
+/* Imputação: o chip de quem pediu fica marcado a tracejado enquanto ninguém
+   for escolhido — é o defeito ("fica na conta de quem pediu"), não uma escolha. */
+.ts-chip.implicito{border-style:dashed;border-color:var(--barrete);color:var(--muted);background:rgba(30,122,77,.06)}
 .ts-chip i{font-style:normal;font-size:11.5px;font-weight:700;color:var(--faint)}
 .ts-chip.on i{color:var(--green)}
 /* Definições › T-shirts */

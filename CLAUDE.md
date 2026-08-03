@@ -27,6 +27,7 @@ Levantamento das t-shirts a encomendar. **Não entra em nenhuma conta** — quot
 - Uma linha = **uma t-shirt**: nome de quem a veste + tipologia (Homem/Mulher/Criança) + tamanho. Cada um mete quantas quiser; mexe nas suas e nas do cônjuge, o admin em tudo.
 - A **grelha de tamanhos** (`tshirt_tamanhos`) é global e só do admin (Definições › T-shirts); o **preço** é opcional — com tudo a 0 a app não fala em dinheiro.
 - `tamanho` guarda-se como **texto, não FK**: apagar um tamanho da grelha não mexe nas encomendas já feitas (ficam marcadas "fora da grelha").
+- **`membro` é quem PEDIU; `imputadoA` é quem PAGA** (`db/tshirts_imputacao.sql`). Lista vazia = conta de quem pediu — o defeito, para o admin só tocar nas exceções (as dos filhos dividem-se pelos pais). Vários nomes = partes iguais, com o arredondamento a ficar para o fim. Só o admin imputa: garantido por **trigger** (`tshirts_guard_imputacao`), porque o dono da linha também a pode editar. Sem a migração, `TS_IMPUT_COL=false` e o campo fica escondido.
 - Relatório PDF próprio (`buildTshirtsReport`): pedidos por pessoa + total por tipologia/tamanho.
 - Migração: `db/tshirts.sql`. Tolerante: sem ela, `TSHIRTS_TABLE=false` e o separador nem aparece.
 

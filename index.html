@@ -546,7 +546,12 @@ setTimeout(function(){ if (window.fbvEsconderSplash) window.fbvEsconderSplash();
     <div class="ts-tams" id="ts-tams"></div>
     <div id="ts-membro-wrap">
       <label>Encomendado por</label>
-      <select id="ts-membro"></select>
+      <select id="ts-membro" onchange="tsRenderImput()"></select>
+    </div>
+    <div id="ts-imput-wrap" style="display:none">
+      <label>Por conta de 💳 <i style="font-weight:400;color:var(--faint);text-transform:none;letter-spacing:0">(só admin)</i></label>
+      <div class="ts-tams" id="ts-imput"></div>
+      <div class="field-hint sf" id="ts-imput-hint"></div>
     </div>
     <div class="note" id="ts-meta" style="display:none"></div>
     <div class="mbtns">

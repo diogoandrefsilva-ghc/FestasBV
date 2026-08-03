@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v176 · 2026-08-03 · T-shirts: ícone da aba passa a t-shirt branca desenhada e o admin manda na ordem dos tamanhos (▲▼)';
+const APP_BUILD = 'v177 · 2026-08-03 · T-shirts: o admin imputa cada t-shirt à conta de um ou vários membros (divide em partes iguais) — resumo Por conta de no painel e no PDF';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -1899,7 +1899,7 @@ async function carregar(){
     const sel='*,membros(*,presencas(*)),refeicoes_def(*),despesas(*),convidados(*),mealheiros(*),pagamentos(*)';
     // shoplist vai numa fetch SEPARADA e tolerante a falha: se a tabela ainda
     // não existir (migração por correr) o resto da app continua a funcionar.
-    const [res,uaRes,cjRes,vlRes,slRes,stRes,ctRes,acRes,npRes,flRes,fpRes,ccRes,sljRes,cpRes,stmRes,ttRes,tsRes]=await Promise.all([
+    const [res,uaRes,cjRes,vlRes,slRes,stRes,ctRes,acRes,npRes,flRes,fpRes,ccRes,sljRes,cpRes,stmRes,ttRes,tsRes,tiRes]=await Promise.all([
       sbFetch(`${SB_URL}/rest/v1/eventos?select=${encodeURIComponent(sel)}&order=ano.asc`,{headers:sbHeaders(),cache:'no-store'}),
       sbFetch(`${SB_URL}/rest/v1/user_amigos?select=email,amigo`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null),
       sbFetch(`${SB_URL}/rest/v1/conjuges?select=amigo_a,amigo_b`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null),
@@ -1929,7 +1929,9 @@ async function carregar(){
       // t-shirts (db/tshirts.sql): tolerantes — sem a migração, TSHIRTS_TABLE=false
       // e o separador 👕 fica escondido
       sbFetch(`${SB_URL}/rest/v1/tshirt_tamanhos?select=*`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null),
-      sbFetch(`${SB_URL}/rest/v1/tshirts?select=*`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null)
+      sbFetch(`${SB_URL}/rest/v1/tshirts?select=*`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null),
+      // sonda à coluna tshirts.imputado_a (db/tshirts_imputacao.sql): 200 = já existe
+      sbFetch(`${SB_URL}/rest/v1/tshirts?select=imputado_a&limit=1`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null)
     ]);
     if(!res.ok)throw new Error('HTTP '+res.status);
     const rows=await res.json();
@@ -1970,6 +1972,7 @@ async function carregar(){
     const N=v=>v==null?0:Number(v);
     // T-shirts: a grelha de tamanhos é global, as encomendas são por evento
     TSHIRTS_TABLE=!!(ttRes&&ttRes.ok&&tsRes&&tsRes.ok);
+    TS_IMPUT_COL=TSHIRTS_TABLE&&!!(tiRes&&tiRes.ok);
     TS_TAMS=TSHIRTS_TABLE?(await ttRes.json()).map(t=>({id:t.id,tipo:t.tipo,tamanho:t.tamanho,ordem:t.ordem||0,preco:N(t.preco)})).sort(tsTamCmp):[];
     const tsByEv={};
     if(TSHIRTS_TABLE)(await tsRes.json()).forEach(t=>{(tsByEv[t.evento_id]=tsByEv[t.evento_id]||[]).push(t);});
@@ -1999,7 +2002,7 @@ async function carregar(){
       pagamentos:(ev.pagamentos||[]).map(p=>({de:p.de,para:p.para,valor:N(p.valor),ref:p.ref,data:p.data,extra:N(p.extra)})),
       shoplist:(shopByEv[ev.id]||[]).map(s=>({_id:s.id,artigo:s.artigo,quantidade:s.quantidade||'',tamanho:s.tamanho||'',loja:s.loja||'',tipo:s.tipo,dataValor:s.data_valor,estado:s.estado||'pendente',tratadoPor:s.tratado_por||null,noCarrinho:!!s.no_carrinho,compraId:s.compra_id||null,cfDesc:s.cf_desc||null,valor:s.valor!=null?N(s.valor):null,criadoPor:s.criado_por||'',criadoEm:s.criado_em,compradoEm:s.comprado_em})),
       stockLotes:(stockByEv[ev.id]||[]).map(l=>({_id:l.id,compraId:l.compra_id,artigo:l.artigo,qtd:N(l.qtd),unidade:l.unidade||'',tamanho:l.tamanho||'',valor:N(l.valor),alocacoes:Array.isArray(l.alocacoes)?l.alocacoes:[],_listArt:l.lista_artigo||null,criadoEm:l.criado_em})),
-      tshirts:(tsByEv[ev.id]||[]).map(t=>({_id:t.id,membro:t.membro,nome:t.nome,tipo:t.tipo,tamanho:t.tamanho,criadoPor:t.criado_por||'',criadoEm:t.criado_em}))
+      tshirts:(tsByEv[ev.id]||[]).map(t=>({_id:t.id,membro:t.membro,nome:t.nome,tipo:t.tipo,tamanho:t.tamanho,imputadoA:Array.isArray(t.imputado_a)?t.imputado_a.filter(Boolean):[],criadoPor:t.criado_por||'',criadoEm:t.criado_em}))
     }));
     ALL_YEARS.sort((a,b)=>(a.evento.ano||0)-(b.evento.ano||0));
     // Restaurar onde o utilizador estava (ano + separadores), senão ano mais recente
@@ -9813,6 +9816,7 @@ function toggleHeroDetail(){
    dinheiro nenhum; assim que o admin puser preços, aparecem os totais.
    Sem a migração corrida, TSHIRTS_TABLE=false e o separador nem aparece. */
 let TSHIRTS_TABLE=false;   // BD já tem tshirt_tamanhos/tshirts?
+let TS_IMPUT_COL=false;    // BD já tem tshirts.imputado_a? (db/tshirts_imputacao.sql)
 let TS_TAMS=[];            // grelha global [{id,tipo,tamanho,ordem,preco}]
 let TS_TAB='minhas';       // sub-separador do painel: minhas | todas
 const TS_TIPOS=['Homem','Mulher','Criança'];
@@ -9834,6 +9838,37 @@ function tsEurSufixo(list,bold){const v=tsTotalEur(list);if(!tsTemPrecos()||v<=0
 function tsPedidoCmp(a,b){
   const pos=it=>{const i=TS_TAMS.findIndex(t=>t.tipo===it.tipo&&t.tamanho===it.tamanho);return i<0?9e9:i;};
   return tsTipoIdx(a.tipo)-tsTipoIdx(b.tipo)||(pos(a)-pos(b))||String(a.nome).localeCompare(String(b.nome),'pt');
+}
+/* ── Imputação: a quem se COBRA a t-shirt (só o admin mexe) ──
+   `membro` é quem PEDIU; `imputadoA` é quem PAGA, e podem ser vários (as dos
+   filhos dividem-se pelos pais). Lista vazia = fica na conta de quem pediu —
+   é o defeito de propósito: assim o admin só toca nas exceções, e se o pedido
+   mudar de dono a conta acompanha sozinha.
+   Continua a não entrar em conta nenhuma da app: é o levantamento de quanto
+   cobrar a cada um, não mexe em quotas, saldos nem cash-flows. */
+function tsImputados(it){const l=(it.imputadoA||[]).filter(Boolean);return l.length?l:[it.membro];}
+// Imputação que vale a pena mostrar: só quando difere de "quem pediu"
+function tsImputExplicita(it){
+  const l=(it.imputadoA||[]).filter(Boolean);
+  return l.length>1||(l.length===1&&l[0]!==it.membro);
+}
+function tsTemImputacoes(){return tsArr().some(tsImputExplicita);}
+/* Quanto vai para cada conta. Divide-se em partes iguais e o arredondamento
+   fica para o fim (somam-se as parcelas exatas): 3 pessoas a dividir 10 € dá
+   3,33 a cada, mas o total do grupo continua a bater certo nos 10 €. */
+function tsImputAgg(items){
+  const by={};
+  items.forEach(it=>{
+    const alvos=tsImputados(it);
+    const parte=alvos.length?tsPreco(it.tipo,it.tamanho)/alvos.length:0;
+    alvos.forEach(m=>{
+      const g=by[m]=by[m]||{membro:m,itens:[],valor:0};
+      g.itens.push({it,partes:alvos.length});
+      g.valor+=parte;
+    });
+  });
+  return Object.values(by).map(g=>({membro:g.membro,itens:g.itens,valor:rnd(g.valor,2)}))
+    .sort((a,b)=>a.membro.localeCompare(b.membro,'pt'));
 }
 function tsMine(it){return MY_NAMES.includes(it.membro);}
 // Mexer num pedido: o dono (próprio ou cônjuge) ou o admin. Ano fechado tranca tudo.
@@ -9886,6 +9921,7 @@ function renderTshirts(){
       h+='<div class="cmp-empty sf"><span class="cmp-empty-ico">📋</span>Ainda ninguém encomendou t-shirts este ano.</div>';
     }else{
       h+=tsResumoHtml(items);
+      h+=tsImputHtml(items);
       // Por pessoa (o próprio primeiro, depois por ordem alfabética)
       const porMembro={};
       items.forEach(it=>{(porMembro[it.membro]=porMembro[it.membro]||[]).push(it);});
@@ -9916,6 +9952,7 @@ function tsListaHtml(list){
       <div class="ts-main">
         <div class="ts-nome">${escHtml(it.nome)}</div>
         <div class="ts-sub">${it.tipo} · <b>${escHtml(it.tamanho)}</b>${comPrecos&&p>0?` · ${eur(p)}`:''}${orfao?' · <i class="ts-orfao">fora da grelha</i>':''}</div>
+        ${tsImputExplicita(it)?`<div class="ts-imput">💳 ${escHtml(tsImputados(it).join(' + '))}${comPrecos&&p>0&&tsImputados(it).length>1?` <i>(${eur(rnd(p/tsImputados(it).length,2))} cada)</i>`:''}</div>`:''}
       </div>
       ${ed?'<span class="stk-chev">›</span>':''}
     </div>`;
@@ -9958,10 +9995,38 @@ function tsTipoAgg(items){
   });
 }
 
+/* "Por conta de": quanto fica para a conta de cada membro depois das
+   imputações do admin. Só aparece quando há imputações mesmo — sem elas isto
+   seria uma cópia do "Por pessoa" logo a seguir. */
+function tsImputHtml(items){
+  if(!TS_IMPUT_COL||!tsTemImputacoes())return '';
+  const comPrecos=tsTemPrecos();
+  const agg=tsImputAgg(items);
+  let h='<div class="ts-sec sf">Por conta de</div><div class="cmp-list">';
+  h+=agg.map(g=>{
+    // Uma t-shirt dividida conta meia (ou um terço) para cada lado — daí o
+    // número poder sair com vírgula. O que interessa mesmo é o valor.
+    const partes=g.itens.reduce((a,x)=>a+1/x.partes,0);
+    const nTxt=Number(rnd(partes,2)).toLocaleString('pt-PT',{maximumFractionDigits:2});
+    const nomes=g.itens.map(x=>escHtml(x.it.nome)+(x.partes>1?` <i>(1/${x.partes})</i>`:'')).join(', ');
+    return `<div class="ts-item">
+      <span class="ts-ava">💳</span>
+      <div class="ts-main">
+        <div class="ts-nome">${escHtml(g.membro)}</div>
+        <div class="ts-sub ts-imput-list">${nomes}</div>
+      </div>
+      <span class="ts-imput-tot">${comPrecos&&g.valor>0?eur(g.valor):`${nTxt} t-shirt${partes===1?'':'s'}`}</span>
+    </div>`;
+  }).join('');
+  h+='</div>';
+  return h;
+}
+
 /* ── Modal: adicionar / editar um pedido ── */
 let _tsEdit=null;   // id em edição · null = novo
 let _tsTipo='Homem';
 let _tsTam='';
+let _tsImput=[];    // imputação em edição (vazio = conta de quem pediu)
 function openTshirtModal(id){
   if(!TSHIRTS_TABLE)return;
   if(bloqueadoPorFecho())return;
@@ -9972,6 +10037,7 @@ function openTshirtModal(id){
   _tsEdit=it?it._id:null;
   _tsTipo=it?it.tipo:(tsTiposAtivos()[0]||TS_TIPOS[0]);
   _tsTam=it?it.tamanho:'';
+  _tsImput=it?(it.imputadoA||[]).filter(Boolean).slice():[];
   document.getElementById('ts-title').textContent=it?'Editar T-shirt':'Adicionar T-shirt';
   document.getElementById('ts-nome').value=it?it.nome:'';
   document.getElementById('ts-membro').innerHTML=isAdmin()?memberOptions(it?it.membro:meuNomePrincipal()):myMemberOptions(it?it.membro:'');
@@ -9985,6 +10051,9 @@ function openTshirtModal(id){
   if(it&&it.criadoPor){meta.innerHTML=`Registado por <b>${escHtml(it.criadoPor)}</b>${it.criadoEm?' · '+fmtDiaMes(String(it.criadoEm).slice(0,10)):''}`;meta.style.display='';}
   else meta.style.display='none';
   tsRenderPicker();
+  // Imputação: só o admin, e só com a coluna migrada
+  document.getElementById('ts-imput-wrap').style.display=(isAdmin()&&TS_IMPUT_COL)?'':'none';
+  tsRenderImput();
   document.getElementById('ts-bg').classList.add('show');
   document.body.classList.add('no-scroll');
   if(!it)setTimeout(()=>document.getElementById('ts-nome').focus(),60);
@@ -10017,6 +10086,49 @@ function tsRenderPicker(){
   tams.innerHTML=opts.length
     ?opts.map(o=>`<button type="button" class="ts-chip${_tsTam===o.tamanho?' on':''}${o._fora?' fora':''}" onclick="tsPickTam(${JSON.stringify(o.tamanho).replace(/"/g,'&quot;')})">${escHtml(o.tamanho)}${(+o.preco||0)>0?`<i>${eur(o.preco)}</i>`:''}</button>`).join('')
     :'<div class="note" style="margin:0">Sem tamanhos definidos para esta tipologia.</div>';
+  tsRenderImput();   // a dica da imputação mostra o preço, que acabou de mudar
+}
+
+/* Imputação (só admin): chips dos membros, multi-seleção. Nenhum escolhido =
+   fica na conta de quem pediu — esse chip aparece marcado como "por defeito". */
+function tsRenderImput(){
+  const box=document.getElementById('ts-imput');
+  const wrap=document.getElementById('ts-imput-wrap');
+  if(!box||!wrap||wrap.style.display==='none')return;
+  const sel=document.getElementById('ts-membro');
+  const dono=(sel&&sel.value)||'';
+  const nomes=CALC?CALC.membros.map(m=>m.nome):[];
+  // Quem já esteja imputado mas não seja membro deste ano não desaparece daqui
+  _tsImput.forEach(n=>{if(!nomes.includes(n))nomes.push(n);});
+  box.innerHTML=nomes.map(n=>{
+    const on=_tsImput.includes(n);
+    const implicito=!_tsImput.length&&n===dono;
+    return `<button type="button" class="ts-chip${on?' on':''}${implicito?' implicito':''}" onclick="tsToggleImput(${JSON.stringify(n).replace(/"/g,'&quot;')})">${escHtml(n)}</button>`;
+  }).join('')||'<div class="note" style="margin:0">Sem membros no plantel deste ano.</div>';
+  const hint=document.getElementById('ts-imput-hint');
+  if(hint){
+    const alvos=_tsImput.length?_tsImput:(dono?[dono]:[]);
+    const p=tsPreco(_tsTipo,_tsTam);
+    let t=_tsImput.length
+      ?`Cobra-se a ${alvos.join(' + ')}`
+      :'Fica na conta de quem pediu. Carrega nos nomes para dividir por outros (ex.: as dos filhos pelos dois pais).';
+    if(tsTemPrecos()&&p>0&&alvos.length>1)t+=` · ${eur(rnd(p/alvos.length,2))} cada`;
+    hint.textContent=t;
+  }
+}
+function tsToggleImput(n){
+  const i=_tsImput.indexOf(n);
+  if(i>=0)_tsImput.splice(i,1);else _tsImput.push(n);
+  // Escolher só quem pediu é o mesmo que não escolher nada: guarda-se vazio e
+  // a conta passa a acompanhar o dono do pedido se ele mudar
+  const sel=document.getElementById('ts-membro');
+  if(_tsImput.length===1&&sel&&_tsImput[0]===sel.value)_tsImput=[];
+  tsRenderImput();
+}
+// Normaliza o que vai para a BD: sem repetidos e sem o caso "só quem pediu"
+function tsImputParaGravar(membro){
+  const l=[...new Set(_tsImput.filter(Boolean))];
+  return (l.length===1&&l[0]===membro)?[]:l;
 }
 async function tshirtSave(more){
   if(bloqueadoPorFecho())return;
@@ -10029,15 +10141,21 @@ async function tshirtSave(more){
   const tipo=_tsTipo,tamanho=_tsTam;
   setSync('load','a guardar…');
   try{
+    // A imputação é só do admin: quem não é admin nem envia o campo, para não
+    // pisar (nem esbarrar no trigger) o que o admin já tenha definido
+    const imput=(isAdmin()&&TS_IMPUT_COL)?tsImputParaGravar(membro):null;
     if(_tsEdit!=null){
-      await queueWrite(()=>sbReq('PATCH',`tshirts?id=eq.${_tsEdit}`,{membro,nome,tipo,tamanho}));
+      const patch={membro,nome,tipo,tamanho};
+      if(imput)patch.imputado_a=imput;
+      await queueWrite(()=>sbReq('PATCH',`tshirts?id=eq.${_tsEdit}`,patch));
       const it=tsArr().find(x=>x._id===_tsEdit);
-      if(it)Object.assign(it,{membro,nome,tipo,tamanho});
+      if(it){Object.assign(it,{membro,nome,tipo,tamanho});if(imput)it.imputadoA=imput;}
     }else{
       const email=_sbSession?_sbSession.user.email:null;
-      const ins=await queueWrite(()=>sbReq('POST','tshirts',
-        [{evento_id:DATA._sbId,membro,nome,tipo,tamanho,criado_por:email}],{Prefer:'return=representation'}));
-      if(ins&&ins[0])tsArr().push({_id:ins[0].id,membro,nome,tipo,tamanho,criadoPor:email||'',criadoEm:ins[0].criado_em});
+      const row={evento_id:DATA._sbId,membro,nome,tipo,tamanho,criado_por:email};
+      if(imput)row.imputado_a=imput;
+      const ins=await queueWrite(()=>sbReq('POST','tshirts',[row],{Prefer:'return=representation'}));
+      if(ins&&ins[0])tsArr().push({_id:ins[0].id,membro,nome,tipo,tamanho,imputadoA:imput||[],criadoPor:email||'',criadoEm:ins[0].criado_em});
     }
     syncMirror();marcaGuardado();renderTshirts();
     if(more&&_tsEdit==null){
@@ -10300,6 +10418,7 @@ function buildTshirtsReport(){
   const nome=(DATA.evento.nome||'MEO').replace(/\s*\d{4}\s*/g,'').trim()||'MEO';
   const items=tsArr().slice();
   const comPrecos=tsTemPrecos();
+  const comImput=TS_IMPUT_COL&&tsTemImputacoes();
   let h=`<h1>${nome} ${ano} — T-shirts</h1>`;
   h+=`<div class="subtitle">Encomenda de t-shirts · ${items.length} no total${tsEurSufixo(items)}</div>`;
   if(!items.length){
@@ -10325,6 +10444,21 @@ function buildTshirtsReport(){
   h+=`<tr style="border-top:2px solid #ddd"><td colspan="2"><b>Total</b></td><td class="right"><b>${items.length}</b></td>${comPrecos?`<td></td><td class="right"><b>${tsTotalEur(items)>0?eur(tsTotalEur(items)):'—'}</b></td>`:''}</tr>`;
   h+='</table>';
 
+  // A cobrar por membro — só quando o admin imputou alguma coisa; sem
+  // imputações isto seria uma cópia dos totais de "Pedidos por pessoa"
+  if(TS_IMPUT_COL&&tsTemImputacoes()){
+    h+='<h2>A cobrar por membro</h2>';
+    h+=`<table><tr><th>Membro</th><th>T-shirts</th><th class="right">Qtd</th>${comPrecos?'<th class="right">Valor</th>':''}</tr>`;
+    const agg=tsImputAgg(items);
+    agg.forEach(g=>{
+      const partes=rnd(g.itens.reduce((a,x)=>a+1/x.partes,0),2);
+      const nomes=g.itens.map(x=>escHtml(x.it.nome)+` (${escHtml(x.it.tipo)} ${escHtml(x.it.tamanho)}${x.partes>1?`, 1/${x.partes}`:''})`).join(', ');
+      h+=`<tr><td><b>${escHtml(g.membro)}</b></td><td>${nomes}</td><td class="right">${Number(partes).toLocaleString('pt-PT',{maximumFractionDigits:2})}</td>${comPrecos?`<td class="right">${g.valor>0?eur(g.valor):'—'}</td>`:''}</tr>`;
+    });
+    h+=`<tr style="border-top:2px solid #ddd"><td colspan="2"><b>Total</b></td><td class="right"><b>${items.length}</b></td>${comPrecos?`<td class="right"><b>${tsTotalEur(items)>0?eur(tsTotalEur(items)):'—'}</b></td>`:''}</tr>`;
+    h+='</table>';
+  }
+
   // Por pessoa — quem pediu o quê
   h+='<h2>Pedidos por pessoa</h2>';
   const porMembro={};
@@ -10332,10 +10466,10 @@ function buildTshirtsReport(){
   Object.keys(porMembro).sort((a,b)=>a.localeCompare(b,'pt')).forEach(m=>{
     const list=porMembro[m].slice().sort(tsPedidoCmp);
     h+=`<h3>${escHtml(m)} — ${list.length} t-shirt${list.length===1?'':'s'}${tsEurSufixo(list)}</h3>`;
-    h+=`<table><tr><th>Nome</th><th>Tipologia</th><th>Tamanho</th>${comPrecos?'<th class="right">Preço</th>':''}</tr>`;
+    h+=`<table><tr><th>Nome</th><th>Tipologia</th><th>Tamanho</th>${comImput?'<th>Por conta de</th>':''}${comPrecos?'<th class="right">Preço</th>':''}</tr>`;
     list.forEach(it=>{
       const p=tsPreco(it.tipo,it.tamanho);
-      h+=`<tr><td>${escHtml(it.nome)}</td><td>${escHtml(it.tipo)}</td><td><b>${escHtml(it.tamanho)}</b></td>${comPrecos?`<td class="right">${p>0?eur(p):'—'}</td>`:''}</tr>`;
+      h+=`<tr><td>${escHtml(it.nome)}</td><td>${escHtml(it.tipo)}</td><td><b>${escHtml(it.tamanho)}</b></td>${comImput?`<td>${tsImputExplicita(it)?escHtml(tsImputados(it).join(' + ')):'—'}</td>`:''}${comPrecos?`<td class="right">${p>0?eur(p):'—'}</td>`:''}</tr>`;
     });
     h+='</table>';
   });
