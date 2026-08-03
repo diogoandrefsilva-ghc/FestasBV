@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v181 · 2026-08-03 · Despensa: o 🫙 passa para depois do nome e o bloco de despensa sobe para o topo da lista de compras';
+const APP_BUILD = 'v182 · 2026-08-03 · Pagar dívida: cada um regista o seu pagamento e o admin valida antes de entrar nas contas';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -302,6 +302,13 @@ function updateContasUI(){
   const fechadas=contasFechadas();
   document.body.classList.toggle('contas-fechadas',fechadas);
   document.body.classList.toggle('dividas-saldadas',dividasTodasSaldadas());
+  // Contas fechadas é justamente quando se pagam as dívidas: quem pode registar
+  // um pagamento (para validação) continua a ter o FAB dos cash-flows.
+  document.body.classList.toggle('pode-saldar',podeSaldar());
+  // Ponto no separador Cash quando há pagamentos à espera de decisão: sem isto,
+  // o admin só dava com eles se lá fosse por acaso.
+  const cashTab=document.querySelector('.tab[data-tab="cashflows"]');
+  if(cashTab)cashTab.classList.toggle('tab-alerta',pagPendAbertos().length>0);
   // Compras não faz sentido em anos fechados — esconde o tab (e sai dele se lá estiver)
   const comprasTab=document.querySelector('.tab[data-tab="compras"]');
   if(comprasTab)comprasTab.style.display=fechadas?'none':'';
@@ -1473,7 +1480,10 @@ function renderCashFlows(){
       <b class="${cls}">${sgn}${eur(tot[t]||0)}</b>
       <small class="sf">${icon} ${lbl} <i>${cnt[t]||0}</i></small>
     </div>`;
-  let pp=`<div class="card cfc-net">
+  // Pagamentos declarados à espera de validação: à cabeça de tudo, porque é o
+  // que exige uma decisão (do admin) ou uma espera (de quem pagou).
+  let pp=pagPendBlockHtml();
+  pp+=`<div class="card cfc-net">
     <div>
       <div class="cfc-net-lbl sf">Resultado do grupo</div>
       <div class="cfc-net-val ${liq<0?'neg':'pos'}">${liq<0?'−':'+'}${eur(Math.abs(liq))}</div>
@@ -1899,7 +1909,7 @@ async function carregar(){
     const sel='*,membros(*,presencas(*)),refeicoes_def(*),despesas(*),convidados(*),mealheiros(*),pagamentos(*)';
     // shoplist vai numa fetch SEPARADA e tolerante a falha: se a tabela ainda
     // não existir (migração por correr) o resto da app continua a funcionar.
-    const [res,uaRes,cjRes,vlRes,slRes,stRes,ctRes,acRes,adRes,npRes,flRes,fpRes,ccRes,sljRes,cpRes,stmRes,ttRes,tsRes,tiRes]=await Promise.all([
+    const [res,uaRes,cjRes,vlRes,slRes,stRes,ctRes,acRes,adRes,npRes,flRes,fpRes,ccRes,sljRes,cpRes,stmRes,ttRes,tsRes,tiRes,ppRes]=await Promise.all([
       sbFetch(`${SB_URL}/rest/v1/eventos?select=${encodeURIComponent(sel)}&order=ano.asc`,{headers:sbHeaders(),cache:'no-store'}),
       sbFetch(`${SB_URL}/rest/v1/user_amigos?select=email,amigo`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null),
       sbFetch(`${SB_URL}/rest/v1/conjuges?select=amigo_a,amigo_b`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null),
@@ -1934,7 +1944,11 @@ async function carregar(){
       sbFetch(`${SB_URL}/rest/v1/tshirt_tamanhos?select=*`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null),
       sbFetch(`${SB_URL}/rest/v1/tshirts?select=*`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null),
       // sonda à coluna tshirts.imputado_a (db/tshirts_imputacao.sql): 200 = já existe
-      sbFetch(`${SB_URL}/rest/v1/tshirts?select=imputado_a&limit=1`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null)
+      sbFetch(`${SB_URL}/rest/v1/tshirts?select=imputado_a&limit=1`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null),
+      // pagamentos de dívida à espera de validação (db/pagamentos_pendentes.sql):
+      // tolerante — sem a migração, PAGPEND_TABLE=false e registar pagamentos
+      // volta a ser só do admin. O RLS já só devolve os pedidos que se podem ver.
+      sbFetch(`${SB_URL}/rest/v1/pagamentos_pendentes?select=*&order=criado_em.desc`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null)
     ]);
     if(!res.ok)throw new Error('HTTP '+res.status);
     const rows=await res.json();
@@ -1981,6 +1995,11 @@ async function carregar(){
     TS_IMPUT_COL=TSHIRTS_TABLE&&!!(tiRes&&tiRes.ok);
     // Trancar encomendas (db/tshirts_trancar.sql): a coluna vem no próprio evento
     TS_LOCK_COL=rows.some(ev=>'tshirts_trancadas' in ev);
+    // Pagamentos à espera de validação: lista global (como as VALIDACOES), não
+    // entra no ano — assim o save do ano, que substitui as tabelas filhas, nunca
+    // lhe toca. Nada disto entra no calcular(): só é dinheiro depois de aprovado.
+    PAGPEND_TABLE=!!(ppRes&&ppRes.ok);
+    PAGPEND=PAGPEND_TABLE?(await ppRes.json()).map(pagPendRow):[];
     TS_TAMS=TSHIRTS_TABLE?(await ttRes.json()).map(t=>({id:t.id,tipo:t.tipo,tamanho:t.tamanho,ordem:t.ordem||0,preco:N(t.preco)})).sort(tsTamCmp):[];
     const tsByEv={};
     if(TSHIRTS_TABLE)(await tsRes.json()).forEach(t=>{(tsByEv[t.evento_id]=tsByEv[t.evento_id]||[]).push(t);});
@@ -2193,6 +2212,17 @@ function fraseHistorico(tipo,accao,alvo,autor,d){
     }
     return `${A} pôs "${alvo}"${q} na lista de compras${dest}${loja}${trato}`;
   }
+  if(tipo==='pagamento'){
+    // O pedido é o único que interessa avisar em cima da hora: fica a aguardar
+    // uma decisão do admin, e é ele quem recebe a notificação.
+    const v=d.valorTxt||'';
+    const dono=(alvo&&alvo!==autor)?` de ${alvo}`:'';
+    const dv=d.dividas?` (${d.dividas})`:'';
+    if(accao==='aprovou')return `${A} validou o pagamento${dono} de ${v}`;
+    if(accao==='rejeitou')return `${A} rejeitou o pagamento${dono} de ${v}`+(d.motivo?` — ${d.motivo}`:'');
+    if(accao==='cancelou')return `${A} cancelou o pagamento${dono} de ${v} que tinha registado`;
+    return `💸 ${A} registou que pagou ${v}${dv} — falta validares em Cash Flows`;
+  }
   if(tipo==='convidado'){
     const dono=(d.membro&&d.membro!==autor)?` (convidado de ${d.membro})`:'';
     // Acompanhantes sem nome: diz-se de que é feita a linha
@@ -2324,7 +2354,7 @@ function renderHistList(){
       const d=r.detalhe||{};
       const quando=new Date(r.ts).toLocaleString('pt-PT',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
       const quem=escHtml(r.autor_amigo||r.autor_email||'?');
-      const icon=r.tipo==='presenca'?'✋':r.tipo==='compras'?'🛒':r.tipo==='refeicao'?'🧑‍🍳':r.tipo==='crianca'?'🧒':'👥';
+      const icon=r.tipo==='presenca'?'✋':r.tipo==='compras'?'🛒':r.tipo==='refeicao'?'🧑‍🍳':r.tipo==='crianca'?'🧒':r.tipo==='pagamento'?'💸':'👥';
       const slot=[d.dia,d.ref].filter(Boolean).join(' · ');
       let txt,sub;
       if(d.frase){
@@ -2457,9 +2487,16 @@ function updateCfForm(){
         </div>
       </div>`;
   } else if(cfDir==='saldar'){
+    // Um membro só regista pagamentos seus (ou do cônjuge) e o que regista fica
+    // à espera de validação — não é dinheiro até o admin dizer que sim.
+    const pede=!isAdmin();
+    const meus=pede?pagPendMeus():[];
+    const jaPend=meus.length?rnd(meus.reduce((a,p)=>a+pagPendTotal(p),0),2):0;
     f.innerHTML=`
+      ${pede?`<div class="cf-aviso">🕓 Fica à espera de validação do administrador. Só entra nas contas — e só baixa a tua dívida — depois de ele confirmar que recebeu.</div>`:''}
+      ${jaPend>0?`<div class="cf-aviso warn">Já tens ${eur(jaPend)} registado${meus.length>1?'s':''} à espera de validação. Não registes duas vezes o mesmo pagamento.</div>`:''}
       <label>Quem pagou?</label>
-      <select id="cf-who" onchange="updateSdChips()">${memberOptions(myPrimaryName())}</select>
+      <select id="cf-who" onchange="updateSdChips()">${pede?myMemberOptions(myPrimaryName()):memberOptions(myPrimaryName())}</select>
       <label>Que dívidas paga?</label>
       <div class="sd-list" id="sd-chips"></div>
       <div class="inline-row" style="margin-top:14px">
@@ -2475,7 +2512,9 @@ function updateCfForm(){
           <input type="number" id="cf-extra" step="0.01" min="0" placeholder="0,00" inputmode="decimal" oninput="updateExtraTotal()">
           <div class="note" id="cf-total-hint"></div>
         </div>
-      </details>`;
+      </details>
+      ${pede?`<label>Como pagaste?</label>
+      <input type="text" id="cf-nota" maxlength="60" placeholder="Opcional — ex: MB Way, transferência, em mão">`:''}`;
     setTimeout(updateSdChips,10);
   }
 }
@@ -2627,11 +2666,17 @@ function updateSdChips(){
   const who=document.getElementById('cf-who')?.value||'';
   const ms=CALC.membros;
   // Only show members with active (unsettled) debts — saldoFinal < 0
-  const debtors=ms.filter(m=>{
+  let debtors=ms.filter(m=>{
     if(m.saldoFinal>=- 0.005) return false; // already settled
     const d=_dividasEmAberto(m);
     return d.prop>0.005||d.conv>0.005;
   });
+  // Um membro paga o que é dele (e do cônjuge). Pagar a dívida de outra pessoa
+  // é acerto entre terceiros e continua a ser matéria do admin.
+  if(!isAdmin()){
+    const rel=_relatedNames(who);
+    debtors=debtors.filter(m=>rel.has(m.nome));
+  }
 
   if(!debtors.length){container.classList.remove('sd-grouped');container.innerHTML='<div class="empty sf" style="width:100%">Sem dívidas ativas por pagar</div>';recalcSdVal();return;}
 
@@ -2735,15 +2780,26 @@ function updateExtraTotal(){
 function openPayModal(){
   document.getElementById('pay-bg').classList.add('show');
   document.body.classList.add('no-scroll');
-  // Não-admin só pode lançar despesas: esconde a roda (ícone único) e diz-o no título
-  const soDespesa=!isAdmin()&&!contasFechadas();
+  // Que opções tem este utilizador? O admin tem tudo; um membro tem despesas
+  // (ano aberto) e pagamentos de dívida — estes só existem se a migração dos
+  // pendentes estiver feita e ele estiver ligado a um membro.
+  const admin=isAdmin();
+  const fechadas=contasFechadas();
+  const podeDespesa=!fechadas;
+  const podeSald=podeSaldar();
+  const optSald=document.getElementById('cf-opt-saldar');
+  if(optSald)optSald.style.display=podeSald?'':'none';
+  // Quantas opções ficam mesmo à vista: despesa (ano aberto), reembolso (admin,
+  // vale mesmo com contas fechadas), mealheiro (admin, .cf-entrada — o CSS
+  // esconde-o com o ano fechado) e pagar dívida. Uma só → a roda não serve.
+  const nOpts=(podeDespesa?1:0)+(admin?1:0)+(admin&&!fechadas?1:0)+(podeSald?1:0);
   const wheel=document.getElementById('cf-wheel');
-  if(wheel)wheel.style.display=soDespesa?'none':'';
+  if(wheel)wheel.style.display=nOpts>1?'':'none';
   const ttl=document.getElementById('pay-title');
-  if(ttl)ttl.textContent=soDespesa?'Cash Flows — Despesas':'Cash Flows';
-  setCfType(contasFechadas()?'saldar':'despesa');
+  if(ttl)ttl.textContent=nOpts>1?'Cash Flows':(podeSald&&!podeDespesa?'Cash Flows — Pagar Dívida':'Cash Flows — Despesas');
+  setCfType((fechadas||!podeDespesa)?'saldar':'despesa');
   const note=document.getElementById('cf-note');
-  if(note)note.textContent=contasFechadas()?'Contas fechadas — só pagamentos de dívidas.':(isAdmin()?'Guardado na base de dados do grupo.':'Podes registar despesas pagas por ti ou pelo teu cônjuge.');
+  if(note)note.textContent=fechadas?'Contas fechadas — só pagamentos de dívidas.':(admin?'Guardado na base de dados do grupo.':'Podes registar despesas e pagamentos teus ou do teu cônjuge.');
 }
 function closePayModal(){
   document.getElementById('pay-bg').classList.remove('show');
@@ -2851,6 +2907,47 @@ async function saveCashFlow(){
     }
     const extra=rnd(Math.max(0,parseFloat(document.getElementById('cf-extra')?.value)||0),2);
     const ref=covParts.join(', ');
+    // ── Não-admin: isto é um PEDIDO, não um lançamento ──
+    // O pagamento fica em pagamentos_pendentes e só vira cash-flow quando o
+    // admin validar (aprovarPagPend). Nada aqui toca no DATA — as contas não
+    // podem mexer com dinheiro que ainda ninguém confirmou ter recebido.
+    if(!isAdmin()){
+      const rel=_relatedNames(who);
+      if(!podePedirPagamento()){
+        toast('Só o administrador regista pagamentos de dívida','bad');
+        document.getElementById('pay-save').disabled=false;return;
+      }
+      if(!MY_NAMES.includes(who)){
+        toast('Só podes registar pagamentos teus ou do teu cônjuge','bad');
+        document.getElementById('pay-save').disabled=false;return;
+      }
+      const alheia=covParts.find(k=>!rel.has(k.replace(/^(own|conv):/,'')));
+      if(alheia){
+        toast('Só podes pagar dívidas tuas ou do teu cônjuge','bad');
+        document.getElementById('pay-save').disabled=false;return;
+      }
+      if(!DATA._sbId){toast('Sem ligação à base de dados — recarrega a página','bad');document.getElementById('pay-save').disabled=false;return;}
+      const nota=(document.getElementById('cf-nota')?.value||'').trim();
+      setSync('load','a guardar…');
+      try{
+        const ins=await queueWrite(()=>sbReq('POST','pagamentos_pendentes',
+          [{evento_id:DATA._sbId,de:who,para:tes,valor:rnd(val,2),extra,ref,data:date||null,
+            nota,criado_por:meuNomePrincipal()||''}],
+          {Prefer:'return=representation'}));
+        if(Array.isArray(ins)&&ins[0])PAGPEND.unshift(pagPendRow(ins[0]));
+        marcaGuardado();
+        sbLog('pagamento','pediu',who,{valorTxt:eur(rnd(val+extra,2)),dividas:sdRefLabel(ref),nota});
+        document.getElementById('pay-save').disabled=false;
+        closePayModal();
+        renderAll();
+        toast('Pagamento registado — à espera de validação 🕓','ok');
+      }catch(e){
+        setSync('err','erro ao guardar');
+        document.getElementById('pay-save').disabled=false;
+        toast(permErrorMsg(e),'bad');
+      }
+      return;
+    }
     // p.valor = dinheiro real entregue (dívida + extra). p.extra = fatia que é poupança.
     DATA.pagamentos.push({de:who,para:tes,valor:rnd(val+extra,2),ref,data:date,extra});
     commitMsg=`Saldar: ${who} → ${tes} ${eur(rnd(val+extra,2))}`+(extra>0?` (poupança +${eur(extra)})`:'');
@@ -2859,6 +2956,197 @@ async function saveCashFlow(){
   const ok=await pushToGitHub(commitMsg);
   document.getElementById('pay-save').disabled=false;
   if(ok){closePayModal();CALC=calcular(JSON.parse(JSON.stringify(DATA)));renderAll();toast('Cash-flow registado ✓','ok');}
+}
+
+/* ═══ PAGAMENTOS PENDENTES (pedidos de pagamento de dívida) ═══
+   Um pagamento de dívida mexe nas contas de toda a gente, por isso a tabela
+   `pagamentos` continua a ser só do admin (e a app grava o ano a substituir as
+   tabelas filhas — um não-admin nunca poderia fazer isso). O que muda é o
+   caminho até lá: quem paga declara-o na app, o pedido fica em
+   `pagamentos_pendentes` e SÓ QUANDO O ADMIN APROVA é que nasce o cash-flow.
+   Enquanto está à espera não é dinheiro — o calcular() nem o vê, as dívidas
+   não baixam, os saldos não mexem.
+   Migração: db/pagamentos_pendentes.sql. Sem ela, PAGPEND_TABLE=false: a opção
+   volta a ser só do admin e nada disto aparece. */
+let PAGPEND_TABLE=false;
+let PAGPEND=[];   // todos os anos, como as VALIDACOES (o RLS já filtra o que se pode ver)
+
+function pagPendRow(r){
+  return {id:r.id,eventoId:r.evento_id,de:r.de,para:r.para||'',
+    valor:+r.valor||0,extra:+r.extra||0,ref:r.ref||'',data:r.data||'',nota:r.nota||'',
+    estado:r.estado||'pendente',criadoPor:r.criado_por||'',criadoPorEmail:r.criado_por_email||'',
+    criadoEm:r.criado_em,decididoPor:r.decidido_por||'',decididoEm:r.decidido_em||null,motivo:r.motivo||''};
+}
+function pagPendDoAno(){
+  if(!PAGPEND_TABLE||!DATA||!DATA._sbId)return[];
+  return PAGPEND.filter(p=>p.eventoId===DATA._sbId);
+}
+function pagPendAbertos(){return pagPendDoAno().filter(p=>p.estado==='pendente');}
+function pagPendTotal(p){return rnd((p.valor||0)+(p.extra||0),2);}
+/* Um membro ligado a uma conta PEDE (não regista) pagamentos seus e do cônjuge.
+   O admin não pede — regista de imediato, como sempre fez. */
+function podePedirPagamento(){return !!_sbSession&&!isAdmin()&&PAGPEND_TABLE&&MY_NAMES.length>0;}
+/* A opção "🤝 Pagar Dívida" tem dono neste utilizador? */
+function podeSaldar(){return !!_sbSession&&(isAdmin()||podePedirPagamento());}
+/* O que o próprio já tem à espera — para não pedir duas vezes a mesma dívida. */
+function pagPendMeus(){return pagPendAbertos().filter(p=>MY_NAMES.includes(p.de));}
+/* Cartão que o admin está a rejeitar (mostra a caixa do motivo). A app não usa
+   prompt() em lado nenhum — o motivo pede-se no próprio cartão. */
+let _ppRejId=null;
+function fecharRejPagPend(){_ppRejId=null;renderCashFlows();}
+
+/* Bloco à cabeça dos Cash Flows. Para o admin é a fila de aprovações; para quem
+   pediu é o estado do pedido. Os aprovados saem daqui — já estão na cronologia
+   como cash-flow, e mostrá-los nos dois sítios era contar o mesmo duas vezes. */
+function pagPendBlockHtml(){
+  const rows=pagPendDoAno().filter(p=>p.estado!=='aprovado');
+  if(!rows.length)return'';
+  const admin=isAdmin();
+  const ord={pendente:0,rejeitado:1};
+  rows.sort((a,b)=>(ord[a.estado]-ord[b.estado])||String(b.criadoEm||'').localeCompare(String(a.criadoEm||'')));
+  const nPend=rows.filter(p=>p.estado==='pendente').length;
+  const totPend=rnd(rows.filter(p=>p.estado==='pendente').reduce((a,p)=>a+pagPendTotal(p),0),2);
+  // Só sobram rejeitados → o bloco muda de assunto: já não há nada a decidir
+  const nota=!nPend
+    ? 'Pagamentos que não foram aceites. Tira-os da lista quando estiver resolvido.'
+    : (admin ? 'Declarados por quem pagou. Só entram nas contas depois de os validares.'
+             : 'Já está registado. Entra nas contas quando o administrador validar.');
+  let h=`<div class="pp-box${nPend?'':' rej'}">
+    <div class="pp-hdr sf"><span>${nPend?`🕓 Pagamentos por validar<span class="pp-n">${nPend}</span>`:'✕ Pagamentos rejeitados'}</span>${totPend>0?`<span class="pp-tot">${eur(totPend)}</span>`:''}</div>
+    <p class="pp-note">${nota}</p>`;
+  rows.forEach(p=>{
+    const rej=p.estado==='rejeitado';
+    const total=pagPendTotal(p);
+    const meta=[];
+    if(p.data)meta.push(fmtDiaMes(p.data));
+    meta.push(escHtml(sdRefLabel(p.ref)));
+    if(p.extra>0)meta.push(`🐖 ${eur(p.extra)} poupança`);
+    if(p.criadoPor&&p.criadoPor!==p.de)meta.push('registado por '+escHtml(p.criadoPor));
+    // Rejeitado só se tira da vista; por validar decide-se (admin) ou cancela-se
+    // (quem registou — enganou-se no valor, ou o pagamento afinal não seguiu).
+    const emRej=admin&&!rej&&_ppRejId===p.id;
+    const acts=rej
+      ? `<button class="pp-btn no" onclick="apagarPagPend(${p.id})">Dispensar</button>`
+      : (admin
+          ? (emRej?'':`<button class="pp-btn ok" onclick="aprovarPagPend(${p.id})">✓ Validar</button>
+             <button class="pp-btn no" onclick="rejeitarPagPend(${p.id})">✕ Rejeitar</button>`)
+          : `<button class="pp-btn no" onclick="apagarPagPend(${p.id})">Cancelar</button>`);
+    h+=`<div class="pp-card${rej?' rej':''}">
+      <div class="pp-l1">
+        <div class="pp-who">${escHtml(p.de)} → ${escHtml(p.para||DATA.evento.tesoureiro||'')}</div>
+        <span class="pp-v">${eur(total)}</span>
+      </div>
+      <div class="pp-meta">${meta.filter(Boolean).join(' · ')}</div>
+      ${p.nota?`<div class="pp-obs">${escHtml(p.nota)}</div>`:''}
+      ${rej?`<div class="pp-rej sf">✕ Rejeitado${p.motivo?' — '+escHtml(p.motivo):''}</div>`:''}
+      ${acts?`<div class="pp-acts">${acts}</div>`:''}
+      ${emRej?`<div class="pp-rejform">
+        <input type="text" id="pp-motivo-${p.id}" maxlength="80" placeholder="Motivo — ex: ainda não recebi" onkeydown="if(event.key==='Enter')confirmarRejPagPend(${p.id})">
+        <div class="pp-acts">
+          <button class="pp-btn" onclick="fecharRejPagPend()">Voltar</button>
+          <button class="pp-btn no" onclick="confirmarRejPagPend(${p.id})">✕ Rejeitar</button>
+        </div>
+      </div>`:''}
+    </div>`;
+  });
+  return h+'</div>';
+}
+
+/* Aprovar = criar o cash-flow verdadeiro com o que foi PEDIDO (não com a dívida
+   de agora: entretanto podem ter entrado despesas, e o admin tem de aprovar o
+   que viu). Marca-se o pedido primeiro e só depois se lança o pagamento — pela
+   ordem inversa, uma falha a meio deixava o dinheiro lançado e o pedido na fila,
+   pronto a ser aprovado outra vez. O `estado=eq.pendente` no PATCH é a trava
+   contra dois toques seguidos (ou dois telemóveis ao mesmo tempo). */
+async function aprovarPagPend(id){
+  if(!isAdmin()){toast('Só o administrador valida pagamentos','bad');return;}
+  const p=PAGPEND.find(x=>x.id===id);
+  if(!p||p.estado!=='pendente')return;
+  _ppRejId=null;
+  const total=pagPendTotal(p);
+  const det=p.extra>0?`\n(${eur(p.valor)} de dívida + ${eur(p.extra)} de poupança)`:'';
+  if(!confirm(`Validar o pagamento de ${p.de}?\n\n${eur(total)}${det}\n\nEntra já nas contas como pagamento de dívida.`))return;
+  const agora=new Date().toISOString();
+  const antes=Object.assign({},p);
+  setSync('load','a guardar…');
+  let ret;
+  try{
+    ret=await queueWrite(()=>sbReq('PATCH',`pagamentos_pendentes?id=eq.${id}&estado=eq.pendente`,
+      {estado:'aprovado',decidido_por:_sbSession.user.email,decidido_em:agora,motivo:null},
+      {Prefer:'return=representation'}));
+  }catch(e){setSync('err','erro ao guardar');toast(permErrorMsg(e),'bad');return;}
+  if(!Array.isArray(ret)||!ret.length){
+    toast('Esse pedido já tinha sido tratado','bad');
+    await carregar();renderAll();return;
+  }
+  Object.assign(p,pagPendRow(ret[0]));
+  // p.valor em `pagamentos` = dinheiro entregue (dívida + extra); p.extra = a
+  // fatia que é poupança. É a mesma convenção do registo feito pelo admin.
+  DATA.pagamentos.push({de:p.de,para:p.para||DATA.evento.tesoureiro,valor:total,
+    ref:p.ref,data:p.data||hojeISO(),extra:p.extra});
+  const ok=await pushToGitHub(`Saldar (validado): ${p.de} → ${p.para||DATA.evento.tesoureiro} ${eur(total)}`);
+  if(!ok){
+    // O ano não gravou: devolve o pedido à fila, senão desaparecia sem nunca
+    // ter chegado a ser dinheiro.
+    try{await queueWrite(()=>sbReq('PATCH',`pagamentos_pendentes?id=eq.${id}`,
+      {estado:'pendente',decidido_por:null,decidido_em:null}));Object.assign(p,antes);}catch(_){}
+    await carregar();renderAll();
+    toast('Não foi possível lançar o pagamento — o pedido continua por validar','bad');
+    return;
+  }
+  sbLog('pagamento','aprovou',p.de,{valorTxt:eur(total),dividas:sdRefLabel(p.ref)});
+  CALC=calcular(JSON.parse(JSON.stringify(DATA)));
+  renderAll();
+  toast('Pagamento validado ✓','ok');
+}
+
+/* 1.º toque no ✕: abre a caixa do motivo no próprio cartão. */
+function rejeitarPagPend(id){
+  if(!isAdmin()){toast('Só o administrador valida pagamentos','bad');return;}
+  _ppRejId=id;
+  renderCashFlows();
+  setTimeout(()=>document.getElementById('pp-motivo-'+id)?.focus(),30);
+}
+/* 2.º toque: rejeita mesmo. O motivo é opcional — mas é o que quem pagou vai
+   ler para saber o que fazer a seguir. */
+async function confirmarRejPagPend(id){
+  if(!isAdmin()){toast('Só o administrador valida pagamentos','bad');return;}
+  const p=PAGPEND.find(x=>x.id===id);
+  if(!p||p.estado!=='pendente'){_ppRejId=null;return;}
+  const motivo=(document.getElementById('pp-motivo-'+id)?.value||'').trim();
+  _ppRejId=null;
+  const agora=new Date().toISOString();
+  setSync('load','a guardar…');
+  try{
+    const ret=await queueWrite(()=>sbReq('PATCH',`pagamentos_pendentes?id=eq.${id}&estado=eq.pendente`,
+      {estado:'rejeitado',decidido_por:_sbSession.user.email,decidido_em:agora,motivo:motivo||null},
+      {Prefer:'return=representation'}));
+    if(!Array.isArray(ret)||!ret.length){toast('Esse pedido já tinha sido tratado','bad');await carregar();renderAll();return;}
+    Object.assign(p,pagPendRow(ret[0]));
+    marcaGuardado();
+    sbLog('pagamento','rejeitou',p.de,{valorTxt:eur(pagPendTotal(p)),motivo});
+    renderAll();
+    toast('Pagamento rejeitado','ok');
+  }catch(e){setSync('err','erro ao guardar');toast(permErrorMsg(e),'bad');}
+}
+
+/* Cancelar (ainda por validar) ou dispensar (já rejeitado). Aprovado não passa
+   por aqui — é um cash-flow, e mexer nele é matéria do editor de cash-flows. */
+async function apagarPagPend(id){
+  const p=PAGPEND.find(x=>x.id===id);
+  if(!p||p.estado==='aprovado')return;
+  _ppRejId=null;
+  const pend=p.estado==='pendente';
+  if(!confirm(pend?`Cancelar o pagamento de ${eur(pagPendTotal(p))} que registaste?`:'Tirar este pedido rejeitado da lista?'))return;
+  setSync('load','a guardar…');
+  try{
+    await queueWrite(()=>sbReq('DELETE',`pagamentos_pendentes?id=eq.${id}`));
+    PAGPEND=PAGPEND.filter(x=>x.id!==id);
+    marcaGuardado();
+    if(pend)sbLog('pagamento','cancelou',p.de,{valorTxt:eur(pagPendTotal(p))});
+    renderAll();
+    toast(pend?'Pedido cancelado':'Pedido dispensado','ok');
+  }catch(e){setSync('err','erro ao guardar');toast(permErrorMsg(e),'bad');}
 }
 
 /* ═══ EDIT / DELETE CASH FLOW ═══ */
@@ -11301,8 +11589,13 @@ function saldosMembrosHtml(){
     const sf=m._sfEcra,zero=Math.abs(sf)<0.005;
     const cls=zero?'zero':(sf>0?'pos':'neg');
     const lblS=zero?'saldado':(sf>0?'a receber':'a pagar');
+    // Pagamento já registado mas ainda por validar: não abate ao saldo (não é
+    // dinheiro enquanto o admin não confirmar), mas tem de se ver aqui — é
+    // para este número que quem pagou vem olhar a seguir.
+    const pendT=rnd(pagPendAbertos().filter(p=>p.de===m.nome).reduce((a,p)=>a+pagPendTotal(p),0),2);
     return `${li?'<div class="rs-mv-title">Movimentos</div>'+li:''}
-      <div class="rs-it rs-saldo"><span class="k">Saldo <small>${lblS}</small></span><span class="v ${cls}">${eur(zero?0:sf)}</span></div>`;
+      <div class="rs-it rs-saldo"><span class="k">Saldo <small>${lblS}</small></span><span class="v ${cls}">${eur(zero?0:sf)}</span></div>
+      ${pendT>0.005?`<div class="rs-it rs-pend"><span class="k">🕓 Pago, à espera de validação</span><span class="v">${eur(pendT)}</span></div>`:''}`;
   };
   // det(g): para uma pessoa → fórmula individual + movimentos/saldo; para o grupo → contribuição de cada membro
   const det=(g,grupo)=>`<div class="rs-detail"><div class="rs-detail-inner sf">

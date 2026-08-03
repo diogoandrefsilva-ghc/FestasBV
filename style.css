@@ -72,6 +72,9 @@ header .sub{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:#
 .tab:not(.on):active{background:rgba(0,0,0,.35);color:#F5DDC2}
 /* Abas só com ícone (👕 T-shirts, ⚙ Definições): largura fixa, para as
    restantes ficarem com o espaço todo para os nomes. */
+/* Há pagamentos por validar neste ano (ver pagamentos_pendentes) */
+.tab.tab-alerta::after{content:"";position:absolute;top:5px;right:5px;width:7px;height:7px;border-radius:50%;background:#F3D9A8;box-shadow:0 0 0 1.5px rgba(0,0,0,.35)}
+.tab.tab-alerta.on::after{background:var(--gold);box-shadow:none}
 .tab.tab-ico{flex:0 0 34px;font-size:15px;padding:9px 0 10px}
 @media (max-width:360px){.tab.tab-ico{flex:0 0 28px;font-size:14px}}
 /* T-shirt BRANCA desenhada em vez do emoji 👕 — o emoji sai azul-claro e muda
@@ -128,6 +131,10 @@ body::before{content:"";position:fixed;top:0;left:0;right:0;height:env(safe-area
 .rs-row.rs-grand{border-color:var(--gold);background:rgba(238,182,77,.08)}
 .rs-row.rs-grand .rs-head .amt{color:var(--gold)}
 /* Detalhe do detalhe (refeições/dia · amigos/dia) */
+/* Pagamento declarado e ainda por validar: fica DEPOIS do saldo e em tom
+   secundário — ainda não abateu nada, só explica o que está a caminho */
+.rs-it.rs-pend{border-bottom:none;padding-top:2px}
+.rs-it.rs-pend .k,.rs-it.rs-pend .v{color:var(--gold);font-size:11.5px;font-weight:700}
 .rs-it.rs-exp{cursor:pointer;user-select:none}
 .rs-it.rs-exp:active{opacity:.7}
 .rs-exp .sub-arrow{display:inline-block;color:var(--faint);font-size:8.5px;margin-left:7px;transition:transform .2s;vertical-align:1px}
@@ -333,12 +340,13 @@ body.contas-fechadas .pl-fator input{pointer-events:none!important;opacity:.7}
 body.contas-fechadas .pl-sexo{pointer-events:none!important;opacity:.55}
 /* No modal de cash-flows, esconder entradas de apuramento (despesa/mealheiro) com contas fechadas */
 body.contas-fechadas .cf-entrada{display:none!important}
-/* Pós-fecho só o admin regista pagamentos */
-body.contas-fechadas.no-admin .fab.gold{display:none!important}
+/* Pós-fecho, o FAB fica para quem pode registar pagamentos: o admin, e o membro
+   que declara os seus (ficam à espera de validação — ver pagamentos_pendentes) */
+body.contas-fechadas.no-admin:not(.pode-saldar) .fab.gold{display:none!important}
 /* Dívidas todas saldadas → não há mais cash-flows a registar */
 body.dividas-saldadas .fab.gold{display:none!important}
 /* O handle de mover acompanha o FAB: só aparece se houver botão para arrastar */
-body.contas-fechadas.no-admin .fab-drag-handle{display:none!important}
+body.contas-fechadas.no-admin:not(.pode-saldar) .fab-drag-handle{display:none!important}
 body.dividas-saldadas .fab-drag-handle{display:none!important}
 
 /* ── Estado das contas ── */
@@ -1466,6 +1474,38 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 #lote-modal .mbtns{margin-top:14px}
 
 /* ═══ CASH-FLOWS — "Mista" (versão C: cabeçalho extrato + cronologia) ═══ */
+/* ── Pagamentos por validar: declarados por quem pagou, à espera do admin.
+      Ficam à cabeça do separador porque pedem uma decisão (admin) ou uma
+      espera (quem pagou) — e porque NÃO são dinheiro até serem validados. ── */
+.pp-box{background:var(--panel);border:1.5px solid var(--gold);border-radius:13px;padding:12px 13px 13px;margin:0 0 12px;box-shadow:0 1px 4px rgba(80,55,20,.07)}
+.pp-hdr{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.07em;color:var(--gold)}
+.pp-n{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 5px;margin-left:7px;border-radius:9px;background:var(--gold);color:#fff;font-size:10.5px;font-weight:800;letter-spacing:0}
+.pp-tot{font-size:13px;font-weight:800;font-variant-numeric:tabular-nums;color:var(--gold);letter-spacing:0;flex-shrink:0}
+.pp-note{font-size:11px;color:var(--faint);line-height:1.45;margin:5px 0 3px}
+.pp-card{background:var(--panel2);border:1px solid var(--line);border-left:4px solid var(--gold);border-radius:10px;padding:9px 11px;margin-top:8px}
+.pp-card.rej{border-left-color:var(--red)}
+.pp-l1{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+.pp-who{font-size:14px;font-weight:700;letter-spacing:-.1px;min-width:0;overflow-wrap:anywhere}
+.pp-v{font-size:15px;font-weight:800;font-variant-numeric:tabular-nums;color:var(--gold);flex-shrink:0}
+.pp-card.rej .pp-v{color:var(--red);text-decoration:line-through}
+.pp-meta{font-size:11.5px;color:var(--muted);margin-top:2px}
+.pp-obs{font-size:11.5px;color:var(--faint);font-style:italic;margin-top:3px;line-height:1.4}
+.pp-rej{font-size:11px;font-weight:700;color:var(--red);margin-top:5px;line-height:1.4;letter-spacing:0;text-transform:none}
+.pp-box.rej{border-color:var(--line)}
+.pp-box.rej .pp-hdr,.pp-box.rej .pp-tot{color:var(--red)}
+.pp-acts{display:flex;gap:7px;margin-top:9px}
+.pp-rejform{margin-top:8px;border-top:1px dashed var(--line);padding-top:8px}
+.pp-rejform input{width:100%;padding:8px 10px;border:1.5px solid var(--line);border-radius:9px;background:var(--panel);color:var(--ink);font-size:13px;font-family:inherit}
+.pp-rejform input:focus{outline:none;border-color:var(--gold)}
+.pp-rejform .pp-acts{margin-top:7px}
+.pp-btn{flex:1;border-radius:9px;border:1.5px solid var(--line);background:var(--panel);color:var(--muted);font-size:12px;font-weight:700;padding:8px 6px;cursor:pointer;transition:.15s;font-family:inherit}
+.pp-btn:active{transform:scale(.96)}
+.pp-btn.ok{border-color:var(--green);color:var(--green);background:rgba(30,122,77,.07)}
+.pp-btn.no{border-color:var(--red);color:var(--red);background:rgba(179,64,47,.06)}
+/* Aviso no modal de cash-flows: o pagamento vai a validação, não entra já */
+.cf-aviso{background:rgba(168,123,20,.09);border:1px solid rgba(168,123,20,.35);border-radius:10px;padding:9px 11px;font-size:11.5px;color:var(--muted);line-height:1.45;margin-bottom:12px}
+.cf-aviso.warn{background:rgba(179,64,47,.07);border-color:rgba(179,64,47,.35);color:var(--red);font-weight:600}
+
 .cfc-net{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 16px;margin:0 0 10px}
 .cfc-net-lbl{font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--faint);font-weight:700}
 .cfc-net-val{font-size:28px;font-weight:800;letter-spacing:-.5px;font-variant-numeric:tabular-nums;line-height:1.15}
