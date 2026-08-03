@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v187 · 2026-08-03 · Despensa: o custo vai sempre para Despesas Gerais — as refeições que pediram ficam respondidas pela cobertura, sem alocação';
+const APP_BUILD = 'v188 · 2026-08-03 · Pesquisa: botão 🔎 na Shop List e no Stock filtra a lista por nome de artigo (e loja/marca/categoria)';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -6097,6 +6097,46 @@ function renderShopViews(){
   if(!CALC||TAB!=='compras')renderCompras();
 }
 
+/* ═══ PESQUISA DE ARTIGOS (Shop List + Stock) ═══
+   Botão 🔎 no cabeçalho que abre uma caixa de filtro por nome. NÃO se memoriza
+   no aparelho (ao contrário da ordenação): procurar é um gesto do momento —
+   quem reabre a app quer a lista inteira, não o filtro de ontem. Fechar a
+   caixa limpa o que lá estiver.
+   Cada re-render refaz o innerHTML da vista e leva a caixa com ele, por isso o
+   foco e o cursor são repostos à mão (buscaRepoe) — e só quando foi a própria
+   pesquisa a mandar redesenhar, para nenhum outro re-render fazer saltar o
+   teclado no telemóvel. */
+let SHOP_BUSCA=false,SHOP_Q='',STOCK_BUSCA=false,STOCK_Q='';
+let _buscaFoco=null;
+// Comparação tolerante: sem maiúsculas nem acentos ("azeitao" acha "Azeitão")
+function buscaKey(s){return (s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');}
+// Todas as palavras têm de aparecer, em qualquer ordem e em qualquer um dos
+// campos: "virgem azeite" acha "Azeite extra virgem".
+function buscaMatch(q,...campos){
+  const t=buscaKey(campos.filter(Boolean).join(' '));
+  return buscaKey(q).split(/\s+/).filter(Boolean).every(w=>t.includes(w));
+}
+function buscaBtn(on,fn){return `<button class="btn hdr-ico busca-btn${on?' on':''}" aria-label="Pesquisar artigo" title="Pesquisar artigo" onclick="${fn}()">🔎</button>`;}
+function buscaCaixa(id,val,ph,fn){
+  return `<div class="busca"><i class="busca-ic">🔎</i>
+    <input id="${id}" class="busca-in" type="text" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="${escHtml(ph)}" value="${escHtml(val)}" oninput="${fn}(this.value)">
+    ${val?`<button class="busca-x" aria-label="Limpar pesquisa" onclick="${fn}('')">✕</button>`:''}</div>`;
+}
+// Se a caixa está focada, um re-render vindo de fora (atualização em tempo
+// real, por exemplo) não pode roubar o teclado a meio de uma palavra
+function buscaGuarda(id){const a=document.activeElement;if(a&&a.id===id)_buscaFoco=id;}
+function buscaRepoe(id){
+  if(_buscaFoco!==id)return;
+  _buscaFoco=null;
+  const inp=document.getElementById(id);if(!inp)return;
+  inp.focus({preventScroll:true});
+  const n=inp.value.length;try{inp.setSelectionRange(n,n);}catch(e){}
+}
+function toggleShopBusca(){SHOP_BUSCA=!SHOP_BUSCA;SHOP_Q='';if(SHOP_BUSCA)_buscaFoco='shop-busca';renderCompras();}
+function setShopQ(v){SHOP_Q=v;_buscaFoco='shop-busca';renderCompras();}
+function toggleStockBusca(){STOCK_BUSCA=!STOCK_BUSCA;STOCK_Q='';if(STOCK_BUSCA)_buscaFoco='stk-busca';renderStock();}
+function setStockQ(v){STOCK_Q=v;_buscaFoco='stk-busca';renderStock();}
+
 // Ordenação do separador Shop List: 'loja' = pela loja indicada por quem pediu
 // (defeito — é por loja que se fazem as compras; sem lojas indicadas cai
 // sozinha na refeição); 'ref' = agrupado por refeição/tipo; 'art' = lista plana
@@ -6172,9 +6212,16 @@ function renderCompras(){
   // (o que falta depois do stock). tratadoPor obsoleto (de uma compra antiga)
   // não o traz de volta ao carrinho.
   const nCobertos=act.filter(x=>!shopIsRemoved(x)&&shopIsCovered(x)).length;     // cobertos pelo stock: fora da shop list; só para a msg "nada por comprar"
-  const mine=act.filter(x=>!shopIsCovered(x)&&shopMineOwn(x)).sort(sortF);       // a MINHA checklist pessoal (só o diferencial por comprar)
-  const falta=act.filter(x=>!x.tratadoPor&&!shopIsRemoved(x)&&!shopIsCovered(x)).sort(sortF);  // livres, por tratar (e não cobertos pelo stock)
-  const carrinhos=act.filter(x=>x.tratadoPor&&!shopIsRemoved(x)&&!shopIsCovered(x)).sort(sortF);// já no carrinho de alguém (só o que ainda falta comprar)
+  /* Pesquisa: filtra pelo nome do artigo e pela LOJA indicada — procurar
+     "continente" dá a volta que se vai fazer a essa loja. Só filtra o que se
+     VÊ: não mexe em nada do que se regista (ver a nota no sub-separador do
+     carrinho). O Histórico não tem pesquisa — lá manda a data. */
+  const buscando=SHOP_BUSCA&&!!SHOP_Q.trim()&&SHOP_TAB!=='hist';
+  const qOk=it=>!buscando||buscaMatch(SHOP_Q,it.artigo,shopLojaTxt(it));
+  const mineTodos=act.filter(x=>!shopIsCovered(x)&&shopMineOwn(x));              // o carrinho inteiro (é ele que a compra leva, não o filtrado)
+  const mine=mineTodos.filter(qOk).sort(sortF);                                  // a MINHA checklist pessoal (só o diferencial por comprar)
+  const falta=act.filter(x=>!x.tratadoPor&&!shopIsRemoved(x)&&!shopIsCovered(x)&&qOk(x)).sort(sortF);  // livres, por tratar (e não cobertos pelo stock)
+  const carrinhos=act.filter(x=>x.tratadoPor&&!shopIsRemoved(x)&&!shopIsCovered(x)&&qOk(x)).sort(sortF);// já no carrinho de alguém (só o que ainda falta comprar)
   const removidos=act.filter(x=>shopIsRemoved(x)&&!x.tratadoPor).sort(sortF);    // histórico de removidos
 
   let h='';
@@ -6182,6 +6229,7 @@ function renderCompras(){
     <div class="cmp-hdr-title sf">🛒 Shop List</div>
     <div class="cmp-hdr-acts">
       ${isAdmin()?`<button class="btn write-action" id="shop-norm-btn" onclick="shopNormOpen()" title="Juntar grafias do mesmo artigo (chouriço/chouriços…) e categorizar o que falta">🔤 Normalizar</button>`:''}
+      ${SHOP_TAB!=='hist'?buscaBtn(SHOP_BUSCA,'toggleShopBusca'):''}
       <button class="btn write-action lfoto-btn hdr-ico" data-busy="⏳" aria-label="Adicionar artigos a partir de uma foto da lista" onclick="listaFotoPick()" title="Ler uma foto da lista (câmara ou galeria) e adicionar os artigos de uma vez" ${canW&&!fechadas?'':'disabled'}>📷</button>
       <button class="btn prim write-action" onclick="openShopItemModal()" ${canW?'':'disabled'}>＋ Artigo</button>
     </div>
@@ -6196,6 +6244,10 @@ function renderCompras(){
     ${tabBtn('carrinho','🛒','Carrinho',nVisiveis(mine))}
     ${tabBtn('hist','🕘','Histórico',nHist)}
   </div>`;
+
+  // Caixa de pesquisa entre os sub-separadores e a ordenação: filtra a lista
+  // que está por baixo, seja qual for o critério de ordenação escolhido.
+  if(SHOP_BUSCA&&SHOP_TAB!=='hist')h+=buscaCaixa('shop-busca',SHOP_Q,'Procurar artigo ou loja…','setShopQ');
 
   // Ordenação só faz sentido nas listas ativas (no histórico manda a data).
   // No Histórico não há chips, mas mantém-se a mesma linha divisória dos outros
@@ -6221,7 +6273,9 @@ function renderCompras(){
   if(SHOP_TAB==='falta'){
     // ── Em falta (livres, ninguém trata, não cobertos) ──
     if(!falta.length){
-      h+=carrinhos.length
+      h+=buscando
+        ?`<div class="cmp-empty sf"><span class="cmp-empty-ico">🔎</span>Nada em falta com <b>${escHtml(SHOP_Q.trim())}</b>.${carrinhos.length?'<br>Vê em <b>🛒 Já em carrinhos</b> 👇':''}</div>`
+        :carrinhos.length
         ?'<div class="cmp-empty sf"><span class="cmp-empty-ico">🛒</span>Nada em falta — está tudo no carrinho de alguém 👇</div>'
         :nCobertos
         ?'<div class="cmp-empty sf"><span class="cmp-empty-ico">🧺</span>Nada por comprar — o stock já cobre o que está pedido.</div>'
@@ -6242,10 +6296,16 @@ function renderCompras(){
   }else if(SHOP_TAB==='carrinho'){
     // ── O meu carrinho (artigos que disse que tratava) ──
     if(!mine.length){
-      h+='<div class="cmp-empty sf"><span class="cmp-empty-ico">🛒</span>O teu carrinho está vazio.<br>Passa por <b>📝 Em falta</b> e toca no <b>＋🛒</b> dos artigos que fores buscar.</div>';
+      h+=buscando
+        ?`<div class="cmp-empty sf"><span class="cmp-empty-ico">🔎</span>Nada no teu carrinho com <b>${escHtml(SHOP_Q.trim())}</b>.</div>`
+        :'<div class="cmp-empty sf"><span class="cmp-empty-ico">🛒</span>O teu carrinho está vazio.<br>Passa por <b>📝 Em falta</b> e toca no <b>＋🛒</b> dos artigos que fores buscar.</div>';
     }else{
       h+=blocoOf(mine,true,'');
     }
+    // A pesquisa é só de leitura: registar a compra leva SEMPRE o carrinho
+    // inteiro. Dizê-lo por escrito enquanto há artigos escondidos pelo filtro.
+    if(buscando&&mine.length<mineTodos.length)
+      h+=`<div class="busca-nota">🔎 Estás a ver ${mine.length} de ${mineTodos.length} artigos — registar a compra leva o carrinho todo.</div>`;
     if(fechadas){
       h+='<div class="empty sf" style="margin-top:10px">Contas fechadas — não é possível registar compras.</div>';
     }else{
@@ -6258,7 +6318,9 @@ function renderCompras(){
     h+=renderRemovidos(removidos,true);
   }
 
+  buscaGuarda('shop-busca');
   el.innerHTML=h;
+  buscaRepoe('shop-busca');
 }
 
 function renderRemovidos(removidos,open){
@@ -6374,17 +6436,28 @@ function renderStock(){
   // Agrupa pelo PEDIDO genérico (loteReqArtigo): Ruffles+Lays ligados a "Batatas
   // Fritas" caem num só cartão; as marcas ficam listadas lá dentro.
   lots.forEach(l=>{const rn=loteReqArtigo(l);const k=shopArtKey(rn);(groups[k]=groups[k]||{artigo:rn,lotes:[]}).lotes.push(l);});
-  const arr=Object.values(groups).sort((a,b)=>a.artigo.localeCompare(b.artigo,'pt'))
+  const arrTodos=Object.values(groups).sort((a,b)=>a.artigo.localeCompare(b.artigo,'pt'))
     .map(g=>Object.assign(g,{estados:stockGroupEstados(stockAggAlocs(g.lotes)),marcas:[...new Set(g.lotes.map(l=>l.artigo))].filter(m=>!shopSameArtigo(m,g.artigo))}));
+  /* Pesquisa: nome do artigo, marcas debaixo do guarda-chuva (Ruffles · Lays) e
+     categoria — procurar "talho" traz o corredor todo. Filtra ANTES dos chips
+     de estado, para as contagens deles falarem do que está à vista. */
+  const stkBuscando=STOCK_BUSCA&&!!STOCK_Q.trim();
+  const arr=stkBuscando?arrTodos.filter(g=>{
+    const c=artCat(g.artigo);
+    return buscaMatch(STOCK_Q,g.artigo,(g.marcas||[]).join(' '),c?c.nome:'');
+  }):arrTodos;
   const canEdit=isAdmin();
   // ✨: pedir à AI categorias para o que ainda não tem (só admin, com migração)
   const aiBtn=(CATS_TABLE&&canEdit&&catNamesPorCategorizar().length)
     ?`<button class="btn write-action" id="stk-catsug-btn" onclick="catSugerir()">✨ Categorias</button>`:'';
   // Stock que não veio de compras (ofertas, sobras do ano anterior)
   const addBtn=canEdit?`<button class="btn ghost write-action stk-add" id="stk-add-btn" onclick="stkAddOpen()" title="Stock que não veio de compras (ofertas, ano anterior)">＋ Stock</button>`:'';
-  let h=`<div class="cmp-hdr"><div class="cmp-hdr-title sf">🧺 Gestão de Stock</div><div class="cmp-hdr-acts">${addBtn}${aiBtn}</div></div>`;
+  // 🔎 só quando há stock: numa lista vazia não há nada para procurar
+  const buscaB=arrTodos.length?buscaBtn(STOCK_BUSCA,'toggleStockBusca'):'';
+  let h=`<div class="cmp-hdr"><div class="cmp-hdr-title sf">🧺 Gestão de Stock</div><div class="cmp-hdr-acts">${buscaB}${addBtn}${aiBtn}</div></div>`;
   h+=`<div class="note" style="margin-top:2px;margin-bottom:8px">${canEdit?'Toca num artigo para o alocar às refeições e categorias — as contas recalculam sozinhas.':'Toca num artigo para ver como está alocado às refeições e categorias.'}</div>`;
-  if(!arr.length){el.innerHTML=h+`<div class="empty sf">Ainda não há stock. Regista uma compra itemizada, importa uma fatura${canEdit?' ou usa <b>＋ Stock</b> para o que não foi comprado (ofertas, sobras do ano anterior)':''}.</div>`;return;}
+  if(!arrTodos.length){el.innerHTML=h+`<div class="empty sf">Ainda não há stock. Regista uma compra itemizada, importa uma fatura${canEdit?' ou usa <b>＋ Stock</b> para o que não foi comprado (ofertas, sobras do ano anterior)':''}.</div>`;return;}
+  if(STOCK_BUSCA)h+=buscaCaixa('stk-busca',STOCK_Q,'Procurar artigo, marca ou categoria…','setStockQ');
   // Chips de filtro por estado: os três aparecem SEMPRE (com a contagem de
   // artigos), mesmo a zero — são a chave de leitura do separador, não podem
   // sumir só porque o stock está todo no mesmo estado
@@ -6396,7 +6469,7 @@ function renderStock(){
     ${FILTROS.map(([s,ic,lbl,n])=>`<span class="sd-chip${STOCK_FILTER===s?' on':''}${n?'':' vazio'}" onclick="setStockFilter('${s}')"><i>${ic}</i><small>${lbl}</small><b class="stk-n">${n}</b></span>`).join('')}
   </div>`;
   const vis=STOCK_FILTER==='all'?arr:arr.filter(g=>g.estados.has(STOCK_FILTER));
-  if(!vis.length)h+=`<div class="empty sf">${STOCK_FILTER==='disponivel'?'Não há stock por alocar — está tudo entregue a refeições.':STOCK_FILTER==='consumido'?'Ainda não há stock consumido.':'Nada alocado a refeições de hoje ou dos próximos dias.'}</div>`;
+  if(!vis.length)h+=`<div class="empty sf">${stkBuscando?`Nenhum artigo com <b>${escHtml(STOCK_Q.trim())}</b>${STOCK_FILTER==='all'?'':' neste estado'}.`:STOCK_FILTER==='disponivel'?'Não há stock por alocar — está tudo entregue a refeições.':STOCK_FILTER==='consumido'?'Ainda não há stock consumido.':'Nada alocado a refeições de hoje ou dos próximos dias.'}</div>`;
   else if(!CATS_TABLE)h+=vis.map(g=>stockArticleCard(g)).join('');
   else{
     // Containers por categoria de produto (Sumos, Talho, …), colapsáveis; os
@@ -6420,7 +6493,9 @@ function renderStock(){
       const nome=s.cat?s.cat.nome:'Outros';
       // € do container: com filtro de estado, só a parte que está nesse estado
       const totV=rnd(s.groups.reduce((a,g)=>a+stockEstadoVal(stockAggAlocs(g.lotes),STOCK_FILTER),0),2);
-      const open=STOCK_CAT_OPEN[k]!==false;   // aberto por defeito; fecho é da sessão
+      // Aberto por defeito; o fecho é da sessão. A pesquisar, abrem-se todos —
+      // um container fechado escondia precisamente o artigo que se procura.
+      const open=stkBuscando||STOCK_CAT_OPEN[k]!==false;
       return `<details class="stk-cat${s.cat?'':' stk-cat-outros'}"${open?' open':''} ontoggle="STOCK_CAT_OPEN['${k}']=this.open">
         <summary class="stk-cat-sum">
           <span class="stk-cat-ico">${catEmoji(nome)}</span>
@@ -6433,7 +6508,9 @@ function renderStock(){
       </details>`;
     }).join('');
   }
+  buscaGuarda('stk-busca');
   el.innerHTML=h;
+  buscaRepoe('stk-busca');
 }
 
 /* Cartões das compras registadas (Histórico): uma linha por compra — onde,
