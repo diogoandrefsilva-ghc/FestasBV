@@ -74,6 +74,14 @@ header .sub{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:#
    restantes ficarem com o espaço todo para os nomes. */
 .tab.tab-ico{flex:0 0 34px;font-size:15px;padding:9px 0 10px}
 @media (max-width:360px){.tab.tab-ico{flex:0 0 28px;font-size:14px}}
+/* T-shirt BRANCA desenhada em vez do emoji 👕 — o emoji sai azul-claro e muda
+   de aparelho para aparelho. Contorno campino para se ler tanto na banda
+   escura como na aba ativa (fundo areia). O texto da aba fica a font-size:0
+   (o title/aria-label é que dá o nome); line-height fixo mantém a altura das
+   outras abas. Selector com .tabs à frente para ganhar ao :active e ao .on,
+   que usam a shorthand `background` e apagariam a imagem. */
+.tabs .tab.tab-ts{font-size:0;line-height:22px;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M9.2 3.4 5.4 4.9 2.7 8.2 5.5 10.7 7.1 9.3 7.1 20.6 16.9 20.6 16.9 9.3 18.5 10.7 21.3 8.2 18.6 4.9 14.8 3.4 C14.5 5 13.4 6 12 6 10.6 6 9.5 5 9.2 3.4 Z' fill='%23FFFFFF' stroke='%236E2012' stroke-width='1.5' stroke-linejoin='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:center;background-size:21px 21px}
+@media (max-width:360px){.tabs .tab.tab-ts{background-size:19px 19px}}
 @media (max-width:380px){.tabs{gap:3px}.tab{padding:10px 2px 11px}}
 body::before{content:"";position:fixed;top:0;left:0;right:0;height:env(safe-area-inset-top,0px);background:var(--campino-escuro);z-index:30}
 
@@ -1814,4 +1822,10 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .adm-ts-grp-hdr{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);font-weight:700;margin-bottom:4px}
 .adm-ts-row{display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;margin-top:5px}
 .adm-ts-tam{flex:1;min-width:0;font-size:13.5px;font-weight:600;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-input.adm-ts-preco{flex:0 0 74px;width:74px;margin:0;padding:6px 8px;font-size:13px;text-align:right}
+input.adm-ts-preco{flex:0 0 66px;width:66px;margin:0;padding:6px 8px;font-size:13px;text-align:right}
+/* ▲/▼ para mandar na ordem dos tamanhos — é esta que manda nos chips do
+   modal, no resumo e no PDF. Empilhados para não roubarem largura à linha. */
+.adm-ts-mv-wrap{flex:0 0 auto;display:flex;flex-direction:column;gap:2px}
+.adm-ts-mv{width:22px;height:16px;padding:0;border:1px solid var(--line);background:var(--panel);color:var(--muted);border-radius:5px;font-size:8px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.adm-ts-mv:active{background:var(--barrete);border-color:var(--barrete);color:#fff}
+.adm-ts-mv:disabled{opacity:.3;cursor:default}
