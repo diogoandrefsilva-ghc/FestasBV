@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v179 · 2026-08-03 · Artigos de despensa: azeite, sal e louro deixam de duplicar a lista — os pedidos das várias refeições passam a valer por uma linha só nas Compras';
+const APP_BUILD = 'v180 · 2026-08-03 · T-shirts: o admin pode fechar a encomenda do ano (só ele mexe daí em diante), quem pede fica trancado para os outros, e o PDF ganha colunas alinhadas com o Por conta de no fim';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -1979,12 +1979,14 @@ async function carregar(){
     // T-shirts: a grelha de tamanhos é global, as encomendas são por evento
     TSHIRTS_TABLE=!!(ttRes&&ttRes.ok&&tsRes&&tsRes.ok);
     TS_IMPUT_COL=TSHIRTS_TABLE&&!!(tiRes&&tiRes.ok);
+    // Trancar encomendas (db/tshirts_trancar.sql): a coluna vem no próprio evento
+    TS_LOCK_COL=rows.some(ev=>'tshirts_trancadas' in ev);
     TS_TAMS=TSHIRTS_TABLE?(await ttRes.json()).map(t=>({id:t.id,tipo:t.tipo,tamanho:t.tamanho,ordem:t.ordem||0,preco:N(t.preco)})).sort(tsTamCmp):[];
     const tsByEv={};
     if(TSHIRTS_TABLE)(await tsRes.json()).forEach(t=>{(tsByEv[t.evento_id]=tsByEv[t.evento_id]||[]).push(t);});
     ALL_YEARS=rows.map(ev=>({
       _sbId: ev.id,
-      evento:{nome:ev.nome,ano:ev.ano,tesoureiro:ev.tesoureiro,arredondaTotal:!!ev.arredonda_total,missaoPoupanca:N(ev.missao_poupanca),fundoReserva:N(ev.fundo_reserva),fatorModo:ev.fator_modo||'fixo',fatorThreshold:ev.fator_threshold!=null?N(ev.fator_threshold):FATOR_THRESHOLD_DEFAULT,dividasPublicas:!!ev.dividas_publicas,dividasPublicasCol:('dividas_publicas' in ev),contasFechadas:!!ev.contas_fechadas,contasFechadasEm:ev.contas_fechadas_em||null,contasFechadasPor:ev.contas_fechadas_por||null},
+      evento:{tshirtsTrancadas:!!ev.tshirts_trancadas,nome:ev.nome,ano:ev.ano,tesoureiro:ev.tesoureiro,arredondaTotal:!!ev.arredonda_total,missaoPoupanca:N(ev.missao_poupanca),fundoReserva:N(ev.fundo_reserva),fatorModo:ev.fator_modo||'fixo',fatorThreshold:ev.fator_threshold!=null?N(ev.fator_threshold):FATOR_THRESHOLD_DEFAULT,dividasPublicas:!!ev.dividas_publicas,dividasPublicasCol:('dividas_publicas' in ev),contasFechadas:!!ev.contas_fechadas,contasFechadasEm:ev.contas_fechadas_em||null,contasFechadasPor:ev.contas_fechadas_por||null},
       membros:(ev.membros||[]).sort((a,b)=>a.nome.localeCompare(b.nome,'pt')).map(m=>({
         _id:m.id,nome:m.nome,fator:N(m.fator),sexo:m.sexo==='F'?'F':'M',
         presencas:(m.presencas||[]).map(p=>({k:`${p.dia}|${p.ref}`,modo:p.modo==='bebe'?'bebe':'come'}))
@@ -3175,7 +3177,7 @@ function openAdmin(){
   if(ver)ver.textContent='Versão '+APP_BUILD.split('·')[0].trim();
   const adm=document.getElementById('adm-pedidos-wrap');
   if(adm)adm.style.display=isAdmin()?'':'none';
-  if(isAdmin()){sbRenderPedidos();sbRenderLigacoes();loadNotif();loadNotifPres();admCatCancel();renderAdmCats();renderAdmTshirts();}
+  if(isAdmin()){sbRenderPedidos();sbRenderLigacoes();loadNotif();loadNotifPres();admCatCancel();renderAdmCats();renderAdmTshirts();renderAdmTsLock();}
   loadMyNotif();
   loadParams();
   renderPlantel();
@@ -10202,6 +10204,7 @@ function toggleHeroDetail(){
    Sem a migração corrida, TSHIRTS_TABLE=false e o separador nem aparece. */
 let TSHIRTS_TABLE=false;   // BD já tem tshirt_tamanhos/tshirts?
 let TS_IMPUT_COL=false;    // BD já tem tshirts.imputado_a? (db/tshirts_imputacao.sql)
+let TS_LOCK_COL=false;     // BD já tem eventos.tshirts_trancadas? (db/tshirts_trancar.sql)
 let TS_TAMS=[];            // grelha global [{id,tipo,tamanho,ordem,preco}]
 let TS_TAB='minhas';       // sub-separador do painel: minhas | todas
 let _tsFiltro=null;        // {tipo,tamanho} — linha do resumo em foco (de quem são estas)
@@ -10258,10 +10261,14 @@ function tsImputAgg(items){
     .sort((a,b)=>a.membro.localeCompare(b.membro,'pt'));
 }
 function tsMine(it){return MY_NAMES.includes(it.membro);}
+/* Encomendas trancadas: a partir daqui só o admin mexe (a encomenda já
+   seguiu). É por ano e independente do fecho de contas — as contas podem
+   estar abertas e a encomenda fechada. O RLS impõe o mesmo no servidor. */
+function tsTrancadas(){return !!(DATA&&DATA.evento&&DATA.evento.tshirtsTrancadas);}
 // Mexer num pedido: o dono (próprio ou cônjuge) ou o admin. Ano fechado tranca tudo.
-function tsCanEdit(it){return !!_sbSession&&!contasFechadas()&&(isAdmin()||tsMine(it));}
+function tsCanEdit(it){return !!_sbSession&&!contasFechadas()&&(isAdmin()||(tsMine(it)&&!tsTrancadas()));}
 // Encomendar: é preciso estar ligado a um membro e haver tamanhos definidos
-function tsCanWrite(){return !!_sbSession&&!contasFechadas()&&(isAdmin()||MY_NAMES.length>0)&&TS_TAMS.length>0;}
+function tsCanWrite(){return !!_sbSession&&!contasFechadas()&&(isAdmin()||(MY_NAMES.length>0&&!tsTrancadas()))&&TS_TAMS.length>0;}
 function updateTshirtTabVis(){const t=document.getElementById('tab-tshirts');if(t)t.style.display=TSHIRTS_TABLE?'':'none';}
 function setTsTab(t){TS_TAB=t;lsSet('fbv_tstab',t);_tsFiltro=null;renderTshirts();}
 // Clicar num tamanho do resumo mostra de quem são essas t-shirts; clicar
@@ -10293,6 +10300,8 @@ function renderTshirts(){
     ${tabBtn('minhas','🙋','As minhas',mine.length)}
     ${tabBtn('todas','📋','Encomenda',items.length)}
   </div>`;
+  if(tsTrancadas())
+    h+=`<div class="ts-lock sf">🔒 <span>Encomenda fechada${isAdmin()?' — só tu é que ainda mexes nela.':' pelo admin. Já não dá para acrescentar nem alterar.'}</span></div>`;
 
   if(TS_TAB==='minhas'){
     if(!TS_TAMS.length){
@@ -10301,6 +10310,8 @@ function renderTshirts(){
       h+='<div class="cmp-empty sf"><span class="cmp-empty-ico">🔒</span>Inicia sessão para encomendares as tuas t-shirts.</div>';
     }else if(!isAdmin()&&!MY_NAMES.length){
       h+='<div class="cmp-empty sf"><span class="cmp-empty-ico">👤</span>A tua conta ainda não está ligada a um membro — pede ao admin.</div>';
+    }else if(tsTrancadas()&&!mine.length){
+      h+='<div class="cmp-empty sf"><span class="cmp-empty-ico">🔒</span>A encomenda já foi fechada — fala com o admin se ainda quiseres alguma.</div>';
     }else if(!mine.length){
       h+=`<div class="cmp-empty sf"><span class="cmp-empty-ico">👕</span>Ainda não pediste nenhuma t-shirt.${canW?'<br>Carrega em <b>＋ T-shirt</b> — podes adicionar quantas quiseres.':''}</div>`;
     }else{
@@ -10464,10 +10475,24 @@ function openTshirtModal(id){
   _tsImput=it?(it.imputadoA||[]).filter(Boolean).slice():[];
   document.getElementById('ts-title').textContent=it?'Editar T-shirt':'Adicionar T-shirt';
   document.getElementById('ts-nome').value=it?it.nome:'';
-  document.getElementById('ts-membro').innerHTML=isAdmin()?memberOptions(it?it.membro:meuNomePrincipal()):myMemberOptions(it?it.membro:'');
-  // Só faz sentido escolher "encomendado por" quando há mais que uma hipótese
-  const nOpts=document.getElementById('ts-membro').options.length;
-  document.getElementById('ts-membro-wrap').style.display=nOpts>1?'':'none';
+  /* Quem pede: o admin escolhe qualquer membro; quem não é admin fica preso
+     ao próprio (ou, a editar, a quem lá está — pode ser o cônjuge). É um
+     select à mesma para o guardar continuar a ler daqui o valor, mas
+     desativado e com cadeado. */
+  const selM=document.getElementById('ts-membro');
+  if(isAdmin()){
+    selM.innerHTML=memberOptions(it?it.membro:meuNomePrincipal());
+    selM.disabled=false;
+    document.getElementById('ts-membro-wrap').classList.remove('locked');
+    document.getElementById('ts-membro-lbl').textContent='Encomendado por';
+  }else{
+    const fixo=it?it.membro:(meuNomePrincipal()||MY_NAMES[0]||'');
+    selM.innerHTML=`<option value="${escHtml(fixo)}" selected>${escHtml(fixo)}</option>`;
+    selM.disabled=true;
+    document.getElementById('ts-membro-wrap').classList.add('locked');
+    document.getElementById('ts-membro-lbl').textContent='Encomendado por 🔒';
+  }
+  document.getElementById('ts-membro-wrap').style.display=selM.value?'':'none';
   document.getElementById('ts-del').style.display=it?'':'none';
   document.getElementById('ts-save').textContent=it?'Guardar':'Adicionar';
   document.getElementById('ts-save-more').style.display=it?'none':'';
@@ -10636,6 +10661,35 @@ function renderAdmTshirts(){
     </div>`;
   }).join('');
 }
+/* Trancar/destrancar as encomendas do ano (Definições › T-shirts, só admin).
+   PATCH direto ao evento: não vale a pena passar pelo save completo, que
+   reescreve todas as tabelas-filhas por causa de um booleano. */
+function renderAdmTsLock(){
+  const row=document.getElementById('adm-ts-lock-row');if(!row)return;
+  row.style.display=(TSHIRTS_TABLE&&TS_LOCK_COL)?'flex':'none';
+  const on=tsTrancadas();
+  const chk=document.getElementById('adm-ts-lock');if(chk)chk.checked=on;
+  const yr=document.getElementById('adm-ts-lock-year');
+  if(yr)yr.textContent=(DATA&&DATA.evento&&DATA.evento.ano)||'';
+  _setTsLockKnob(on);
+}
+function _setTsLockKnob(on){
+  const knob=document.getElementById('adm-ts-lock-knob');
+  const track=knob&&knob.previousElementSibling;
+  if(knob)knob.style.left=on?'22px':'2px';
+  if(track)track.style.background=on?'var(--gold)':'var(--line)';
+}
+async function admTsLock(on){
+  if(!isAdmin()||!TS_LOCK_COL||!DATA||!DATA._sbId){renderAdmTsLock();return;}
+  setSync('load','a guardar…');
+  try{
+    await queueWrite(()=>sbReq('PATCH',`eventos?id=eq.${DATA._sbId}`,{tshirts_trancadas:!!on}));
+    DATA.evento.tshirtsTrancadas=!!on;
+    syncMirror();marcaGuardado();_setTsLockKnob(!!on);
+    if(TAB==='tshirts')renderTshirts();
+    toast(on?'Encomenda fechada 🔒 — a partir de agora só tu mexes':'Encomenda reaberta 🔓','ok');
+  }catch(e){setSync('err','erro ao guardar');toast(permErrorMsg(e),'bad');renderAdmTsLock();}
+}
 async function admTsAdd(){
   if(!isAdmin()||!TSHIRTS_TABLE)return;
   const tipo=document.getElementById('adm-ts-tipo').value;
@@ -10791,6 +10845,10 @@ function generatePDF(type){
     tr:last-child td{border-bottom:none}
     .pos{color:#2a9d6a;font-weight:700}.neg{color:#e04545;font-weight:700}.zero{color:#999}
     .right{text-align:right}
+    table.ts-fix{table-layout:fixed}
+    table.ts-fix th,table.ts-fix td{overflow-wrap:anywhere;padding-left:6px;padding-right:6px}
+    table.ts-fix th{letter-spacing:.02em}
+    table.ts-fix td.right{white-space:nowrap}
     table.gastos-membro th{font-size:8px;letter-spacing:.02em;padding:5px 5px;white-space:nowrap}
     table.gastos-membro td{padding:5px 5px}
     table.gastos-membro td:first-child{white-space:nowrap;font-size:10.5px}
@@ -10868,10 +10926,35 @@ function buildTshirtsReport(){
   h+=`<tr style="border-top:2px solid #ddd"><td colspan="2"><b>Total</b></td><td class="right"><b>${items.length}</b></td>${comPrecos?`<td></td><td class="right"><b>${tsTotalEur(items)>0?eur(tsTotalEur(items)):'—'}</b></td>`:''}</tr>`;
   h+='</table>';
 
-  // A cobrar por membro — só quando o admin imputou alguma coisa; sem
-  // imputações isto seria uma cópia dos totais de "Pedidos por pessoa"
+  // Por pessoa — quem pediu o quê. As larguras dependem de quantas colunas
+  // há (imputação e preço são opcionais), mas são iguais em todos os quadros.
+  const larg=comImput&&comPrecos?[29,16,14,24,17]
+    :comImput?[34,19,17,30]
+    :comPrecos?[38,22,20,20]
+    :[46,27,27];
+  const cols='<colgroup>'+larg.map(w=>`<col style="width:${w}%">`).join('')+'</colgroup>';
+  h+='<h2>Pedidos por pessoa</h2>';
+  const porMembro={};
+  items.forEach(it=>{(porMembro[it.membro]=porMembro[it.membro]||[]).push(it);});
+  Object.keys(porMembro).sort((a,b)=>a.localeCompare(b,'pt')).forEach(m=>{
+    const list=porMembro[m].slice().sort(tsPedidoCmp);
+    h+=`<h3>${escHtml(m)} — ${list.length} t-shirt${list.length===1?'':'s'}${tsEurSufixo(list)}</h3>`;
+    // colgroup + table-layout:fixed: as colunas ficam na MESMA posição em
+    // todos os quadros. Sem isto cada quadro media-se pelo seu conteúdo e a
+    // folha ficava com as colunas a saltar de pessoa para pessoa.
+    h+=`<table class="ts-fix">${cols}<tr><th>Nome</th><th>Tipo</th><th>Tam.</th>${comImput?'<th>Por conta de</th>':''}${comPrecos?'<th class="right">Preço</th>':''}</tr>`;
+    list.forEach(it=>{
+      const p=tsPreco(it.tipo,it.tamanho);
+      h+=`<tr><td>${escHtml(it.nome)}</td><td>${escHtml(it.tipo)}</td><td><b>${escHtml(it.tamanho)}</b></td>${comImput?`<td>${tsImputExplicita(it)?escHtml(tsImputados(it).join(' + ')):'—'}</td>`:''}${comPrecos?`<td class="right">${p>0?eur(p):'—'}</td>`:''}</tr>`;
+    });
+    h+='</table>';
+  });
+
+  // A cobrar por membro — fecha o relatório, como no painel. Só quando o
+  // admin imputou alguma coisa; sem imputações seria uma cópia dos totais
+  // de "Pedidos por pessoa".
   if(TS_IMPUT_COL&&tsTemImputacoes()){
-    h+='<h2>A cobrar por membro</h2>';
+    h+='<h2>Por conta de</h2>';
     h+=`<table><tr><th>Membro</th><th>T-shirts</th><th class="right">Qtd</th>${comPrecos?'<th class="right">Valor</th>':''}</tr>`;
     const agg=tsImputAgg(items);
     agg.forEach(g=>{
@@ -10883,20 +10966,6 @@ function buildTshirtsReport(){
     h+='</table>';
   }
 
-  // Por pessoa — quem pediu o quê
-  h+='<h2>Pedidos por pessoa</h2>';
-  const porMembro={};
-  items.forEach(it=>{(porMembro[it.membro]=porMembro[it.membro]||[]).push(it);});
-  Object.keys(porMembro).sort((a,b)=>a.localeCompare(b,'pt')).forEach(m=>{
-    const list=porMembro[m].slice().sort(tsPedidoCmp);
-    h+=`<h3>${escHtml(m)} — ${list.length} t-shirt${list.length===1?'':'s'}${tsEurSufixo(list)}</h3>`;
-    h+=`<table><tr><th>Nome</th><th>Tipologia</th><th>Tamanho</th>${comImput?'<th>Por conta de</th>':''}${comPrecos?'<th class="right">Preço</th>':''}</tr>`;
-    list.forEach(it=>{
-      const p=tsPreco(it.tipo,it.tamanho);
-      h+=`<tr><td>${escHtml(it.nome)}</td><td>${escHtml(it.tipo)}</td><td><b>${escHtml(it.tamanho)}</b></td>${comImput?`<td>${tsImputExplicita(it)?escHtml(tsImputados(it).join(' + ')):'—'}</td>`:''}${comPrecos?`<td class="right">${p>0?eur(p):'—'}</td>`:''}</tr>`;
-    });
-    h+='</table>';
-  });
   h+=`<div class="footer">Relatório gerado em ${new Date().toLocaleString('pt-PT')} · ${nome} ${ano}</div>`;
   return h;
 }

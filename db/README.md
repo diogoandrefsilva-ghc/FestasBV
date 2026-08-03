@@ -34,8 +34,11 @@ Numa BD limpa, correr por esta ordem (há dependências entre eles):
 11. `tshirts_imputacao.sql` — `tshirts.imputado_a`: a quem se cobra cada t-shirt
     (um ou vários membros, em partes iguais). Vazio = quem pediu. Só o admin
     imputa — garantido por trigger, não só pelo RLS
+12. `tshirts_trancar.sql` — `eventos.tshirts_trancadas`: fechar a encomenda do
+    ano. Trancada, só o admin acrescenta/edita/remove t-shirts (as policies
+    "self" passam a exigir `tshirts_abertas()`)
 
-Os passos 4–11 são migrações add-on idempotentes: correr uma vez cada. A app é
+Os passos 4–12 são migrações add-on idempotentes: correr uma vez cada. A app é
 tolerante a qualquer uma delas faltar — sonda a coluna/tabela e esconde o que
 ainda não existe.
 
@@ -64,6 +67,7 @@ consola do browser o Supabase recusa). Resumo do que está em `policies.sql`:
 | T-shirts (encomendar/editar/remover)          | ✅ sempre | ✅ próprias + cônjuge                   | ❌               |
 | Tamanhos e preços das t-shirts                | ✅        | ❌                                     | ❌               |
 | Imputar a t-shirt à conta de membros          | ✅        | ❌ (trigger recusa)                    | ❌               |
+| Trancar/reabrir a encomenda de t-shirts       | ✅        | ❌                                     | ❌               |
 | Validar contas (`validacoes`)                 | ✅        | ✅ próprias + cônjuge                   | ❌               |
 | Editar/apagar cash-flows                      | ✅        | ❌                                     | ❌               |
 | Mealheiros, reembolsos, pagamentos            | ✅        | ❌                                     | ❌               |
