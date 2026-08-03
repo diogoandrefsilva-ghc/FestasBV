@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v172 · 2026-08-03 · Convidado que leva gente sem nome: campos Adultos + Crianças';
+const APP_BUILD = 'v173 · 2026-08-03 · Cartão do convidado: fica só o badge da composição, sem a nota repetida';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -8422,13 +8422,12 @@ function guestCardsHtml(lista,diaToDate){
     const ad=gAdultos(g),cr=gCriancas(g);
     const paysBadge=gSoCriancas(g)&&cr===1?'<span class="pg-badge kid sf">Criança</span>'
       :(g.pagante==='Sim'||!ad?'':'<span class="pg-badge free sf">Oferta</span>');
-    // Acompanhantes sem nome: diz-se logo de que é feita a linha
-    const comp=composicaoConv(ad,cr);
-    const headsBadge=(ad+cr)>1?`<span class="pg-badge heads sf">${comp}</span>`:'';
+    // Acompanhantes sem nome: o badge diz de que é feita a linha e chega
+    const headsBadge=(ad+cr)>1?`<span class="pg-badge heads sf">${composicaoConv(ad,cr)}</span>`:'';
     h+=`<div class="pres-guest-card">
       <div class="pg-info sf">
         <span class="pg-name">${escHtml(g.nome)}</span>
-        <span class="pg-meta">convidado por ${escHtml(g.membro||'')}${(ad+cr)>1?` · +${ad+cr-1} sem nome`:''}</span>
+        <span class="pg-meta">convidado por ${escHtml(g.membro||'')}</span>
       </div>
       ${headsBadge}${paysBadge}
       ${(isAdmin()||(MY_NAMES.includes(g.membro)&&diaEditavel(g.dia)))?`<div class="card-actions">
