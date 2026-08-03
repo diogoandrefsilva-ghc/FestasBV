@@ -15,12 +15,29 @@ App pessoal de gestão de despesas das Festas (Barrete Verde e Salinas).
   Sessão/refresh do token · Permissões · Fecho de contas + validação · Fator das quotas · Ícones de refeição · Classificar cash-flow · Histórico (auditoria) · **Cash Flow Modal** · **Pagamentos Pendentes** · Edit/Delete Cash Flow · Parametrizações · Notificações Telegram · Limpeza · Add New Year · Plantel · Categorias de Artigos (agrupadores + AI) · Normalizar Artigos (nomes, via AI) · Pedidos Repetidos (2.º passo do Normalizar: tamanhos/embalagens) · **Artigos de Despensa** (3.º passo do Normalizar) · **Compras/Shoplist** · Separador Stock · Stock sem compra (ofertas / ano anterior) · **Foto → Lista** (foto da lista de compras → Gemini) · Importar Fatura (OCR) · **Presenças Grid** · Convidados · Refeições Def (CRUD) · **Swipe entre painéis** (refeições + convidados) · **Troca de Refeições** · Cartaz das Ementas · Hero sub-totais · **T-shirts** · **Relatórios/PDF** · Read-only mode · Resumo fundido nos Saldos (despesa por membro + movimentos + saldo) · FABs arrastáveis · **Auth (Supabase)** · Utilizadores↔Membros
 
 ## Esqueci-me da password
-Quem entra com email+password recupera-a sozinho: "Esqueci-me da password" no login → `/auth/v1/recover` → email com link de volta para a app (`sbRedirectUrl()`, o mesmo URL que o login Google já usa, logo já está na allow-list do Supabase).
-- O link traz `#type=recovery` + `access_token`. O hash é tratado no **arranque, antes da sessão guardada** (`sbTratarHashAuth`): quem clica no link costuma já ter sessão neste dispositivo e o token de recuperação era ignorado. Recovery mostra o ecrã `page-nova-pass`; qualquer outro `access_token` (Google) segue direto para o `sbAposLogin()`, como antes.
+Quem entra com email+password recupera-a sozinho: "Esqueci-me da password" no login → `/auth/v1/recover` → email com **link e código**.
+
+**O template do email tem de apontar para a app, não para o GoTrue.** (Supabase › Authentication › Emails › Reset Password.) O `{{ .ConfirmationURL }}` de defeito vai a `/auth/v1/verify`, que **gasta o token num simples GET** — e os scanners de segurança do email (Gmail & c.ª) abrem os links antes do dono, pelo que ele apanhava "link inválido ou expirado" **sempre, logo à primeira**. Com `token_hash` o link é uma página estática nossa e o token só é gasto no `POST /auth/v1/verify` que a app faz:
+```html
+<a href="https://diogoandrefsilva-ghc.github.io/FestasBV/?token_hash={{ .TokenHash }}&type=recovery">Definir password nova</a>
+<p>Ou escreve este código na app: <strong>{{ .Token }}</strong></p>
+```
+- **O código de 6 dígitos (`{{ .Token }}`) é a saída garantida**: ler um email não o gasta. Aparece na caixa `login-codigo`, que se abre sozinha depois de se pedir o email e sempre que um link falha. Confirma-se com `POST /auth/v1/verify` (`{type:'recovery',email,token}`).
+- `sbTratarHashAuth` trata **três formas**: `?token_hash=` (link novo), `#access_token=` (login Google e links à moda antiga) e `#error=`/`?error=` (link gasto). Lê query **e** hash — o link novo traz tudo na query.
+- Mensagem de link falhado leva o `error_code` entre parênteses de propósito: é o que distingue "gasto pelo scanner" (`otp_expired`) de um problema de rede.
+- O hash/query é tratado no **arranque, antes da sessão guardada** (`sbTratarHashAuth`): quem clica no link costuma já ter sessão neste dispositivo e o token de recuperação era ignorado. Recovery mostra o ecrã `page-nova-pass`; qualquer outro `access_token` (Google) segue direto para o `sbAposLogin()`, como antes.
 - **O token de recuperação dá sessão mas não troca a password** — sem o ecrã da password nova ele voltava a ficar de fora no arranque seguinte. A troca é um `PUT /auth/v1/user` (`sbTrocarPassword`, partilhado com Definições › Conta).
 - **PWA:** no iOS o link do email abre no Safari, não na app instalada. A password fica na mesma trocada (é servidor), mas a sessão fica do lado do browser — por isso o ecrã de sucesso diz-lhe para voltar à app e entrar com a password nova.
 - Falha de rede a tratar o hash **não pode pendurar o arranque no splash**: cai no login com aviso (`sbInit` apanha).
 - Não se diz se o email existe (a resposta é sempre a mesma) e o 429 do Supabase tem frase própria — o SMTP de defeito deixa passar poucos emails por hora.
+
+## Password temporária dada pelo admin (Definições › Utilizadores & Casais)
+Rede de segurança para quando a recuperação por email não serve — e não serve sempre: o serviço de email de defeito do Supabase manda meia dúzia de mensagens por hora e **não deixa editar os templates sem SMTP próprio**, que é o que trava o link com `token_hash`. O admin gera uma password, dita-a pelo telefone, e a pessoa troca-a em Definições › Conta.
+- **A app nunca escreve em `auth.users`** — nem podia: a chave é a `anon` pública. Quem faz o trabalho é `festasbv.admin_pass_temp` (SECURITY DEFINER), chamada por RPC. **A verificação é do lado do servidor** (`is_admin()`), não da UI: esconder o botão não era proteção nenhuma.
+- A função recusa: quem não é admin, contas fora de `allowed_users`, passwords com menos de 8, e **a conta do próprio admin** (essa muda-se no Supabase, para um admin com a sessão roubada não se poder trancar sozinho lá dentro).
+- `crypt(..., gen_salt('bf', 10))` — bcrypt custo 10 **explícito**, que é o do GoTrue; o defeito do `gen_salt` é 6 e daria um hash mais fraco do que o das outras contas.
+- Fica no `historico` (`tipo:'conta'`, `accao:'pass_temp'`) porque mudar a password de outra pessoa tem de deixar rasto — e o Telegram avisa, como em tudo o resto.
+- Migração: `db/admin_pass_temp.sql`. Tolerante: sem ela, o botão diz que falta correr o ficheiro e mais nada muda.
 
 ## Pagar dívida sem ser o admin (🕓 pagamentos pendentes)
 Registar um pagamento de dívida continua a ser um ato do admin — o que mudou é quem o **desencadeia**. Um membro declara o pagamento dele (ou do cônjuge) e a linha fica em `pagamentos_pendentes`; só quando o admin valida é que a app cria o cash-flow em `pagamentos`.
