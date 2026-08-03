@@ -31,6 +31,14 @@ Quem entra com email+password recupera-a sozinho: "Esqueci-me da password" no lo
 - Falha de rede a tratar o hash **não pode pendurar o arranque no splash**: cai no login com aviso (`sbInit` apanha).
 - Não se diz se o email existe (a resposta é sempre a mesma) e o 429 do Supabase tem frase própria — o SMTP de defeito deixa passar poucos emails por hora.
 
+## Password temporária dada pelo admin (Definições › Utilizadores & Casais)
+Rede de segurança para quando a recuperação por email não serve — e não serve sempre: o serviço de email de defeito do Supabase manda meia dúzia de mensagens por hora e **não deixa editar os templates sem SMTP próprio**, que é o que trava o link com `token_hash`. O admin gera uma password, dita-a pelo telefone, e a pessoa troca-a em Definições › Conta.
+- **A app nunca escreve em `auth.users`** — nem podia: a chave é a `anon` pública. Quem faz o trabalho é `festasbv.admin_pass_temp` (SECURITY DEFINER), chamada por RPC. **A verificação é do lado do servidor** (`is_admin()`), não da UI: esconder o botão não era proteção nenhuma.
+- A função recusa: quem não é admin, contas fora de `allowed_users`, passwords com menos de 8, e **a conta do próprio admin** (essa muda-se no Supabase, para um admin com a sessão roubada não se poder trancar sozinho lá dentro).
+- `crypt(..., gen_salt('bf', 10))` — bcrypt custo 10 **explícito**, que é o do GoTrue; o defeito do `gen_salt` é 6 e daria um hash mais fraco do que o das outras contas.
+- Fica no `historico` (`tipo:'conta'`, `accao:'pass_temp'`) porque mudar a password de outra pessoa tem de deixar rasto — e o Telegram avisa, como em tudo o resto.
+- Migração: `db/admin_pass_temp.sql`. Tolerante: sem ela, o botão diz que falta correr o ficheiro e mais nada muda.
+
 ## Pagar dívida sem ser o admin (🕓 pagamentos pendentes)
 Registar um pagamento de dívida continua a ser um ato do admin — o que mudou é quem o **desencadeia**. Um membro declara o pagamento dele (ou do cônjuge) e a linha fica em `pagamentos_pendentes`; só quando o admin valida é que a app cria o cash-flow em `pagamentos`.
 - **Pendente não é dinheiro.** Nada disto entra no `calcular()`: as dívidas não baixam, os saldos não mexem, o resultado do grupo não muda. Se mexeres nas contas, os pendentes não têm de aparecer lá — só o aviso 🕓 por baixo do saldo (`rs-pend`) e o bloco à cabeça dos Cash Flows.

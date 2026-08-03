@@ -835,6 +835,16 @@ setTimeout(function(){ if (window.fbvEsconderSplash) window.fbvEsconderSplash();
         <p style="font-size:12px;color:var(--muted);margin-bottom:12px;line-height:1.5">Liga cada conta aprovada a um membro do plantel. Os casais definem quem pode marcar presenças, convidados e despesas um do outro.</p>
         <div class="sf" style="font-size:11px;font-weight:700;color:var(--gold);letter-spacing:.04em;margin-bottom:6px">CONTAS ↔ MEMBROS</div>
         <div id="adm-ligacoes-list"><div class="note">A carregar…</div></div>
+        <div style="border:1px dashed var(--line);border-radius:10px;padding:12px;margin-top:8px">
+          <div class="sf" style="font-size:11px;color:var(--faint);text-transform:uppercase;letter-spacing:.08em;font-weight:700;margin-bottom:8px">Password temporária</div>
+          <p style="font-size:12px;color:var(--muted);line-height:1.5;margin-bottom:8px">Para quem se esqueceu da password e não consegue receber o email. Gera uma password nova, dá-lha pelo telefone e diz-lhe para a trocar em Definições › Conta.</p>
+          <select id="adm-pt-email" class="sf" style="width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:9px 10px;color:var(--ink);font-size:13px;-webkit-appearance:none;appearance:none;min-width:0"></select>
+          <div class="mbtns" style="margin-top:8px">
+            <button class="btn prim" id="adm-pt-btn" onclick="admGerarPassTemp()">🔑 Gerar password temporária</button>
+          </div>
+          <div id="adm-pt-out"></div>
+        </div>
+
         <div class="sf" style="font-size:11px;font-weight:700;color:var(--gold);letter-spacing:.04em;margin:14px 0 6px">CASAIS</div>
         <div id="adm-casais-list"><div class="note">A carregar…</div></div>
         <div style="border:1px dashed var(--line);border-radius:10px;padding:12px;margin-top:8px">

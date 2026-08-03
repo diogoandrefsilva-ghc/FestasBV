@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v185 · 2026-08-03 · Recuperar password: link à prova dos scanners do email (token_hash) e código de 6 dígitos como alternativa';
+const APP_BUILD = 'v186 · 2026-08-03 · Password temporária: o admin gera uma na hora para quem não consegue recuperar pelo email';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -2242,6 +2242,9 @@ function fraseHistorico(tipo,accao,alvo,autor,d){
     const pais=(listaPais.length&&!listaPais.includes(autor))?` (filho/a de ${d.pais})`:'';
     if(accao==='removeu')return `${A} tirou ${alvo}${pais} do ${refDia}${tot}`;
     return `${A} inscreveu ${alvo}${pais} no ${refDia}${tot}`;
+  }
+  if(tipo==='conta'){
+    if(accao==='pass_temp')return `${A} gerou uma password temporária para ${alvo}`;
   }
   // presença: usa a transição origem(de) -> destino(para)
   const de=('de'in d)?d.de:undefined;
@@ -12247,6 +12250,13 @@ async function sbRenderLigacoes(){
       const o=names.map(n=>`<option value="${n}">${n}</option>`).join('');
       sa.innerHTML=o;sb2.innerHTML=o;
     }
+    // Password temporária: todas as contas aprovadas menos a do próprio admin
+    const spt=document.getElementById('adm-pt-email');
+    if(spt){
+      const outros=(users||[]).filter(u=>u.email!==ADMIN_EMAIL);
+      spt.innerHTML='<option value="">— escolhe a conta —</option>'+outros.map(u=>`<option value="${u.email}">${u.email}</option>`).join('');
+      const out=document.getElementById('adm-pt-out');if(out)out.innerHTML='';
+    }
   }catch(e){
     elL.innerHTML='<div class="note">Erro a carregar ('+e.message+'). Já correste o script 03 no Supabase?</div>';
     elC.innerHTML='';
@@ -12260,6 +12270,53 @@ async function sbSetAmigo(email,amigo){
     toast('Ligação atualizada ✓','ok');
     sbRenderLigacoes();
   }catch(e){toast('Erro: '+e.message,'bad');}
+}
+
+/* ── Password temporária dada pelo admin ──
+   A recuperação por email depende de um serviço de email a funcionar (e o de
+   defeito do Supabase nem templates deixa editar). Quando isso falha, o admin
+   gera aqui uma password, dita-a pelo telefone, e a pessoa troca-a em
+   Definições › Conta. A password vive em auth.users, que a app não pode tocar
+   com a chave pública — quem faz o trabalho é a função admin_pass_temp
+   (SECURITY DEFINER), que confirma do lado do servidor que quem chama é o
+   admin. Ver db/admin_pass_temp.sql. */
+function gerarPassTemp(){
+  // Legível ao telefone de propósito: sem maiúsculas, sem símbolos, sem
+  // caracteres que se confundam a ditar. Serve para uma vez.
+  const pal=['barrete','salinas','campino','moliceiro','fandango','caldeirada','avieiro','sardinha','bacalhau','ementa'];
+  return pal[Math.floor(Math.random()*pal.length)]+'-'+String(Math.floor(Math.random()*9000)+1000);
+}
+function copiarPassTemp(pass){
+  const done=()=>toast('Password copiada ✓','ok');
+  if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(pass).then(done).catch(()=>toast(pass,'ok'));
+  else toast(pass,'ok');
+}
+async function admGerarPassTemp(){
+  const sel=document.getElementById('adm-pt-email');
+  const out=document.getElementById('adm-pt-out');
+  const btn=document.getElementById('adm-pt-btn');
+  const email=sel?sel.value:'';
+  if(!email){toast('Escolhe primeiro a conta','bad');return;}
+  const pass=gerarPassTemp();
+  const txt=btn.textContent;btn.disabled=true;btn.textContent='A gerar…';
+  try{
+    await sbReq('POST','rpc/admin_pass_temp',{p_email:email,p_password:pass});
+    out.innerHTML=`<div style="margin-top:10px;padding:12px;background:var(--panel2);border:1px solid var(--green);border-radius:10px">
+      <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:700;margin-bottom:6px">Password de ${email}</div>
+      <div style="font-family:ui-monospace,Menlo,Consolas,monospace;font-size:20px;font-weight:700;color:var(--ink);letter-spacing:1px;word-break:break-all">${pass}</div>
+      <div class="note" style="margin-top:8px">Dita-lha pelo telefone: entra com o email e esta password e troca-a em Definições › Conta. A password antiga deixou de funcionar. Isto só aparece aqui uma vez.</div>
+      <div class="mbtns" style="margin-top:8px"><button class="btn" onclick="copiarPassTemp('${pass}')">📋 Copiar</button></div>
+    </div>`;
+    sbLog('conta','pass_temp',email,{});
+    toast('Password gerada ✓','ok');
+  }catch(e){
+    const m=String(e&&e.message||e);
+    out.innerHTML='<div class="note" style="color:var(--red)">'+
+      (/PGRST202|could not find|not exist|404/i.test(m)
+        ?'Falta correr o db/admin_pass_temp.sql no SQL Editor do Supabase.'
+        :('Não deu: '+m))+'</div>';
+  }
+  btn.disabled=false;btn.textContent=txt;
 }
 
 async function sbAddConjuge(){
