@@ -415,6 +415,10 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .pres-guest-card .pg-badge.pays{background:rgba(30,122,77,.12);color:var(--green)}
 .pres-guest-card .pg-badge.free{background:rgba(46,111,168,.12);color:var(--blue)}
 .pres-guest-card .pg-badge.kid{background:rgba(168,123,20,.14);color:var(--gold)}
+/* "6 pessoas": a linha do convidado vale mais que uma boca (acompanhantes sem
+   nome). Fica em tinta neutra para não competir com Oferta/Criança, que dizem
+   quem paga o quê. */
+.pres-guest-card .pg-badge.heads{background:var(--panel);border:1px solid var(--line);color:var(--muted);white-space:nowrap}
 .pres-guest-add{display:flex;align-items:center;gap:6px;padding:10px 16px;border-radius:10px;border:1.5px dashed var(--line);background:transparent;color:var(--barrete);font-size:13px;font-weight:600;cursor:pointer;transition:.15s;width:100%;justify-content:center;margin-top:8px}
 .pres-guest-add:active{background:rgba(30,122,77,.06);transform:scale(.97)}
 
