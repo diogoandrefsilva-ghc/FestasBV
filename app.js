@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v178 · 2026-08-03 · T-shirts: as 3 tipologias numa linha, clicar num tamanho mostra de quem são, e Por conta de passa para o fim, colapsado';
+const APP_BUILD = 'v179 · 2026-08-03 · Artigos de despensa: azeite, sal e louro deixam de duplicar a lista — os pedidos das várias refeições passam a valer por uma linha só nas Compras';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -1899,7 +1899,7 @@ async function carregar(){
     const sel='*,membros(*,presencas(*)),refeicoes_def(*),despesas(*),convidados(*),mealheiros(*),pagamentos(*)';
     // shoplist vai numa fetch SEPARADA e tolerante a falha: se a tabela ainda
     // não existir (migração por correr) o resto da app continua a funcionar.
-    const [res,uaRes,cjRes,vlRes,slRes,stRes,ctRes,acRes,npRes,flRes,fpRes,ccRes,sljRes,cpRes,stmRes,ttRes,tsRes,tiRes]=await Promise.all([
+    const [res,uaRes,cjRes,vlRes,slRes,stRes,ctRes,acRes,adRes,npRes,flRes,fpRes,ccRes,sljRes,cpRes,stmRes,ttRes,tsRes,tiRes]=await Promise.all([
       sbFetch(`${SB_URL}/rest/v1/eventos?select=${encodeURIComponent(sel)}&order=ano.asc`,{headers:sbHeaders(),cache:'no-store'}),
       sbFetch(`${SB_URL}/rest/v1/user_amigos?select=email,amigo`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null),
       sbFetch(`${SB_URL}/rest/v1/conjuges?select=amigo_a,amigo_b`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null),
@@ -1911,6 +1911,9 @@ async function carregar(){
       // migração, CATS_TABLE=false e tudo o que é categorias fica escondido
       sbFetch(`${SB_URL}/rest/v1/categorias?select=*`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null),
       sbFetch(`${SB_URL}/rest/v1/artigo_categorias?select=*`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null),
+      // artigos de despensa (db/despensa.sql): idem — sem a migração,
+      // DESP_TABLE=false e a lista comporta-se como sempre se comportou
+      sbFetch(`${SB_URL}/rest/v1/artigos_despensa?select=*`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null),
       // switch das notificações de presenças (config): toda a gente precisa
       // dele para marcar/não marcar as entradas como silenciosas
       sbFetch(`${SB_URL}/rest/v1/config?chave=eq.notif_presencas&select=valor`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null),
@@ -1946,6 +1949,9 @@ async function carregar(){
     CATEGORIAS=CATS_TABLE?(await ctRes.json()).sort((a,b)=>a.nome.localeCompare(b.nome,'pt')):[];
     ART_CATS={};
     if(CATS_TABLE)(await acRes.json()).forEach(r=>{ART_CATS[r.artigo_key]={catId:r.categoria_id,origem:r.origem||'manual'};});
+    DESP_TABLE=!!(adRes&&adRes.ok);
+    ART_DESP={};
+    if(DESP_TABLE)(await adRes.json()).forEach(r=>{ART_DESP[r.artigo_key]=r.origem||'manual';});
     const stockByEv={};stockRows.forEach(s=>{(stockByEv[s.evento_id]=stockByEv[s.evento_id]||[]).push(s);});
     FILHOS_TABLE=!!(flRes&&flRes.ok&&fpRes&&fpRes.ok);
     FILHOS=FILHOS_TABLE
@@ -3994,6 +4000,197 @@ async function catSugApply(){
   btn.disabled=false;
 }
 
+/* ═══ ARTIGOS DE DESPENSA (3.º passo do 🔤 Normalizar) ═══
+   Há dois tipos de artigo na lista e a app tratava-os como um só:
+   · CONSUMÍVEL — a procura escala com as refeições. Três jantares com carne
+     precisam de três vezes a carne; dois pedidos para dias diferentes NÃO são
+     duplicados (é por isso que o passo dos Pedidos Repetidos se recusa a juntar
+     entre refeições — ver shopRepFusiveis).
+   · DESPENSA — compra-se UMA embalagem e chega para o evento todo: azeite, sal,
+     pimenta, louro, orégãos, colorau. Cada cozinheiro escreve-o na lista da sua
+     refeição, e faz bem (precisa de saber que o prato leva azeite), mas quem vai
+     às compras não pode ver três "Azeite" e trazer três garrafas.
+   A marca é por NOME (chave = shopArtKey, como o ART_CATS) e é GLOBAL: o azeite
+   é despensa em todos os anos. Nada disto apaga pedidos — é agregação:
+   · lista da refeição → a linha fica, marcada 🫙;
+   · separador Compras → os pedidos colapsam numa linha só (secção 🫙 Despensa),
+     e o ＋🛒 leva o grupo todo de uma vez;
+   · cobertura → havendo lote comprado do artigo, todos os pedidos ficam
+     cobertos, sem obrigar a alocar refeição a refeição.
+   DETEÇÃO: local e determinística (não precisa de AI) — repetido em ≥2 refeições
+   e ninguém indicou quantidade. Quem escreve "azeite" sem quantidade não está a
+   pedir uma garrafa por refeição, está a lembrar-se do ingrediente. A AI, quando
+   responde, acrescenta o que a heurística não apanha. Em qualquer dos casos só
+   fica gravado depois de o admin confirmar: a deteção erra em casos legítimos —
+   salsa, coentros e hortelã repetem-se entre refeições mas são fresco, estragam-se
+   e compram-se por refeição. Migração: db/despensa.sql. Sem ela, DESP_TABLE=false
+   e tudo isto fica escondido (a lista comporta-se como sempre se comportou). */
+let DESP_TABLE=false;   // BD já tem artigos_despensa?
+let ART_DESP={};        // artigo_key → origem ('manual'|'ai'|'heur')
+let _despRows=null;     // linhas do modal do 3.º passo
+let _despCont=null;     // grupos juntados nos passos anteriores (segue p/ as categorias)
+
+function isDespensa(artigo){return DESP_TABLE&&!!ART_DESP[shopArtKey(artigo)];}
+/* Linhas do passo: um artigo por linha, com o estado atual e o proposto.
+   Entram os nomes pedidos em ≥2 refeições (é aí que há duplicação a resolver) e
+   ainda os que JÁ estão marcados e continuam na lista — para se poderem desmarcar
+   aqui mesmo, sem ir procurar o artigo. `sug` = sugestões da AI por artigo_key. */
+function despStepRows(sug){
+  const map={};
+  shopArr().forEach(it=>{
+    if(!shopIsPending(it)||!shopIsMeal(it.tipo)||!it.dataValor)return;
+    const k=shopArtKey(it.artigo);if(!k)return;
+    const g=map[k]=map[k]||{key:k,artigo:it.artigo,refs:new Set(),comQtd:0};
+    g.refs.add(shopGroupKey(it));
+    if((it.quantidade||'').trim())g.comQtd++;
+    if(it.artigo.length>g.artigo.length)g.artigo=it.artigo;   // a grafia mais completa
+  });
+  const out=[];
+  Object.keys(map).forEach(k=>{
+    const g=map[k],nRef=g.refs.size,ja=!!ART_DESP[k];
+    if(nRef<2&&!ja)return;
+    const heur=nRef>=2&&!g.comQtd;
+    const viaAI=!!(sug&&sug[k]);
+    out.push({key:k,artigo:g.artigo,nRef,ja,on:ja||viaAI||heur,
+      motivo:ja?'já marcado como despensa'
+        :heur?`pedido em ${nRef} refeições e ninguém indicou quantidade`
+        :viaAI?'sugerido pela AI'
+        :`pedido em ${nRef} refeições`});
+  });
+  out.sort((a,b)=>(b.on?1:0)-(a.on?1:0)||b.nRef-a.nRef||a.artigo.localeCompare(b.artigo,'pt'));
+  return out;
+}
+// Há alguma coisa para mostrar no passo? (decide se o modal chega a abrir)
+function despStepTemAlgo(sug){
+  if(!DESP_TABLE||!isAdmin()||contasFechadas())return false;
+  const rows=despStepRows(sug);
+  // Só vale a pena interromper se houver alguma DECISÃO por tomar — uma lista
+  // onde tudo já está como deve ficar não faz o admin ganhar nada.
+  return rows.some(r=>r.on!==r.ja);
+}
+function despStep(juntados,sug){
+  _despCont=juntados||null;
+  if(!despStepTemAlgo(sug))return false;
+  _despRows=despStepRows(sug);
+  despRender();
+  document.getElementById('shopdesp-bg').classList.add('show');
+  document.body.classList.add('no-scroll');
+  return true;
+}
+function despRender(){
+  if(!_despRows)return;
+  const nNovos=_despRows.filter(r=>r.on&&!r.ja).length;
+  const info=document.getElementById('shopdesp-info');
+  if(info)info.textContent=`${nNovos?`${nNovos} artigo${nNovos===1?'':'s'} que parece${nNovos===1?'':'m'} ser de despensa`:'Nada de novo detetado'} — uma embalagem chega para o evento todo, por isso os pedidos das várias refeições passam a valer por um só na lista de compras. Confirma: temperos e óleos sim; fresco que se estraga (salsa, coentros, hortelã) não.`;
+  document.getElementById('shopdesp-list').innerHTML=_despRows.map((r,i)=>`<div class="desp-row${r.on?' on':''}">
+      <button type="button" class="norm-sw${r.on?' on':''}" role="switch" aria-checked="${r.on?'true':'false'}" aria-label="Marcar como despensa" onclick="despToggle(${i})"><i></i></button>
+      <div class="desp-main"><span class="desp-art">${escHtml(r.artigo)}</span><span class="desp-why">${escHtml(r.motivo)}</span></div>
+      <span class="desp-n">${r.nRef}×</span>
+    </div>`).join('');
+  despBarUpd();
+}
+function despToggle(i){
+  const r=_despRows&&_despRows[i];if(!r)return;
+  r.on=!r.on;
+  const row=document.querySelectorAll('#shopdesp-list .desp-row')[i];
+  if(!row){despRender();return;}
+  row.classList.toggle('on',r.on);
+  const sw=row.querySelector('.norm-sw');
+  if(sw){sw.classList.toggle('on',r.on);sw.setAttribute('aria-checked',r.on?'true':'false');}
+  despBarUpd();
+}
+// O que muda face ao que está gravado: {add:[key],del:[key]}
+function despDiff(){
+  const add=[],del=[];
+  (_despRows||[]).forEach(r=>{if(r.on&&!r.ja)add.push(r.key);else if(!r.on&&r.ja)del.push(r.key);});
+  return {add,del};
+}
+function despBarUpd(){
+  const save=document.getElementById('shopdesp-save');if(!save)return;
+  const {add,del}=despDiff();
+  save.disabled=!add.length&&!del.length;
+  const p=[];
+  if(add.length)p.push(`marcar ${add.length}`);
+  if(del.length)p.push(`desmarcar ${del.length}`);
+  save.textContent=p.length?'Guardar — '+p.join(' e '):'Sem alterações';
+}
+function despClose(){
+  document.getElementById('shopdesp-bg').classList.remove('show');
+  document.body.classList.remove('no-scroll');
+  _despRows=null;
+  const cont=_despCont;_despCont=null;
+  shopCatStep(cont);   // último passo do fluxo
+}
+async function despApply(){
+  if(!_despRows)return;
+  if(!isAdmin()){toast('Só o admin marca artigos de despensa','bad');return;}
+  const {add,del}=despDiff();
+  if(!add.length&&!del.length){despClose();return;}
+  const btn=document.getElementById('shopdesp-save');if(btn)btn.disabled=true;
+  setSync('load','a guardar…');
+  try{
+    if(add.length){
+      const rows=add.map(k=>({artigo_key:k,origem:'manual',atualizado_em:new Date().toISOString()}));
+      await queueWrite(()=>sbReq('POST','artigos_despensa?on_conflict=artigo_key',rows,{Prefer:'resolution=merge-duplicates'}));
+      add.forEach(k=>{ART_DESP[k]='manual';});
+    }
+    // Um DELETE por chave (e não um in.(…)): a chave é TEXTO livre com espaços
+    // e vírgulas — só o eq.+encodeURIComponent é seguro aqui.
+    for(const k of del){
+      await queueWrite(()=>sbReq('DELETE',`artigos_despensa?artigo_key=eq.${enc(k)}`));
+      delete ART_DESP[k];
+    }
+    marcaGuardado();
+    toast(`${add.length?`${add.length} artigo(s) de despensa`:''}${add.length&&del.length?' · ':''}${del.length?`${del.length} desmarcado(s)`:''} ✓`,'ok');
+    renderShopViews();
+    despClose();
+  }catch(e){setSync('err','erro ao guardar');toast(permErrorMsg(e),'bad');if(btn)btn.disabled=false;}
+}
+/* Marcar/desmarcar um artigo a partir do detalhe (só admin) — o atalho para os
+   casos que a deteção não apanha, sem esperar pelo 🔤 Normalizar. */
+async function despSetFromModal(){
+  if(!DESP_TABLE||!isAdmin())return;
+  const artigo=(document.getElementById('shop-artigo').value||'').trim();
+  const k=shopArtKey(artigo);if(!k){toast('Escreve primeiro o nome do artigo','bad');return;}
+  const era=!!ART_DESP[k];
+  setSync('load','a guardar…');
+  try{
+    if(era){
+      await queueWrite(()=>sbReq('DELETE',`artigos_despensa?artigo_key=eq.${enc(k)}`));
+      delete ART_DESP[k];
+    }else{
+      await queueWrite(()=>sbReq('POST','artigos_despensa?on_conflict=artigo_key',
+        [{artigo_key:k,origem:'manual',atualizado_em:new Date().toISOString()}],
+        {Prefer:'resolution=merge-duplicates'}));
+      ART_DESP[k]='manual';
+    }
+    marcaGuardado();despSync();renderShopViews();
+    toast(era?'Deixou de ser artigo de despensa ✓':'Marcado como artigo de despensa 🫙','ok');
+  }catch(e){setSync('err','erro ao guardar');toast(permErrorMsg(e),'bad');}
+}
+/* Estado do interruptor de despensa no detalhe do artigo. Para quem não é admin
+   fica visível mas em leitura — importa saber PORQUE é que aquele azeite não
+   aparece três vezes na lista. */
+function despSync(){
+  const wrap=document.getElementById('shop-desp-wrap');if(!wrap)return;
+  if(!DESP_TABLE){wrap.style.display='none';return;}
+  const artigo=(document.getElementById('shop-artigo').value||'').trim();
+  const on=isDespensa(artigo);
+  if(!on&&!isAdmin()){wrap.style.display='none';return;}   // nada a dizer nem a fazer
+  wrap.style.display='';
+  wrap.classList.toggle('on',on);
+  const sw=wrap.querySelector('.norm-sw');
+  if(sw){
+    sw.classList.toggle('on',on);
+    sw.setAttribute('aria-checked',on?'true':'false');
+    sw.disabled=!isAdmin();
+  }
+  const note=document.getElementById('shop-desp-note');
+  if(note)note.textContent=on
+    ?'Uma embalagem chega para o evento todo: os pedidos das várias refeições aparecem como uma linha só na lista de compras.'
+    :'Liga para artigos que se compram uma vez e servem todas as refeições (azeite, sal, louro). Não ligues em fresco que se estraga.';
+}
+
 /* ═══ NORMALIZAR ARTIGOS (Shop List, só admin) ═══
    Diferentes pessoas escrevem o mesmo produto de formas diferentes
    ("Chouriço"/"Chouriços", "Polpa Tomate 1000ml"/"Polpa Tomate 1L"). A app já
@@ -4017,6 +4214,7 @@ async function catSugApply(){
 let _normGroups=null;   // [{variants:[{name,count}],canon,apply}]
 let _normViaAI=false;   // sugestões vieram da AI (true) ou da heurística local (false)
 let _normCats=null;     // {artigo_key: nome de categoria} sugerido no mesmo pedido
+let _normDesp=null;     // {artigo_key:true} — artigos de despensa sugeridos no mesmo pedido
 // Chave "solta" para agrupar grafias do mesmo produto: sem acentos/maiúsculas,
 // unidades embutidas em forma canónica (1000ml→1l, 500gr→500g), sem pontuação e
 // com plurais simples reduzidos ao singular (batatas→batata, chouriços→chouriço).
@@ -4103,13 +4301,14 @@ async function shopNormOpen(){
   const btn=document.getElementById('shop-norm-btn');
   if(btn){btn.disabled=true;btn.textContent='⏳ A analisar…';}
   let groups=null,viaAI=false,aiErr='';
-  _normCats=null;
+  _normCats=null;_normDesp=null;
   const comCats=CATS_TABLE&&CATEGORIAS.length>0;
   try{
     // AI primeiro: agrupa por significado (marca vs genérico, sinónimos…) e,
     // se houver dicionário de categorias, classifica os nomes no mesmo pedido
     const req={normalizar:nomes.slice(0,200)};
     if(comCats)req.categorias=catPromptList();
+    if(DESP_TABLE)req.despensa=true;   // pede também os candidatos a artigo de despensa
     const r=await sbFetch(`${SB_URL}/functions/v1/fatura-ocr`,{
       method:'POST',
       headers:{'Content-Type':'application/json','apikey':SB_KEY},
@@ -4121,6 +4320,12 @@ async function shopNormOpen(){
     // Função antiga (ainda sem categorias na normalização) → fica vazio e o
     // passo das categorias pede-as num segundo pedido
     if(comCats)_normCats=catSugMap(d&&d.sugestoes);
+    // Despensa: a função pode ainda não responder isto (edge function por
+    // atualizar) — fica null e o passo corre só com a deteção local
+    if(DESP_TABLE&&Array.isArray(d&&d.despensa)){
+      _normDesp={};
+      d.despensa.forEach(n=>{const k=shopArtKey(n);if(k)_normDesp[k]=true;});
+    }
     viaAI=true;
   }catch(e){
     // Sem AI (offline/erro) → heurística local (plurais, unidades, pontuação)
@@ -4131,8 +4336,8 @@ async function shopNormOpen(){
   _normViaAI=viaAI;
   if(!groups||!groups.length){
     _normGroups=null;
-    // Nomes já arrumados: salta o passo dos nomes e segue para repetidos → categorias
-    if(viaAI&&(shopRepGrupos().length||shopCatPendentes())){shopFluxoDepoisDosNomes(null);return;}
+    // Nomes já arrumados: salta o passo dos nomes e segue para os restantes
+    if(viaAI&&shopFluxoTemPassos()){shopFluxoDepoisDosNomes(null);return;}
     toast(viaAI?'Nada a arrumar — grafias e categorias em dia 🎉'
       :('Sugestões AI falharam ('+aiErr+') e nada básico a juntar'),viaAI?'ok':'bad');
     return;
@@ -4264,7 +4469,7 @@ async function shopNormApply(){
     // Nomes já estavam certos — segue-se na mesma para as categorias
     await catHerdarNormalizacao(juntados);
     shopNormClose();
-    if(shopRepGrupos().length||shopCatPendentes())shopFluxoDepoisDosNomes(juntados);
+    if(shopFluxoTemPassos())shopFluxoDepoisDosNomes(juntados);
     else toast('Nada mudou — os nomes finais já estavam aplicados','ok');
     return;
   }
@@ -4405,7 +4610,7 @@ function shopRepFusiveis(g){
   });
   return out;
 }
-// Abre o passo. Devolve false se não houver nada repetido (o fluxo segue em frente).
+// Abre o passo. Devolve false se não houver nada repetido (o fluxo segue adiante).
 function shopRepStep(juntados){
   _repCont=juntados||null;
   if(!isAdmin()||contasFechadas())return false;
@@ -4417,10 +4622,23 @@ function shopRepStep(juntados){
   document.body.classList.add('no-scroll');
   return true;
 }
-// Encadeamento do botão: nomes → repetidos → categorias (cada passo só aparece
-// se tiver alguma coisa para mostrar)
+/* Encadeamento do botão: nomes → repetidos → despensa → categorias (cada passo
+   só aparece se tiver alguma coisa para mostrar). A ordem não é arbitrária: os
+   repetidos precisam dos nomes já unificados, e a despensa precisa dos repetidos
+   já acertados — só depois de o mesmo artigo ser mesmo o mesmo é que faz sentido
+   perguntar se uma embalagem chega para todos. */
 function shopFluxoDepoisDosNomes(juntados){
-  if(!shopRepStep(juntados))shopCatStep(juntados);
+  if(!shopRepStep(juntados))shopDespStep(juntados);
+}
+// Algum dos passos seguintes tem matéria? (evita anunciar "nada a arrumar"
+// quando ainda há repetidos, despensa ou categorias por tratar)
+function shopFluxoTemPassos(){
+  return !!(shopRepGrupos().length||despStepTemAlgo(_normDesp)||shopCatPendentes());
+}
+// Chamado no fecho dos Pedidos Repetidos e no salto direto acima
+function shopDespStep(juntados){
+  const sug=_normDesp;_normDesp=null;
+  if(!despStep(juntados,sug))shopCatStep(juntados);
 }
 function shopRepRender(){
   if(!_repGrupos)return;
@@ -4515,7 +4733,7 @@ function shopRepClose(){
   document.body.classList.remove('no-scroll');
   _repGrupos=null;
   const cont=_repCont;_repCont=null;
-  shopCatStep(cont);   // último passo do fluxo
+  shopDespStep(cont);   // passos seguintes: despensa → categorias
 }
 async function shopRepApply(){
   if(!_repGrupos)return;
@@ -4935,7 +5153,12 @@ function shopItemCoverage(it){
    sai do "falta quem trate" (não há nada a comprar) mas continua visível;
    se a alocação mudar, volta sozinho. Sem qtd numérica: cobertura binária. */
 function shopIsCovered(it){
-  if(!STOCK_TABLE||!shopIsPending(it)||!shopIsMeal(it.tipo)||!it.dataValor)return false;
+  if(!STOCK_TABLE||!shopIsPending(it))return false;
+  // Despensa: uma embalagem serve o evento todo, por isso basta HAVER lote
+  // comprado do artigo — não se exige alocação a esta refeição em particular,
+  // que é justamente o trabalho manual que a marca de despensa evita.
+  if(isDespensa(it.artigo)&&stockArr().some(l=>stockBacked(l)&&shopSameArtigo(loteReqArtigo(l),it.artigo)))return true;
+  if(!shopIsMeal(it.tipo)||!it.dataValor)return false;
   const c=shopItemCoverage(it);
   if(c)return c.aloc>0.0005&&c.falta<=0.0005;
   return mealStockAllocAnyFor(it.artigo,it.tipo,it.dataValor);
@@ -5281,6 +5504,119 @@ function shopArtGroupedList(list,mineView){
   return '<div class="cmp-list">'+order.map(k=>shopArtNestHtml(groups[k].items,mineView)).join('')+'</div>';
 }
 
+/* ── Lista de DESPENSA ──
+   Uma linha por ARTIGO, sejam quantos forem os pedidos e a que refeições se
+   destinem. É o coração da marca de despensa: é por aqui que o azeite deixa de
+   aparecer três vezes a quem vai às compras. As refeições que o pediram ficam
+   como chips por baixo (a informação que o colapso não pode perder) e as ações
+   valem para o grupo todo — um toque leva/larga tudo. Não respeita a ordenação
+   escolhida (loja/refeição/artigo/categoria) de propósito: um artigo que serve o
+   evento inteiro não pertence a nenhum desses grupos em particular. */
+function shopDespGroupedList(list,mineView){
+  const g={},order=[];
+  list.forEach(it=>{const k=shopArtKey(it.artigo);if(!g[k]){g[k]=[];order.push(k);}g[k].push(it);});
+  order.sort((a,b)=>g[a][0].artigo.localeCompare(g[b][0].artigo,'pt'));
+  return '<div class="cmp-list">'+order.map(k=>shopDespCard(g[k],mineView)).join('')+'</div>';
+}
+/* Quantidade de um grupo de despensa: o MÁXIMO pedido, nunca a soma. Somar era
+   exatamente o erro que isto vem corrigir — se um cozinheiro pede 1 L de azeite e
+   outro 2 L, leva-se 2 L, não 3. */
+function shopDespQty(items){
+  const byU={};let has=false;
+  items.forEach(it=>{const q=qtyParse(it.quantidade);if(q){has=true;const u=uKey(q.u);byU[u]=Math.max(byU[u]||0,q.n);}});
+  if(!has)return '';
+  const semTam=!items.some(it=>(it.tamanho||'').trim());
+  return Object.keys(byU).map(u=>{
+    const n=byU[u];
+    return (semTam&&(!u||u==='un'))?fmtQty(n,n===1?'unidade':'unidades'):fmtQty(n,u);
+  }).join(' + ');
+}
+function shopDespCard(items,mineView){
+  const it=items[0];                       // representante: é o detalhe que abre ao tocar
+  const qtdTxt=shopDespQty(items);
+  const qtd=qtdTxt?`<div class="cmp-qtd-row">Quantidade: <b>${escHtml(qtdTxt)}</b></div>`:'';
+  const lojaTxt=shopLojaTxt(items.find(x=>shopLojaTxt(x))||it);
+  const lojaRow=lojaTxt?`<div class="cmp-loja-row"><span class="cmp-loja">${escHtml(lojaTxt)}</span></div>`:'';
+  // As refeições que pediram — sem o prato (só ícone + dia): é uma linha de
+  // chips e o nome do prato rebentava-a em ecrã de telemóvel
+  const refs=[];
+  items.forEach(x=>{
+    const l=shopIsMeal(x.tipo)&&x.dataValor?`${shopTipoIcon(x.tipo)} ${fmtDiaMes(x.dataValor)}`:`${shopTipoIcon(x.tipo)} ${x.tipo}`;
+    if(refs.indexOf(l)<0)refs.push(l);
+  });
+  const refsRow=`<div class="cmp-badge-row cmp-desp-refs">${refs.map(r=>`<span class="cmp-badge meal">${escHtml(r)}</span>`).join('')}</div>`;
+  // Quem pediu (todos os nomes, sem repetir) — no colapso é o único sítio onde
+  // se fica a saber a quem perguntar
+  const quem=[];items.forEach(x=>{if(x.criadoPor&&quem.indexOf(x.criadoPor)<0)quem.push(x.criadoPor);});
+  const sub=quem.length?`<div class="cmp-sub">pedido por ${escHtml(quem.join(', '))}</div>`:'';
+  // As ações passam o _id do representante (e não o nome do artigo): a chave é
+  // texto livre e não tem escape seguro dentro de um onclick — o handler
+  // re-deriva o grupo a partir do item.
+  let check='',right='';
+  if(mineView){
+    // A bolinha marca o grupo todo como apanhado (é uma embalagem só)
+    const todos=items.every(x=>x.noCarrinho);
+    check=`<button class="cmp-check write-action ${todos?'on':''}" onclick="event.stopPropagation();toggleCartDespensa(${it._id})" aria-label="Já no carrinho">✓</button>`;
+    right=`<button class="cmp-x write-action" aria-label="Tirar do carrinho" onclick="event.stopPropagation();unclaimDespensa(${it._id})">✕</button>`;
+  }else if(it.tratadoPor){
+    right=`<span class="cmp-chip">🛒 ${escHtml(it.tratadoPor)}</span>`;
+  }else{
+    right=`<button class="cmp-mini cart write-action" title="Pôr no carrinho" aria-label="Pôr no carrinho" onclick="event.stopPropagation();claimDespensa(${it._id})"><i class="cmp-plus">＋</i>🛒</button>`;
+  }
+  return `<div class="cmp-item cmp-line cmp-tap cmp-desp${mineView&&items.every(x=>x.noCarrinho)?' incart':''}" onclick="openShopItemModal(${it._id})">
+    ${check}
+    <div class="cmp-main">
+      <div class="cmp-artigo"><i class="desp-ic">🫙</i>${escHtml(it.artigo)}</div>
+      ${qtd}${lojaRow}${refsRow}${sub}
+    </div>
+    ${right}<span class="cmp-chev-r">›</span>
+  </div>`;
+}
+/* Ações em bloco. Uma embalagem de despensa é uma decisão só: quem a leva,
+   leva-a para todas as refeições que a pediram. Sem isto, o colapso resolvia o
+   ver e devolvia o problema no carrinho (três linhas de azeite outra vez). */
+// Os pendentes do mesmo artigo do item `id` (o grupo que o cartão representa)
+function despItemsOf(id,filtro){
+  const ref=shopArr().find(x=>x._id===id);if(!ref)return [];
+  const key=shopArtKey(ref.artigo);
+  return shopArr().filter(x=>x._id!=null&&shopArtKey(x.artigo)===key&&shopIsPending(x)&&!shopIsCovered(x)&&(!filtro||filtro(x)));
+}
+async function claimDespensa(id){
+  const ids=despItemsOf(id,x=>!x.tratadoPor).map(x=>x._id);
+  if(!ids.length)return;
+  if(ids.length===1){claimItem(ids[0]);return;}
+  const nome=myPrimaryName()||(isAdmin()?'Admin':'');
+  setSync('load','a guardar…');
+  try{
+    // Mesma guarda anti-corrida do claim simples: só leva os que ainda estão livres
+    const res=await queueWrite(()=>sbReq('PATCH',`shoplist?id=in.(${ids.join(',')})&tratado_por=is.null`,{tratado_por:nome},{Prefer:'return=representation'}));
+    const got=new Set((res||[]).map(r=>r.id));
+    shopArr().forEach(x=>{if(got.has(x._id))x.tratadoPor=nome;});
+    if(got.size<ids.length)toast('Alguns pedidos já tinham ficado com outra pessoa','bad');
+    syncMirror();marcaGuardado();renderShopViews();
+  }catch(e){setSync('err','erro ao guardar');toast(permErrorMsg(e),'bad');}
+}
+/* Largar / marcar apanhado: só os pedidos que estão no carrinho da MESMA pessoa
+   do cartão. Um `shopMine(x)||isAdmin()` apanharia também os pedidos do mesmo
+   artigo reclamados por outra pessoa — o admin largava-lhe o azeite sem querer. */
+function despMesmoDono(id){
+  const ref=shopArr().find(x=>x._id===id);if(!ref||!ref.tratadoPor)return [];
+  return despItemsOf(id,x=>x.tratadoPor===ref.tratadoPor);
+}
+async function unclaimDespensa(id){
+  const ref=shopArr().find(x=>x._id===id);if(!ref)return;
+  if(!shopMine(ref)&&!isAdmin()){toast('Só quem está a tratar pode largar o artigo','bad');return;}
+  const its=despMesmoDono(id);if(!its.length)return;
+  await _shopBulkUpdate(its.map(x=>x._id),{tratado_por:null,no_carrinho:false},{tratadoPor:null,noCarrinho:false});
+}
+async function toggleCartDespensa(id){
+  const ref=shopArr().find(x=>x._id===id);if(!ref)return;
+  if(!shopMine(ref)&&!isAdmin())return;   // o carrinho é pessoal de quem trata
+  const its=despMesmoDono(id);if(!its.length)return;
+  const v=!its.every(x=>x.noCarrinho);    // nem todos apanhados → apanha tudo
+  await _shopBulkUpdate(its.map(x=>x._id),{no_carrinho:v},{noCarrinho:v});
+}
+
 /* Lista agrupada por CATEGORIA de produto (Sumos, Talho, …): a vista para
    fazer as compras "por corredor". O badge de refeição/tipo mantém-se em cada
    cartão — o cabeçalho diz o produto, não o destino. Sem categoria no fim. */
@@ -5335,7 +5671,7 @@ const MEAL_SHOP_OPEN={};   // aberto/fechado por refeição (sobrevive a re-rend
    e dá à lista uma coluna de quantidades a direito, seja qual for o nome.
    Vai num bloco próprio para o que vem a seguir (carimbo/botão) nunca ser
    empurrado para a linha de baixo por um nome comprido. */
-function mslLead(artigo,t){return `<span class="msl-row"><span class="msl-nm">${escHtml(artigo)}</span><i class="msl-lead"></i><span class="msl-q">${t?escHtml(t):''}</span></span>`;}
+function mslLead(artigo,t,desp){return `<span class="msl-row"><span class="msl-nm">${desp?'<i class="desp-ic" title="Artigo de despensa — uma embalagem serve todas as refeições">🫙</i>':''}${escHtml(artigo)}</span><i class="msl-lead"></i><span class="msl-q">${t?escHtml(t):''}</span></span>`;}
 /* Carimbo de quem trata do artigo. Só o primeiro nome — é o que se lê de
    relance e mantém o carimbo curto; o nome inteiro fica no title. */
 function mslWho(nome){
@@ -5364,14 +5700,18 @@ function mealShopSection(rd){
   const alocLines=alocs.map(x=>`<div class="msl-it stk" onclick="openLoteModal(${x.l._id})">
       ${mslLead(x.l.artigo,loteQtdLabel(x.l,x.qtd))}<span class="msl-st ok">${x.org?x.org.ic+' '+escHtml(x.org.lbl):eur(x.val)}</span></div>`).join('');
   const lineOf=(it,dim)=>{
-    const done=shopIsBought(it);
+    // Coberto pelo stock conta como resolvido: não há nada a tratar nem a
+    // comprar (é assim que a despensa já comprada aparece no bloco Comprado)
+    const cob=!shopIsBought(it)&&shopIsCovered(it);
+    const done=shopIsBought(it)||cob;
     const qtdTxt=shopQtyLabel(it);
     // Sem "riscado": um artigo comprado é uma linha normal do bloco Comprado,
     // igual às dos lotes — o bloco onde está já diz tudo
     // Sem dono: em vez de dizer "falta quem trate", dá-se logo o botão de o
     // resolver — o ＋🛒 da Shop List em botão de talão, um toque e o artigo é
     // meu. Em refeições passadas não há nada a tratar: fica só a constatação.
-    const st=done?''
+    const st=cob?'<span class="msl-st ok">🧺 em stock</span>'
+      :done?''
       :it.tratadoPor?mslWho(it.tratadoPor)
       :past?'<span class="msl-st falta">por tratar</span>'
       :`<button class="cmp-mini cart write-action msl-claim" title="Pôr no meu carrinho" aria-label="Pôr no meu carrinho" onclick="event.stopPropagation();claimItem(${it._id})"><i class="cmp-plus">＋</i>🛒</button>`;
@@ -5379,7 +5719,7 @@ function mealShopSection(rd){
     // toque para alocar o livre a esta refeição). Ver shopStockHint/shopHintHtml.
     const hint=(!done&&!past)?shopHintHtml(it,'msl-hint',true):'';
     return `<div class="msl-it${dim?' msl-dim':''}" onclick="openShopItemModal(${it._id})">
-      ${mslLead(it.artigo,qtdTxt)}${st}${hint}</div>`;
+      ${mslLead(it.artigo,qtdTxt,isDespensa(it.artigo))}${st}${hint}</div>`;
   };
   /* A loja NÃO vai em cada linha: nesta lista estreita a etiqueta caía para
      baixo numas linhas e não noutras (leitura aos solavancos). Vai antes como
@@ -5408,7 +5748,13 @@ function mealShopSection(rd){
   // refeição): se o admin mover a alocação para outra refeição, o pedido não
   // pode reaparecer aqui como "comprado" — os lotes são a fonte de verdade.
   const temLote=it=>stockArr().some(l=>stockBacked(l)&&(shopSameArtigo(loteReqArtigo(l),it.artigo)||faturaScore(it.artigo,loteReqArtigo(l))>=0.5));
-  const bought=items.filter(it=>shopIsBought(it)&&!temLote(it));
+  /* Despensa já comprada: a embalagem existe mas pode estar alocada a OUTRA
+     refeição, e então não vem nas linhas de `alocs`. Sem isto a linha sumia
+     deste cartão e o cozinheiro deixava de saber que o prato leva azeite — que
+     é precisamente o que a marca de despensa promete não fazer. */
+  const despCoberto=items.filter(it=>!shopIsBought(it)&&shopIsCovered(it)&&isDespensa(it.artigo)
+    &&!alocs.some(x=>shopSameArtigo(x.l.artigo,it.artigo)));
+  const bought=items.filter(it=>shopIsBought(it)&&!temLote(it)).concat(despCoberto);
   const nComp=alocs.length+bought.length;
   const det=(sub,lbl,cnt,body)=>{
     const k=key+sub;
@@ -5483,6 +5829,27 @@ function renderCompras(){
     :byCat?shopCatGroupedList(arr,mineView)
     :byArt?shopArtGroupedList(arr,mineView)
     :shopGroupedList(arr,mineView);
+  /* DESPENSA: os pedidos do mesmo artigo em várias refeições valem por UM só —
+     uma embalagem chega para o evento todo (ver a secção ARTIGOS DE DESPENSA).
+     Saem do fluxo normal de ordenação e vão para um bloco próprio, já colapsados;
+     as contagens passam a contar grupos e não pedidos, para o número no topo
+     bater certo com os cartões que se veem. */
+  const splitDesp=arr=>{
+    const norm=[],desp=[];
+    arr.forEach(it=>(isDespensa(it.artigo)?desp:norm).push(it));
+    return {norm,desp};
+  };
+  const nGruposDesp=arr=>new Set(arr.map(it=>shopArtKey(it.artigo))).size;
+  const nVisiveis=arr=>{const {norm,desp}=splitDesp(arr);return norm.length+nGruposDesp(desp);};
+  // Um bloco de estado (em falta / em carrinhos / o meu carrinho): a lista
+  // normal e, por baixo, o bloco de despensa com o seu próprio cabeçalho
+  const blocoOf=(arr,mineView,cls)=>{
+    const {norm,desp}=splitDesp(arr);
+    const wrap=inner=>cls?`<div class="${cls}">${inner}</div>`:inner;
+    let b=norm.length?wrap(listOf(norm,mineView)):'';
+    if(desp.length)b+=`<div class="cmp-desp-hdr sf">🫙 Despensa <span class="cmp-count">${nGruposDesp(desp)}</span><i>uma embalagem serve todas as refeições</i></div>`+wrap(shopDespGroupedList(desp,mineView));
+    return b;
+  };
   // A COBERTURA precede tudo: um pedido coberto pelo stock não está "em falta"
   // nem "no carrinho" — está satisfeito. O carrinho fica só com o diferencial
   // (o que falta depois do stock). tratadoPor obsoleto (de uma compra antiga)
@@ -5508,8 +5875,8 @@ function renderCompras(){
   const nHist=nCompras+removidos.length;
   const tabBtn=(id,ico,lbl,n)=>`<button class="cmp-tab${SHOP_TAB===id?' on':''}" onclick="setShopTab('${id}')"><span class="cmp-tab-ico">${ico}</span><span class="cmp-tab-lbl">${lbl}</span>${n?`<span class="cmp-tab-n">${n}</span>`:''}</button>`;
   h+=`<div class="cmp-tabs sf">
-    ${tabBtn('falta','📝','Em falta',falta.length)}
-    ${tabBtn('carrinho','🛒','Carrinho',mine.length)}
+    ${tabBtn('falta','📝','Em falta',nVisiveis(falta))}
+    ${tabBtn('carrinho','🛒','Carrinho',nVisiveis(mine))}
     ${tabBtn('hist','🕘','Histórico',nHist)}
   </div>`;
 
@@ -5545,13 +5912,13 @@ function renderCompras(){
     }else{
       // Cabeçalho de estado + wrapper .cmp-free: distingue à vista o que ainda
       // não tem dono (fita campino) do que já está entregue (bloco verde abaixo)
-      h+=`<div class="cmp-sec-hdr sf cmp-sec-falta">📣 Falta quem trate <span class="cmp-count">${falta.length}</span></div>`;
-      h+='<div class="cmp-free">'+listOf(falta,false)+'</div>';
+      h+=`<div class="cmp-sec-hdr sf cmp-sec-falta">📣 Falta quem trate <span class="cmp-count">${nVisiveis(falta)}</span></div>`;
+      h+=blocoOf(falta,false,'cmp-free');
     }
     // ── Já em carrinhos (de qualquer pessoa — todos veem quem leva o quê) ──
     if(carrinhos.length){
-      h+=`<div class="cmp-sec-hdr sf cmp-sec-claim" style="margin-top:22px">🛒 Já em carrinhos <span class="cmp-count">${carrinhos.length}</span></div>`;
-      h+='<div class="cmp-claimed">'+listOf(carrinhos,false)+'</div>';
+      h+=`<div class="cmp-sec-hdr sf cmp-sec-claim" style="margin-top:22px">🛒 Já em carrinhos <span class="cmp-count">${nVisiveis(carrinhos)}</span></div>`;
+      h+=blocoOf(carrinhos,false,'cmp-claimed');
     }
     // Pedidos cobertos pelo stock NÃO entram na shop list — não há nada a
     // comprar. Vêem-se no cartão da refeição (bloco "Comprado") e no Stock.
@@ -5560,7 +5927,7 @@ function renderCompras(){
     if(!mine.length){
       h+='<div class="cmp-empty sf"><span class="cmp-empty-ico">🛒</span>O teu carrinho está vazio.<br>Passa por <b>📝 Em falta</b> e toca no <b>＋🛒</b> dos artigos que fores buscar.</div>';
     }else{
-      h+=listOf(mine,true);
+      h+=blocoOf(mine,true,'');
     }
     if(fechadas){
       h+='<div class="empty sf" style="margin-top:10px">Contas fechadas — não é possível registar compras.</div>';
@@ -5847,6 +6214,7 @@ function openShopItemModal(id,presetTipo,presetData){
   document.querySelectorAll('#shop-item-modal input,#shop-item-modal select').forEach(el=>{el.disabled=!canEdit;el.style.opacity=canEdit?'':'.75';});
   _shopCatRO=!canEdit;
   shopCatSync();   // depois do disable geral: a categoria tem regras próprias
+  despSync();      // idem para a despensa (é do admin, mesmo em artigo alheio)
   const saveBtn=document.getElementById('shop-item-save');
   saveBtn.textContent=it?'Guardar':'Adicionar';
   saveBtn.style.display=canEdit?'':'none';
@@ -5992,6 +6360,19 @@ async function saveShopItem(){
 }
 
 /* ── Marcações (tratar / carrinho / largar / remover) ── */
+/* Versão em bloco do _shopUpdate: um PATCH para vários ids. Serve os artigos de
+   despensa, onde uma embalagem é uma decisão só e as ações valem para o grupo. */
+async function _shopBulkUpdate(ids,patch,local){
+  if(!ids||!ids.length)return;
+  if(ids.length===1)return _shopUpdate(ids[0],patch,local);
+  setSync('load','a guardar…');
+  try{
+    await queueWrite(()=>sbReq('PATCH',`shoplist?id=in.(${ids.join(',')})`,patch));
+    const s=new Set(ids);
+    shopArr().forEach(x=>{if(s.has(x._id))Object.assign(x,local);});
+    syncMirror();marcaGuardado();renderShopViews();
+  }catch(e){setSync('err','erro ao guardar');toast(permErrorMsg(e),'bad');}
+}
 async function _shopUpdate(id,patch,local){
   const it=shopArr().find(x=>x._id===id);if(!it)return;
   setSync('load','a guardar…');
@@ -6027,8 +6408,12 @@ function shopSameArtigo(a,b){return shopArtKey(a)===shopArtKey(b);}
 async function claimSameElsewhere(it,nome){
   const others=shopArr().filter(x=>x._id!==it._id&&x._id!=null&&!x.tratadoPor&&shopIsPending(x)&&!shopIsCovered(x)&&shopGroupKey(x)!==shopGroupKey(it)&&shopSameArtigo(x.artigo,it.artigo));
   if(!others.length)return;
-  const lst=others.map(o=>{const q=shopQtyLabel(o);return `• ${shopGroupLabel(o.tipo,o.dataValor)}${q?' — '+q:''}`;}).join('\n');
-  if(!confirm(`"${it.artigo}" também está em falta em:\n\n${lst}\n\nLevas também?`))return;
+  // Despensa: não se pergunta — é UMA embalagem para todas as refeições, e
+  // deixar pedidos do mesmo artigo para trás era recriar a duplicação
+  if(!isDespensa(it.artigo)){
+    const lst=others.map(o=>{const q=shopQtyLabel(o);return `• ${shopGroupLabel(o.tipo,o.dataValor)}${q?' — '+q:''}`;}).join('\n');
+    if(!confirm(`"${it.artigo}" também está em falta em:\n\n${lst}\n\nLevas também?`))return;
+  }
   // Mesma guarda anti-corrida do claim simples: só leva os que ainda estão livres
   const ids=others.map(o=>o._id);
   const res=await queueWrite(()=>sbReq('PATCH',`shoplist?id=in.(${ids.join(',')})&tratado_por=is.null`,{tratado_por:nome},{Prefer:'return=representation'}));

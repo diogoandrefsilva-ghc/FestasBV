@@ -165,7 +165,7 @@ setTimeout(function(){ if (window.fbvEsconderSplash) window.fbvEsconderSplash();
       <button onclick="closeShopItemModal()" style="background:var(--panel2);border:1px solid var(--line);color:var(--muted);border-radius:9px;width:32px;height:32px;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0">✕</button>
     </div>
     <label>Artigo</label>
-    <input type="text" id="shop-artigo" maxlength="60" placeholder="Ex: Feijão" list="shop-artigo-list" autocomplete="off" onchange="this.value=shopCapArtigo(this.value);shopCatSync()">
+    <input type="text" id="shop-artigo" maxlength="60" placeholder="Ex: Feijão" list="shop-artigo-list" autocomplete="off" onchange="this.value=shopCapArtigo(this.value);shopCatSync();despSync()">
     <datalist id="shop-artigo-list"></datalist>
     <div class="inline-row">
       <div style="flex:3"><label>Tamanho / embalagem</label><input type="text" id="shop-tam" maxlength="20" placeholder="Ex: lata 250 ml" onblur="this.value=normalizeQty(this.value)"></div>
@@ -175,6 +175,13 @@ setTimeout(function(){ if (window.fbvEsconderSplash) window.fbvEsconderSplash();
       <label>Categoria 🏷️</label>
       <select id="shop-cat"></select>
       <div class="note" id="shop-cat-note" style="display:none;margin-top:4px"></div>
+    </div>
+    <div id="shop-desp-wrap" class="shop-desp-wrap" style="display:none">
+      <div class="shop-desp-hd">
+        <span class="shop-desp-lbl">🫙 Artigo de despensa</span>
+        <button type="button" class="norm-sw" role="switch" aria-checked="false" aria-label="Artigo de despensa" onclick="despSetFromModal()"><i></i></button>
+      </div>
+      <div class="note" id="shop-desp-note" style="margin-top:4px"></div>
     </div>
     <div id="shop-loja-wrap" style="display:none">
       <label>Loja 🏬 <i style="font-weight:400;color:var(--faint)">(opcional)</i></label>
@@ -400,6 +407,23 @@ setTimeout(function(){ if (window.fbvEsconderSplash) window.fbvEsconderSplash();
       <button class="btn prim" id="shoprep-save" onclick="shopRepApply()">Guardar</button>
     </div>
     <div class="note">Juntar é opcional e só acontece entre pedidos da mesma refeição com a mesma embalagem — nunca toca num pedido que alguém já reclamou. O que for absorvido fica no histórico de Removidos.</div>
+  </div>
+</div>
+
+<!-- 3.º passo do 🔤 Normalizar: artigos de despensa -->
+<div class="modal-bg" id="shopdesp-bg">
+  <div class="modal" id="shopdesp-modal">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <h3 style="margin-bottom:0">🫙 Artigos de Despensa</h3>
+      <button onclick="despClose()" style="background:var(--panel2);border:1px solid var(--line);color:var(--muted);border-radius:9px;width:32px;height:32px;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0">✕</button>
+    </div>
+    <div class="note" id="shopdesp-info" style="margin-top:0"></div>
+    <div id="shopdesp-list"></div>
+    <div class="mbtns">
+      <button class="btn ghost" onclick="despClose()">Deixar como está</button>
+      <button class="btn prim" id="shopdesp-save" onclick="despApply()">Guardar</button>
+    </div>
+    <div class="note">Não apaga nem junta pedidos: cada refeição mantém o seu (e continua a ver o artigo na sua lista, marcado 🫙). O que muda é a lista de compras, onde passam a valer por uma linha só — e a cobertura, que deixa de exigir alocar refeição a refeição.</div>
   </div>
 </div>
 
