@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v180 · 2026-08-03 · T-shirts: o admin pode fechar a encomenda do ano (só ele mexe daí em diante), quem pede fica trancado para os outros, e o PDF ganha colunas alinhadas com o Por conta de no fim';
+const APP_BUILD = 'v181 · 2026-08-03 · Despensa: o 🫙 passa para depois do nome e o bloco de despensa sobe para o topo da lista de compras';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -5568,7 +5568,7 @@ function shopDespCard(items,mineView){
   return `<div class="cmp-item cmp-line cmp-tap cmp-desp${mineView&&items.every(x=>x.noCarrinho)?' incart':''}" onclick="openShopItemModal(${it._id})">
     ${check}
     <div class="cmp-main">
-      <div class="cmp-artigo"><i class="desp-ic">🫙</i>${escHtml(it.artigo)}</div>
+      <div class="cmp-artigo cmp-desp-art"><span>${escHtml(it.artigo)}</span><i class="desp-ic">🫙</i></div>
       ${qtd}${lojaRow}${refsRow}${sub}
     </div>
     ${right}<span class="cmp-chev-r">›</span>
@@ -5673,7 +5673,7 @@ const MEAL_SHOP_OPEN={};   // aberto/fechado por refeição (sobrevive a re-rend
    e dá à lista uma coluna de quantidades a direito, seja qual for o nome.
    Vai num bloco próprio para o que vem a seguir (carimbo/botão) nunca ser
    empurrado para a linha de baixo por um nome comprido. */
-function mslLead(artigo,t,desp){return `<span class="msl-row"><span class="msl-nm">${desp?'<i class="desp-ic" title="Artigo de despensa — uma embalagem serve todas as refeições">🫙</i>':''}${escHtml(artigo)}</span><i class="msl-lead"></i><span class="msl-q">${t?escHtml(t):''}</span></span>`;}
+function mslLead(artigo,t,desp){return `<span class="msl-row"><span class="msl-nm">${escHtml(artigo)}${desp?'<i class="desp-ic" title="Artigo de despensa — uma embalagem serve todas as refeições">🫙</i>':''}</span><i class="msl-lead"></i><span class="msl-q">${t?escHtml(t):''}</span></span>`;}
 /* Carimbo de quem trata do artigo. Só o primeiro nome — é o que se lê de
    relance e mantém o carimbo curto; o nome inteiro fica no title. */
 function mslWho(nome){
@@ -5845,11 +5845,15 @@ function renderCompras(){
   const nVisiveis=arr=>{const {norm,desp}=splitDesp(arr);return norm.length+nGruposDesp(desp);};
   // Um bloco de estado (em falta / em carrinhos / o meu carrinho): a lista
   // normal e, por baixo, o bloco de despensa com o seu próprio cabeçalho
+  // A despensa vem À CABEÇA: é uma lista curta e fixa, que se despacha de uma
+  // vez e não muda de refeição para refeição — resolvida logo, o resto da lista
+  // fica a ser só o que é específico de cada dia.
   const blocoOf=(arr,mineView,cls)=>{
     const {norm,desp}=splitDesp(arr);
     const wrap=inner=>cls?`<div class="${cls}">${inner}</div>`:inner;
-    let b=norm.length?wrap(listOf(norm,mineView)):'';
+    let b='';
     if(desp.length)b+=`<div class="cmp-desp-hdr sf">🫙 Despensa <span class="cmp-count">${nGruposDesp(desp)}</span><i>uma embalagem serve todas as refeições</i></div>`+wrap(shopDespGroupedList(desp,mineView));
+    if(norm.length)b+=wrap(listOf(norm,mineView));
     return b;
   };
   // A COBERTURA precede tudo: um pedido coberto pelo stock não está "em falta"
