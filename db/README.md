@@ -29,8 +29,10 @@ Numa BD limpa, correr por esta ordem (há dependências entre eles):
 9. `convidados_acompanhantes.sql` — `convidados.adultos` / `.criancas`: uma linha
    de convidado pode valer várias bocas ("levo 5 comigo"), sem se inventarem
    nomes; só os adultos pagam quota
+10. `tshirts.sql` — encomenda de t-shirts (`tshirt_tamanhos` globais + `tshirts`
+    por evento); levantamento de pedidos, não mexe em nenhuma conta
 
-Os passos 4–9 são migrações add-on idempotentes: correr uma vez cada. A app é
+Os passos 4–10 são migrações add-on idempotentes: correr uma vez cada. A app é
 tolerante a qualquer uma delas faltar — sonda a coluna/tabela e esconde o que
 ainda não existe.
 
@@ -56,6 +58,8 @@ consola do browser o Supabase recusa). Resumo do que está em `policies.sql`:
 | Marcar presenças                              | ✅ sempre | ✅ próprias + cônjuge, até à data do dia | ❌              |
 | Convidados (adicionar/editar/remover)         | ✅ sempre | ✅ próprios + cônjuge, até à data do dia | ❌              |
 | Registar despesas                             | ✅        | ✅ próprias + cônjuge (só inserir)      | ❌               |
+| T-shirts (encomendar/editar/remover)          | ✅ sempre | ✅ próprias + cônjuge                   | ❌               |
+| Tamanhos e preços das t-shirts                | ✅        | ❌                                     | ❌               |
 | Validar contas (`validacoes`)                 | ✅        | ✅ próprias + cônjuge                   | ❌               |
 | Editar/apagar cash-flows                      | ✅        | ❌                                     | ❌               |
 | Mealheiros, reembolsos, pagamentos            | ✅        | ❌                                     | ❌               |

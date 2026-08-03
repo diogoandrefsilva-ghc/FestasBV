@@ -77,10 +77,11 @@ setTimeout(function(){ if (window.fbvEsconderSplash) window.fbvEsconderSplash();
 <div class="tabs">
   <div class="tab on" data-tab="saldos" onclick="setTab('saldos')">Saldos</div>
   <div class="tab" data-tab="refeicoes" onclick="setTab('refeicoes')">Refeições</div>
-  <div class="tab" data-tab="compras" onclick="setTab('compras')">Shop List</div>
-  <div class="tab" data-tab="cashflows" onclick="setTab('cashflows')">Cash-Flows</div>
+  <div class="tab" data-tab="compras" onclick="setTab('compras')">Compras</div>
+  <div class="tab" data-tab="cashflows" onclick="setTab('cashflows')">Cash</div>
   <div class="tab" data-tab="stock" id="tab-stock" onclick="setTab('stock')" style="display:none">Stock</div>
-  <div class="tab" data-tab="definicoes" onclick="openAdmin()">⚙</div>
+  <div class="tab tab-ico" data-tab="tshirts" id="tab-tshirts" onclick="setTab('tshirts')" style="display:none" title="T-shirts">👕</div>
+  <div class="tab tab-ico" data-tab="definicoes" onclick="openAdmin()">⚙</div>
 </div>
 <div class="wrap">
   <div class="readonly-banner sf">🔒 Modo leitura — inicia sessão para editar</div>
@@ -97,6 +98,7 @@ setTimeout(function(){ if (window.fbvEsconderSplash) window.fbvEsconderSplash();
   <div id="view-cashflows" style="display:none"></div>
   <div id="view-compras" style="display:none"></div>
   <div id="view-stock" style="display:none"></div>
+  <div id="view-tshirts" style="display:none"></div>
 </div>
 
 <div class="fabs" id="fab-container">
@@ -529,6 +531,33 @@ setTimeout(function(){ if (window.fbvEsconderSplash) window.fbvEsconderSplash();
 </div>
 
 <!-- Admin modal -->
+<!-- T-shirt: adicionar / editar um pedido -->
+<div class="modal-bg" id="ts-bg">
+  <div class="modal" id="ts-modal">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <h3 style="margin-bottom:0" id="ts-title">Adicionar T-shirt</h3>
+      <button onclick="closeTshirtModal()" style="background:var(--panel2);border:1px solid var(--line);color:var(--muted);border-radius:9px;width:32px;height:32px;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0">✕</button>
+    </div>
+    <label>Nome (quem veste a t-shirt)</label>
+    <input type="text" id="ts-nome" maxlength="40" placeholder="Ex: João" autocomplete="off">
+    <label style="margin-top:12px">Tipologia</label>
+    <div class="ts-tipos" id="ts-tipos"></div>
+    <label style="margin-top:12px">Tamanho</label>
+    <div class="ts-tams" id="ts-tams"></div>
+    <div id="ts-membro-wrap">
+      <label>Encomendado por</label>
+      <select id="ts-membro"></select>
+    </div>
+    <div class="note" id="ts-meta" style="display:none"></div>
+    <div class="mbtns">
+      <button class="btn ghost" onclick="closeTshirtModal()">Cancelar</button>
+      <button class="btn danger" id="ts-del" onclick="tshirtDelete()" style="display:none">Eliminar</button>
+      <button class="btn prim" id="ts-save" onclick="tshirtSave()">Adicionar</button>
+    </div>
+    <button class="btn ghost" id="ts-save-more" onclick="tshirtSave(true)" style="width:100%;margin-top:8px">＋ Guardar e adicionar outra</button>
+  </div>
+</div>
+
 <div class="modal-bg" id="admin-bg">
   <div class="modal">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
@@ -646,6 +675,32 @@ setTimeout(function(){ if (window.fbvEsconderSplash) window.fbvEsconderSplash();
           </div>
         </div>
         <button class="btn" id="adm-cat-add" style="width:100%;margin-top:8px" onclick="admCatEdit(null)">＋ Categoria</button>
+      </div>
+    </div>
+
+    <!-- 1e. T-shirts (só admin · tamanhos disponíveis por tipologia) -->
+    <div class="settings-block admin-only">
+      <div class="settings-block-hdr" onclick="toggleSettingsBlock(this)">
+        <span class="sb-icon">👕</span>
+        <span class="sb-title sf">T-shirts</span>
+        <span class="sb-arrow sf">▼</span>
+      </div>
+      <div class="settings-block-body">
+        <p style="font-size:12px;color:var(--muted);margin-bottom:10px;line-height:1.5">Tamanhos que aparecem a quem encomenda, por tipologia. O <b>preço</b> é opcional — deixado a 0, a app nem fala em dinheiro; assim que puseres preços, o resumo e o PDF passam a mostrar os totais. Apagar um tamanho <b>não</b> apaga encomendas já feitas.</p>
+        <div id="adm-ts-list"><div class="note">A carregar…</div></div>
+        <div id="adm-ts-form" style="margin-top:10px;padding:10px 12px;background:var(--panel2);border:1px solid var(--line);border-radius:10px">
+          <label style="margin-top:0">Tipologia</label>
+          <select id="adm-ts-tipo">
+            <option value="Homem">👨 Homem</option>
+            <option value="Mulher">👩 Mulher</option>
+            <option value="Criança">🧒 Criança</option>
+          </select>
+          <div class="inline-row">
+            <div style="flex:2"><label>Tamanho</label><input type="text" id="adm-ts-tam" maxlength="16" placeholder="Ex: XL" autocomplete="off"></div>
+            <div style="flex:1.4"><label>Preço €</label><input type="number" id="adm-ts-preco" step="0.5" min="0" placeholder="0" inputmode="decimal"></div>
+          </div>
+          <button class="btn prim" onclick="admTsAdd()" style="width:100%;margin-top:10px">＋ Adicionar tamanho</button>
+        </div>
       </div>
     </div>
 
