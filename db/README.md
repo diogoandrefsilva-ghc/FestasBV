@@ -37,8 +37,12 @@ Numa BD limpa, correr por esta ordem (há dependências entre eles):
 12. `tshirts_trancar.sql` — `eventos.tshirts_trancadas`: fechar a encomenda do
     ano. Trancada, só o admin acrescenta/edita/remove t-shirts (as policies
     "self" passam a exigir `tshirts_abertas()`)
+13. `pagamentos_pendentes.sql` — caixa de entrada dos pagamentos de dívida
+    declarados pelos membros. Ficam à espera; quando o admin valida, a app
+    cria o cash-flow em `pagamentos`. Enquanto esperam não entram em conta
+    nenhuma
 
-Os passos 4–12 são migrações add-on idempotentes: correr uma vez cada. A app é
+Os passos 4–13 são migrações add-on idempotentes: correr uma vez cada. A app é
 tolerante a qualquer uma delas faltar — sonda a coluna/tabela e esconde o que
 ainda não existe.
 
@@ -71,6 +75,8 @@ consola do browser o Supabase recusa). Resumo do que está em `policies.sql`:
 | Validar contas (`validacoes`)                 | ✅        | ✅ próprias + cônjuge                   | ❌               |
 | Editar/apagar cash-flows                      | ✅        | ❌                                     | ❌               |
 | Mealheiros, reembolsos, pagamentos            | ✅        | ❌                                     | ❌               |
+| Registar pagamento de dívida (a validar)      | ✅ direto | ✅ próprios + cônjuge, fica pendente    | ❌               |
+| Validar/rejeitar pagamentos pendentes         | ✅        | ❌ (só cancelar os seus)               | ❌               |
 | Fechar/reabrir contas (trigger `guard_fecho`) | ✅        | ❌                                     | ❌               |
 | Parametrizações, plantel, refeições, novo ano | ✅        | ❌                                     | ❌               |
 | Config (`notif_telegram`), aprovar acessos    | ✅        | ❌                                     | ❌               |
