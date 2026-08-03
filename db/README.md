@@ -23,8 +23,15 @@ Numa BD limpa, correr por esta ordem (há dependências entre eles):
 6. `categorias.sql` — categorias de artigos (`categorias` + `artigo_categorias`,
    globais/sem evento); alimentam os agrupadores no Stock/Compras e o prompt
    da AI no `fatura-ocr`
+7. `notifs.sql` — responsáveis das refeições + avisos Telegram
+8. `filhos.sql` — filhos dos membros (`filhos` + `filho_presencas`) e
+   `convidados.crianca`; crianças não pagam, só contam bocas
+9. `convidados_pessoas.sql` — `convidados.pessoas`: uma linha de convidado pode
+   valer várias bocas ("levo 5 comigo"), sem se inventarem nomes
 
-Os passos 4–6 são migrações add-on idempotentes: correr uma vez cada.
+Os passos 4–9 são migrações add-on idempotentes: correr uma vez cada. A app é
+tolerante a qualquer uma delas faltar — sonda a coluna/tabela e esconde o que
+ainda não existe.
 
 ## Conteúdo
 
