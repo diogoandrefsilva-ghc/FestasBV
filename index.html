@@ -272,10 +272,10 @@ setTimeout(function(){ if (window.fbvEsconderSplash) window.fbvEsconderSplash();
       <button onclick="closeShopBuyModal()" style="background:var(--panel2);border:1px solid var(--line);color:var(--muted);border-radius:9px;width:32px;height:32px;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0">✕</button>
     </div>
     <div class="cf-quando" id="sb-quando" style="display:none">
-      <div class="cfq on" data-q="real" onclick="setShopBuyQuando('real')">📅 Com data</div>
-      <div class="cfq" data-q="prevista" onclick="setShopBuyQuando('prevista')">📌 Prevista</div>
+      <div class="cfq on" data-q="efet" onclick="setShopBuyQuando('efet')">📅 Efetiva</div>
+      <div class="cfq" data-q="prov" onclick="setShopBuyQuando('prov')">📌 Provisória</div>
     </div>
-    <div class="cf-quando-hint" id="sb-quando-hint" style="display:none">Despesa já realizada, com data conhecida.</div>
+    <div class="cf-quando-hint" id="sb-quando-hint" style="display:none">Despesa já feita, com data de pagamento conhecida.</div>
     <div class="inline-row">
       <div><label>Quem pagou?</label><select id="shop-buy-who"></select></div>
       <div id="shop-buy-date-wrap"><label>Data</label><input type="date" id="shop-buy-date"></div>
