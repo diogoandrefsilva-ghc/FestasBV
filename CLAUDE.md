@@ -56,6 +56,8 @@ Botão no formulário de despesa do cash-flow. Por baixo é uma **compra sem art
 - **Não abre a câmara.** Abria (`faturaPick()` no arranque) e quem não tem fatura ficava sem saída. O 📷 continua lá dentro, para quem tiver.
 - **Não pré-marca a lista de compras.** O bloco "🛒 Artigos da lista" fica **fechado e por marcar** (`defOn` devolve `false` com `detalhe:true`) — a despesa é o que a pessoa escrever, não o carrinho dela. Quem quiser fechar pedidos da lista abre o bloco.
 - Abre já com **uma linha de artigo em branco**; herda quem/data/descritivo/**tipo**/observações do cash-flow.
+- **Quem parte do cash-flow não parte da lista**: o que está a fazer é meter artigos em 🧺 Stock. Por isso o bloco chama-se "🧺 Artigos desta despesa", o botão é "＋ Artigo" (não "fora da lista" — não há lista de onde estar fora) e os pedidos da lista ficam num bloco à parte, "🔗 Responde a pedidos da lista?", **opcional**. Ligar artigo a artigo faz-se no 🔗 de cada linha.
+- **Destino herdado**: os artigos nascem alocados ao que o cash-flow dizia — o tipo, e a **refeição** quando a data-valor casa com uma refeição definida (`compraDestPad`). Sem isso, uma despesa do Jantar de sábado punha tudo em Gerais e obrigava a realocar à mão.
 
 ### 📌 Prevista itemizada
 O 📅/📌 do cash-flow segue para o modal da compra (`sb-quando`, só visível a detalhar uma despesa ou a editar uma que ficou prevista — registar a compra da lista é sempre coisa já paga).
