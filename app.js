@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v199 · 2026-08-04 · Provisórias: a fatura pode ser importada (os extras deixaram de estar escondidos), cada artigo é uma linha de despesa — reabre itemizada e leva o € para o custo da refeição — e o picker já não abre escancarado na edição';
+const APP_BUILD = 'v200 · 2026-08-04 · Bebida da refeição: alocar bebidas a um dia como custo direto, mas repartidas por quem come E por quem só bebe — no stock (destino 🍻) e na despesa avulsa';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -113,6 +113,12 @@ let CONV_AC_COLS=false;
 // bolso de cada um), o token diz que são a mesma despesa. Sem a migração,
 // DESP_GRUPO_COL=false, "pagaram vários" fica escondido e nunca se grava.
 let DESP_GRUPO_COL=false;
+// despesas já tem a coluna 'bebida' (migração db/bebida_refeicao.sql)? Marca uma
+// despesa alocada a uma refeição como BEBIDA: continua custo direto, mas divide-se
+// por quem come + quem só bebe. Sem a migração, DESP_BEBIDA_COL=false, o botão
+// fica escondido e nunca se grava (no stock a marca vive no JSON das alocações,
+// por isso essa metade funciona à mesma).
+let DESP_BEBIDA_COL=false;
 // shoplist já tem a coluna 'loja' (loja preferida do artigo)? Sem a migração,
 // SHOP_LOJA_COL=false: o campo e a ordenação por loja ficam escondidos e nunca
 // se grava a coluna — a app funciona exatamente como antes.
@@ -633,28 +639,36 @@ function calcular(data){
       if(Ec===0)Q=0;else Q=P===0?0:Math.max(5,roundup(P,0)+rd.extraConv);
       const indir=rnd(L*D,2);
       const cBebidas=rnd(indir*fracBebidas,2),cCerveja=rnd(indir*fracCerveja,2),cGerais=rnd(indir-cBebidas-cCerveja,2);
-      refeicoes.push({...rd,D,E:Ec,Ncomem:D,Nbebe:0,Fdir:0,I:0,L,P,Pbebe:0,Q,dirRef:0,cBebidas,cCerveja,cGerais,custoTotal:indir,custoUnit:L,custoUnitBebe:0,temBebe:false});
+      refeicoes.push({...rd,D,E:Ec,Ncomem:D,Nbebe:0,Fdir:0,Fbeb:0,bebidaPP:0,I:0,L,P,Pbebe:0,Q,dirRef:0,cBebidas,cCerveja,cGerais,custoTotal:indir,custoUnit:L,custoUnitBebe:0,temBebe:false});
       continue;
     }
     // Refeição normal (Almoço/Jantar): estados come / só bebe
     const Ncomem=countModo(rd.data,rd.ref,'come')+Ec;   // convidados comem sempre
     const Nbebe=countModo(rd.data,rd.ref,'bebe');
-    const Fdir=despesas.filter(x=>x.tipo===rd.ref&&x.dataValor===rd.data).reduce((a,x)=>a+x.valor,0);
+    // O que está alocado a esta refeição divide-se em dois baldes: a COMIDA, que
+    // só quem come paga, e a BEBIDA (marcada), que quem só veio ao copo também
+    // bebeu — essa divide-se pelos dois grupos, como o indireto da refeição.
+    const dRef=despesas.filter(x=>x.tipo===rd.ref&&x.dataValor===rd.data);
+    const Fdir=dRef.filter(x=>!x.bebida).reduce((a,x)=>a+x.valor,0);
+    const Fbeb=dRef.filter(x=>x.bebida).reduce((a,x)=>a+x.valor,0);
     const I=rnd(F20*(rd.peso||0),2);
     const Ndiv=indiretoComBebe?(Ncomem+Nbebe):Ncomem;   // 2026+: bebes entram no denominador
     const indiretoPP=Ndiv>0?rnd(I/Ndiv,2):0;
+    const bebidaPP=Ndiv>0?rnd(Fbeb/Ndiv,2):0;
     const diretoPP=Ncomem>0?rnd(Fdir/Ncomem,2):0;
-    const L=rnd(diretoPP+indiretoPP,2);                  // unitário de quem come
-    const Lbebe=indiretoPP;                              // unitário de quem só bebe
+    const L=rnd(diretoPP+bebidaPP+indiretoPP,2);         // unitário de quem come
+    // Modelo legado (pré-2026): não há "só bebe" a dividir nada — a bebida
+    // marcada comporta-se como comida (Ndiv=Ncomem) e não lhe toca.
+    const Lbebe=rnd(indiretoPP+(indiretoComBebe?bebidaPP:0),2);   // unitário de quem só bebe
     if(Ncomem)prevIndirectPerPerson=rnd(I/Ncomem,2);     // para o lanche legado herdar
     const P=Ncomem===0?0:Math.max(rd.minMEO,L);
     const Pbebe=Lbebe;                                   // sem mínimo
     let Q;
     if(Ec===0)Q=0;else Q=P===0?0:Math.max(rd.minConv,roundup(P,0)+rd.extraConv);
-    const dirRef=rnd(Fdir,2);
+    const dirRef=rnd(Fdir+Fbeb,2);                       // total alocado à refeição
     const cBebidas=rnd(I*fracBebidas,2),cCerveja=rnd(I*fracCerveja,2),cGerais=rnd(I-cBebidas-cCerveja,2);
-    const custoTotal=rnd(Fdir+I,2);
-    refeicoes.push({...rd,D:Ncomem,E:Ec,Ncomem,Nbebe,Fdir:rnd(Fdir,2),I,L,P,Pbebe,Q,dirRef,cBebidas,cCerveja,cGerais,custoTotal,custoUnit:L,custoUnitBebe:Lbebe,temBebe:Nbebe>0});
+    const custoTotal=rnd(Fdir+Fbeb+I,2);
+    refeicoes.push({...rd,D:Ncomem,E:Ec,Ncomem,Nbebe,Fdir:rnd(Fdir,2),Fbeb:rnd(Fbeb,2),bebidaPP,I,L,P,Pbebe,Q,dirRef,cBebidas,cCerveja,cGerais,custoTotal,custoUnit:L,custoUnitBebe:Lbebe,temBebe:Nbebe>0});
   }
 
   const rmap={};for(const r of refeicoes)rmap[r.data+'|'+r.ref]=r;
@@ -1282,8 +1296,13 @@ function renderAll(){
       let costBox='',quemBox='';
       if(calcRef){
         const indTot=calcRef.I||0;
-        const dirTot=calcRef.dirRef||0;
-        let indPP=calcRef.custoUnitBebe||0;
+        // Diretos = só a COMIDA (÷ quem come). A bebida alocada à refeição tem
+        // bloco próprio logo abaixo porque tem outro denominador.
+        const dirTot=calcRef.Fdir||0;
+        const bebTot=calcRef.Fbeb||0;
+        const bebPP=calcRef.bebidaPP||0;
+        let indPP=rnd((calcRef.custoUnitBebe||0)-bebPP,2);
+        if(indPP<0)indPP=0;
         if(indPP===0&&indTot>0&&calcRef.D>0)indPP=rnd(indTot/calcRef.D,2);
         let dirPP=dirTot>0?rnd((calcRef.custoUnit||0)-(calcRef.custoUnitBebe||0),2):0;
         if(dirPP<0)dirPP=0;
@@ -1297,25 +1316,30 @@ function renderAll(){
         ].filter(x=>x.v>0);
         const chipsHtml=ind.map(x=>`<span class="rc ${x.c}">${x.lbl} ${eur(x.v)}</span>`).join('');
         const pesoHtml=rd.peso!=null?`<div class="rdc-peso"><span class="rdc-peso-lbl">Peso <b>${pesoDisplay}</b></span><span class="rdc-peso-rule"></span></div>`:'';
-        const notaBebe=calcRef.temBebe?' <span class="rdc-note">= custo p/ quem só bebe</span>':'';
+        // Com bebida alocada, o indireto já não é TODO o custo de quem só bebe
+        // (falta-lhe a bebida) — a nota passa para o bloco da bebida.
+        const notaBebe=(calcRef.temBebe&&bebTot<=0)?' <span class="rdc-note">= custo p/ quem só bebe</span>':'';
         // Colapsados por defeito (só label + total); toque expande o detalhe
         let costDet=`<details class="rdc rdc-fold sf">
           <summary class="rdc-hdr"><span class="rdc-lbl">Custos indiretos</span><span class="rdc-tot">${eur(indTot)}</span>${ppTag(indPP)}<span class="rdc-fold-arrow">›</span></summary>
           ${pesoHtml}${chipsHtml?`<div class="rdc-chips">${chipsHtml}</div>`:''}
           <div class="rdc-unit"><span>Por pessoa${notaBebe}</span><span class="rdc-unit-v">${eur(indPP)}</span></div>
         </details>`;
-        const dirItems=(DATA.despesas||[]).filter(x=>x.tipo===rd.ref&&x.dataValor===rd.data).slice();
+        const desteDia=x=>x.tipo===rd.ref&&x.dataValor===rd.data;
+        const dirItems=(DATA.despesas||[]).filter(x=>desteDia(x)&&!x.bebida);
+        const bebItems=(DATA.despesas||[]).filter(x=>desteDia(x)&&x.bebida);
         // Alocações de stock a esta refeição contam como custo direto — entram no detalhe
         // (o que veio de oferta/ano anterior entra na mesma, mas a 0 € — leva o
-        // ícone da origem em vez do 🧺 para se perceber porque não custa nada)
-        stockArr().forEach(l=>{if(!stockBacked(l)||!(l.qtd>0))return;const om=origemMeta(l);(l.alocacoes||[]).forEach(a=>{if(a.tipo===rd.ref&&a.data===rd.data&&+a.qtd>0)dirItems.push({desc:(om?om.ic:'🧺')+' '+l.artigo+' ('+loteQtdLabel(l,+a.qtd)+')',quem:om?om.lbl:'',valor:rnd(l.valor/l.qtd*a.qtd,2)});});});
+        // ícone da origem em vez do 🧺 para se perceber porque não custa nada).
+        // As marcadas como bebida vão para o balde da bebida, não para o da comida.
+        stockArr().forEach(l=>{if(!stockBacked(l)||!(l.qtd>0))return;const om=origemMeta(l);(l.alocacoes||[]).forEach(a=>{if(a.tipo===rd.ref&&a.data===rd.data&&+a.qtd>0)(a.bebida?bebItems:dirItems).push({desc:(om?om.ic:'🧺')+' '+l.artigo+' ('+loteQtdLabel(l,+a.qtd)+')',quem:om?om.lbl:'',valor:rnd(l.valor/l.qtd*a.qtd,2)});});});
         /* Provisória: * à frente, cor própria e os artigos por baixo — o detalhe
            dela vive nas observações (é uma despesa só, sem lotes), senão a
            refeição mostrava "Talho do Rui — 141 €" e mais nada. Aqui a linha
            continua a ser a DESPESA, não o artigo: esta é a conta do dinheiro e
            cada linha tem de casar com um valor. A legenda do * fecha o bloco. */
         let temProvDir=false;
-        const dirRows=dirItems.map(it=>{
+        const mkRows=items=>items.map(it=>{
           const prov=it.tipo!==undefined&&despProvisoria(it);
           if(prov)temProvDir=true;
           const arts=prov?provArtigos(it):[];
@@ -1329,18 +1353,33 @@ function renderAll(){
           const lista=arts.length>1?arts.map(a=>a.artigo+(a.qtd?' ('+a.qtd+')':'')).join(', '):'';
           return `<div class="rdc-det-it${prov?' prov':''}"><span class="k">${prov?'*':''}${escHtml(nome)}${meta?`<small> · ${escHtml(meta)}</small>`:''}${lista?`<small class="rdc-det-obs">${escHtml(lista)}</small>`:''}</span><span class="v">${eur(it.valor||0)}</span></div>`;
         }).join('');
-        const dirDetBody=dirItems.length?`<div class="rdc-det-body">${dirRows}${temProvDir?'<div class="rdc-det-leg"><b>*</b> provisório — ainda por comprar</div>':''}</div>`:'';
-        let dirChipsRow='';
-        if(dirTot>0){
-          const drChip=`<div class="rdc-chips"><span class="rc cv">Despesa Refeição ${eur(dirTot)}</span></div>`;
-          dirChipsRow=dirItems.length?`<details class="rdc-det rdc-det-chips" onclick="event.stopPropagation()"><summary>${drChip}<span class="rdc-det-arrow">›</span></summary>${dirDetBody}</details>`:drChip;
-        }
+        // Bloco de chips + detalhe (o mesmo desenho para a comida e para a bebida)
+        const chipsRow=(items,tot,lbl)=>{
+          if(!(tot>0))return '';
+          const chip=`<div class="rdc-chips"><span class="rc cv">${lbl} ${eur(tot)}</span></div>`;
+          if(!items.length)return chip;
+          const body=`<div class="rdc-det-body">${mkRows(items)}${temProvDir?'<div class="rdc-det-leg"><b>*</b> provisório — ainda por comprar</div>':''}</div>`;
+          return `<details class="rdc-det rdc-det-chips" onclick="event.stopPropagation()"><summary>${chip}<span class="rdc-det-arrow">›</span></summary>${body}</details>`;
+        };
         costDet+=`<details class="rdc rdc-fold sf">
           <summary class="rdc-hdr"><span class="rdc-lbl">Custos diretos</span><span class="rdc-tot">${eur(dirTot)}</span>${ppTag(dirPP)}<span class="rdc-fold-arrow">›</span></summary>
           <div class="rdc-peso"><span class="rdc-peso-lbl">Compras</span><span class="rdc-peso-rule"></span></div>
-          ${dirChipsRow}
+          ${chipsRow(dirItems,dirTot,'Despesa Refeição')}
           <div class="rdc-unit"><span>Por pessoa</span><span class="rdc-unit-v">${eur(dirPP)}</span></div>
         </details>`;
+        /* Bebida da refeição: custo direto como a comida, mas dividido também por
+           quem só veio ao copo — por isso tem bloco e unitário próprios. Só
+           aparece quando há bebida marcada nesta refeição. */
+        if(bebTot>0){
+          const nQuem=calcRef.Ncomem+calcRef.Nbebe;
+          costDet+=`<details class="rdc rdc-fold sf">
+            <summary class="rdc-hdr"><span class="rdc-lbl">${DEST_BEB_ICON} Bebida</span><span class="rdc-tot">${eur(bebTot)}</span>${ppTag(bebPP)}<span class="rdc-fold-arrow">›</span></summary>
+            <div class="rdc-peso"><span class="rdc-peso-lbl">Dividida por ${nQuem} ${nQuem===1?'pessoa':'pessoas'} — quem come e quem só bebe</span><span class="rdc-peso-rule"></span></div>
+            ${chipsRow(bebItems,bebTot,'Bebida')}
+            <div class="rdc-unit"><span>Por pessoa</span><span class="rdc-unit-v">${eur(bebPP)}</span></div>
+            ${calcRef.temBebe?`<div class="rdc-unit"><span>Quem só bebe paga<span class="rdc-note"> = bebida + indiretos</span></span><span class="rdc-unit-v">${eur(calcRef.custoUnitBebe||0)}</span></div>`:''}
+          </details>`;
+        }
         const membrosCount=Math.max(0,calcRef.D-calcRef.E);
         const rkey=`${rd.dia}|${rd.ref==='Lanche'?'Tarde':rd.ref}`;
         const membrosCome=(DATA.membros||[]).filter(m=>(m.presencas||[]).some(p=>p.k===rkey&&p.modo==='come')).map(m=>m.nome).sort((a,b)=>a.localeCompare(b,'pt'));
@@ -1366,7 +1405,7 @@ function renderAll(){
         const presNota=calcRef.D>0?'':'<div class="rdc-sempres">Sem presenças marcadas</div>';
         const mkey=rd.data+'|'+rd.ref,cid='rdcb'+rd._idx,cOpen=!!MEAL_COST_OPEN[mkey];
         costBox=`<div class="rdc rdc-hero rdc-costs sf">
-          <div class="rdc-hdr rdc-costs-hdr${cOpen?' open':''}" onclick="toggleCosts(this,'${cid}','${mkey}')"><span class="rdc-lbl rdc-lbl-green">Custo da refeição</span><span class="rdc-tot">${eur(calcRef.custoTotal)}</span>${ppTag(rnd(indPP+dirPP,2))}<span class="rdc-fold-arrow">›</span></div>
+          <div class="rdc-hdr rdc-costs-hdr${cOpen?' open':''}" onclick="toggleCosts(this,'${cid}','${mkey}')"><span class="rdc-lbl rdc-lbl-green">Custo da refeição</span><span class="rdc-tot">${eur(calcRef.custoTotal)}</span>${ppTag(rnd(indPP+dirPP+bebPP,2))}<span class="rdc-fold-arrow">›</span></div>
           ${presNota}
           <div class="rdc-cells">${membroCell}${convCell}${kidsCell}</div>
           ${memPanel}${guestPanel}${kidPanel}
@@ -1821,7 +1860,9 @@ function cfDespDests(d){
     const ks=Object.keys(cfStockDestMap(d.compraId,d.valor));
     if(ks.length)return ks;
   }
-  return[shopIsMeal(d.tipo)&&d.dataValor?d.tipo+'|'+d.dataValor:(d.tipo||'Gerais')];
+  // Bebida da refeição é um destino próprio (mesma chave que o stock usa), para
+  // o filtro a separar da comida do mesmo dia
+  return[shopIsMeal(d.tipo)&&d.dataValor?d.tipo+'|'+d.dataValor+(d.bebida?'|'+DEST_BEB:''):(d.tipo||'Gerais')];
 }
 
 function truncRef(s){return s.length>40?s.slice(0,37)+'…':s;}
@@ -2022,7 +2063,7 @@ async function carregar(){
     const sel='*,membros(*,presencas(*)),refeicoes_def(*),despesas(*),convidados(*),mealheiros(*),pagamentos(*)';
     // shoplist vai numa fetch SEPARADA e tolerante a falha: se a tabela ainda
     // não existir (migração por correr) o resto da app continua a funcionar.
-    const [res,uaRes,cjRes,vlRes,slRes,stRes,ctRes,acRes,adRes,npRes,flRes,fpRes,ccRes,sljRes,cpRes,stmRes,ttRes,tsRes,tiRes,ppRes,dgRes]=await Promise.all([
+    const [res,uaRes,cjRes,vlRes,slRes,stRes,ctRes,acRes,adRes,npRes,flRes,fpRes,ccRes,sljRes,cpRes,stmRes,ttRes,tsRes,tiRes,ppRes,dgRes,dbRes]=await Promise.all([
       sbFetch(`${SB_URL}/rest/v1/eventos?select=${encodeURIComponent(sel)}&order=ano.asc`,{headers:sbHeaders(),cache:'no-store'}),
       sbFetch(`${SB_URL}/rest/v1/user_amigos?select=email,amigo`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null),
       sbFetch(`${SB_URL}/rest/v1/conjuges?select=amigo_a,amigo_b`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null),
@@ -2063,7 +2104,9 @@ async function carregar(){
       // volta a ser só do admin. O RLS já só devolve os pedidos que se podem ver.
       sbFetch(`${SB_URL}/rest/v1/pagamentos_pendentes?select=*&order=criado_em.desc`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null),
       // sonda à coluna despesas.grupo_pag (db/despesas_pagadores.sql): 200 = já existe
-      sbFetch(`${SB_URL}/rest/v1/despesas?select=grupo_pag&limit=1`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null)
+      sbFetch(`${SB_URL}/rest/v1/despesas?select=grupo_pag&limit=1`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null),
+      // sonda à coluna despesas.bebida (db/bebida_refeicao.sql)
+      sbFetch(`${SB_URL}/rest/v1/despesas?select=bebida&limit=1`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null)
     ]);
     if(!res.ok)throw new Error('HTTP '+res.status);
     const rows=await res.json();
@@ -2100,6 +2143,8 @@ async function carregar(){
     SHOP_LOJA_COL=!!(sljRes&&sljRes.ok);
     // Despesa paga por vários: sem a coluna, cada despesa continua a ter um dono só
     DESP_GRUPO_COL=!!(dgRes&&dgRes.ok);
+    // Bebida alocada à refeição: sem a coluna, a despesa avulsa não se marca
+    DESP_BEBIDA_COL=!!(dbRes&&dbRes.ok);
     STOCK_TAM_COL=STOCK_TABLE&&!!(stmRes&&stmRes.ok);
     // Só gravamos os responsáveis se as colunas já existirem no Supabase
     // (senão o replace das refeições falhava todo — padrão dividas_publicas)
@@ -2130,7 +2175,7 @@ async function carregar(){
         presencas:(m.presencas||[]).map(p=>({k:`${p.dia}|${p.ref}`,modo:p.modo==='bebe'?'bebe':'come'}))
       })),
       refeicoesDef:(ev.refeicoes_def||[]).map(r=>({data:r.data,dia:r.dia,ref:r.ref,prato:r.prato||'',peso:N(r.peso),minMEO:N(r.min_meo),minConv:N(r.min_conv),extraConv:N(r.extra_conv),responsaveis:parseResps(r.resp_cozinha),menu:r.menu||''})),
-      despesas:(ev.despesas||[]).map(d=>({_id:d.id,quem:d.quem,dataDesp:d.data_desp,dataValor:d.data_valor,desc:d.descricao,tipo:d.tipo,valor:N(d.valor),obs:d.observacoes||'',compraId:d.compra_id||null,grupoPag:d.grupo_pag||null})),
+      despesas:(ev.despesas||[]).map(d=>({_id:d.id,quem:d.quem,dataDesp:d.data_desp,dataValor:d.data_valor,desc:d.descricao,tipo:d.tipo,valor:N(d.valor),obs:d.observacoes||'',compraId:d.compra_id||null,grupoPag:d.grupo_pag||null,bebida:!!d.bebida})),
       convidados:(ev.convidados||[]).map(c=>{
         const cri=!!c.crianca;
         const row={_id:c.id,membro:c.membro,nome:c.nome,data:c.data,dia:c.dia,ref:c.ref,pagante:c.pagante?'Sim':'Não',crianca:cri,preco:N(c.preco)};
@@ -2228,6 +2273,7 @@ async function sbGuardarEvento(y,slot){
       const dres=await sbReq('POST','despesas',y.despesas.map(d=>{
         const row={evento_id:eid,quem:d.quem,data_desp:d.dataDesp||null,data_valor:d.dataValor||null,descricao:d.desc||'',tipo:d.tipo,valor:d.valor,observacoes:d.obs||null,compra_id:d.compraId||null};
         if(DESP_GRUPO_COL)row.grupo_pag=d.grupoPag||null;   // sem a migração, nem se manda a coluna
+        if(DESP_BEBIDA_COL)row.bebida=!!d.bebida;
         return row;
       }),{Prefer:'return=representation'});
       if(Array.isArray(dres))dres.forEach((r,i)=>{if(y.despesas[i])y.despesas[i]._id=r.id;});
@@ -2736,11 +2782,13 @@ function updateCfForm(){
           <input type="date" id="cf-date2" value="">
         </div>
       </div>
+      ${bebRowHtml('cf')}
       <label>Descritivo <span class="cf-desc-count" id="cf-desc-count">0/30</span></label>
       <input type="text" id="cf-desc" placeholder="Ex: Continente — Bacalhau" maxlength="30" oninput="updDescCount('cf')">
       <label>Observações</label>
       <textarea id="cf-obs" placeholder="Detalhe adicional (opcional)" rows="2"></textarea>
       ${STOCK_TABLE?`<button class="btn ghost" id="cf-detalhe-btn" style="width:100%;margin-top:14px" onclick="cfAbrirDetalhe()">🧾 Detalhar por artigo →<span style="display:block;font-size:11px;font-weight:400;color:var(--muted);margin-top:2px;text-transform:none;letter-spacing:0">itens e preços — à mão ou a partir da fatura</span></button>`:''}`;
+    CF_BEB.cf=false;              // despesa nova começa sempre como comida
     setTimeout(cfTipoChanged,10);
   } else if(cfDir==='tshirts'){
     f.innerHTML=tshirtCfFormHtml(today);
@@ -2874,10 +2922,44 @@ function dvSync(prefix){
     d2.value=d1.value;            // força igual à data-despesa
     d2.readOnly=true;d2.style.opacity='.55';d2.style.pointerEvents='none';
   }
+  bebSync(prefix);
 }
 function dvMealChanged(prefix){
   const sel=document.getElementById(prefix+'-dv-sel'),d2=document.getElementById(prefix+'-date2');
   if(sel&&d2)d2.value=sel.value;
+  bebSync(prefix);
+}
+
+/* ── Comida ou bebida da refeição ──
+   Uma despesa alocada a uma refeição é comida por defeito: divide-se por quem
+   come. Marcada como bebida, continua custo direto daquela refeição mas
+   divide-se por quem come + quem só bebe — é o caso das bebidas compradas para
+   uma noite e bebidas depois do jantar. Só faz sentido com refeição escolhida
+   (num tipo puro a despesa já cai na bolsa comum), e só se a BD tiver a coluna. */
+const CF_BEB={cf:false,ecf:false};
+function bebRowHtml(prefix){
+  return `<div id="${prefix}-beb-row" style="display:none">${
+    `<button type="button" class="cfp-toggle" id="${prefix}-beb-btn" onclick="bebToggle('${prefix}')"></button>`}
+    <div class="cf-quando-hint" id="${prefix}-beb-hint"></div></div>`;
+}
+// Marcável? (tipo de refeição + refeição mesmo escolhida + coluna na BD)
+function bebPode(prefix){
+  const tipo=document.getElementById(prefix+'-tipo')?.value||'Gerais';
+  return DESP_BEBIDA_COL&&shopIsMeal(tipo)&&!!document.getElementById(prefix+'-date2')?.value;
+}
+// Estado efetivo: escondido = nunca é bebida (não fica marca pendurada num tipo puro)
+function bebOn(prefix){return bebPode(prefix)&&!!CF_BEB[prefix];}
+function bebToggle(prefix){CF_BEB[prefix]=!CF_BEB[prefix];bebSync(prefix);}
+function bebSync(prefix){
+  const row=document.getElementById(prefix+'-beb-row');if(!row)return;
+  const pode=bebPode(prefix);
+  row.style.display=pode?'':'none';
+  if(!pode)return;
+  const on=!!CF_BEB[prefix];
+  const btn=document.getElementById(prefix+'-beb-btn');
+  const hint=document.getElementById(prefix+'-beb-hint');
+  if(btn)btn.textContent=on?`${DEST_BEB_ICON} Bebida da refeição`:'🍽️ Comida da refeição';
+  if(hint)hint.textContent=on?'Divide-se por quem come E por quem só bebe.':'Divide-se só por quem come. Toca para marcar como bebida.';
 }
 function dvSyncFromDate(prefix){
   if(isCfProv(prefix))return;   // provisória: não há data-despesa a seguir
@@ -3170,6 +3252,7 @@ async function saveCashFlow(){
       linhas=[{quem:who,valor:rnd(val,2)}];
     }
     const grupo=linhas.length>1?('p'+Date.now()):null;
+    const beb=bebOn('cf');
     if(!DATA._sbId){toast('Sem ligação à base de dados — recarrega a página','bad');document.getElementById('pay-save').disabled=false;return;}
     setSync('load','a guardar…');
     try{
@@ -3177,10 +3260,11 @@ async function saveCashFlow(){
         linhas.map(l=>{
           const row={evento_id:DATA._sbId,quem:l.quem,data_desp:dDesp||null,data_valor:date2||null,descricao:descD||'(sem descrição)',tipo,valor:l.valor,observacoes:obs||null};
           if(DESP_GRUPO_COL)row.grupo_pag=grupo;
+          if(DESP_BEBIDA_COL)row.bebida=beb;
           return row;
         }),
         {Prefer:'return=representation'}));
-      linhas.forEach((l,i)=>DATA.despesas.push({_id:ins&&ins[i]?ins[i].id:null,quem:l.quem,dataDesp:dDesp,dataValor:date2,desc:descD||'(sem descrição)',tipo,valor:l.valor,obs,compraId:null,grupoPag:grupo}));
+      linhas.forEach((l,i)=>DATA.despesas.push({_id:ins&&ins[i]?ins[i].id:null,quem:l.quem,dataDesp:dDesp,dataValor:date2,desc:descD||'(sem descrição)',tipo,valor:l.valor,obs,compraId:null,grupoPag:grupo,bebida:beb}));
       syncMirror();
       marcaGuardado();
       document.getElementById('pay-save').disabled=false;
@@ -3628,6 +3712,7 @@ function editCfEntry(source,idx){
           <input type="date" id="ecf-date2" value="${d.dataValor||''}">
         </div>
       </div>
+      ${bebRowHtml('ecf')}
       <label>Descritivo <span class="cf-desc-count" id="ecf-desc-count"></span></label>
       <input type="text" id="ecf-desc" maxlength="30" value="${escHtml((d.desc||'').slice(0,30))}" oninput="updDescCount('ecf')">
       ${(!isAdmin()&&!String(d.obs||'').trim())?''   /* consulta: caixa vazia que não se pode preencher não acrescenta nada */
@@ -3636,6 +3721,7 @@ function editCfEntry(source,idx){
     // Já — e não no setTimeout: o openCfDetail desativa os campos logo a seguir,
     // e o que nascesse depois disso ficava editável em modo consulta.
     if(grupo.length)pagAbrir('ecf',grupo.map(i=>({quem:DATA.despesas[i].quem,valor:DATA.despesas[i].valor})));
+    CF_BEB.ecf=!!d.bebida;
     setTimeout(()=>{ecfTipoChanged();updDescCount('ecf');},10);
   } else if(editType==='mealheiro'){
     const m=DATA.mealheiros[idx];
@@ -3802,6 +3888,7 @@ async function saveEditCf(){
       dataDesp:prov?'':document.getElementById('ecf-date').value,
       dataValor:document.getElementById('ecf-date2').value,
       tipo:tipoE,
+      bebida:bebOn('ecf'),   // deixa de ser bebida se o tipo/refeição já não o permitir
       desc:(document.getElementById('ecf-desc')?.value||'').trim().slice(0,30)
     });
     const obsEl=document.getElementById('ecf-obs');
@@ -6002,8 +6089,9 @@ async function allocFreeToMeal(itemId){
     const cap=rnd(l.qtd-usado,3);
     if(cap<=0.0005)continue;
     const take=rnd(Math.min(cap,rest),3);
-    const alocs=(l.alocacoes||[]).map(x=>({tipo:x.tipo,data:x.data,qtd:+x.qtd||0}));
-    const ex=alocs.find(x=>x.tipo===ref&&x.data===data);
+    const alocs=(l.alocacoes||[]).map(x=>{const o={tipo:x.tipo,data:x.data,qtd:+x.qtd||0};if(x.bebida)o.bebida=true;return o;});
+    // pedido de stock da refeição = comida; a bebida marcada é um destino à parte
+    const ex=alocs.find(x=>x.tipo===ref&&x.data===data&&!x.bebida);
     if(ex)ex.qtd=rnd(ex.qtd+take,3);else alocs.push({tipo:ref,data,qtd:take});
     patches.push({l,alocs});rest=rnd(rest-take,3);
   }
@@ -6054,9 +6142,18 @@ function fifoAlocar(artigo,qtd,u,skipLotId,preferKeys){
 
 /* Um destino (string) → entrada de alocação: '' = por alocar (FIFO, fora daqui);
    'Tipo' = tipo puro (data null); 'Ref|data' = refeição. */
+/* Destino → alocação. 'Jantar|2026-08-15' = comida daquela refeição;
+   'Jantar|2026-08-15|b' = BEBIDA da mesma refeição (o 3.º segmento é o
+   interruptor). O flag só se põe quando é bebida — as alocações antigas ficam
+   exatamente na forma em que foram gravadas. */
 function destinoAloc(destino,qtd){
   if(!destino)return null;
-  if(String(destino).includes('|')){const p=String(destino).split('|');return{tipo:p[0],data:p[1],qtd:rnd(qtd,3)};}
+  if(String(destino).includes('|')){
+    const p=String(destino).split('|');
+    const a={tipo:p[0],data:p[1],qtd:rnd(qtd,3)};
+    if(p[2]===DEST_BEB)a.bebida=true;
+    return a;
+  }
   return{tipo:destino,data:null,qtd:rnd(qtd,3)};
 }
 /* Resolve as alocações de um lote a gravar a partir do destino/split escolhido.
@@ -6075,14 +6172,20 @@ function resolveLoteAlocs(l){
 /* Uma alocação aponta a uma REFEIÇÃO (tipo Almoço/Jantar + data) ou a um TIPO
    puro (Gerais/Bebidas/Cerveja/Renda, sem data — cai no pool desse tipo). */
 function alocIsMeal(a){return shopIsMeal(a&&a.tipo)&&!!(a&&a.data);}
-// Alocação gravada → chave de destino usada na UI ('' | 'Tipo' | 'Ref|data')
-function alocToDestino(a){return alocIsMeal(a)?a.tipo+'|'+a.data:(a&&a.tipo)||'';}
+// Sufixo do destino "bebida da refeição" (ver destinoAloc) e o ícone que a marca
+const DEST_BEB='b';
+const DEST_BEB_ICON='🍻';
+// A alocação é bebida da refeição? (custo direto, mas dividido também por quem só bebe)
+function alocIsBebida(a){return alocIsMeal(a)&&!!(a&&a.bebida);}
+// Alocação gravada → chave de destino usada na UI ('' | 'Tipo' | 'Ref|data' | 'Ref|data|b')
+function alocToDestino(a){return alocIsMeal(a)?a.tipo+'|'+a.data+(a.bebida?'|'+DEST_BEB:''):(a&&a.tipo)||'';}
 // Ordenação de destinos para mostrar: refeições primeiro, por ordem do
 // calendário; depois os tipos puros por ordem alfabética
 function destKeyCmp(a,b){
   const A=destinoAloc(a,0),B=destinoAloc(b,0);
   const am=alocIsMeal(A),bm=alocIsMeal(B);
-  if(am&&bm)return (A.data||'').localeCompare(B.data||'')||A.tipo.localeCompare(B.tipo,'pt');
+  // mesma refeição: a comida primeiro, a bebida logo a seguir
+  if(am&&bm)return (A.data||'').localeCompare(B.data||'')||A.tipo.localeCompare(B.tipo,'pt')||((A.bebida?1:0)-(B.bebida?1:0));
   if(am!==bm)return am?-1:1;
   return (A&&A.tipo||'').localeCompare(B&&B.tipo||'','pt');
 }
@@ -6111,7 +6214,8 @@ function aplicarStock(data){
         if(meal&&!refOk[a.tipo+'|'+a.data])return;
         const v=Math.min(rnd(unit*(+a.qtd||0),2),resto);
         if(v<=0)return;
-        data.despesas.push({quem:linha.quem,dataDesp:linha.dataDesp,dataValor:meal?a.data:linha.dataDesp,desc:l.artigo,tipo:a.tipo,valor:v,obs:STOCK_OBS,compraId:null,_stock:true});
+        // bebida só faz sentido numa refeição (num tipo puro já cai no pool certo)
+        data.despesas.push({quem:linha.quem,dataDesp:linha.dataDesp,dataValor:meal?a.data:linha.dataDesp,desc:l.artigo,tipo:a.tipo,valor:v,obs:STOCK_OBS,compraId:null,bebida:!!(meal&&a.bebida),_stock:true});
         resto=rnd(resto-v,2);
       });
     });
@@ -6850,7 +6954,9 @@ function diaAbrev(ds){const s=diaCurto(ds);return s?s.slice(0,3):'';}
 function stockDestChip(k,qtd,u){
   const a=destinoAloc(k,qtd);if(!a)return '';
   const meal=alocIsMeal(a);
-  const ic=shopTipoIcon(a.tipo);
+  // Bebida: ícone composto (🍻 + o da refeição) — o 🍻 sozinho não dizia se era
+  // do almoço ou do jantar, e pode haver os dois no mesmo dia
+  const ic=alocIsBebida(a)?DEST_BEB_ICON+shopTipoIcon(a.tipo):shopTipoIcon(a.tipo);
   const lbl=meal?`${diaAbrev(a.data)} ${fmtDiaMes(a.data)}`:a.tipo;
   const cls=stockDestEstado(k)==='consumido'?' usado':'';
   return `<span class="stk-chip${cls}">${ic} ${escHtml(lbl)} · ${escHtml(fmtQty(qtd,u))}</span>`;
@@ -7697,6 +7803,11 @@ function destPickList(){
   // short: versão sem a palavra Almoço/Jantar, para o botão do seletor — lá o
   // ☀️/🌙 já diz qual é e o espaço é curto. No bottom-sheet fica o label longo.
   (DATA.refeicoesDef||[]).filter(r=>shopIsMeal(r.ref)).forEach(r=>out.push({value:r.ref+'|'+r.data,icon:shopTipoIcon(r.ref),label:`${r.ref} ${diaCurto(r.data)}, ${fmtDiaMes(r.data)}`,short:`${diaCurto(r.data)}, ${fmtDiaMes(r.data)}`,sub:r.prato||'',group:'Refeição'}));
+  /* Bebida da refeição: mesmo dia, mesmo custo direto — mas repartido também por
+     quem só veio ao copo. Aqui o rótulo curto leva a refeição por extenso: o
+     ícone passa a ser o da bebida, deixa de dizer se é almoço ou jantar, e pode
+     haver os dois no mesmo dia. */
+  (DATA.refeicoesDef||[]).filter(r=>shopIsMeal(r.ref)).forEach(r=>out.push({value:r.ref+'|'+r.data+'|'+DEST_BEB,icon:DEST_BEB_ICON,label:`Bebida · ${r.ref} ${diaCurto(r.data)}, ${fmtDiaMes(r.data)}`,short:`${r.ref} ${diaCurto(r.data)}, ${fmtDiaMes(r.data)}`,sub:'divide por quem come + quem só bebe',group:'Bebida'}));
   return out;
 }
 // Rótulo (ícone + texto) de um valor de destino, para o botão do seletor
@@ -7704,6 +7815,7 @@ function destLabel(value){
   const it=value?destPickList().find(x=>x.value===value):null;
   if(it)return{icon:it.icon,label:it.label,short:it.short||it.label};
   const a=value?destinoAloc(value,0):null;
+  if(a&&alocIsBebida(a))return{icon:DEST_BEB_ICON,label:`Bebida · ${a.tipo} ${diaCurto(a.data)}, ${fmtDiaMes(a.data)}`,short:`${a.tipo} ${diaCurto(a.data)}, ${fmtDiaMes(a.data)}`};
   if(a)return alocIsMeal(a)
     ?{icon:shopTipoIcon(a.tipo),label:`${a.tipo} ${diaCurto(a.data)}, ${fmtDiaMes(a.data)}`,short:`${diaCurto(a.data)}, ${fmtDiaMes(a.data)}`}
     :{icon:shopTipoIcon(a.tipo),label:a.tipo,short:a.tipo};
@@ -7722,7 +7834,7 @@ function openDestPicker(current,cb,title){
   document.getElementById('dpick-title').textContent=title||'Alocar a…';
   let last=null,h='';
   items.forEach((it,idx)=>{
-    if(it.group!==last){h+=`<div class="dsheet-grp">${it.group==='Tipo'?'Tipos de despesa':'Refeições'}</div>`;last=it.group;}
+    if(it.group!==last){h+=`<div class="dsheet-grp">${it.group==='Tipo'?'Tipos de despesa':it.group==='Bebida'?'Bebida da refeição':'Refeições'}</div>`;last=it.group;}
     h+=`<button type="button" class="dsheet-opt${it.value===current?' on':''}" onclick="pickDest(${idx})">
       <span class="dsheet-ic">${it.icon}</span><span class="dsheet-lbl">${escHtml(it.label)}${it.sub?`<small class="dsheet-sub">${escHtml(it.sub)}</small>`:''}</span>${it.value===current?'<span class="dsheet-chk">✓</span>':''}</button>`;
   });
@@ -8680,7 +8792,11 @@ const _ALOC_SEP='␟';   // separador interno marca␟destino (não aparece em n
 function resolveUmbrella(lotesFifo,alocs,lineVal){
   const cap={},out={},unit={};
   lotesFifo.forEach(l=>{cap[l._id]=l.qtd;out[l._id]=[];unit[l._id]=l.qtd>0?(+l.valor||0)/l.qtd:0;});
-  const put=(l,a,take)=>{const ex=out[l._id].find(x=>x.tipo===a.tipo&&x.data===a.data);if(ex)ex.qtd=rnd(ex.qtd+take,3);else out[l._id].push({tipo:a.tipo,data:a.data,qtd:rnd(take,3)});
+  // comida e bebida da mesma refeição são destinos DIFERENTES: não se juntam
+  // numa linha só, senão a marca perdia-se ao distribuir pelos lotes físicos
+  const put=(l,a,take)=>{const ex=out[l._id].find(x=>x.tipo===a.tipo&&x.data===a.data&&!x.bebida===!a.bebida);
+    if(ex)ex.qtd=rnd(ex.qtd+take,3);
+    else{const o={tipo:a.tipo,data:a.data,qtd:rnd(take,3)};if(a.bebida)o.bebida=true;out[l._id].push(o);}
     if(lineVal&&a._i!=null)lineVal[a._i]=rnd((lineVal[a._i]||0)+unit[l._id]*take,2);};
   const fill=(a,lots)=>{let rest=a.qtd;for(const l of lots){if(rest<=0.0005)break;const c=cap[l._id];if(c<=0.0005)continue;const take=Math.min(c,rest);put(l,a,take);cap[l._id]=rnd(c-take,3);rest=rnd(rest-take,3);}return rest;};
   alocs.filter(a=>a.marca).forEach(a=>fill(a,lotesFifo.filter(l=>shopSameArtigo(l.artigo,a.marca))));
@@ -9135,7 +9251,7 @@ function loteRenderAlocs(){
   // vê é o que vai para as contas (uma alocação servida por stock oferecido
   // aparece a 0 €, não ao preço médio do artigo)
   const lineVal=[];
-  resolveUmbrella(editingLote.lotesFifo,editingLote.alocs.map((a,i)=>({tipo:a.tipo,data:a.data,qtd:+a.qtd||0,marca:a.marca||'',_i:i})),lineVal);
+  resolveUmbrella(editingLote.lotesFifo,editingLote.alocs.map((a,i)=>({tipo:a.tipo,data:a.data,qtd:+a.qtd||0,marca:a.marca||'',bebida:!!a.bebida,_i:i})),lineVal);
   const lv=i=>rnd(lineVal[i]||0,2);
   // Sufixo da unidade dentro do campo da qtd ("0,5 kg") — sem ele não se
   // percebe se o 0,5 são quilos, litros ou unidades. Vazio = à unidade.
@@ -9169,15 +9285,18 @@ function loteRenderAlocs(){
   const html=order.map(k=>{
     const idx=groups[k].idx;
     const a0=destinoAloc(k,0);const meal=alocIsMeal(a0);
-    const lbl=meal?`${diaAbrev(a0.data)} ${fmtDiaMes(a0.data)}`:a0.tipo;
+    // Bebida: ícone composto e a refeição por extenso — o dia sozinho não
+    // chegava para a distinguir da comida do mesmo dia
+    const dIc=alocIsBebida(a0)?DEST_BEB_ICON+shopTipoIcon(a0.tipo):shopTipoIcon(a0.tipo);
+    const lbl=meal?(alocIsBebida(a0)?`${a0.tipo} ${diaAbrev(a0.data)} ${fmtDiaMes(a0.data)}`:`${diaAbrev(a0.data)} ${fmtDiaMes(a0.data)}`):a0.tipo;
     // Sem selo "precisa" nas linhas simples: não cabe ao lado da qtd em ecrãs
     // estreitos e o painel "Pedidos na lista" (acima) já diz o mesmo.
     if(solo)return idx.map(i=>`<div class="lote-al">
-        ${pickBtn('dest',shopTipoIcon(a0.tipo),lbl,`loteGroupDest(${i})`)}${endCells(i,editingLote.alocs[i])}
+        ${pickBtn('dest',dIc,lbl,`loteGroupDest(${i})`)}${endCells(i,editingLote.alocs[i])}
       </div>`).join('');
     return `<div class="lote-dest">
       <div class="lote-dest-h">
-        ${pickBtn('hd',shopTipoIcon(a0.tipo),lbl,`loteGroupDest(${idx[0]})`)}${needTag(k)}
+        ${pickBtn('hd',dIc,lbl,`loteGroupDest(${idx[0]})`)}${needTag(k)}
       </div>
       ${idx.map(i=>{const a=editingLote.alocs[i];
         return `<div class="lote-al">${pickBtn('marca','',a.marca||'qualquer marca',`loteMarcaPicker(${i})`)}${endCells(i,a)}</div>`;}).join('')}
@@ -9233,7 +9352,8 @@ function loteAlocField(i,f,v){
   const a=editingLote&&editingLote.alocs[i];if(!a)return;
   if(f==='marca'){a.marca=v||'';loteRenderAlocs();return;}
   if(f==='qtd')a.qtd=parseFloat(String(v).replace(',','.'))||0;
-  else{const d=destinoAloc(v,0);a.tipo=d?d.tipo:v;a.data=d?d.data:null;}
+  else{const d=destinoAloc(v,0);a.tipo=d?d.tipo:v;a.data=d?d.data:null;
+    if(d&&d.bebida)a.bebida=true;else delete a.bebida;}
   loteRenderAlocs();
 }
 function loteDestPick(i){
@@ -9248,7 +9368,8 @@ function loteGroupDest(i){
   const oldK=alocToDestino(a);
   openDestPicker(oldK,v=>{
     const d=destinoAloc(v,0);
-    editingLote.alocs.forEach(x=>{if(alocToDestino(x)===oldK){x.tipo=d?d.tipo:v;x.data=d?d.data:null;}});
+    editingLote.alocs.forEach(x=>{if(alocToDestino(x)===oldK){x.tipo=d?d.tipo:v;x.data=d?d.data:null;
+      if(d&&d.bebida)x.bebida=true;else delete x.bebida;}});
     loteRenderAlocs();
   },'Alocar a');
 }
@@ -9256,7 +9377,9 @@ function loteGroupDest(i){
 function loteAddToGroup(i){
   if(!isAdmin()||!editingLote)return;
   const a=editingLote.alocs[i];if(!a)return;
-  editingLote.alocs.push({tipo:a.tipo,data:a.data,qtd:0,marca:''});
+  const nova={tipo:a.tipo,data:a.data,qtd:0,marca:''};
+  if(a.bebida)nova.bebida=true;   // mesma linha do container: se ele é bebida, ela também
+  editingLote.alocs.push(nova);
   loteRenderAlocs();
 }
 /* Sugestão para uma linha de alocação NOVA: a próxima refeição que ainda pede
@@ -9482,7 +9605,7 @@ function stkAddRenderOrigem(){
    estão à porta ficam servidas, e quem perde é quem ainda vai a tempo de
    comprar. Devolve as alocações novas e quanto se tirou. */
 function stkTrimAlocs(alocs,qtd){
-  const out=(alocs||[]).map(a=>({tipo:a.tipo,data:a.data,qtd:+a.qtd||0}));
+  const out=(alocs||[]).map(a=>{const o={tipo:a.tipo,data:a.data,qtd:+a.qtd||0};if(a.bebida)o.bebida=true;return o;});
   let excesso=rnd(out.reduce((s,a)=>s+a.qtd,0)-qtd,3);
   if(excesso<=0.0005)return{alocs:out,cortado:0};
   const cortado=excesso;
