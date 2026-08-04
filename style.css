@@ -927,13 +927,13 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .cf-subchip{padding:6px 12px;border-radius:18px;border:1.5px solid var(--line);background:#FFFDF6;font-size:12px;font-weight:700;color:var(--muted);cursor:pointer;transition:.15s;user-select:none}
 .cf-subchip:active{transform:scale(.95)}
 .cf-subchip.on{border-color:var(--barrete);background:rgba(30,122,77,.1);color:var(--barrete)}
-/* Despesa prevista (sem data) — segmentado de 2 estados */
+/* Despesa efetiva (paga) ↔ provisória (por pagar) — segmentado de 2 estados */
 .cf-quando{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:14px;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:4px}
 .cf-quando .cfq{text-align:center;padding:10px 6px;border-radius:9px;font-size:13px;font-weight:700;color:var(--muted);cursor:pointer;user-select:none;transition:.15s;border:1.5px solid transparent;line-height:1.2}
 .cf-quando .cfq:active{transform:scale(.97)}
 .cf-quando .cfq.on{background:#FFFDF6;box-shadow:0 1px 4px rgba(80,55,20,.12)}
-.cf-quando .cfq[data-q="real"].on{border-color:var(--barrete);color:var(--barrete)}
-.cf-quando .cfq[data-q="prevista"].on{border-color:var(--gold);color:var(--gold)}
+.cf-quando .cfq[data-q="efet"].on{border-color:var(--barrete);color:var(--barrete)}
+.cf-quando .cfq[data-q="prov"].on{border-color:var(--gold);color:var(--gold)}
 .cf-quando-hint{font-size:11px;color:var(--faint);margin-top:6px;line-height:1.4}
 .cf-desc-count{float:right;font-size:10.5px;font-weight:600;color:var(--faint);letter-spacing:.02em}
 .cf-desc-count.full{color:#B5453B}
@@ -1560,8 +1560,8 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
    antes o destino apanhava este estilo por ser :last-child, ficando a bold só
    nas compras de uma refeição (nas de várias, nenhum destino ficava). */
 .cft-sub span+span{flex:0 0 auto;font-variant-numeric:tabular-nums;font-weight:600;color:var(--ink)}
-.cft-prevista{border-left-style:dashed;background:repeating-linear-gradient(135deg,rgba(168,123,20,.04) 0 9px,transparent 9px 18px)}
-.cft-prevista .cft-kind{color:var(--gold)}
+.cft-prov{border-left-style:dashed;background:repeating-linear-gradient(135deg,rgba(168,123,20,.04) 0 9px,transparent 9px 18px)}
+.cft-prov .cft-kind{color:var(--gold)}
 
 /* ── Categorias de artigos (agrupadores: Sumos, Talho, …) ── */
 /* Stock: um container colapsável por categoria; "Outros" (sem categoria) no fim */

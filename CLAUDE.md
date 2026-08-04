@@ -51,6 +51,16 @@ Registar um pagamento de dívida continua a ser um ato do admin — o que mudou 
 - O admin é avisado pelo Telegram porque o pedido escreve no `historico` (`tipo:'pagamento'`); as Edge Functions não foram tocadas — a frase vem redigida da app, como todas.
 - Migração: `db/pagamentos_pendentes.sql`. Tolerante: sem ela, `PAGPEND_TABLE=false` e a opção volta a ser só do admin.
 
+## Despesa efetiva (📅) vs provisória (📌)
+Duas datas, duas perguntas diferentes — e é isso que o segmentado do cash-flow separa:
+- **`data_desp` = quando se pagou.** É ela, e só ela, que diz se a despesa é **efetiva** ou **provisória** (`despProvisoria(d)` = `!d.dataDesp`). Antes a marca era "não ter data nenhuma", o que obrigava a provisória a ser cega ao destino.
+- **`data_valor` = a que refeição/dia pertence.** Vale nos dois estados: *"sei que vou gastar X no jantar de sábado, mas só compro sábado de manhã"* regista-se hoje como provisória **do jantar de sábado**, e o custo entra logo nesse jantar (`allocDireta` filtra por `data_valor`, não por `data_desp`). Sem `data_valor`, cai no rateio indireto (F20) — como antes.
+- **A refeição é obrigatória em Almoço/Jantar nos dois estados** (`dvFaltaRefeicao`, sem `!prov`): uma provisória de Jantar sem refeição escolhida ia parar ao indireto sem ninguém dar por isso.
+- Na UI só desaparece a **Data Despesa** (`cf-date-cell`/`ecf-date-cell`); o campo do lado fica, como "Refeição" ou "Data prevista" (`dvSync` já não desiste à cabeça em modo provisório).
+- As provisórias continuam a viver **num tabulador à parte** dos Cash Flows — a separação é `cf.prov`, **não** "ter data", que agora podem ter. A data que mostram é a data-valor (🗓 no cartão), não dia de movimento nenhum.
+- **Fechar contas continua travado enquanto houver provisórias** (`temDespesasPendentes`, agora por `data_desp`). Ter refeição não as torna pagas.
+- Sem migração: as duas colunas já eram `null`-áveis e os anos antigos têm `data_desp` em todas as linhas.
+
 ## Detalhar uma despesa do cash-flow (🧾 Detalhar por artigo)
 Botão no formulário de despesa do cash-flow. Por baixo é uma **compra sem artigos de lista** (mesmo `compra_id`), mas a entrada é outra e **não se comporta como registar o carrinho**:
 - **Não abre a câmara.** Abria (`faturaPick()` no arranque) e quem não tem fatura ficava sem saída. O 📷 continua lá dentro, para quem tiver.
@@ -59,13 +69,13 @@ Botão no formulário de despesa do cash-flow. Por baixo é uma **compra sem art
 - **Quem parte do cash-flow não parte da lista**: o que está a fazer é meter artigos em 🧺 Stock. Por isso o bloco chama-se "🧺 Artigos desta despesa", o botão é "＋ Artigo" (não "fora da lista" — não há lista de onde estar fora) e os pedidos da lista ficam num bloco à parte, "🔗 Responde a pedidos da lista?", **opcional**. Ligar artigo a artigo faz-se no 🔗 de cada linha.
 - **Destino herdado**: os artigos nascem alocados ao que o cash-flow dizia — o tipo, e a **refeição** quando a data-valor casa com uma refeição definida (`compraDestPad`). Sem isso, uma despesa do Jantar de sábado punha tudo em Gerais e obrigava a realocar à mão.
 
-### 📌 Prevista itemizada
-O 📅/📌 do cash-flow segue para o modal da compra (`sb-quando`, só visível a detalhar uma despesa ou a editar uma que ficou prevista — registar a compra da lista é sempre coisa já paga).
-- **Prevista não é compra.** `data_desp` fica a `null` e os artigos **não geram lotes de stock**: dar entrada em stock do que ainda não se comprou fazia a lista dar pedidos por cobertos e mandava quem vai às compras de mãos a abanar. Ficam como **detalhe (observações) de uma única despesa**, com o tipo escolhido à cabeça (`compraPrevTipoHtml`) — nunca destino por artigo.
+### 📌 Provisória itemizada
+O 📅/📌 do cash-flow segue para o modal da compra (`sb-quando`, só visível a detalhar uma despesa ou a editar uma que ficou provisória — registar a compra da lista é sempre coisa já paga).
+- **Provisória não é compra.** `data_desp` fica a `null` e os artigos **não geram lotes de stock**: dar entrada em stock do que ainda não se comprou fazia a lista dar pedidos por cobertos e mandava quem vai às compras de mãos a abanar. Ficam como **detalhe (observações) de uma única despesa**, com o destino escolhido à cabeça (`compraProvDestHtml`: tipo + refeição) — nunca destino por artigo.
 - **Também não fecha pedidos da lista**: o picker nem aparece e `checkedIds` é forçado a vazio.
-- Sem `data_valor` (nem para Almoço/Jantar), tal como a prevista do cash-flow — é isso que a mantém fora da alocação direta e a faz cair no rateio indireto (F20).
-- Ao editar uma prevista já gravada os tabuladores 💶/∑ desaparecem: os artigos vivem nas observações, e reabrir o "preço por artigo" só daria para os somar duas vezes. Quando for paga, mete-se a data em 📅 e ela passa a movimento datado (**sem** virar stock — isso quer o registo normal da compra).
-- Editar despesas continua a ser **só do admin** (as despesas não têm policy de self-update). Nada de novo, mas conta: quem regista uma prevista não a fecha sozinho.
+- **Tem `data_valor`** quando é de Almoço/Jantar (`dataValorProv`) — é ela que a aloca à refeição, tal como no cash-flow. Sendo de outro tipo não se pergunta data nenhuma: `data_valor` só conta para refeições.
+- Ao editar uma provisória já gravada os tabuladores 💶/∑ desaparecem: os artigos vivem nas observações, e reabrir o "preço por artigo" só daria para os somar duas vezes. Nessa vista o destino vem das linhas de repartição (que já trazem o seletor da refeição), não do cabeçalho. Quando for paga, mete-se a data em 📅 e ela passa a movimento efetivo (**sem** virar stock — isso quer o registo normal da compra).
+- Editar despesas continua a ser **só do admin** (as despesas não têm policy de self-update). Nada de novo, mas conta: quem regista uma provisória não a fecha sozinho.
 
 ## Artigos de despensa (🫙)
 Há **dois tipos de artigo** na lista de compras e antes disto eram tratados como um só:

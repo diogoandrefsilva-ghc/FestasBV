@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v191 · 2026-08-04 · A fatura das t-shirts entra nas contas: cash-flow 👕 com preço por tipologia, cada t-shirt vai ao saldo de quem a leva e o desconto fica como crédito do MEO';
+const APP_BUILD = 'v192 · 2026-08-04 · Despesas efetivas (📅) vs provisórias (📌): uma provisória pode já dizer a que refeição/dia se destina e entra logo no custo dessa refeição';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -163,7 +163,11 @@ function bloqueadoPorFecho(){
   return true;
 }
 function ultimaRefeicaoISO(){const ds=(DATA&&DATA.refeicoesDef||[]).map(r=>r.data).filter(Boolean);return ds.length?ds.slice().sort().slice(-1)[0]:null;}
-function temDespesasPendentes(){return (DATA&&DATA.despesas||[]).some(d=>!d.dataValor);}  // sem data-valor = pagamento ainda não efetivo
+/* Provisória = despesa ainda não paga. A marca é NÃO TER data de despesa (a data
+   do pagamento). A data-valor não serve para isto: uma provisória pode muito bem
+   já saber a que refeição pertence ("o jantar de sábado") sem ter sido paga. */
+function despProvisoria(d){return !d.dataDesp;}
+function temDespesasPendentes(){return (DATA&&DATA.despesas||[]).some(despProvisoria);}
 function podeFecharContas(){
   if(!isAdmin()||!DATA||!DATA._sbId)return false;
   if(contasFechadas())return false;
@@ -452,7 +456,7 @@ function secContasHtml(){
       let motivo;
       if(!ult)motivo='Define primeiro as refeições do ano.';
       else if(hojeISO()<ult)motivo='Disponível a partir da última refeição ('+ult+').';
-      else if(temDespesasPendentes())motivo='Há despesas previstas ainda sem data de pagamento.';
+      else if(temDespesasPendentes())motivo='Há despesas provisórias por confirmar — mete-lhes a data de pagamento (ou apaga-as).';
       else motivo='Indisponível de momento.';
       s+=`<button class="btn prim sf" style="margin-top:13px;opacity:.4;pointer-events:none">🔒 Fechar Contas</button>
           <p class="sf" style="font-size:11px;color:var(--faint);margin:8px 2px 0">${motivo}</p>`;
@@ -580,8 +584,10 @@ function calcular(data){
   const tot={};for(const x of despesas)tot[x.tipo]=(tot[x.tipo]||0)+x.valor;
   const totalDesp=rnd(sumv(tot),2);
 
-  // Almoço/Jantar são alocados diretamente à refeição via data-valor. As "previstas"
-  // (sem data-valor) não casam com nenhuma refeição, por isso entram no rateio indireto (F20).
+  // Almoço/Jantar são alocados diretamente à refeição via data-valor — e isso vale
+  // também para as provisórias: o que já se sabe que se vai gastar no jantar de
+  // sábado conta no custo desse jantar, mesmo antes de ser pago. Sem data-valor não
+  // casam com refeição nenhuma e entram no rateio indireto (F20).
   const allocDireta=despesas.filter(x=>(x.tipo==='Almoço'||x.tipo==='Jantar')&&x.dataValor).reduce((a,x)=>a+x.valor,0);
   /* T-shirts: a fatura é dinheiro do grupo, mas NÃO se reparte pela fórmula —
      cada t-shirt é cobrada a quem lhe está imputada, ao preço da tipologia.
@@ -1423,7 +1429,7 @@ let cfFilterType='all';
 let cfFilterPerson='all';
 let cfFilterDest='all';   // destino: 'Tipo' (Gerais/Bebidas/…) ou 'Ref|data' (refeição)
 let cfFilterSub='all';
-let cfFilterView='mov';   // 'mov' = movimentos datados · 'previstas' = sem data
+let cfFilterView='mov';   // 'mov' = movimentos efetivos · 'prov' = despesas provisórias (ainda por pagar)
 
 /* Reembolsos e dívidas pagas: não-admins só veem movimentos seus ou dos cônjuges */
 function cfVisivel(cf){
@@ -1466,11 +1472,11 @@ function renderCashFlows(){
       const dd=dataToDia(d.dataValor);
       if(dd)dia=dd;
     }
-    const prevista=!d.dataDesp&&!d.dataValor;
+    const prov=despProvisoria(d);
     const dests=cfDespDests(d);
-    allCf.push({type:'despesa',date:d.dataDesp||d.dataValor||'',label:'Despesa',icon:'🛒',sub:d.tipo||'Gerais',dia,prevista,obs:d.obs||'',fromList:!!d.compraId,compraId:d.compraId||null,quem:d.quem,
+    allCf.push({type:'despesa',date:d.dataDesp||d.dataValor||'',label:'Despesa',icon:'🛒',sub:d.tipo||'Gerais',dia,prov,obs:d.obs||'',fromList:!!d.compraId,compraId:d.compraId||null,quem:d.quem,
       dests,destKey:dests.length===1?dests[0]:null,
-      line1:d.desc||'(sem descrição)',line2:`${prevista?'pagará':'pagou'} ${d.quem}`,valor:d.valor,
+      line1:d.desc||'(sem descrição)',line2:`${prov?'pagará':'pagou'} ${d.quem}`,valor:d.valor,
       sign:'neg',source:'despesas',idx:i,people:[d.quem]});
   });
 
@@ -1597,23 +1603,24 @@ function renderCashFlows(){
   // a pergunta: que movimentos tocaram no jantar de sábado / nas gerais).
   if(cfFilterDest!=='all')display=display.filter(cf=>(cf.dests||[]).includes(cfFilterDest));
 
-  // As despesas sem data (previstas) vivem num 2.º tabulador em vez de
-  // aparecerem no fim da cronologia.
-  const dated=display.filter(cf=>cf.date);
-  const undated=display.filter(cf=>!cf.date);
+  // As despesas provisórias vivem num 2.º tabulador em vez de se misturarem com o
+  // dinheiro que já saiu. Não é "ter data" que as separa — uma provisória pode ter
+  // data-valor (a refeição a que se destina); é não ter sido paga.
+  const dated=display.filter(cf=>cf.date&&!cf.prov);
+  const undated=display.filter(cf=>cf.prov||!cf.date);
   if(!undated.length)cfFilterView='mov';
   if(undated.length){
     pp+=`<div class="sub-tabs cfc-tabs">
       <div class="sub-tab${cfFilterView==='mov'?' on':''}" onclick="cfFilterView='mov';renderCashFlows()">Movimentos</div>
-      <div class="sub-tab${cfFilterView==='previstas'?' on':''}" onclick="cfFilterView='previstas';renderCashFlows()">📌 Previstas · ${undated.length}</div>
+      <div class="sub-tab${cfFilterView==='prov'?' on':''}" onclick="cfFilterView='prov';renderCashFlows()">📌 Provisórias · ${undated.length}</div>
     </div>`;
   }
-  const shown=cfFilterView==='previstas'?undated:dated;
+  const shown=cfFilterView==='prov'?undated:dated;
 
   const filteredTotal=shown.reduce((a,cf)=>a+cf.valor,0);
-  const showTotal=(cfFilterView==='previstas'||cfFilterType!=='all'||cfFilterPerson!=='all'||cfFilterDest!=='all')&&shown.length>0;
+  const showTotal=(cfFilterView==='prov'||cfFilterType!=='all'||cfFilterPerson!=='all'||cfFilterDest!=='all')&&shown.length>0;
   pp+=`<div class="sec-title sf" style="display:flex;justify-content:space-between;align-items:center">
-    <span>${cfFilterView==='previstas'?'Previstas':'Movimentos'} (${shown.length}${cfFilterView==='mov'&&shown.length!==totalCount?' de '+totalCount:''})</span>
+    <span>${cfFilterView==='prov'?'Provisórias':'Movimentos'} (${shown.length}${cfFilterView==='mov'&&shown.length!==totalCount?' de '+totalCount:''})</span>
     ${showTotal?`<span style="color:var(--gold);font-size:12px;font-weight:700;letter-spacing:0">${eur(filteredTotal)}</span>`:''}
   </div>`;
   if(!shown.length) pp+='<div class="empty sf">Nenhum movimento encontrado</div>';
@@ -1622,6 +1629,10 @@ function renderCashFlows(){
   // com separadores de mês. O tipo é dado pela cor + rótulo pequeno (sem chips);
   // o valor fica na linha do título para o rótulo não criar espaçamento extra.
   const cardHtml=cf=>{
+    // Provisória: a data que tem é a data-valor (a refeição a que se destina, ou o
+    // dia em que se conta gastar) — vai para a meta, que na pilha das provisórias
+    // não há calha de datas para a mostrar.
+    const provData=(cf.prov&&cf.date)?'🗓 '+fmtDiaMes(cf.date):'';
     if(cf.isCompra){
       // Cartão de compra da lista: resumo + para onde foi o dinheiro (refeição/tipo).
       // Toca → editor da compra.
@@ -1632,29 +1643,31 @@ function renderCashFlows(){
       // Com um destino filtrado, a linha que fez a compra entrar na lista fica
       // marcada — é a resposta a "o que é que esta compra tem a ver com isto?"
       const lines=subs.map(l=>`<div class="cft-sub${cfFilterDest!=='all'&&l.key===cfFilterDest?' on':''}"><span>${shopTipoIcon(l.sub)} ${l.sub}${l.dia?' · '+l.dia:''}${l.obs?' · <i>'+escHtml(l.obs)+'</i>':''}</span>${one?'':`<span>−${eur(l.valor)}</span>`}</div>`).join('');
-      return `<div class="card cft-card b-despesa${cf.prevista?' cft-prevista':''}" onclick="openCompra('${cf.compraId}')">
-        <div class="cft-kind k-despesa sf">${cf.prevista?'📌 Prevista · detalhada':'🛒 Compra · lista'}</div>
+      return `<div class="card cft-card b-despesa${cf.prov?' cft-prov':''}" onclick="openCompra('${cf.compraId}')">
+        <div class="cft-kind k-despesa sf">${cf.prov?'📌 Provisória · detalhada':'🛒 Compra · lista'}</div>
         <div class="cft-l1"><div class="cft-title">${escHtml(cf.line1)}</div><span class="cft-v neg">−${eur(cf.valor)}</span></div>
-        ${cf.line2?`<div class="cft-meta">${truncRef(cf.line2)}</div>`:''}
+        ${(cf.line2||provData)?`<div class="cft-meta">${[provData,cf.line2?truncRef(cf.line2):''].filter(Boolean).join(' · ')}</div>`:''}
         ${subs.length?`<div class="cft-subs"><div class="cft-subs-h sf">onde entra</div>${lines}</div>`:''}
       </div>`;
     }
     const sgn=cf.sign==='neg'?'−':cf.sign==='pos'?'+':'';
-    const kind=cf.type==='despesa'?('Despesa'+(cf.sub?' · '+cf.sub:'')+(cf.dia?' · '+cf.dia:''))
+    const kind=cf.type==='despesa'?((cf.prov?'Provisória':'Despesa')+(cf.sub?' · '+cf.sub:'')+(cf.dia?' · '+cf.dia:''))
       :cf.type==='mealheiro'?('Mealheiro · '+(cf.sub||'Lata'))
       :cf.label;
     const meta=[];
+    if(provData)meta.push(provData);
     if(cf.line2)meta.push(truncRef(cf.line2));
     if(cf.fromList)meta.push('🛒 lista');
-    return `<div class="card cft-card b-${cf.type}${cf.prevista?' cft-prevista':''}" onclick="openCfDetail('${cf.source}',${cf.idx})">
-      <div class="cft-kind k-${cf.type} sf">${cf.prevista?'📌':cf.icon} ${kind}</div>
+    return `<div class="card cft-card b-${cf.type}${cf.prov?' cft-prov':''}" onclick="openCfDetail('${cf.source}',${cf.idx})">
+      <div class="cft-kind k-${cf.type} sf">${cf.prov?'📌':cf.icon} ${kind}</div>
       <div class="cft-l1"><div class="cft-title">${cf.line1}</div><span class="cft-v ${cf.sign}">${sgn}${eur(cf.valor)}</span></div>
       ${meta.length?`<div class="cft-meta">${meta.join(' · ')}</div>`:''}
       ${cf.obs?`<div class="cft-obs">${escHtml(cf.obs)}</div>`:''}
     </div>`;
   };
-  if(cfFilterView==='previstas'){
-    // Previstas: pilha simples, sem calha de datas
+  if(cfFilterView==='prov'){
+    // Provisórias: pilha simples, sem calha de datas (a data que têm é a data-valor,
+    // que vai no próprio cartão — não é dia de movimento nenhum)
     pp+=`<div class="cfc-prev-list">${shown.map(cardHtml).join('')}</div>`;
   }else{
     const days=[];let cur=null;
@@ -1688,7 +1701,7 @@ function groupCompraCfs(list){
     if(cf.type==='despesa'&&cf.compraId){
       let g=byId[cf.compraId];
       if(!g){
-        g={type:'despesa',isCompra:true,compraId:cf.compraId,date:cf.date,icon:'🛒',label:'Compra',prevista:cf.prevista,
+        g={type:'despesa',isCompra:true,compraId:cf.compraId,date:cf.date,icon:'🛒',label:'Compra',prov:cf.prov,
            line1:'',line2:cf.line2,valor:0,sign:'neg',people:cf.people?[...cf.people]:[],lines:[],dests:[],_desc:''};
         byId[cf.compraId]=g;out.push(g);
       }
@@ -1699,7 +1712,7 @@ function groupCompraCfs(list){
       if(!g._desc&&cf.line1&&cf.line1!=='Compras'&&cf.line1!=='(sem descrição)')g._desc=cf.line1;
     }else out.push(cf);
   });
-  out.forEach(g=>{if(g.isCompra){g.line1=g._desc||(g.prevista?'Despesa prevista':'Compra da lista');g.subN=g.lines.length;}});
+  out.forEach(g=>{if(g.isCompra){g.line1=g._desc||(g.prov?'Despesa provisória':'Compra da lista');g.subN=g.lines.length;}});
   return out;
 }
 
@@ -2491,13 +2504,13 @@ function updateCfForm(){
         <div><label>Valor (€)</label><input type="number" id="cf-val" step="0.01" min="0.01" placeholder="0,00" inputmode="decimal"></div>
       </div>
       <div class="cf-quando" id="cf-quando">
-        <div class="cfq on" data-q="real" onclick="setCfQuando('cf','real')">📅 Com data</div>
-        <div class="cfq" data-q="prevista" onclick="setCfQuando('cf','prevista')">📌 Prevista</div>
+        <div class="cfq on" data-q="efet" onclick="setCfQuando('cf','efet')">📅 Efetiva</div>
+        <div class="cfq" data-q="prov" onclick="setCfQuando('cf','prov')">📌 Provisória</div>
       </div>
-      <div class="cf-quando-hint" id="cf-quando-hint">Despesa já realizada, com data conhecida.</div>
+      <div class="cf-quando-hint" id="cf-quando-hint">${CF_QUANDO_HINT.efet}</div>
       <div id="cf-date-row" class="inline-row" style="margin-top:14px">
-        <div><label>Data Despesa</label><input type="date" id="cf-date" value="${today}" oninput="cfSyncDataValor()"></div>
-        <div><label id="cf-dv-lbl">Data-Valor</label>
+        <div id="cf-date-cell"><label>Data Despesa</label><input type="date" id="cf-date" value="${today}" oninput="cfSyncDataValor()"></div>
+        <div id="cf-dv-cell"><label id="cf-dv-lbl">Data-Valor</label>
           <select id="cf-dv-sel" onchange="cfMealChanged()" style="display:none"></select>
           <input type="date" id="cf-date2" value="">
         </div>
@@ -2604,9 +2617,11 @@ function dvMealOptions(ref,sel){
   return h;
 }
 /* O <input date> é sempre a fonte do valor; o <select> das refeições é só a
-   interface. prefix: 'cf' (criar) ou 'ecf' (editar). */
+   interface. prefix: 'cf' (criar) ou 'ecf' (editar).
+   Numa provisória não há data de despesa (não foi paga), mas a data-valor
+   mantém-se: é ela que diz a que refeição — ou a que dia — a despesa se destina. */
 function dvSync(prefix){
-  if(isCfPrevista(prefix))return; // prevista: datas escondidas
+  const prov=isCfProv(prefix);
   const tipo=document.getElementById(prefix+'-tipo')?.value||'Gerais';
   const d1=document.getElementById(prefix+'-date');
   const d2=document.getElementById(prefix+'-date2');
@@ -2616,19 +2631,21 @@ function dvSync(prefix){
   const usaRefeicoes=shopIsMeal(tipo)&&dvMeals(tipo).length>0;
   if(sel)sel.style.display=usaRefeicoes?'':'none';
   d2.style.display=usaRefeicoes?'none':'';
-  if(lbl)lbl.textContent=usaRefeicoes?'Refeição':'Data-Valor';
+  if(lbl)lbl.textContent=usaRefeicoes?'Refeição':(prov?'Data prevista':'Data-Valor');
   if(usaRefeicoes){
     d2.readOnly=false;d2.style.opacity='1';d2.style.pointerEvents='';   // limpa o estado de um tipo anterior
     // veio de um tipo que impôs a data-despesa → devolve a escolha original
     if(sel.dataset.imposto){d2.value=sel.dataset.last||'';delete sel.dataset.imposto;delete sel.dataset.last;}
     // ainda sem escolha: se a data-despesa for dia de refeição, propõe essa
-    if(!d2.value&&dvMeals(tipo).some(r=>r.data===d1.value))d2.value=d1.value;
+    // (numa provisória não há data-despesa — a refeição escolhe-se à mão)
+    if(!d2.value&&!prov&&dvMeals(tipo).some(r=>r.data===d1.value))d2.value=d1.value;
     sel.innerHTML=dvMealOptions(tipo,d2.value);
     d2.value=sel.value;
-  }else if(shopIsMeal(tipo)){
-    // ano ainda sem refeições definidas → data livre (como antes)
+  }else if(shopIsMeal(tipo)||prov){
+    // ano ainda sem refeições definidas → data livre (como antes); provisória de
+    // tipo não-refeição → a data é a que se prevê gastar, e é opcional
     d2.readOnly=false;d2.style.opacity='1';d2.style.pointerEvents='';
-    if(!d2.value)d2.value=d1.value;
+    if(!d2.value&&!prov)d2.value=d1.value;
   }else{
     // guarda a refeição escolhida — se o utilizador voltar a Almoço/Jantar, não a perde
     if(sel&&!sel.dataset.imposto){sel.dataset.last=d2.value||'';sel.dataset.imposto='1';}
@@ -2641,6 +2658,7 @@ function dvMealChanged(prefix){
   if(sel&&d2)d2.value=sel.value;
 }
 function dvSyncFromDate(prefix){
+  if(isCfProv(prefix))return;   // provisória: não há data-despesa a seguir
   const tipo=document.getElementById(prefix+'-tipo')?.value||'Gerais';
   const d1=document.getElementById(prefix+'-date');
   const d2=document.getElementById(prefix+'-date2');
@@ -2661,8 +2679,14 @@ function dvFaltaRefeicao(prefix,tipo){
 function cfTipoChanged(){dvSync('cf');}
 function cfSyncDataValor(){dvSyncFromDate('cf');}
 function cfMealChanged(){dvMealChanged('cf');}
-function isCfPrevista(prefix){
-  return document.querySelector(`#${prefix}-quando .cfq.on`)?.dataset?.q==='prevista';
+/* Efetiva = já foi paga (tem data de despesa). Provisória = ainda não, mas já se
+   sabe o valor — e pode já saber-se a que refeição/dia se destina. */
+const CF_QUANDO_HINT={
+  efet:'Despesa já feita, com data de pagamento conhecida.',
+  prov:'Ainda não paga — entra nas contas na mesma. Diz a refeição (ou o dia) a que se destina.'
+};
+function isCfProv(prefix){
+  return document.querySelector(`#${prefix}-quando .cfq.on`)?.dataset?.q==='prov';
 }
 function updDescCount(prefix){
   const inp=document.getElementById(`${prefix}-desc`);
@@ -2672,21 +2696,19 @@ function updDescCount(prefix){
   c.textContent=`${n}/30`;
   c.classList.toggle('full',n>=30);
 }
+/* 📅 Efetiva ↔ 📌 Provisória. Só a data de DESPESA (o pagamento) é que desaparece
+   numa provisória — a data-valor fica, que é a que a liga à refeição. */
 function setCfQuando(prefix,q){
   document.querySelectorAll(`#${prefix}-quando .cfq`).forEach(el=>el.classList.toggle('on',el.dataset.q===q));
-  const on=q==='prevista';
-  const row=document.getElementById(`${prefix}-date-row`);
+  const prov=q==='prov';
+  const cell=document.getElementById(`${prefix}-date-cell`);
   const hint=document.getElementById(`${prefix}-quando-hint`);
-  const d1=document.getElementById(`${prefix}-date`),d2=document.getElementById(`${prefix}-date2`);
-  if(row)row.style.display=on?'none':'';
-  if(hint)hint.textContent=on?'Despesa prevista — entra nas contas, mas ainda sem data de pagamento.':'Despesa já realizada, com data conhecida.';
-  if(on){
-    if(d1)d1.value='';
-    if(d2)d2.value='';
-  }else{
-    if(d1&&!d1.value)d1.value=new Date().toISOString().slice(0,10);
-    if(prefix==='cf')cfTipoChanged();else ecfTipoChanged();
-  }
+  const d1=document.getElementById(`${prefix}-date`);
+  if(cell)cell.style.display=prov?'none':'';
+  if(hint)hint.textContent=prov?CF_QUANDO_HINT.prov:CF_QUANDO_HINT.efet;
+  if(prov){if(d1)d1.value='';}
+  else if(d1&&!d1.value)d1.value=new Date().toISOString().slice(0,10);
+  if(prefix==='cf')cfTipoChanged();else ecfTipoChanged();
 }
 
 function ecfTipoChanged(){dvSync('ecf');}
@@ -2897,15 +2919,18 @@ async function saveCashFlow(){
     commitMsg=`Reembolso: ${tes} → ${who} ${eur(val)}`;
   } else if(cfDir==='despesa'){
     const tipo=document.getElementById('cf-tipo')?.value||'Gerais';
-    const prevista=isCfPrevista('cf');
+    const prov=isCfProv('cf');
     const obs=document.getElementById('cf-obs')?.value?.trim()||'';
     const descD=desc.slice(0,30);
-    if(!prevista&&dvFaltaRefeicao('cf',tipo)){
+    // A refeição exige-se nos dois modos: uma provisória de Almoço/Jantar sem
+    // refeição escolhida ia para o rateio indireto sem ninguém dar por isso.
+    if(dvFaltaRefeicao('cf',tipo)){
       toast(`Escolhe a ${tipo.toLowerCase()} a que esta despesa pertence`,'bad');
       document.getElementById('pay-save').disabled=false;return;
     }
-    const date2=prevista?'':(document.getElementById('cf-date2')?.value||date);
-    const dDesp=prevista?'':date;
+    const dv=document.getElementById('cf-date2')?.value||'';
+    const date2=prov?dv:(dv||date);
+    const dDesp=prov?'':date;
     if(!isAdmin()&&!MY_NAMES.includes(who)){
       toast('Só podes registar despesas tuas ou do teu cônjuge','bad');
       document.getElementById('pay-save').disabled=false;return;
@@ -2923,7 +2948,7 @@ async function saveCashFlow(){
       closePayModal();
       CALC=calcular(JSON.parse(JSON.stringify(DATA)));
       renderAll();
-      toast('Despesa registada ✓','ok');
+      toast(prov?'Despesa provisória registada ✓':'Despesa registada ✓','ok');
     }catch(e){
       setSync('err','erro ao guardar');
       document.getElementById('pay-save').disabled=false;
@@ -3320,7 +3345,7 @@ function editCfEntry(source,idx){
     setTimeout(()=>updateEditSdChips(),10);
   } else if(editType==='despesa'){
     const d=DATA.despesas[idx];
-    const isPrev=!d.dataDesp&&!d.dataValor;
+    const isProv=despProvisoria(d);
     f.innerHTML=`
       <label>Quem pagou?</label>
       <select id="ecf-who">${memberOptions(d.quem)}</select>
@@ -3338,13 +3363,13 @@ function editCfEntry(source,idx){
         <div><label>Valor (€)</label><input type="number" id="ecf-val" step="0.01" value="${d.valor}" inputmode="decimal"></div>
       </div>
       <div class="cf-quando" id="ecf-quando">
-        <div class="cfq${isPrev?'':' on'}" data-q="real" onclick="setCfQuando('ecf','real')">📅 Com data</div>
-        <div class="cfq${isPrev?' on':''}" data-q="prevista" onclick="setCfQuando('ecf','prevista')">📌 Prevista</div>
+        <div class="cfq${isProv?'':' on'}" data-q="efet" onclick="setCfQuando('ecf','efet')">📅 Efetiva</div>
+        <div class="cfq${isProv?' on':''}" data-q="prov" onclick="setCfQuando('ecf','prov')">📌 Provisória</div>
       </div>
-      <div class="cf-quando-hint" id="ecf-quando-hint">${isPrev?'Despesa prevista — entra nas contas, mas ainda sem data de pagamento.':'Despesa já realizada, com data conhecida.'}</div>
-      <div id="ecf-date-row" class="inline-row" style="margin-top:14px${isPrev?';display:none':''}">
-        <div><label>Data Despesa</label><input type="date" id="ecf-date" value="${d.dataDesp||''}" oninput="ecfSyncDataValor()"></div>
-        <div><label id="ecf-dv-lbl">Data-Valor</label>
+      <div class="cf-quando-hint" id="ecf-quando-hint">${isProv?CF_QUANDO_HINT.prov:CF_QUANDO_HINT.efet}</div>
+      <div id="ecf-date-row" class="inline-row" style="margin-top:14px">
+        <div id="ecf-date-cell"${isProv?' style="display:none"':''}><label>Data Despesa</label><input type="date" id="ecf-date" value="${d.dataDesp||''}" oninput="ecfSyncDataValor()"></div>
+        <div id="ecf-dv-cell"><label id="ecf-dv-lbl">Data-Valor</label>
           <select id="ecf-dv-sel" onchange="ecfMealChanged()" style="display:none"></select>
           <input type="date" id="ecf-date2" value="${d.dataValor||''}">
         </div>
@@ -3497,15 +3522,16 @@ async function saveEditCf(){
     }
   } else if(source==='despesas'){
     const d=DATA.despesas[idx];
-    const prevista=isCfPrevista('ecf');
+    const prov=isCfProv('ecf');
     const tipoE=document.getElementById('ecf-tipo').value;
-    if(!prevista&&dvFaltaRefeicao('ecf',tipoE)){
+    if(dvFaltaRefeicao('ecf',tipoE)){
       toast(`Escolhe a ${tipoE.toLowerCase()} a que esta despesa pertence`,'bad');
       document.getElementById('edit-cf-save').disabled=false;return;
     }
     d.quem=document.getElementById('ecf-who').value;
-    d.dataDesp=prevista?'':document.getElementById('ecf-date').value;
-    d.dataValor=prevista?'':document.getElementById('ecf-date2').value;
+    // Provisória → só perde a data de pagamento; a data-valor (refeição/dia) fica.
+    d.dataDesp=prov?'':document.getElementById('ecf-date').value;
+    d.dataValor=document.getElementById('ecf-date2').value;
     d.tipo=tipoE;
     d.valor=parseFloat(document.getElementById('ecf-val').value)||d.valor;
     d.desc=(document.getElementById('ecf-desc')?.value||'').trim().slice(0,30);
@@ -6944,7 +6970,7 @@ let compraEdit={id:null,lines:[],lotes:[],det:false};
 /* opts (só na entrada pelo cash-flow, ver cfAbrirDetalhe):
    detalhe=true → itemização de uma despesa: o picker da lista fica fechado e por
    marcar, o detalhe abre com uma linha em branco e aparece o 📅/📌.
-   prevista=true → despesa ainda não paga; tipo/obs vêm do cash-flow. */
+   prov=true → despesa provisória (ainda não paga); tipo/data-valor/obs vêm do cash-flow. */
 function openCompra(compraId,opts){
   if(!shopCanWrite()){toast('Sem permissão','bad');return;}
   if(contasFechadas()&&!compraId){toast('Contas fechadas — só pagamentos de dívidas','bad');return;}
@@ -6954,12 +6980,15 @@ function openCompra(compraId,opts){
   // artigo e as linhas de despesa geram-se sozinhas. Na edição abre no separador
   // que corresponde ao que a compra tem (lotes → por artigo; senão por totais) —
   // os dois tabuladores ficam disponíveis e AMBAS as partes são gravadas.
-  // Prevista: na edição lê-se do que está gravado (despesa sem data de despesa)
-  const prevGrav=isEdit&&(DATA.despesas||[]).some(d=>d.compraId===compraId&&!d.dataDesp);
+  // Provisória: na edição lê-se do que está gravado (despesa sem data de despesa).
+  // O tipo E a data-valor vêm da despesa gravada — uma provisória pode estar
+  // destinada a uma refeição, e reabri-la não a pode fazer perder o destino.
+  const provGrav=isEdit&&(DATA.despesas||[]).some(d=>d.compraId===compraId&&!d.dataDesp);
+  const dProv=provGrav?((DATA.despesas||[]).find(d=>d.compraId===compraId)||{}):null;
   compraEdit={id:compraId||null,lines:[],lotes:[],det:!isEdit||stockArr().some(l=>l.compraId===compraId),
-    detalhe:!!o.detalhe,prevista:!!o.prevista||prevGrav,
-    tipoPrev:(prevGrav?((DATA.despesas||[]).find(d=>d.compraId===compraId)||{}).tipo:o.tipo)||'Gerais',
-    dataValorPrev:o.dataValor||'',obsPrev:prevGrav?'':(o.obs||'')};
+    detalhe:!!o.detalhe,prov:!!o.prov||provGrav,
+    tipoProv:(dProv?dProv.tipo:o.tipo)||'Gerais',
+    dataValorProv:(dProv?dProv.dataValor:o.dataValor)||'',obsProv:provGrav?'':(o.obs||'')};
   const linked=isEdit?shopArr().filter(x=>x.compraId===compraId):[];
   // Linhas: (edição) reconstruídas das despesas da compra; (nova) semeadas dos meus artigos
   if(isEdit){
@@ -6996,15 +7025,15 @@ function openCompra(compraId,opts){
   const who0=isEdit?((DATA.despesas.find(d=>d.compraId===compraId)||{}).quem||myPrimaryName()):myPrimaryName();
   document.getElementById('shop-buy-who').innerHTML=isAdmin()?memberOptions(who0):myMemberOptions(who0);
   const date0=isEdit?((DATA.despesas.find(d=>d.compraId===compraId)||{}).dataDesp||new Date().toISOString().slice(0,10)):new Date().toISOString().slice(0,10);
-  document.getElementById('shop-buy-date').value=compraEdit.prevista?'':date0;
+  document.getElementById('shop-buy-date').value=compraEdit.prov?'':date0;
   // 📅/📌 só onde faz sentido: a detalhar uma despesa do cash-flow, ou a editar
-  // uma que ficou prevista. Registar a compra da lista é sempre coisa já paga.
+  // uma que ficou provisória. Registar a compra da lista é sempre coisa já paga.
   const qw=document.getElementById('sb-quando'),qh=document.getElementById('sb-quando-hint');
-  const mostraQuando=(!ro)&&(o.detalhe||compraEdit.prevista);
+  const mostraQuando=(!ro)&&(o.detalhe||compraEdit.prov);
   if(qw)qw.style.display=mostraQuando?'':'none';
   if(qh)qh.style.display=mostraQuando?'':'none';
   const dw=document.getElementById('shop-buy-date-wrap');if(dw)dw.style.display='';   // limpa um 📌 anterior
-  if(mostraQuando)shopBuyQuandoApply(compraEdit.prevista?'prevista':'real');
+  if(mostraQuando)shopBuyQuandoApply(compraEdit.prov?'prov':'efet');
   const desc0=isEdit?((DATA.despesas.find(d=>d.compraId===compraId&&d.desc&&d.desc!=='Compras')||{}).desc||''):'';
   document.getElementById('shop-buy-desc').value=desc0;
   shopBuyDescCount();
@@ -7016,9 +7045,9 @@ function openCompra(compraId,opts){
   const pend=shopArr().filter(x=>shopIsPending(x)||(shopIsRemoved(x)&&shopMine(x)));
   // Em consulta o picker não se mexe: mostrar os pendentes só encheria a lista
   // de artigos que nada têm a ver com esta compra — ficam os que lhe ficaram ligados.
-  // Prevista: nada da lista pode ser marcado — dar por comprado o que ainda não
+  // Provisória: nada da lista pode ser marcado — dar por comprado o que ainda não
   // se comprou tirava o pedido da lista de quem tem de o ir buscar.
-  const pickItems=compraEdit.prevista?[]:(ro?linked:(isEdit?linked.concat(pend.filter(x=>x.compraId!==compraId)):pend));
+  const pickItems=compraEdit.prov?[]:(ro?linked:(isEdit?linked.concat(pend.filter(x=>x.compraId!==compraId)):pend));
   // O picker vive num bloco recolhível DEPOIS do detalhe por artigo (junto ao
   // "＋ Artigo fora da lista") — abre sozinho quando ainda nada está marcado.
   let pl='';
@@ -7050,9 +7079,9 @@ function openCompra(compraId,opts){
     </details>`;
   }
   document.getElementById('shop-buy-body').innerHTML=(ro?'<div class="note" style="margin-bottom:10px">🔒 Só o administrador pode editar uma compra já registada.</div>':'')+
-    // Prevista já gravada: os artigos vivem nas observações da despesa, não em
+    // Provisória já gravada: os artigos vivem nas observações da despesa, não em
     // lotes — reabrir o "preço por artigo" só daria para os somar duas vezes.
-    ((compraEdit.prevista&&isEdit)?'':`<div class="cmp-sort" style="margin-top:14px">
+    ((compraEdit.prov&&isEdit)?'':`<div class="cmp-sort" style="margin-top:14px">
       <span class="sd-chip" id="shop-mode-det" onclick="compraSetMode(true)">💶 Preço por artigo</span>
       <span class="sd-chip" id="shop-mode-tot" onclick="compraSetMode(false)">∑ Só totais</span>
     </div>`)+
@@ -7079,16 +7108,17 @@ function openCompra(compraId,opts){
   document.body.classList.add('no-scroll');
 }
 function closeShopBuyModal(){document.getElementById('shop-buy-bg').classList.remove('show');document.body.classList.remove('no-scroll');}
-/* 📅 Com data ↔ 📌 Prevista (só na itemização de uma despesa do cash-flow).
-   Prevista = ainda não foi comprado: sem data de pagamento, sem artigos da lista
-   e — ver saveCompra — sem lotes de stock. */
+/* 📅 Efetiva ↔ 📌 Provisória (só na itemização de uma despesa do cash-flow).
+   Provisória = ainda não foi comprado: sem data de pagamento, sem artigos da lista
+   e — ver saveCompra — sem lotes de stock. A refeição/dia a que se destina fica
+   (ver compraProvDestHtml), que é o que a mantém alocada ao jantar de sábado. */
 function shopBuyQuandoApply(q){
-  const on=q==='prevista';
-  compraEdit.prevista=on;
+  const on=q==='prov';
+  compraEdit.prov=on;
   document.querySelectorAll('#sb-quando .cfq').forEach(el=>el.classList.toggle('on',el.dataset.q===q));
   const w=document.getElementById('shop-buy-date-wrap');if(w)w.style.display=on?'none':'';
   const h=document.getElementById('sb-quando-hint');
-  if(h)h.textContent=on?'Ainda não comprado — entra nas contas, mas sem data de pagamento nem entrada em stock.':'Despesa já realizada, com data conhecida.';
+  if(h)h.textContent=on?'Ainda não comprado — entra nas contas, mas sem data de pagamento nem entrada em stock.':'Despesa já feita, com data de pagamento conhecida.';
   const d=document.getElementById('shop-buy-date');
   if(d){if(on)d.value='';else if(!d.value)d.value=new Date().toISOString().slice(0,10);}
   const pick=document.getElementById('shop-buy-pick');
@@ -7341,9 +7371,9 @@ function compraLoteHtml(l,i){
   const head=`<div class="lote-head">${name}${tag}${l.free?`<button class="lote-x" title="Remover" onclick="compraDelLote(${i})">✕</button>`:''}</div>`;
   // Uma só linha: qtd + preço + destino (o destino desce para o bloco de split
   // quando o artigo está dividido por vários destinos)
-  // Prevista: sem destino por artigo — não há stock a alocar e o tipo da
-  // despesa é um só, escolhido à cabeça (compraPrevTipoHtml).
-  const prev=!!compraEdit.prevista;
+  // Provisória: sem destino por artigo — não há stock a alocar e o destino da
+  // despesa é um só, escolhido à cabeça (compraProvDestHtml).
+  const prev=!!compraEdit.prov;
   const hasSplit=!prev&&!!(l.splits&&l.splits.length);
   const destInline=(STOCK_TABLE&&!prev&&!hasSplit)
     ?destBtnHtml(l.destino,`compraDestPick(${i})`)+`<button class="lote-split-btn" title="Dividir por vários destinos" onclick="compraLoteAddSplit(${i})">⇄</button>`
@@ -7399,32 +7429,44 @@ function compraRenderLotes(){
   // preço ficar em branco). Fica visível na revisão, antes de registar.
   const miss=ls.filter(l=>!l.free&&l._fat==='miss');
   const missWarn=miss.length?`<div class="lote-miss-warn">⚠️ <b>${miss.length} artigo(s) do carrinho não apareceram na fatura.</b> Se deixares o preço em branco, ficam na lista <b>por tratar</b> (não são dados como comprados):<ul>${miss.map(l=>'<li>'+escHtml(l.artigo)+(l.qtd?' <i style="color:var(--muted);font-style:normal">('+escHtml(l.qtd)+')</i>':'')+'</li>').join('')}</ul></div>`:'';
-  const prev=!!compraEdit.prevista;
+  const prev=!!compraEdit.prov;
   // Quem vem do cash-flow não vem da lista: o que está a fazer é meter artigos
   // em 🧺 Stock. Ligar a um pedido da lista é opcional (🔗 no artigo, ou o bloco
   // dos pedidos mais abaixo) — por isso aqui não se fala em "fora da lista",
   // que só faz sentido a quem partiu do carrinho.
   const dtl=!!compraEdit.detalhe;
   cont.innerHTML=`<div class="cmp-pick sf" style="margin-top:14px">${prev?'💶 Preço por artigo':dtl?'🧺 Artigos desta despesa':'💶 Preço por artigo'}</div>`+
-    (prev?compraPrevTipoHtml():'')+
+    (prev?compraProvDestHtml():'')+
     ls.map((l,i)=>compraLoteHtml(l,i)).join('')+
     missWarn+
     `<button class="btn ghost" style="width:100%;margin-top:8px" onclick="compraAddLote()">＋ ${(prev||dtl)?'Artigo':'Artigo fora da lista'}</button>`+
     (prev
-      ?'<div class="note">📌 Prevista: os artigos ficam como <b>detalhe da despesa</b> — não entram no 🧺 Stock nem dão pedidos da lista por comprados. Quando pagares, edita a despesa e mete a data.</div>'
+      ?'<div class="note">📌 Provisória: os artigos ficam como <b>detalhe da despesa</b> — não entram no 🧺 Stock nem dão pedidos da lista por comprados. Quando pagares, edita a despesa e mete a data.</div>'
       :dtl
       ?'<div class="note">Cada artigo entra em <b>🧺 Stock</b> com o destino que lhe deres (refeição ou tipo) — divides por vários com ⇄ e reajustas depois no separador Stock. Se algum responde a um pedido da lista, liga-o em <b>🔗 pertence a</b> ou marca-o mais abaixo.</div>'
       :'<div class="note">A app propõe o destino de cada artigo (refeição ou tipo) — confirma ou muda. Podes dividir um artigo por vários destinos com ⇄. Reajustas tudo depois no separador 🧺 Stock.</div>')+
     (prev?'':faturaExtrasHtml());
   compraUpdateTotal();
 }
-/* Tipo da despesa prevista: um só para o detalhe todo (o destino por artigo não
-   se aplica — nada disto vai a stock). Refeições entram como tipo puro, sem dia:
-   uma prevista sem data-valor cai no rateio indireto, como as do cash-flow. */
-function compraPrevTipoHtml(){
-  const t=compraEdit.tipoPrev||'Gerais';
-  return `<div class="lote-req-inline" style="margin:0 0 8px">🧾 tipo de despesa <select onchange="compraEdit.tipoPrev=this.value">${
-    SHOP_TIPOS.map(x=>`<option value="${x}"${x===t?' selected':''}>${shopTipoIcon(x)} ${x}</option>`).join('')}</select></div>`;
+/* Destino da despesa provisória: um só para o detalhe todo (o destino por artigo
+   não se aplica — nada disto vai a stock). Sendo Almoço/Jantar escolhe-se também
+   a refeição: é a data-valor que a aloca ao jantar de sábado em vez de a deixar
+   cair no rateio indireto. Sem refeição escolhida, indireto — como antes. */
+function compraProvDestHtml(){
+  const t=compraEdit.tipoProv||'Gerais';
+  const linha=(ic,lbl,sel)=>`<div class="lote-req-inline" style="margin:0 0 8px">${ic} ${lbl} ${sel}</div>`;
+  let h=linha('🧾','tipo de despesa',`<select onchange="compraProvTipo(this.value)">${
+    SHOP_TIPOS.map(x=>`<option value="${x}"${x===t?' selected':''}>${shopTipoIcon(x)} ${x}</option>`).join('')}</select>`);
+  if(shopIsMeal(t)&&dvMeals(t).length)
+    h+=linha('📅','refeição',`<select onchange="compraEdit.dataValorProv=this.value">${dvMealOptions(t,compraEdit.dataValorProv||'')}</select>`);
+  return h;
+}
+function compraProvTipo(t){
+  compraEdit.tipoProv=t;
+  // Gerais não se aloca a refeição nenhuma; e trocar de refeição (Jantar→Almoço)
+  // não pode arrastar a data da anterior, que não é dia deste tipo.
+  if(!dvMeals(t).some(r=>r.data===compraEdit.dataValorProv))compraEdit.dataValorProv='';
+  compraRenderLotes();
 }
 function compraSplitNoteUpd(i){const l=(compraEdit.lotes||[])[i];const el=document.getElementById('split-note-'+i);if(l&&el)el.innerHTML=compraSplitNote(l);}
 function compraLoteSplitQty(i,j,v){const l=(compraEdit.lotes||[])[i];if(!l||!l.splits||!l.splits[j])return;l.splits[j].qtd=v;compraSplitNoteUpd(i);}
@@ -7448,8 +7490,8 @@ function compraSplitDestPick(i,j){const l=(compraEdit.lotes||[])[i];if(!l||!l.sp
    lá estava escolhido: o tipo, e a refeição quando a data-valor casa mesmo com
    uma refeição definida (senão o destino ficava a apontar para lado nenhum). */
 function compraDestPad(){
-  const t=(compraEdit&&compraEdit.tipoPrev)||'Gerais';
-  const dv=(compraEdit&&compraEdit.dataValorPrev)||'';
+  const t=(compraEdit&&compraEdit.tipoProv)||'Gerais';
+  const dv=(compraEdit&&compraEdit.dataValorProv)||'';
   if(shopIsMeal(t))return (dv&&dvMeals(t).some(r=>r.data===dv))?t+'|'+dv:'Gerais';
   return ['Gerais','Bebidas','Cerveja'].includes(t)?t:'Gerais';
 }
@@ -7767,7 +7809,7 @@ async function listaFotoApply(){
    fica movível). Herda quem/data/descritivo/tipo do cash-flow.
    NÃO abre a câmara nem pré-marca a lista de compras: detalhar uma despesa não
    é registar o carrinho da lista — muita despesa não tem fatura nenhuma (e a
-   prevista nem foi paga ainda). Quem tiver fatura carrega no 📷 lá dentro;
+   provisória nem foi paga ainda). Quem tiver fatura carrega no 📷 lá dentro;
    quem não tiver escreve os artigos, que já vêm com uma linha em branco. */
 function cfAbrirDetalhe(){
   const who=(document.getElementById('cf-who')||{}).value||'';
@@ -7776,9 +7818,9 @@ function cfAbrirDetalhe(){
   const obs=((document.getElementById('cf-obs')||{}).value||'').trim();
   const tipo=(document.getElementById('cf-tipo')||{}).value||'Gerais';
   const dataValor=(document.getElementById('cf-date2')||{}).value||'';
-  const prevista=isCfPrevista('cf');
+  const prov=isCfProv('cf');
   closePayModal();
-  openCompra(null,{detalhe:true,prevista,tipo,dataValor,obs});
+  openCompra(null,{detalhe:true,prov,tipo,dataValor,obs});
   const w=document.getElementById('shop-buy-who');
   if(who&&w&&[...w.options].some(o=>o.value===who))w.value=who;
   const d=document.getElementById('shop-buy-date');if(date&&d)d.value=date;
@@ -8019,15 +8061,15 @@ async function saveCompra(){
   const who=document.getElementById('shop-buy-who').value;
   const date=document.getElementById('shop-buy-date').value;
   const desc=(document.getElementById('shop-buy-desc').value||'').trim().slice(0,30);
-  const prevista=!!compraEdit.prevista;
+  const prov=!!compraEdit.prov;
   if(!who){toast('Quem pagou?','bad');return;}
-  if(!prevista&&!date){toast('Indica a data','bad');return;}
+  if(!prov&&!date){toast('Indica a data','bad');return;}
   if(!isAdmin()&&!MY_NAMES.includes(who)){toast('Só podes registar compras tuas ou do cônjuge','bad');return;}
   // Detalhe por artigo: lotes de stock (qtd+€, alocados por FIFO) e despesas
   // diretas por tipo/refeição (tipoFix e artigos fora da lista com destino tipo)
   const det=!!compraEdit.det;
   const lotes=[];const tipoRows={};const naoDetetados=[];   // tipoRows: 'Tipo'|'Tipo|data' → artigos; naoDetetados: artigos do carrinho sem preço
-  const prevItens=[];   // prevista: artigos que ficam só como detalhe da despesa
+  const provItens=[];   // provisória: artigos que ficam só como detalhe da despesa
   const byBrandParents=[];   // pedidos cobertos por marcas (só ficam "comprados" se alguma marca for confirmada)
   // "Só totais" numa compra nova: o detalhe está escondido → não entra no registo
   for(const l of ((det||isEdit)?(compraEdit.lotes||[]):[])){
@@ -8045,9 +8087,9 @@ async function saveCompra(){
       continue;
     }
     if(!artigo){toast('Indica o nome do artigo detalhado','bad');return;}
-    // Prevista: ainda não foi comprado, logo não é stock nem cobre pedidos —
+    // Provisória: ainda não foi comprado, logo não é stock nem cobre pedidos —
     // os artigos ficam como detalhe (observações) de uma única despesa.
-    if(prevista){prevItens.push({artigo,qtd:(l.qtd||'').trim(),valor:v});continue;}
+    if(prov){provItens.push({artigo,qtd:(l.qtd||'').trim(),valor:v});continue;}
     if(STOCK_TABLE){
       // Unificado: TODO item detalhado vira um lote movível. O destino/split
       // guia a alocação (refeição, tipo puro, ou FIFO se ficar "por alocar").
@@ -8082,17 +8124,20 @@ async function saveCompra(){
     const vazia=(!v||v<=0)&&!(ln.obs||'').trim();
     if(vazia&&(lotes.length||Object.keys(tipoRows).length||compraEdit.lines.length>1))continue;
     if(!v||v<=0){toast(`Preenche o valor de "${shopGroupLabel(ln.tipo,ln.dataValor)}"`,'bad');return;}
-    // Prevista não tem data-valor (é isso que a mantém fora da alocação direta),
-    // por isso também não se lhe exige a refeição.
-    if(!prevista&&shopIsMeal(ln.tipo)&&!ln.dataValor){toast(`Escolhe a refeição em "${ln.tipo}"`,'bad');return;}
-    rows.push({tipo:ln.tipo,data_valor:(!prevista&&shopIsMeal(ln.tipo))?ln.dataValor:null,valor:v,obs:(ln.obs||'').trim()});
+    // A refeição exige-se também nas provisórias: é ela que aloca a despesa ao
+    // jantar de sábado em vez de a deixar cair no rateio indireto.
+    if(shopIsMeal(ln.tipo)&&!ln.dataValor){toast(`Escolhe a refeição em "${ln.tipo}"`,'bad');return;}
+    rows.push({tipo:ln.tipo,data_valor:shopIsMeal(ln.tipo)?ln.dataValor:null,valor:v,obs:(ln.obs||'').trim()});
   }
-  // Detalhe de uma despesa prevista → uma linha só, com os artigos por escrito
-  if(prevItens.length){
-    const lista=prevItens.map(x=>x.artigo+(x.qtd?' ('+x.qtd+')':'')).join(', ');
-    rows.push({tipo:compraEdit.tipoPrev||'Gerais',data_valor:null,
-      valor:rnd(prevItens.reduce((a,x)=>a+x.valor,0),2),
-      obs:[(compraEdit.obsPrev||'').trim(),lista].filter(Boolean).join(' · ')});
+  // Detalhe de uma despesa provisória → uma linha só, com os artigos por escrito
+  if(provItens.length){
+    const tipoP=compraEdit.tipoProv||'Gerais';
+    const dvP=shopIsMeal(tipoP)?(compraEdit.dataValorProv||''):'';
+    if(shopIsMeal(tipoP)&&dvMeals(tipoP).length&&!dvP){toast(`Escolhe a ${tipoP.toLowerCase()} a que esta despesa pertence`,'bad');return;}
+    const lista=provItens.map(x=>x.artigo+(x.qtd?' ('+x.qtd+')':'')).join(', ');
+    rows.push({tipo:tipoP,data_valor:dvP||null,
+      valor:rnd(provItens.reduce((a,x)=>a+x.valor,0),2),
+      obs:[(compraEdit.obsProv||'').trim(),lista].filter(Boolean).join(' · ')});
   }
   // Despesas diretas geradas do detalhe: uma linha por tipo (ou tipo+refeição)
   for(const k in tipoRows){
@@ -8102,9 +8147,9 @@ async function saveCompra(){
   // O valor dos lotes entra numa linha "🧺 Stock" (Gerais → bolsa comum); o
   // calcular() move depois o alocado para as refeições via stock_lotes
   if(lotes.length)rows.push({tipo:'Gerais',data_valor:null,valor:rnd(lotes.reduce((a,l)=>a+l.valor,0),2),obs:STOCK_OBS});
-  if(!rows.length){toast(prevista?'Preenche o nome e o € de pelo menos um artigo':(det?'Preenche o € dos artigos (ou marca artigos da lista)':'Adiciona pelo menos uma linha'),'bad');return;}
-  // Prevista não fecha pedidos da lista (o picker nem aparece)
-  const checkedIds=prevista?[]:[...document.querySelectorAll('.shop-pick:checked')].map(c=>+c.value);
+  if(!rows.length){toast(prov?'Preenche o nome e o € de pelo menos um artigo':(det?'Preenche o € dos artigos (ou marca artigos da lista)':'Adiciona pelo menos uma linha'),'bad');return;}
+  // Provisória não fecha pedidos da lista (o picker nem aparece)
+  const checkedIds=prov?[]:[...document.querySelectorAll('.shop-pick:checked')].map(c=>+c.value);
   // Artigos marcados no carrinho mas não detetados na fatura (sem preço): ficam
   // por tratar (não comprados). Avisa e confirma antes de registar.
   const missIds=new Set(shopArr().filter(x=>checkedIds.includes(x._id)&&naoDetetados.some(n=>shopSameArtigo(n.artigo,x.artigo))).map(x=>x._id));
@@ -8123,7 +8168,7 @@ async function saveCompra(){
       DATA.despesas=(DATA.despesas||[]).filter(d=>d.compraId!==compraId);
     }
     // Cria uma despesa por linha
-    const payload=rows.map(r=>({evento_id:DATA._sbId,quem:who,data_desp:prevista?null:date,data_valor:r.data_valor,descricao:desc||'Compras',tipo:r.tipo,valor:r.valor,observacoes:r.obs||null,compra_id:compraId}));
+    const payload=rows.map(r=>({evento_id:DATA._sbId,quem:who,data_desp:prov?null:date,data_valor:r.data_valor,descricao:desc||'Compras',tipo:r.tipo,valor:r.valor,observacoes:r.obs||null,compra_id:compraId}));
     const ins=await queueWrite(()=>sbReq('POST','despesas',payload,{Prefer:'return=representation'}));
     payload.forEach((r,i)=>DATA.despesas.push({_id:ins&&ins[i]?ins[i].id:null,quem:r.quem,dataDesp:r.data_desp,dataValor:r.data_valor,desc:r.descricao,tipo:r.tipo,valor:r.valor,obs:r.observacoes||'',compraId:compraId}));
     // Lotes de stock: substitui os da compra e aloca por FIFO (cada lote já vê
@@ -8178,7 +8223,7 @@ async function saveCompra(){
     syncMirror();marcaGuardado();
     btn.disabled=false;closeShopBuyModal();
     CALC=calcular(JSON.parse(JSON.stringify(DATA)));renderAll();
-    toast(isEdit?'Compra atualizada ✓':(prevista?'Despesa prevista registada ✓':'Compra registada ✓'),'ok');
+    toast(isEdit?'Compra atualizada ✓':(prov?'Despesa provisória registada ✓':'Compra registada ✓'),'ok');
   }catch(e){setSync('err','erro ao guardar');btn.disabled=false;toast(permErrorMsg(e),'bad');}
 }
 
@@ -11769,11 +11814,10 @@ function buildGeneralReport(){
   const cfSubLabels={'sobras_ano_anterior':'Sobras Ano Anterior','outros':'Outros','lata':'Lata'};
   const allCf=[];
   (DATA.despesas||[]).forEach(d=>{
-    const prevista=!d.dataDesp&&!d.dataValor;
-    allCf.push({type:'despesa',date:d.dataDesp||d.dataValor||'',title:d.desc||'(sem descrição)',tipo:d.tipo||'',obs:d.obs||'',valor:d.valor,prevista});
+    allCf.push({type:'despesa',date:d.dataDesp||d.dataValor||'',title:d.desc||'(sem descrição)',tipo:d.tipo||'',obs:d.obs||'',valor:d.valor,prov:despProvisoria(d)});
   });
   (DATA.mealheiros||[]).forEach(m=>{
-    allCf.push({type:'mealheiro',date:m.data||'',title:m.desc||'',tipo:cfSubLabels[m.subtipo]||m.subtipo||'Mealheiro',obs:'',valor:m.valor,prevista:false});
+    allCf.push({type:'mealheiro',date:m.data||'',title:m.desc||'',tipo:cfSubLabels[m.subtipo]||m.subtipo||'Mealheiro',obs:'',valor:m.valor,prov:false});
   });
   allCf.sort((a,b)=>(b.date||'').localeCompare(a.date||''));
 
@@ -11785,7 +11829,7 @@ function buildGeneralReport(){
     if(cf.title) descCell+=`<div>${escHtml(cf.title)}</div>`;
     const badges=[];
     if(cf.tipo) badges.push(`<span class="badge ${badgeCls}">${escHtml(cf.tipo)}</span>`);
-    if(cf.prevista) badges.push(`<span class="badge badge-amber">Prevista</span>`);
+    if(cf.prov) badges.push(`<span class="badge badge-amber">Provisória</span>`);
     if(badges.length) descCell+=`<div${cf.title?' style="margin-top:3px"':''}>${badges.join(' ')}</div>`;
     if(cf.obs) descCell+=`<div style="color:#888;font-size:10px;margin-top:3px">📝 ${escHtml(cf.obs)}</div>`;
     if(!descCell) descCell='—';
@@ -11890,8 +11934,7 @@ function buildPersonReport(pessoa){
     h+='<h2>Despesas Adiantadas</h2>';
     h+='<table><tr><th>Data</th><th>Descrição</th><th>Tipo</th><th class="right">Valor</th></tr>';
     DATA.despesas.filter(x=>x.quem===m.nome).forEach(d=>{
-      const prevista=!d.dataDesp&&!d.dataValor;
-      h+=`<tr><td>${fmtPdfDate(d.dataDesp||d.dataValor||'')}</td><td>${d.desc||'—'}${prevista?' <span class="badge badge-amber">prevista</span>':''}${d.obs?`<br><span style="color:#888;font-size:10px">📝 ${escHtml(d.obs)}</span>`:''}</td><td>${d.tipo}</td><td class="right">${eur(d.valor)}</td></tr>`;
+      h+=`<tr><td>${fmtPdfDate(d.dataDesp||d.dataValor||'')}</td><td>${d.desc||'—'}${despProvisoria(d)?' <span class="badge badge-amber">provisória</span>':''}${d.obs?`<br><span style="color:#888;font-size:10px">📝 ${escHtml(d.obs)}</span>`:''}</td><td>${d.tipo}</td><td class="right">${eur(d.valor)}</td></tr>`;
     });
     h+=`<tr style="border-top:2px solid #ddd;font-weight:700"><td colspan="3"><b>Total</b></td><td class="right pos"><b>${eur(rnd(totalPagoDesp,2))}</b></td></tr>`;
     h+='</table>';
