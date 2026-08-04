@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v196 · 2026-08-04 · Despesa paga por vários: no cash-flow da despesa dá para repartir o que cada um pôs do bolso (uma linha por pagador, um cartão só nos Cash Flows), com divisão igual num toque';
+const APP_BUILD = 'v197 · 2026-08-04 · Despesa paga por vários: no cash-flow da despesa — e na fatura das t-shirts — dá para repartir o que cada um pôs do bolso (uma linha por pagador, um cartão só nos Cash Flows), com divisão igual num toque';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -2564,30 +2564,30 @@ function pagRender(prefix,rows){
     <div class="cfp-hint" id="${prefix}-pag-hint"></div>`;
   pagHint(prefix);
 }
+/* Abre o modo vários já com estas linhas (uma despesa/fatura que já os tem). */
+function pagAbrir(prefix,rows){
+  const box=document.getElementById(prefix+'-pag-box');if(!box)return;
+  pagRender(prefix,rows);
+  box.style.display='';
+  const cell=document.getElementById(prefix+'-who-cell');if(cell)cell.style.display='none';
+  const btn=document.getElementById(prefix+'-pag-btn');if(btn)btn.textContent='👤 Pagou só um';
+  // Detalhar por artigo é uma compra, e uma compra tem um dono só (é assim que
+  // os lotes de stock se gravam) — com vários pagadores não se oferece.
+  const det=document.getElementById(prefix+'-detalhe-btn');if(det)det.style.display='none';
+}
 /* Liga/desliga o modo. O <select> de um pagador só fica escondido (não some):
    quem desliste volta a encontrar lá quem tinha escolhido. */
 function pagToggle(prefix){
   const box=document.getElementById(prefix+'-pag-box');if(!box)return;
-  const on=!pagOn(prefix);
-  const cell=document.getElementById(prefix+'-who-cell');
   const sel=document.getElementById(prefix+'-who');
-  const btn=document.getElementById(prefix+'-pag-btn');
-  const det=document.getElementById(prefix+'-detalhe-btn');
-  if(on){
-    const total=parseFloat(document.getElementById(prefix+'-val')?.value);
-    pagRender(prefix,[{quem:sel?sel.value:'',valor:''},{quem:'',valor:''}]);
-    if(total>0)pagHint(prefix);
-  }else{
-    // volta a um pagador: fica com o primeiro que estiver escolhido
-    const r=pagRows(prefix).find(x=>x.quem);
-    if(sel&&r)sel.value=r.quem;
-  }
-  box.style.display=on?'':'none';
-  if(cell)cell.style.display=on?'none':'';
-  if(btn)btn.textContent=on?'👤 Pagou só um':'👥 Pagaram vários';
-  // Detalhar por artigo é uma compra, e uma compra tem um dono só (é assim que
-  // os lotes de stock se gravam) — com vários pagadores não se oferece.
-  if(det)det.style.display=on?'none':'';
+  if(!pagOn(prefix)){pagAbrir(prefix,[{quem:sel?sel.value:'',valor:''},{quem:'',valor:''}]);return;}
+  // volta a um pagador: fica com o primeiro que estiver escolhido
+  const r=pagRows(prefix).find(x=>x.quem);
+  if(sel&&r)sel.value=r.quem;
+  box.style.display='none';
+  const cell=document.getElementById(prefix+'-who-cell');if(cell)cell.style.display='';
+  const btn=document.getElementById(prefix+'-pag-btn');if(btn)btn.textContent='👥 Pagaram vários';
+  const det=document.getElementById(prefix+'-detalhe-btn');if(det)det.style.display='';
 }
 function pagRows(prefix){
   const box=document.getElementById(prefix+'-pag-box');if(!box)return[];
@@ -2610,12 +2610,24 @@ function pagDel(prefix,btn){
   if(box.querySelectorAll('.cfp-row').length<2)pagToggle(prefix);
   else pagHint(prefix);
 }
+/* Total a repartir. Normalmente é o campo Valor do formulário; quando o total
+   é calculado e não escrito (a fatura das t-shirts sai dos preços × as
+   encomendas), quem o manda é o dataset da caixa. */
+function pagTotalCalc(prefix){
+  const box=document.getElementById(prefix+'-pag-box');
+  return !!box&&box.dataset.total!==undefined;
+}
+function pagTotal(prefix){
+  const box=document.getElementById(prefix+'-pag-box');
+  if(pagTotalCalc(prefix))return rnd(parseFloat(box.dataset.total)||0,2);
+  return rnd(parseFloat(document.getElementById(prefix+'-val')?.value)||0,2);
+}
 /* Reparte o total pelas linhas; os cêntimos que não dividem ficam na primeira. */
 function pagSplit(prefix){
   const rows=[...(document.getElementById(prefix+'-pag-box')?.querySelectorAll('.cfp-row')||[])];
-  const total=rnd(parseFloat(document.getElementById(prefix+'-val')?.value)||0,2);
+  const total=pagTotal(prefix);
   if(!rows.length)return;
-  if(total<=0){toast('Escreve primeiro o valor total da despesa','bad');return;}
+  if(total<=0){toast(pagTotalCalc(prefix)?'Indica primeiro os preços das t-shirts':'Escreve primeiro o valor total da despesa','bad');return;}
   const base=Math.floor((total*100)/rows.length)/100;
   const resto=rnd(total-base*rows.length,2);
   rows.forEach((r,i)=>{r.querySelector('.cfp-val').value=rnd(base+(i===0?resto:0),2).toFixed(2);});
@@ -2623,10 +2635,15 @@ function pagSplit(prefix){
 }
 function pagHint(prefix){
   const el=document.getElementById(prefix+'-pag-hint');if(!el)return;
-  const total=rnd(parseFloat(document.getElementById(prefix+'-val')?.value)||0,2);
+  const total=pagTotal(prefix);
   const soma=rnd(pagRows(prefix).reduce((a,r)=>a+(r.valor>0?r.valor:0),0),2);
   const dif=rnd(total-soma,2);
-  if(!total){el.className='cfp-hint';el.textContent='Escreve o valor total da despesa e reparte-o pelos pagadores.';return;}
+  if(!total){
+    el.className='cfp-hint';
+    el.textContent=pagTotalCalc(prefix)?'Indica os preços — é o total da fatura que se reparte pelos pagadores.'
+                                       :'Escreve o valor total da despesa e reparte-o pelos pagadores.';
+    return;
+  }
   if(Math.abs(dif)<=0.005){el.className='cfp-hint ok';el.textContent=`Somam ${eur(soma)} — bate certo com o total.`;return;}
   el.className='cfp-hint bad';
   el.textContent=dif>0?`Somam ${eur(soma)} — faltam ${eur(dif)} para o total de ${eur(total)}.`
@@ -2713,6 +2730,7 @@ function updateCfForm(){
     setTimeout(cfTipoChanged,10);
   } else if(cfDir==='tshirts'){
     f.innerHTML=tshirtCfFormHtml(today);
+    tsCfInitPag();
     setTimeout(tsCfRecalc,10);
   } else if(cfDir==='mealheiro'){
     f.innerHTML=`
@@ -3565,12 +3583,12 @@ function editCfEntry(source,idx){
     const grupo=cfGrupoIdxs(d);
     const valTotal=grupo.length?rnd(grupo.reduce((a,i)=>a+(+DATA.despesas[i].valor||0),0),2):d.valor;
     f.innerHTML=`
-      <div id="ecf-who-cell"${grupo.length?' style="display:none"':''}>
+      <div id="ecf-who-cell">
         <label>Quem pagou?</label>
         <select id="ecf-who">${memberOptions(d.quem)}</select>
       </div>
-      <div class="cfp-box" id="ecf-pag-box"${grupo.length?'':' style="display:none"'}></div>
-      ${pagBtnHtml('ecf',grupo.length>0)}
+      <div class="cfp-box" id="ecf-pag-box" style="display:none"></div>
+      ${pagBtnHtml('ecf',false)}
       <div class="inline-row" style="margin-top:14px">
         <div><label>Tipo</label>
           <select id="ecf-tipo" onchange="ecfTipoChanged()">
@@ -3603,7 +3621,7 @@ function editCfEntry(source,idx){
       <textarea id="ecf-obs" rows="2" placeholder="Detalhe adicional (opcional)">${escHtml(d.obs||'')}</textarea>`}`;
     // Já — e não no setTimeout: o openCfDetail desativa os campos logo a seguir,
     // e o que nascesse depois disso ficava editável em modo consulta.
-    if(grupo.length)pagRender('ecf',grupo.map(i=>({quem:DATA.despesas[i].quem,valor:DATA.despesas[i].valor})));
+    if(grupo.length)pagAbrir('ecf',grupo.map(i=>({quem:DATA.despesas[i].quem,valor:DATA.despesas[i].valor})));
     setTimeout(()=>{ecfTipoChanged();updDescCount('ecf');},10);
   } else if(editType==='mealheiro'){
     const m=DATA.mealheiros[idx];
@@ -11478,7 +11496,20 @@ function tsToggleImputSec(el){
    imputadas; o desconto NÃO se abate a ninguém: fica como crédito do MEO
    (entra no resultado do grupo e alivia a quota extra de todos).
    Uma fatura por ano: se já existir, o formulário abre-a e grava por cima. */
-function tsCfDespesa(){return (DATA&&DATA.despesas||[]).find(d=>d.tipo===TS_TIPO_DESP)||null;}
+/* A fatura pode estar em VÁRIAS linhas — uma por pagador (👥 Pagaram vários).
+   tsCfDespesas() são todas (é a fatura); tsCfDespesa() é a primeira, de onde
+   saem os campos que são iguais em todas (data, descritivo). */
+function tsCfDespesas(){return (DATA&&DATA.despesas||[]).filter(d=>d.tipo===TS_TIPO_DESP);}
+function tsCfDespesa(){return tsCfDespesas()[0]||null;}
+/* Fatura já gravada com vários pagadores → o formulário abre com a repartição.
+   O tsCfRecalc() vem primeiro (e não só no setTimeout de baixo): é ele que
+   escreve o total na caixa, e sem total a repartição não sabia contra o que
+   havia de bater. */
+function tsCfInitPag(){
+  tsCfRecalc();
+  const ds=tsCfDespesas();
+  if(ds.length>1)pagAbrir('cf',ds.map(d=>({quem:d.quem,valor:d.valor})));
+}
 // Total bruto pelos preços que estão nas caixas (não pelos guardados)
 function tsCfBruto(){
   const c=tsContagemTipo();
@@ -11506,8 +11537,12 @@ function tshirtCfFormHtml(today){
       <span class="ts-cf-sub" id="${id}-sub">—</span>
     </div>`;
   return `
-    <label>Quem pagou / adiantou?</label>
-    <select id="cf-who">${memberOptions(d?d.quem:myPrimaryName())}</select>
+    <div id="cf-who-cell">
+      <label>Quem pagou / adiantou?</label>
+      <select id="cf-who">${memberOptions(d?d.quem:myPrimaryName())}</select>
+    </div>
+    <div class="cfp-box" id="cf-pag-box" style="display:none" data-total="0"></div>
+    ${pagBtnHtml('cf',false)}
     <div class="inline-row" style="margin-top:14px">
       <div><label>Data da fatura</label><input type="date" id="cf-date" value="${d&&(d.dataDesp||d.dataValor)?(d.dataDesp||d.dataValor):today}"></div>
       <div><label>Desconto (€)</label><input type="number" id="ts-cf-desc-val" step="0.5" min="0" placeholder="0,00" inputmode="decimal" value="${(+ev.tshirtDesconto||0)>0?(+ev.tshirtDesconto):''}" oninput="tsCfRecalc()"></div>
@@ -11535,6 +11570,10 @@ function tsCfRecalc(){
   const el=document.getElementById('ts-cf-tot');
   if(el)el.innerHTML=`<span>A pagar</span><b class="${tot<0?'neg':''}">${eur(tot)}</b>`+
     (desc>0?`<i>${eur(bruto)} − ${eur(desc)} de desconto</i>`:'');
+  // Aqui o total não se escreve, calcula-se — é por isto que a caixa dos
+  // pagadores o vai buscar ao dataset e não a um campo Valor.
+  const box=document.getElementById('cf-pag-box');
+  if(box){box.dataset.total=tot;pagHint('cf');}
   const cnt=document.getElementById('cf-desc-count');
   if(cnt&&typeof updDescCount==='function')updDescCount('cf');
 }
@@ -11544,16 +11583,27 @@ async function tshirtCfSave(){
   if(!isAdmin())return falha('Só o admin regista a fatura das t-shirts');
   if(!TS_CF_COLS)return falha('Falta correr a migração db/tshirts_cashflow.sql');
   if(!DATA||!DATA._sbId)return falha('Sem ligação à base de dados — recarrega a página');
+  const multi=pagOn('cf');
   const who=document.getElementById('cf-who')?.value;
   const date=document.getElementById('cf-date')?.value;
-  if(!who)return falha('Indica quem pagou a fatura');
+  if(!who&&!multi)return falha('Indica quem pagou a fatura');
   if(!date)return falha('Indica a data da fatura');
   const precos={'Homem':tsCfInput('Homem'),'Mulher':tsCfInput('Mulher'),'Criança':tsCfInput('Criança')};
   if(!TS_TIPOS.some(t=>precos[t]>0))return falha('Indica pelo menos um preço');
   const bruto=tsCfBruto(),desconto=tsCfDesconto(),total=rnd(bruto-desconto,2);
   if(total<0)return falha('O desconto é maior do que o total das t-shirts');
+  // A fatura também pode ter saído de vários bolsos: uma linha por pagador,
+  // como em qualquer despesa. O que se reparte é o total já com o desconto.
+  let linhas;
+  if(multi){
+    linhas=pagValidar('cf',total);
+    if(!linhas){if(btn)btn.disabled=false;return;}
+  }else{
+    linhas=[{quem:who,valor:total}];
+  }
+  const grupo=linhas.length>1?('p'+Date.now()):null;
   const desc=(document.getElementById('cf-desc')?.value||'').trim().slice(0,30)||'T-shirts';
-  const existente=tsCfDespesa();
+  const antigas=tsCfDespesas();
   setSync('load','a guardar…');
   try{
     // 1) os preços/desconto do ano — é deles que sai a cobrança a cada membro
@@ -11563,20 +11613,33 @@ async function tshirtCfSave(){
     Object.assign(DATA.evento,{tshirtPrecoHomem:precos['Homem'],tshirtPrecoMulher:precos['Mulher'],
       tshirtPrecoCrianca:precos['Criança'],tshirtDesconto:desconto});
     // 2) a fatura em si (despesa). Uma por ano: se já existe, grava por cima.
-    const row={quem:who,data_desp:date,data_valor:date,descricao:desc,tipo:TS_TIPO_DESP,valor:total};
-    if(existente&&existente._id){
-      await queueWrite(()=>sbReq('PATCH',`despesas?id=eq.${existente._id}`,row));
-      Object.assign(existente,{quem:who,dataDesp:date,dataValor:date,desc,valor:total});
+    const comum={data_desp:date,data_valor:date,descricao:desc,tipo:TS_TIPO_DESP};
+    if(linhas.length===1&&antigas.length===1&&antigas[0]._id){
+      // caso de sempre — um pagador, uma linha: grava por cima da que existe
+      const row=Object.assign({quem:linhas[0].quem,valor:linhas[0].valor},comum);
+      if(DESP_GRUPO_COL)row.grupo_pag=null;
+      await queueWrite(()=>sbReq('PATCH',`despesas?id=eq.${antigas[0]._id}`,row));
+      Object.assign(antigas[0],{quem:linhas[0].quem,dataDesp:date,dataValor:date,desc,valor:linhas[0].valor,grupoPag:null});
     }else{
-      const ins=await queueWrite(()=>sbReq('POST','despesas',[Object.assign({evento_id:DATA._sbId},row)],{Prefer:'return=representation'}));
-      DATA.despesas.push({_id:ins&&ins[0]?ins[0].id:null,quem:who,dataDesp:date,dataValor:date,desc,tipo:TS_TIPO_DESP,valor:total,obs:'',compraId:null});
+      // o nº de pagadores mudou (ou é a primeira fatura): saem as linhas
+      // antigas, entram as novas. Apagar primeiro — pela ordem inversa, uma
+      // falha a meio deixava a fatura contada duas vezes nas contas.
+      const ids=antigas.filter(x=>x._id!=null).map(x=>x._id);
+      if(ids.length)await queueWrite(()=>sbReq('DELETE',`despesas?id=in.(${ids.join(',')})`));
+      for(let i=DATA.despesas.length-1;i>=0;i--)if(DATA.despesas[i].tipo===TS_TIPO_DESP)DATA.despesas.splice(i,1);
+      const ins=await queueWrite(()=>sbReq('POST','despesas',linhas.map(l=>{
+        const row=Object.assign({evento_id:DATA._sbId,quem:l.quem,valor:l.valor},comum);
+        if(DESP_GRUPO_COL)row.grupo_pag=grupo;
+        return row;
+      }),{Prefer:'return=representation'}));
+      linhas.forEach((l,i)=>DATA.despesas.push({_id:ins&&ins[i]?ins[i].id:null,quem:l.quem,dataDesp:date,dataValor:date,desc,tipo:TS_TIPO_DESP,valor:l.valor,obs:'',compraId:null,grupoPag:grupo}));
     }
     syncMirror();marcaGuardado();
     if(btn)btn.disabled=false;
     closePayModal();
     CALC=calcular(JSON.parse(JSON.stringify(DATA)));
     renderAll();
-    toast(`Fatura das t-shirts registada ✓ — ${eur(total)}`,'ok');
+    toast(`Fatura das t-shirts registada ✓ — ${eur(total)}`+(grupo?` · ${linhas.length} pagadores`:''),'ok');
   }catch(e){
     setSync('err','erro ao guardar');
     if(btn)btn.disabled=false;
