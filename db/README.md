@@ -46,7 +46,12 @@ Numa BD limpa, correr por esta ordem (há dependências entre eles):
     t-shirt é cobrada a quem lhe está imputada, ao preço da tipologia; o
     desconto fica como crédito do MEO
 
-Os passos 4–14 são migrações add-on idempotentes: correr uma vez cada. A app é
+15. `despesas_pagadores.sql` — `despesas.grupo_pag`: uma despesa pode ter sido
+    paga por várias pessoas. Continua a ser uma linha por pagador (é o que as
+    contas leem); o token diz que são a mesma despesa, para aparecerem num
+    cartão só e se editarem/apagarem juntas
+
+Os passos 4–15 são migrações add-on idempotentes: correr uma vez cada. A app é
 tolerante a qualquer uma delas faltar — sonda a coluna/tabela e esconde o que
 ainda não existe.
 

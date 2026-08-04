@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v195 · 2026-08-04 · Provisórias na cozinha: os artigos aparecem no custo da refeição, os pedidos da lista podem ficar 📌 encomendados (sem serem dados por comprados) e o bloco Comprado mostra o que está encomendado, com nota';
+const APP_BUILD = 'v196 · 2026-08-04 · Despesa paga por vários: no cash-flow da despesa dá para repartir o que cada um pôs do bolso (uma linha por pagador, um cartão só nos Cash Flows), com divisão igual num toque';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -107,6 +107,12 @@ let CONV_CRIANCA_COL=false;   // convidados já tem a coluna 'crianca'?
 // ficam escondidos e cada convidado vale uma pessoa (adulto ou criança,
 // conforme o flag 'crianca') — a app funciona exatamente como antes.
 let CONV_AC_COLS=false;
+// despesas já tem a coluna 'grupo_pag' (migração db/despesas_pagadores.sql)?
+// É o token que junta as linhas de uma despesa paga por VÁRIAS pessoas: cada
+// pagador tem a sua linha (é o que as contas precisam — o dinheiro saiu do
+// bolso de cada um), o token diz que são a mesma despesa. Sem a migração,
+// DESP_GRUPO_COL=false, "pagaram vários" fica escondido e nunca se grava.
+let DESP_GRUPO_COL=false;
 // shoplist já tem a coluna 'loja' (loja preferida do artigo)? Sem a migração,
 // SHOP_LOJA_COL=false: o campo e a ordenação por loja ficam escondidos e nunca
 // se grava a coluna — a app funciona exatamente como antes.
@@ -1480,7 +1486,7 @@ function renderCashFlows(){
     }
     const prov=despProvisoria(d);
     const dests=cfDespDests(d);
-    allCf.push({type:'despesa',date:d.dataDesp||d.dataValor||'',label:'Despesa',icon:'🛒',sub:d.tipo||'Gerais',dia,prov,obs:d.obs||'',fromList:!!d.compraId,compraId:d.compraId||null,quem:d.quem,
+    allCf.push({type:'despesa',date:d.dataDesp||d.dataValor||'',label:'Despesa',icon:'🛒',sub:d.tipo||'Gerais',dia,prov,obs:d.obs||'',fromList:!!d.compraId,compraId:d.compraId||null,grupoPag:d.grupoPag||null,quem:d.quem,
       dests,destKey:dests.length===1?dests[0]:null,
       line1:d.desc||'(sem descrição)',line2:`${prov?'pagará':'pagou'} ${d.quem}`,valor:d.valor,
       sign:'neg',source:'despesas',idx:i,people:[d.quem]});
@@ -1664,11 +1670,15 @@ function renderCashFlows(){
     if(provData)meta.push(provData);
     if(cf.line2)meta.push(truncRef(cf.line2));
     if(cf.fromList)meta.push('🛒 lista');
+    // Pago por vários: o cartão é um só (é uma despesa só) e diz quanto pôs cada um
+    const pagLinhas=cf.isMulti?`<div class="cft-subs"><div class="cft-subs-h sf">quem pagou</div>${
+      cf.pagadores.map(p=>`<div class="cft-sub"><span>👤 ${escHtml(p.quem)}</span><span>−${eur(p.valor)}</span></div>`).join('')}</div>`:'';
     return `<div class="card cft-card b-${cf.type}${cf.prov?' cft-prov':''}" onclick="openCfDetail('${cf.source}',${cf.idx})">
-      <div class="cft-kind k-${cf.type} sf">${cf.prov?'📌':cf.icon} ${kind}</div>
+      <div class="cft-kind k-${cf.type} sf">${cf.prov?'📌':cf.icon} ${kind}${cf.isMulti?' · 👥':''}</div>
       <div class="cft-l1"><div class="cft-title">${cf.line1}</div><span class="cft-v ${cf.sign}">${sgn}${eur(cf.valor)}</span></div>
       ${meta.length?`<div class="cft-meta">${meta.join(' · ')}</div>`:''}
       ${cf.obs?`<div class="cft-obs">${escHtml(cf.obs)}</div>`:''}
+      ${pagLinhas}
     </div>`;
   };
   if(cfFilterView==='prov'){
@@ -1699,12 +1709,24 @@ function renderCashFlows(){
   document.getElementById('view-cashflows').innerHTML=pp;
 }
 
-/* Agrupa as despesas da mesma compra da lista (compra_id) num único movimento.
-   Só apresentação: os cálculos e os filtros continuam a usar as despesas linha a linha. */
+/* Agrupa as despesas da mesma compra da lista (compra_id) — e as linhas da
+   mesma despesa paga por vários (grupo_pag) — num único movimento.
+   Só apresentação: os cálculos e os filtros continuam a usar as despesas linha
+   a linha (é linha a linha que se sabe quanto cada um pôs do bolso). */
 function groupCompraCfs(list){
   const out=[];const byId={};
   list.forEach(cf=>{
-    if(cf.type==='despesa'&&cf.compraId){
+    if(cf.type==='despesa'&&!cf.compraId&&cf.grupoPag){
+      const k='pag:'+cf.grupoPag;
+      let g=byId[k];
+      if(!g){
+        g=Object.assign({},cf,{isMulti:true,valor:0,pagadores:[],people:[]});
+        byId[k]=g;out.push(g);
+      }
+      g.valor=rnd(g.valor+cf.valor,2);
+      g.pagadores.push({quem:cf.quem,valor:cf.valor});
+      if(!g.people.includes(cf.quem))g.people.push(cf.quem);
+    }else if(cf.type==='despesa'&&cf.compraId){
       let g=byId[cf.compraId];
       if(!g){
         g={type:'despesa',isCompra:true,compraId:cf.compraId,date:cf.date,icon:'🛒',label:'Compra',prov:cf.prov,
@@ -1718,7 +1740,12 @@ function groupCompraCfs(list){
       if(!g._desc&&cf.line1&&cf.line1!=='Compras'&&cf.line1!=='(sem descrição)')g._desc=cf.line1;
     }else out.push(cf);
   });
-  out.forEach(g=>{if(g.isCompra){g.line1=g._desc||(g.prov?'Despesa provisória':'Compra da lista');g.subN=g.lines.length;}});
+  out.forEach(g=>{
+    if(g.isCompra){g.line1=g._desc||(g.prov?'Despesa provisória':'Compra da lista');g.subN=g.lines.length;}
+    // quem pagou fica no bloco de baixo, com os valores — repeti-lo na meta só
+    // gastava uma linha do cartão
+    else if(g.isMulti)g.line2='';
+  });
   return out;
 }
 
@@ -1981,7 +2008,7 @@ async function carregar(){
     const sel='*,membros(*,presencas(*)),refeicoes_def(*),despesas(*),convidados(*),mealheiros(*),pagamentos(*)';
     // shoplist vai numa fetch SEPARADA e tolerante a falha: se a tabela ainda
     // não existir (migração por correr) o resto da app continua a funcionar.
-    const [res,uaRes,cjRes,vlRes,slRes,stRes,ctRes,acRes,adRes,npRes,flRes,fpRes,ccRes,sljRes,cpRes,stmRes,ttRes,tsRes,tiRes,ppRes]=await Promise.all([
+    const [res,uaRes,cjRes,vlRes,slRes,stRes,ctRes,acRes,adRes,npRes,flRes,fpRes,ccRes,sljRes,cpRes,stmRes,ttRes,tsRes,tiRes,ppRes,dgRes]=await Promise.all([
       sbFetch(`${SB_URL}/rest/v1/eventos?select=${encodeURIComponent(sel)}&order=ano.asc`,{headers:sbHeaders(),cache:'no-store'}),
       sbFetch(`${SB_URL}/rest/v1/user_amigos?select=email,amigo`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null),
       sbFetch(`${SB_URL}/rest/v1/conjuges?select=amigo_a,amigo_b`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null),
@@ -2020,7 +2047,9 @@ async function carregar(){
       // pagamentos de dívida à espera de validação (db/pagamentos_pendentes.sql):
       // tolerante — sem a migração, PAGPEND_TABLE=false e registar pagamentos
       // volta a ser só do admin. O RLS já só devolve os pedidos que se podem ver.
-      sbFetch(`${SB_URL}/rest/v1/pagamentos_pendentes?select=*&order=criado_em.desc`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null)
+      sbFetch(`${SB_URL}/rest/v1/pagamentos_pendentes?select=*&order=criado_em.desc`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null),
+      // sonda à coluna despesas.grupo_pag (db/despesas_pagadores.sql): 200 = já existe
+      sbFetch(`${SB_URL}/rest/v1/despesas?select=grupo_pag&limit=1`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null)
     ]);
     if(!res.ok)throw new Error('HTTP '+res.status);
     const rows=await res.json();
@@ -2055,6 +2084,8 @@ async function carregar(){
     // Idem para a composição do convidado: sem as colunas, vale 1 pessoa
     CONV_AC_COLS=!!(cpRes&&cpRes.ok);
     SHOP_LOJA_COL=!!(sljRes&&sljRes.ok);
+    // Despesa paga por vários: sem a coluna, cada despesa continua a ter um dono só
+    DESP_GRUPO_COL=!!(dgRes&&dgRes.ok);
     STOCK_TAM_COL=STOCK_TABLE&&!!(stmRes&&stmRes.ok);
     // Só gravamos os responsáveis se as colunas já existirem no Supabase
     // (senão o replace das refeições falhava todo — padrão dividas_publicas)
@@ -2085,7 +2116,7 @@ async function carregar(){
         presencas:(m.presencas||[]).map(p=>({k:`${p.dia}|${p.ref}`,modo:p.modo==='bebe'?'bebe':'come'}))
       })),
       refeicoesDef:(ev.refeicoes_def||[]).map(r=>({data:r.data,dia:r.dia,ref:r.ref,prato:r.prato||'',peso:N(r.peso),minMEO:N(r.min_meo),minConv:N(r.min_conv),extraConv:N(r.extra_conv),responsaveis:parseResps(r.resp_cozinha),menu:r.menu||''})),
-      despesas:(ev.despesas||[]).map(d=>({_id:d.id,quem:d.quem,dataDesp:d.data_desp,dataValor:d.data_valor,desc:d.descricao,tipo:d.tipo,valor:N(d.valor),obs:d.observacoes||'',compraId:d.compra_id||null})),
+      despesas:(ev.despesas||[]).map(d=>({_id:d.id,quem:d.quem,dataDesp:d.data_desp,dataValor:d.data_valor,desc:d.descricao,tipo:d.tipo,valor:N(d.valor),obs:d.observacoes||'',compraId:d.compra_id||null,grupoPag:d.grupo_pag||null})),
       convidados:(ev.convidados||[]).map(c=>{
         const cri=!!c.crianca;
         const row={_id:c.id,membro:c.membro,nome:c.nome,data:c.data,dia:c.dia,ref:c.ref,pagante:c.pagante?'Sim':'Não',crianca:cri,preco:N(c.preco)};
@@ -2180,7 +2211,11 @@ async function sbGuardarEvento(y,slot){
         return row;
       }));
     if(y.despesas&&y.despesas.length){
-      const dres=await sbReq('POST','despesas',y.despesas.map(d=>({evento_id:eid,quem:d.quem,data_desp:d.dataDesp||null,data_valor:d.dataValor||null,descricao:d.desc||'',tipo:d.tipo,valor:d.valor,observacoes:d.obs||null,compra_id:d.compraId||null})),{Prefer:'return=representation'});
+      const dres=await sbReq('POST','despesas',y.despesas.map(d=>{
+        const row={evento_id:eid,quem:d.quem,data_desp:d.dataDesp||null,data_valor:d.dataValor||null,descricao:d.desc||'',tipo:d.tipo,valor:d.valor,observacoes:d.obs||null,compra_id:d.compraId||null};
+        if(DESP_GRUPO_COL)row.grupo_pag=d.grupoPag||null;   // sem a migração, nem se manda a coluna
+        return row;
+      }),{Prefer:'return=representation'});
       if(Array.isArray(dres))dres.forEach((r,i)=>{if(y.despesas[i])y.despesas[i]._id=r.id;});
     }
     if(y.convidados&&y.convidados.length){
@@ -2482,6 +2517,151 @@ function memberOptions(sel){
   return o;
 }
 
+/* ── Despesa paga por VÁRIOS ──────────────────────────────────────────
+   Uma despesa continua a ser uma linha por pagador: é assim que o calcular()
+   sabe quanto cada um pôs do bolso (filtra as despesas por `quem`), e é a
+   verdade — saiu dinheiro de dois sítios. O que a coluna `grupo_pag`
+   acrescenta é dizer que essas linhas são a MESMA despesa: nos cash-flows
+   aparecem num cartão só, editam-se e apagam-se juntas.
+   Os helpers valem nos dois formulários — 'cf' (criar) e 'ecf' (editar). */
+function pagNomesDisp(){
+  const nomes=(DATA&&DATA.membros||[]).map(m=>m.nome);
+  return isAdmin()?nomes:nomes.filter(n=>MY_NAMES.includes(n));
+}
+/* Sem a migração — ou sem duas pessoas para escolher (um membro sem cônjuge) —
+   a opção nem aparece: dava uma caixa que nunca se conseguia preencher. */
+function pagPodeMulti(){return DESP_GRUPO_COL&&pagNomesDisp().length>1;}
+function pagOn(prefix){const b=document.getElementById(prefix+'-pag-box');return !!b&&b.style.display!=='none';}
+function pagBtnHtml(prefix,on){
+  if(!pagPodeMulti())return'';
+  return `<button type="button" class="cfp-toggle" id="${prefix}-pag-btn" onclick="pagToggle('${prefix}')">${on?'👤 Pagou só um':'👥 Pagaram vários'}</button>`;
+}
+/* Opções de um pagador: como o memberOptions, mas limitadas a quem o
+   utilizador pode lançar (o admin lança por qualquer um) e sempre com a linha
+   vazia — senão a 2.ª linha nascia com o mesmo nome da 1.ª já escolhido. */
+function pagOpcoes(sel){
+  const nomes=pagNomesDisp();
+  if(sel&&!nomes.includes(sel))nomes.unshift(sel);   // quem já lá está não se perde
+  let o=`<option value=""${sel?'':' selected'}>Seleciona…</option>`;
+  nomes.forEach(n=>{o+=`<option value="${n}"${sel===n?' selected':''}>${n}</option>`;});
+  return o;
+}
+function pagRowHtml(prefix,nome,valor){
+  return `<div class="cfp-row">
+    <select class="cfp-who" onchange="pagHint('${prefix}')">${pagOpcoes(nome||'')}</select>
+    <input type="number" class="cfp-val" step="0.01" min="0" inputmode="decimal" placeholder="0,00" value="${(valor||valor===0)?rnd(valor,2):''}" oninput="pagHint('${prefix}')">
+    <button type="button" class="cfp-del" onclick="pagDel('${prefix}',this)" title="Tirar">✕</button>
+  </div>`;
+}
+function pagRender(prefix,rows){
+  const box=document.getElementById(prefix+'-pag-box');if(!box)return;
+  box.innerHTML=`<div class="cfp-hdr sf">Quem pagou · quanto pôs</div>
+    <div class="cfp-rows">${rows.map(r=>pagRowHtml(prefix,r.quem,r.valor)).join('')}</div>
+    <div class="cfp-actions">
+      <button type="button" class="cfp-btn" onclick="pagAdd('${prefix}')">＋ Pagador</button>
+      <button type="button" class="cfp-btn" onclick="pagSplit('${prefix}')">⇄ Dividir igualmente</button>
+    </div>
+    <div class="cfp-hint" id="${prefix}-pag-hint"></div>`;
+  pagHint(prefix);
+}
+/* Liga/desliga o modo. O <select> de um pagador só fica escondido (não some):
+   quem desliste volta a encontrar lá quem tinha escolhido. */
+function pagToggle(prefix){
+  const box=document.getElementById(prefix+'-pag-box');if(!box)return;
+  const on=!pagOn(prefix);
+  const cell=document.getElementById(prefix+'-who-cell');
+  const sel=document.getElementById(prefix+'-who');
+  const btn=document.getElementById(prefix+'-pag-btn');
+  const det=document.getElementById(prefix+'-detalhe-btn');
+  if(on){
+    const total=parseFloat(document.getElementById(prefix+'-val')?.value);
+    pagRender(prefix,[{quem:sel?sel.value:'',valor:''},{quem:'',valor:''}]);
+    if(total>0)pagHint(prefix);
+  }else{
+    // volta a um pagador: fica com o primeiro que estiver escolhido
+    const r=pagRows(prefix).find(x=>x.quem);
+    if(sel&&r)sel.value=r.quem;
+  }
+  box.style.display=on?'':'none';
+  if(cell)cell.style.display=on?'none':'';
+  if(btn)btn.textContent=on?'👤 Pagou só um':'👥 Pagaram vários';
+  // Detalhar por artigo é uma compra, e uma compra tem um dono só (é assim que
+  // os lotes de stock se gravam) — com vários pagadores não se oferece.
+  if(det)det.style.display=on?'none':'';
+}
+function pagRows(prefix){
+  const box=document.getElementById(prefix+'-pag-box');if(!box)return[];
+  return [...box.querySelectorAll('.cfp-row')].map(r=>({
+    quem:r.querySelector('.cfp-who').value||'',
+    valor:parseFloat(r.querySelector('.cfp-val').value)
+  }));
+}
+function pagAdd(prefix){
+  const rows=document.getElementById(prefix+'-pag-box')?.querySelector('.cfp-rows');
+  if(!rows)return;
+  if(rows.querySelectorAll('.cfp-row').length>=pagNomesDisp().length){toast('Já estão lá todos','bad');return;}
+  rows.insertAdjacentHTML('beforeend',pagRowHtml(prefix,'',''));
+  pagHint(prefix);
+}
+function pagDel(prefix,btn){
+  const box=document.getElementById(prefix+'-pag-box');if(!box)return;
+  btn.closest('.cfp-row').remove();
+  // Sobrou um → já não são "vários": volta ao formulário normal com esse nome.
+  if(box.querySelectorAll('.cfp-row').length<2)pagToggle(prefix);
+  else pagHint(prefix);
+}
+/* Reparte o total pelas linhas; os cêntimos que não dividem ficam na primeira. */
+function pagSplit(prefix){
+  const rows=[...(document.getElementById(prefix+'-pag-box')?.querySelectorAll('.cfp-row')||[])];
+  const total=rnd(parseFloat(document.getElementById(prefix+'-val')?.value)||0,2);
+  if(!rows.length)return;
+  if(total<=0){toast('Escreve primeiro o valor total da despesa','bad');return;}
+  const base=Math.floor((total*100)/rows.length)/100;
+  const resto=rnd(total-base*rows.length,2);
+  rows.forEach((r,i)=>{r.querySelector('.cfp-val').value=rnd(base+(i===0?resto:0),2).toFixed(2);});
+  pagHint(prefix);
+}
+function pagHint(prefix){
+  const el=document.getElementById(prefix+'-pag-hint');if(!el)return;
+  const total=rnd(parseFloat(document.getElementById(prefix+'-val')?.value)||0,2);
+  const soma=rnd(pagRows(prefix).reduce((a,r)=>a+(r.valor>0?r.valor:0),0),2);
+  const dif=rnd(total-soma,2);
+  if(!total){el.className='cfp-hint';el.textContent='Escreve o valor total da despesa e reparte-o pelos pagadores.';return;}
+  if(Math.abs(dif)<=0.005){el.className='cfp-hint ok';el.textContent=`Somam ${eur(soma)} — bate certo com o total.`;return;}
+  el.className='cfp-hint bad';
+  el.textContent=dif>0?`Somam ${eur(soma)} — faltam ${eur(dif)} para o total de ${eur(total)}.`
+                      :`Somam ${eur(soma)} — ${eur(-dif)} a mais do que o total de ${eur(total)}.`;
+}
+/* Linhas a gravar ({quem,valor}) ou null (já com o aviso) se algo não bate certo. */
+function pagValidar(prefix,total){
+  const rows=pagRows(prefix);
+  if(rows.length<2){toast('Pagaram vários? Então são precisas pelo menos duas pessoas','bad');return null;}
+  const vistos=new Set();
+  for(const r of rows){
+    if(!r.quem){toast('Falta escolher quem pagou em cada linha','bad');return null;}
+    if(vistos.has(r.quem)){toast(`${r.quem} está repetido — junta as parcelas dele numa linha`,'bad');return null;}
+    vistos.add(r.quem);
+    if(!(r.valor>0)){toast(`Falta o valor que ${r.quem} pôs`,'bad');return null;}
+  }
+  const soma=rnd(rows.reduce((a,r)=>a+r.valor,0),2);
+  if(Math.abs(soma-rnd(total||0,2))>0.005){
+    toast(`Os pagadores somam ${eur(soma)} e a despesa é de ${eur(rnd(total||0,2))}`,'bad');return null;
+  }
+  if(!isAdmin()){
+    const meus=pagNomesDisp();
+    if(rows.some(r=>!meus.includes(r.quem))){toast('Só podes registar despesas tuas ou do teu cônjuge','bad');return null;}
+  }
+  return rows.map(r=>({quem:r.quem,valor:rnd(r.valor,2)}));
+}
+/* Índices das linhas que são a mesma despesa paga por vários (a de `d` incluída).
+   Vazio = despesa normal, de um pagador só. */
+function cfGrupoIdxs(d){
+  if(!d||!d.grupoPag)return[];
+  const out=[];
+  (DATA.despesas||[]).forEach((x,i)=>{if(x.grupoPag&&x.grupoPag===d.grupoPag)out.push(i);});
+  return out.length>1?out:[];
+}
+
 function updateCfForm(){
   const f=document.getElementById('cf-form');if(!f)return;
   const today=new Date().toISOString().slice(0,10);
@@ -2499,15 +2679,19 @@ function updateCfForm(){
       <textarea id="cf-desc" placeholder="Opcional" rows="2"></textarea>`;
   } else if(cfDir==='despesa'){
     f.innerHTML=`
-      <label>Quem pagou?</label>
-      <select id="cf-who">${isAdmin()?memberOptions(myPrimaryName()):myMemberOptions(myPrimaryName())}</select>
+      <div id="cf-who-cell">
+        <label>Quem pagou?</label>
+        <select id="cf-who">${isAdmin()?memberOptions(myPrimaryName()):myMemberOptions(myPrimaryName())}</select>
+      </div>
+      <div class="cfp-box" id="cf-pag-box" style="display:none"></div>
+      ${pagBtnHtml('cf',false)}
       <div class="inline-row" style="margin-top:14px">
         <div><label>Tipo</label>
           <select id="cf-tipo" onchange="cfTipoChanged()">
             ${['Gerais','Bebidas','Almoço','Jantar','Renda','Cerveja'].map(t=>`<option value="${t}">${t}</option>`).join('')}
           </select>
         </div>
-        <div><label>Valor (€)</label><input type="number" id="cf-val" step="0.01" min="0.01" placeholder="0,00" inputmode="decimal"></div>
+        <div><label>Valor (€)</label><input type="number" id="cf-val" step="0.01" min="0.01" placeholder="0,00" inputmode="decimal" oninput="pagHint('cf')"></div>
       </div>
       <div class="cf-quando" id="cf-quando">
         <div class="cfq on" data-q="efet" onclick="setCfQuando('cf','efet')">📅 Efetiva</div>
@@ -2525,7 +2709,7 @@ function updateCfForm(){
       <input type="text" id="cf-desc" placeholder="Ex: Continente — Bacalhau" maxlength="30" oninput="updDescCount('cf')">
       <label>Observações</label>
       <textarea id="cf-obs" placeholder="Detalhe adicional (opcional)" rows="2"></textarea>
-      ${STOCK_TABLE?`<button class="btn ghost" style="width:100%;margin-top:14px" onclick="cfAbrirDetalhe()">🧾 Detalhar por artigo →<span style="display:block;font-size:11px;font-weight:400;color:var(--muted);margin-top:2px;text-transform:none;letter-spacing:0">itens e preços — à mão ou a partir da fatura</span></button>`:''}`;
+      ${STOCK_TABLE?`<button class="btn ghost" id="cf-detalhe-btn" style="width:100%;margin-top:14px" onclick="cfAbrirDetalhe()">🧾 Detalhar por artigo →<span style="display:block;font-size:11px;font-weight:400;color:var(--muted);margin-top:2px;text-transform:none;letter-spacing:0">itens e preços — à mão ou a partir da fatura</span></button>`:''}`;
     setTimeout(cfTipoChanged,10);
   } else if(cfDir==='tshirts'){
     f.innerHTML=tshirtCfFormHtml(today);
@@ -2908,8 +3092,11 @@ async function saveCashFlow(){
   const mealSubCheck=cfDir==='mealheiro'&&(document.querySelector('#meal-subtype-wheel .cf-opt.on')?.dataset?.sub||'corrente')!=='corrente';
   // As t-shirts têm o seu próprio formulário (preços por tipologia): o valor
   // não vem de um campo, é calculado — a validação genérica não se aplica.
+  // Com "pagaram vários" o <select> de um pagador só está escondido: quem
+  // valida as pessoas é o pagValidar(), linha a linha.
+  const despMulti=cfDir==='despesa'&&pagOn('cf');
   if(cfDir!=='tshirts'&&!mealSubCheck){
-    if(!who){toast('Seleciona a pessoa','bad');return;}
+    if(!who&&!despMulti){toast('Seleciona a pessoa','bad');return;}
     if(!val||val<=0){toast('Valor inválido','bad');return;}
   }
 
@@ -2937,24 +3124,39 @@ async function saveCashFlow(){
     const dv=document.getElementById('cf-date2')?.value||'';
     const date2=prov?dv:(dv||date);
     const dDesp=prov?'':date;
-    if(!isAdmin()&&!MY_NAMES.includes(who)){
-      toast('Só podes registar despesas tuas ou do teu cônjuge','bad');
-      document.getElementById('pay-save').disabled=false;return;
+    // Uma linha por pagador (é o que o calcular() lê); o grupo diz que são a
+    // mesma despesa. Um pagador só = como sempre, sem grupo nenhum.
+    let linhas;
+    if(despMulti){
+      linhas=pagValidar('cf',val);
+      if(!linhas){document.getElementById('pay-save').disabled=false;return;}
+    }else{
+      if(!isAdmin()&&!MY_NAMES.includes(who)){
+        toast('Só podes registar despesas tuas ou do teu cônjuge','bad');
+        document.getElementById('pay-save').disabled=false;return;
+      }
+      linhas=[{quem:who,valor:rnd(val,2)}];
     }
+    const grupo=linhas.length>1?('p'+Date.now()):null;
     if(!DATA._sbId){toast('Sem ligação à base de dados — recarrega a página','bad');document.getElementById('pay-save').disabled=false;return;}
     setSync('load','a guardar…');
     try{
       const ins=await queueWrite(()=>sbReq('POST','despesas',
-        [{evento_id:DATA._sbId,quem:who,data_desp:dDesp||null,data_valor:date2||null,descricao:descD||'(sem descrição)',tipo,valor:rnd(val,2),observacoes:obs||null}],
+        linhas.map(l=>{
+          const row={evento_id:DATA._sbId,quem:l.quem,data_desp:dDesp||null,data_valor:date2||null,descricao:descD||'(sem descrição)',tipo,valor:l.valor,observacoes:obs||null};
+          if(DESP_GRUPO_COL)row.grupo_pag=grupo;
+          return row;
+        }),
         {Prefer:'return=representation'}));
-      DATA.despesas.push({_id:ins&&ins[0]?ins[0].id:null,quem:who,dataDesp:dDesp,dataValor:date2,desc:descD||'(sem descrição)',tipo,valor:rnd(val,2),obs,compraId:null});
+      linhas.forEach((l,i)=>DATA.despesas.push({_id:ins&&ins[i]?ins[i].id:null,quem:l.quem,dataDesp:dDesp,dataValor:date2,desc:descD||'(sem descrição)',tipo,valor:l.valor,obs,compraId:null,grupoPag:grupo}));
       syncMirror();
       marcaGuardado();
       document.getElementById('pay-save').disabled=false;
       closePayModal();
       CALC=calcular(JSON.parse(JSON.stringify(DATA)));
       renderAll();
-      toast(prov?'Despesa provisória registada ✓':'Despesa registada ✓','ok');
+      toast(grupo?`Despesa ${prov?'provisória ':''}registada — ${linhas.length} pagadores ✓`
+                 :(prov?'Despesa provisória registada ✓':'Despesa registada ✓'),'ok');
     }catch(e){
       setSync('err','erro ao guardar');
       document.getElementById('pay-save').disabled=false;
@@ -3268,16 +3470,22 @@ function openCfDetail(source,idx){
   if(!isAdmin()||bloquearPorFecho){
     const f=document.getElementById('edit-cf-form');
     f.querySelectorAll('input,select,textarea').forEach(el=>{el.disabled=true;el.style.opacity='.75';});
-    f.querySelectorAll('.sd-chip,.cf-opt').forEach(el=>{el.style.pointerEvents='none';});
+    f.querySelectorAll('.sd-chip,.cf-opt,.cfp-toggle,.cfp-btn,.cfp-del').forEach(el=>{el.style.pointerEvents='none';});
   }
 }
 
 function deleteCfFromDetail(){
   if(!editingCf)return;
   const{source,idx}=editingCf;
-  if(!confirm('Tens a certeza que queres apagar este movimento?'))return;
+  // Paga por vários = uma despesa só, em várias linhas: apaga-se inteira.
+  const grupo=source==='despesas'?cfGrupoIdxs(DATA.despesas[idx]):[];
+  if(!confirm(grupo.length?`Esta despesa foi paga por ${grupo.length} pessoas. Apagar a despesa inteira?`
+                          :'Tens a certeza que queres apagar este movimento?'))return;
   if(source==='pagamentos')DATA.pagamentos.splice(idx,1);
-  else if(source==='despesas')DATA.despesas.splice(idx,1);
+  else if(source==='despesas'){
+    if(grupo.length)grupo.slice().sort((a,b)=>b-a).forEach(i=>DATA.despesas.splice(i,1));
+    else DATA.despesas.splice(idx,1);
+  }
   else if(source==='mealheiros')DATA.mealheiros.splice(idx,1);
   closeEditCf();
   pushToGitHub('Remover cash-flow').then(ok=>{
@@ -3352,9 +3560,17 @@ function editCfEntry(source,idx){
   } else if(editType==='despesa'){
     const d=DATA.despesas[idx];
     const isProv=despProvisoria(d);
+    // Paga por vários: o valor que se mostra é o da despesa toda (a soma das
+    // linhas); a repartição pelos pagadores está na caixa por baixo.
+    const grupo=cfGrupoIdxs(d);
+    const valTotal=grupo.length?rnd(grupo.reduce((a,i)=>a+(+DATA.despesas[i].valor||0),0),2):d.valor;
     f.innerHTML=`
-      <label>Quem pagou?</label>
-      <select id="ecf-who">${memberOptions(d.quem)}</select>
+      <div id="ecf-who-cell"${grupo.length?' style="display:none"':''}>
+        <label>Quem pagou?</label>
+        <select id="ecf-who">${memberOptions(d.quem)}</select>
+      </div>
+      <div class="cfp-box" id="ecf-pag-box"${grupo.length?'':' style="display:none"'}></div>
+      ${pagBtnHtml('ecf',grupo.length>0)}
       <div class="inline-row" style="margin-top:14px">
         <div><label>Tipo</label>
           <select id="ecf-tipo" onchange="ecfTipoChanged()">
@@ -3366,7 +3582,7 @@ function editCfEntry(source,idx){
                 .map(t=>`<option value="${t}"${t===d.tipo?' selected':''}>${t}</option>`).join('')}
           </select>
         </div>
-        <div><label>Valor (€)</label><input type="number" id="ecf-val" step="0.01" value="${d.valor}" inputmode="decimal"></div>
+        <div><label>Valor (€)</label><input type="number" id="ecf-val" step="0.01" value="${valTotal}" inputmode="decimal" oninput="pagHint('ecf')"></div>
       </div>
       <div class="cf-quando" id="ecf-quando">
         <div class="cfq${isProv?'':' on'}" data-q="efet" onclick="setCfQuando('ecf','efet')">📅 Efetiva</div>
@@ -3385,6 +3601,9 @@ function editCfEntry(source,idx){
       ${(!isAdmin()&&!String(d.obs||'').trim())?''   /* consulta: caixa vazia que não se pode preencher não acrescenta nada */
         :`<label>Observações</label>
       <textarea id="ecf-obs" rows="2" placeholder="Detalhe adicional (opcional)">${escHtml(d.obs||'')}</textarea>`}`;
+    // Já — e não no setTimeout: o openCfDetail desativa os campos logo a seguir,
+    // e o que nascesse depois disso ficava editável em modo consulta.
+    if(grupo.length)pagRender('ecf',grupo.map(i=>({quem:DATA.despesas[i].quem,valor:DATA.despesas[i].valor})));
     setTimeout(()=>{ecfTipoChanged();updDescCount('ecf');},10);
   } else if(editType==='mealheiro'){
     const m=DATA.mealheiros[idx];
@@ -3534,15 +3753,40 @@ async function saveEditCf(){
       toast(`Escolhe a ${tipoE.toLowerCase()} a que esta despesa pertence`,'bad');
       document.getElementById('edit-cf-save').disabled=false;return;
     }
-    d.quem=document.getElementById('ecf-who').value;
-    // Provisória → só perde a data de pagamento; a data-valor (refeição/dia) fica.
-    d.dataDesp=prov?'':document.getElementById('ecf-date').value;
-    d.dataValor=document.getElementById('ecf-date2').value;
-    d.tipo=tipoE;
-    d.valor=parseFloat(document.getElementById('ecf-val').value)||d.valor;
-    d.desc=(document.getElementById('ecf-desc')?.value||'').trim().slice(0,30);
+    const total=parseFloat(document.getElementById('ecf-val').value);
+    // Quem pagou: uma linha ou várias. Vale nos dois sentidos — uma despesa de um
+    // pagador pode passar a paga por vários aqui, e o contrário também.
+    let linhas;
+    if(pagOn('ecf')){
+      linhas=pagValidar('ecf',isNaN(total)?0:total);
+      if(!linhas){document.getElementById('edit-cf-save').disabled=false;return;}
+    }else{
+      // valor em branco/0 mantém o que lá estava — como sempre fez
+      linhas=[{quem:document.getElementById('ecf-who').value,valor:total>0?rnd(total,2):d.valor}];
+    }
+    // Campos partilhados por todas as linhas da mesma despesa
+    const base=Object.assign({},d,{
+      // Provisória → só perde a data de pagamento; a data-valor (refeição/dia) fica.
+      dataDesp:prov?'':document.getElementById('ecf-date').value,
+      dataValor:document.getElementById('ecf-date2').value,
+      tipo:tipoE,
+      desc:(document.getElementById('ecf-desc')?.value||'').trim().slice(0,30)
+    });
     const obsEl=document.getElementById('ecf-obs');
-    if(obsEl)d.obs=obsEl.value.trim();   // campo omitido (consulta) → não apaga o que lá está
+    if(obsEl)base.obs=obsEl.value.trim();   // campo omitido (consulta) → não apaga o que lá está
+    const grupoAtual=cfGrupoIdxs(d);
+    const alvo=(grupoAtual.length?grupoAtual:[idx]).slice().sort((a,b)=>a-b);
+    const grupoId=linhas.length>1?(d.grupoPag||('p'+Date.now())):null;
+    const antigas=alvo.map(i=>DATA.despesas[i]);
+    const novas=linhas.map((l,k)=>Object.assign({},base,{
+      quem:l.quem,valor:rnd(l.valor,2),grupoPag:grupoId,
+      _id:antigas[k]?antigas[k]._id:null   // o guardar reescreve as despesas todas
+    }));
+    // Substituir em bloco: o nº de pagadores pode ter mudado
+    const at=alvo[0];
+    for(let k=alvo.length-1;k>=0;k--)DATA.despesas.splice(alvo[k],1);
+    DATA.despesas.splice(at,0,...novas);
+    editingCf.idx=at;   // falhando o guardar, o modal continua a apontar à despesa certa
   } else if(source==='mealheiros'){
     const m=DATA.mealheiros[idx];
     m.quem=document.getElementById('ecf-who').value;

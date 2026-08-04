@@ -69,6 +69,17 @@ Uma provisória mexe em dinheiro, mas quem cozinha quer saber **com o que pode c
 - **Quando a provisória é paga** (mete-se a data em 📅), deixa de ser provisória: os pedidos ligados **voltam à lista** por comprar. É a verdade — ninguém registou a compra, logo não há stock. É também o que faz o ciclo fechar: regista-se a compra a sério e aí sim os pedidos fecham e o stock entra.
 - Apagar a compra já soltava os pedidos ligados (`deleteCompra`); desmarcá-los no picker também (`toRelease`). Nada disto é novo — a provisória entra pelo mesmo caminho.
 
+## Despesa paga por vários (👥)
+Às compras vão dois e o dinheiro sai de dois bolsos. O botão "👥 Pagaram vários" no cash-flow da despesa abre uma caixa com **uma linha por pagador** (quem + quanto pôs).
+- **Continua a ser uma linha de `despesas` por pagador** — é o que o `calcular()` lê (filtra por `quem` para saber quanto cada um adiantou), e é a verdade: saiu dinheiro de dois sítios. **Não juntar os pagadores numa linha só** com uma lista de nomes: partia todos os `filter(x=>x.quem===m.nome)` da app.
+- O que a coluna `grupo_pag` (`db/despesas_pagadores.sql`) acrescenta é dizer que essas linhas são **a mesma despesa**: um cartão só nos Cash Flows (com a repartição "quem pagou" por baixo), e edição/apagar em bloco (`cfGrupoIdxs`).
+- **Nada disto toca nas contas.** São despesas normais — quotas, saldos, rateios e provisórias comportam-se como sempre.
+- **A soma dos pagadores tem de bater certo com o total** (`pagValidar`), com o aviso a dizer quanto falta enquanto se escreve. "⇄ Dividir igualmente" reparte o total; os cêntimos que não dividem ficam na primeira linha.
+- Um **não-admin** só pode pôr nomes seus/do cônjuge — em **cada** linha (a policy `despesas_self_ins` é por linha, e o `pagValidar` diz o mesmo antes de tentar). Sem cônjuge não há segunda pessoa para escolher e o botão nem aparece.
+- **Não se combina com o 🧾 Detalhar por artigo**: uma compra tem um dono só (é assim que os lotes de stock se gravam), por isso o botão desaparece em modo vários.
+- Editar aceita os dois sentidos: um pagador passa a vários e vários voltam a um (tirar linhas até sobrar uma volta ao formulário normal).
+- Migração: `db/despesas_pagadores.sql`. Tolerante: sem ela, `DESP_GRUPO_COL=false`, o botão fica escondido e a coluna nunca é gravada.
+
 ## Detalhar uma despesa do cash-flow (🧾 Detalhar por artigo)
 Botão no formulário de despesa do cash-flow. Por baixo é uma **compra sem artigos de lista** (mesmo `compra_id`), mas a entrada é outra e **não se comporta como registar o carrinho**:
 - **Não abre a câmara.** Abria (`faturaPick()` no arranque) e quem não tem fatura ficava sem saída. O 📷 continua lá dentro, para quem tiver.
