@@ -153,6 +153,9 @@ setTimeout(function(){ if (window.fbvEsconderSplash) window.fbvEsconderSplash();
       <div class="cf-opt cf-entrada" data-cf="despesa" onclick="setCfType('despesa')"><span class="cf-icon">🛒</span><span class="cf-lbl">Despesa</span></div>
       <div class="cf-opt admin-only" data-cf="reembolso" onclick="setCfType('reembolso')"><span class="cf-icon">💸</span><span class="cf-lbl">Reembolso</span></div>
       <div class="cf-opt admin-only cf-entrada" data-cf="mealheiro" onclick="setCfType('mealheiro')"><span class="cf-icon" style="font-size:20px">🐷</span><span class="cf-lbl">Mealheiro</span></div>
+      <!-- Fatura das t-shirts: só admin. Escondida se faltar a migração
+           db/tshirts_cashflow.sql (openPayModal trata disso). -->
+      <div class="cf-opt admin-only cf-entrada" id="cf-opt-tshirts" data-cf="tshirts" onclick="setCfType('tshirts')"><span class="cf-icon" style="font-size:20px">👕</span><span class="cf-lbl">T-shirts</span></div>
       <!-- Sem admin-only: os membros também registam pagamentos seus (ficam à
            espera de validação). Quem a vê decide-se em openPayModal(). -->
       <div class="cf-opt" id="cf-opt-saldar" data-cf="saldar" onclick="setCfType('saldar')"><span class="cf-icon">🤝</span><span class="cf-lbl">Pagar Dívida</span></div>

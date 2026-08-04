@@ -41,8 +41,12 @@ Numa BD limpa, correr por esta ordem (há dependências entre eles):
     declarados pelos membros. Ficam à espera; quando o admin valida, a app
     cria o cash-flow em `pagamentos`. Enquanto esperam não entram em conta
     nenhuma
+14. `tshirts_cashflow.sql` — `eventos.tshirt_preco_homem/mulher/crianca` +
+    `tshirt_desconto`: a fatura das t-shirts passa a entrar nas contas. Cada
+    t-shirt é cobrada a quem lhe está imputada, ao preço da tipologia; o
+    desconto fica como crédito do MEO
 
-Os passos 4–13 são migrações add-on idempotentes: correr uma vez cada. A app é
+Os passos 4–14 são migrações add-on idempotentes: correr uma vez cada. A app é
 tolerante a qualquer uma delas faltar — sonda a coluna/tabela e esconde o que
 ainda não existe.
 
@@ -72,6 +76,7 @@ consola do browser o Supabase recusa). Resumo do que está em `policies.sql`:
 | Tamanhos e preços das t-shirts                | ✅        | ❌                                     | ❌               |
 | Imputar a t-shirt à conta de membros          | ✅        | ❌ (trigger recusa)                    | ❌               |
 | Trancar/reabrir a encomenda de t-shirts       | ✅        | ❌                                     | ❌               |
+| Fatura das t-shirts (preços + desconto)       | ✅        | ❌                                     | ❌               |
 | Validar contas (`validacoes`)                 | ✅        | ✅ próprias + cônjuge                   | ❌               |
 | Editar/apagar cash-flows                      | ✅        | ❌                                     | ❌               |
 | Mealheiros, reembolsos, pagamentos            | ✅        | ❌                                     | ❌               |

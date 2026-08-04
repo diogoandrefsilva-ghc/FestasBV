@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v190 · 2026-08-04 · Detalhar despesa fala em stock, não na lista; artigos herdam a refeição do cash-flow';
+const APP_BUILD = 'v191 · 2026-08-04 · A fatura das t-shirts entra nas contas: cash-flow 👕 com preço por tipologia, cada t-shirt vai ao saldo de quem a leva e o desconto fica como crédito do MEO';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -526,6 +526,9 @@ function updateYearUI(){
 }
 
 /* MOTOR */
+// Tipo de despesa da fatura das t-shirts. Fica fora do rateio das refeições e
+// da base da quota extra: cada t-shirt é cobrada a quem lhe está imputada.
+const TS_TIPO_DESP='T-shirts';
 function rnd(x,n=2){const f=Math.pow(10,n);return Math.floor(Math.abs(x)*f+0.5)/f*(x>=0?1:-1);}
 function roundup(x,n=0){const f=Math.pow(10,n);return Math.ceil(Math.abs(x)*f-1e-9)/f*(x>=0?1:-1);}
 const sumv=o=>Object.values(o).reduce((a,b)=>a+b,0);
@@ -580,12 +583,17 @@ function calcular(data){
   // Almoço/Jantar são alocados diretamente à refeição via data-valor. As "previstas"
   // (sem data-valor) não casam com nenhuma refeição, por isso entram no rateio indireto (F20).
   const allocDireta=despesas.filter(x=>(x.tipo==='Almoço'||x.tipo==='Jantar')&&x.dataValor).reduce((a,x)=>a+x.valor,0);
-  const F20=rnd((totalDesp-allocDireta)*0.5,2);
+  /* T-shirts: a fatura é dinheiro do grupo, mas NÃO se reparte pela fórmula —
+     cada t-shirt é cobrada a quem lhe está imputada, ao preço da tipologia.
+     Por isso sai da bolsa indireta (senão inflacionava o custo das refeições)
+     e, mais abaixo, sai também da base da quota extra. */
+  const totTSdesp=rnd(despesas.filter(x=>x.tipo===TS_TIPO_DESP).reduce((a,x)=>a+x.valor,0),2);
+  const F20=rnd((totalDesp-allocDireta-totTSdesp)*0.5,2);
 
   // Repartição do indireto entre "bebidas", "cerveja" e "gerais" (só apresentação na lista).
   // A bolsa indireta = tudo o que não é despesa direta de refeição. A soma das 3 parcelas é
   // SEMPRE igual ao indireto I, por isso L/P/Q e os saldos não mudam.
-  const baseIndireta=rnd(totalDesp-allocDireta,2);
+  const baseIndireta=rnd(totalDesp-allocDireta-totTSdesp,2);
   const baseBebidas=rnd(despesas.filter(x=>x.tipo==='Bebidas').reduce((a,x)=>a+x.valor,0),2);
   const baseCerveja=rnd(despesas.filter(x=>x.tipo==='Cerveja').reduce((a,x)=>a+x.valor,0),2);
   const fracBebidas=baseIndireta>0?baseBebidas/baseIndireta:0;
@@ -663,13 +671,35 @@ function calcular(data){
     m.AA=rnd(m._convs.reduce((a,x)=>a+x.q,0),2);
   }
 
+  /* T-shirts imputadas a cada membro, ao preço da tipologia. Uma t-shirt
+     dividida por dois pais vale metade para cada um; o arredondamento fica
+     para o fim. Nomes fora do plantel deste ano não geram cobrança — e por
+     isso o total cobrado é a SOMA do que caiu nos membros, nunca a soma dos
+     preços: assim as contas do grupo fecham sempre. */
+  const nomesM={};for(const m of membros)nomesM[m.nome]=m;
+  for(const m of membros){m._tshirts=[];m.TS=0;}
+  for(const it of (data.tshirts||[])){
+    const preco=tsPrecoEv(evento,it.tipo,it.tamanho);
+    if(preco<=0)continue;
+    const alvos=tsImputados(it).filter(n=>nomesM[n]);
+    if(!alvos.length)continue;
+    const parte=preco/alvos.length;
+    alvos.forEach(n=>{
+      const m=nomesM[n];
+      m._tshirts.push({nome:it.nome,tipo:it.tipo,tamanho:it.tamanho,partes:alvos.length,v:parte});
+      m.TS+=parte;
+    });
+  }
+  for(const m of membros)m.TS=rnd(m.TS,2);
+  const tsTot=rnd(membros.reduce((a,m)=>a+m.TS,0),2);
+
   const totRefMembros=rnd(membros.reduce((a,m)=>a+m.Sown,0),2);
   const totGuestPayments=rnd(membros.reduce((a,m)=>a+m.AA,0),2);
   const sobrasTot=0; // migrado para mealheiros
   const descontoTot=0; // migrado para mealheiros
   const mealTot=mealheiros.reduce((a,x)=>a+x.valor,0);
 
-  const baseQuota=totalDesp-(totRefMembros+totGuestPayments+sobrasTot+descontoTot+mealTot);
+  const baseQuota=totalDesp-(totRefMembros+totGuestPayments+sobrasTot+descontoTot+mealTot+tsTot);
   const fundoReserva=evento.fundoReserva||0;
   const missaoPoupanca=evento.missaoPoupanca||0;
   const arredondaTotal=evento.arredondaTotal!==undefined?evento.arredondaTotal:false;
@@ -698,7 +728,10 @@ function calcular(data){
     } else {
       m.U=rnd(missaoPoupanca+m.T,2);
     }
-    m.V=rnd(m.Sown+m.R+m.U,2);
+    // As t-shirts entram no total a pagar, mas ficam DE FORA do arredondamento
+    // (m.U, acima): a fatura é um valor exato a recuperar e arredondá-lo
+    // cobrava ao grupo mais do que as t-shirts custaram.
+    m.V=rnd(m.Sown+m.R+m.U+(m.TS||0),2);
     m.W=mealBy[m.nome]||0;
     m.X=0; // sobras e outros migrados para mealheiros
     const totalPago=despesas.filter(x=>x.quem===m.nome).reduce((a,x)=>a+x.valor,0);
@@ -712,7 +745,7 @@ function calcular(data){
   const missaoTot=rnd(membros.reduce((a,m)=>a+m.U,0),2);
   const quotaTot=rnd(membros.reduce((a,m)=>a+m.R,0),2);
   const totRefAll=rnd(membros.reduce((a,m)=>a+m.Sown,0),2);
-  const totReceitas=rnd(quotaTot+totRefAll+totGuestPayments+sobrasTot+descontoTot+mealTot+missaoTot,2);
+  const totReceitas=rnd(quotaTot+totRefAll+totGuestPayments+sobrasTot+descontoTot+mealTot+missaoTot+tsTot,2);
   const saldoGrupo=rnd(totReceitas-totalDesp,2);
 
   const pagNonReemb=pag.filter(p=>!p.ref||!p.ref.startsWith('Reembolso'));
@@ -799,7 +832,7 @@ function calcular(data){
     m._payerOthersPortion=payerOthersPortion[m.nome]||0;
   }
 
-  return{refeicoes,membros,BN3,F20,saldoGrupo,totRefMembros,tot,totReceitas,totDespesas:totalDesp,sumF,pagamentos:pag,sobrasTot,descontoTot,mealTot,quotaTot,missaoTot};
+  return{refeicoes,membros,BN3,F20,saldoGrupo,totRefMembros,tot,totReceitas,totDespesas:totalDesp,sumF,pagamentos:pag,sobrasTot,descontoTot,mealTot,quotaTot,missaoTot,tsTot,totTSdesp};
 }
 
 /* RENDER */
@@ -1155,7 +1188,7 @@ function renderAll(){
     const receb=rcL.reduce((a,p)=>a+p.valor,0);
     const mealL=DATA.mealheiros.filter(x=>x.quem===m.nome);
     const mealT=rnd((m.W||0)+(m.X||0),2);
-    const contribT=rnd(m.Sown+m.AA,2);
+    const contribT=rnd(m.Sown+m.AA+(m.TS||0),2);
     const quotaE=rnd((m.R||0)+(m.U||0),2);
     let cred=totalPagoDesp;
     if(isTes) cred+=reembFeitos;
@@ -1752,7 +1785,9 @@ function openMember(nome){
   // ═══════════════════════════════════════
   // 1. CONTRIBUIÇÕES (débito — vermelho)
   // ═══════════════════════════════════════
-  const contribTotal=rnd(m.Sown+m.AA,2);
+  // As t-shirts são contribuição como as refeições e os convidados: dinheiro
+  // que o membro deve. Sem isto o saldo do ecrã ficava a divergir do detalhe.
+  const contribTotal=rnd(m.Sown+m.AA+(m.TS||0),2);
   if(contribTotal>0){
     h+='<div class="bd-title sf">Contribuições</div>';
     if(m._refs.length){
@@ -1790,11 +1825,29 @@ function openMember(nome){
       m._convs.forEach(c=>h+=`<div class="meal"><span class="d">${c.nome}${c.n>1?' ×'+c.n:''} · ${c.dia} ${c.ref}</span><span class="p">${eur(c.q)}</span></div>`);
       h+='</div></div>';
     }
+    if((m.TS||0)>0.005){
+      h+=`<div class="collapse-toggle" onclick="this.classList.toggle('open');this.nextElementSibling.classList.toggle('open')" style="margin-top:6px">
+        <span class="ct-label">👕 T-shirts (${(m._tshirts||[]).length})</span>
+        <span><span class="ct-val minus">${eur(m.TS)}</span><span class="ct-arrow">▼</span></span>
+      </div>`;
+      h+='<div class="collapse-body"><div class="meals">';
+      (m._tshirts||[]).forEach(x=>h+=`<div class="meal"><span class="d">${escHtml(x.nome)} · ${escHtml(x.tipo)} ${escHtml(x.tamanho)}${x.partes>1?` (1/${x.partes})`:''}</span><span class="p">${eur(rnd(x.v,2))}</span></div>`);
+      h+='</div></div>';
+    }
   }
 
   // ═══════════════════════════════════════
   // 2. QUOTA EXTRA (débito — vermelho)
   // ═══════════════════════════════════════
+  // T-shirts imputadas a este membro (preço da tipologia, dividido quando é
+  // partilhada) — é dinheiro que ele deve, como as refeições e os convidados
+  if((m.TS||0)>0.005){
+    h+='<h2>T-shirts</h2><table><tr><th>Quem veste</th><th>Tipologia</th><th class="right">Valor</th></tr>';
+    (m._tshirts||[]).forEach(x=>{
+      h+=`<tr><td>${escHtml(x.nome)}${x.partes>1?` <i style="color:#888">(1/${x.partes})</i>`:''}</td><td>${escHtml(x.tipo)} ${escHtml(x.tamanho)}</td><td class="right">${eur(rnd(x.v,2))}</td></tr>`;
+    });
+    h+=`<tr style="border-top:2px solid #ddd;font-weight:700"><td colspan="2"><b>Total</b></td><td class="right"><b>${eur(m.TS)}</b></td></tr></table>`;
+  }
   const quotaExtra=rnd((m.R||0)+(m.U||0),2);
   if(quotaExtra>0){
     h+='<div class="bd-title sf">Quota Extra</div>';
@@ -1995,6 +2048,8 @@ async function carregar(){
     TS_IMPUT_COL=TSHIRTS_TABLE&&!!(tiRes&&tiRes.ok);
     // Trancar encomendas (db/tshirts_trancar.sql): a coluna vem no próprio evento
     TS_LOCK_COL=rows.some(ev=>'tshirts_trancadas' in ev);
+    // Fatura das t-shirts (db/tshirts_cashflow.sql): preços por tipologia + desconto
+    TS_CF_COLS=rows.some(ev=>'tshirt_preco_homem' in ev);
     // Pagamentos à espera de validação: lista global (como as VALIDACOES), não
     // entra no ano — assim o save do ano, que substitui as tabelas filhas, nunca
     // lhe toca. Nada disto entra no calcular(): só é dinheiro depois de aprovado.
@@ -2005,7 +2060,7 @@ async function carregar(){
     if(TSHIRTS_TABLE)(await tsRes.json()).forEach(t=>{(tsByEv[t.evento_id]=tsByEv[t.evento_id]||[]).push(t);});
     ALL_YEARS=rows.map(ev=>({
       _sbId: ev.id,
-      evento:{tshirtsTrancadas:!!ev.tshirts_trancadas,nome:ev.nome,ano:ev.ano,tesoureiro:ev.tesoureiro,arredondaTotal:!!ev.arredonda_total,missaoPoupanca:N(ev.missao_poupanca),fundoReserva:N(ev.fundo_reserva),fatorModo:ev.fator_modo||'fixo',fatorThreshold:ev.fator_threshold!=null?N(ev.fator_threshold):FATOR_THRESHOLD_DEFAULT,dividasPublicas:!!ev.dividas_publicas,dividasPublicasCol:('dividas_publicas' in ev),contasFechadas:!!ev.contas_fechadas,contasFechadasEm:ev.contas_fechadas_em||null,contasFechadasPor:ev.contas_fechadas_por||null},
+      evento:{tshirtsTrancadas:!!ev.tshirts_trancadas,tshirtPrecoHomem:N(ev.tshirt_preco_homem),tshirtPrecoMulher:N(ev.tshirt_preco_mulher),tshirtPrecoCrianca:N(ev.tshirt_preco_crianca),tshirtDesconto:N(ev.tshirt_desconto),nome:ev.nome,ano:ev.ano,tesoureiro:ev.tesoureiro,arredondaTotal:!!ev.arredonda_total,missaoPoupanca:N(ev.missao_poupanca),fundoReserva:N(ev.fundo_reserva),fatorModo:ev.fator_modo||'fixo',fatorThreshold:ev.fator_threshold!=null?N(ev.fator_threshold):FATOR_THRESHOLD_DEFAULT,dividasPublicas:!!ev.dividas_publicas,dividasPublicasCol:('dividas_publicas' in ev),contasFechadas:!!ev.contas_fechadas,contasFechadasEm:ev.contas_fechadas_em||null,contasFechadasPor:ev.contas_fechadas_por||null},
       membros:(ev.membros||[]).sort((a,b)=>a.nome.localeCompare(b.nome,'pt')).map(m=>({
         _id:m.id,nome:m.nome,fator:N(m.fator),sexo:m.sexo==='F'?'F':'M',
         presencas:(m.presencas||[]).map(p=>({k:`${p.dia}|${p.ref}`,modo:p.modo==='bebe'?'bebe':'come'}))
@@ -2453,6 +2508,9 @@ function updateCfForm(){
       <textarea id="cf-obs" placeholder="Detalhe adicional (opcional)" rows="2"></textarea>
       ${STOCK_TABLE?`<button class="btn ghost" style="width:100%;margin-top:14px" onclick="cfAbrirDetalhe()">🧾 Detalhar por artigo →<span style="display:block;font-size:11px;font-weight:400;color:var(--muted);margin-top:2px;text-transform:none;letter-spacing:0">itens e preços — à mão ou a partir da fatura</span></button>`:''}`;
     setTimeout(cfTipoChanged,10);
+  } else if(cfDir==='tshirts'){
+    f.innerHTML=tshirtCfFormHtml(today);
+    setTimeout(tsCfRecalc,10);
   } else if(cfDir==='mealheiro'){
     f.innerHTML=`
       <label>Tipo de mealheiro</label>
@@ -2792,10 +2850,14 @@ function openPayModal(){
   const podeSald=podeSaldar();
   const optSald=document.getElementById('cf-opt-saldar');
   if(optSald)optSald.style.display=podeSald?'':'none';
+  // Fatura das t-shirts: só admin, ano aberto, e com a migração dos preços
+  const podeTs=admin&&!fechadas&&TSHIRTS_TABLE&&TS_CF_COLS;
+  const optTs=document.getElementById('cf-opt-tshirts');
+  if(optTs)optTs.style.display=podeTs?'':'none';
   // Quantas opções ficam mesmo à vista: despesa (ano aberto), reembolso (admin,
   // vale mesmo com contas fechadas), mealheiro (admin, .cf-entrada — o CSS
   // esconde-o com o ano fechado) e pagar dívida. Uma só → a roda não serve.
-  const nOpts=(podeDespesa?1:0)+(admin?1:0)+(admin&&!fechadas?1:0)+(podeSald?1:0);
+  const nOpts=(podeDespesa?1:0)+(admin?1:0)+(admin&&!fechadas?1:0)+(podeSald?1:0)+(podeTs?1:0);
   const wheel=document.getElementById('cf-wheel');
   if(wheel)wheel.style.display=nOpts>1?'':'none';
   const ttl=document.getElementById('pay-title');
@@ -2810,13 +2872,15 @@ function closePayModal(){
 }
 
 async function saveCashFlow(){
-  if(contasFechadas()&&(cfDir==='despesa'||cfDir==='mealheiro')){toast('Contas fechadas — só pagamentos de dívidas','bad');return;}
+  if(contasFechadas()&&(cfDir==='despesa'||cfDir==='mealheiro'||cfDir==='tshirts')){toast('Contas fechadas — só pagamentos de dívidas','bad');return;}
   const who=document.getElementById('cf-who')?.value;
   const val=parseFloat(document.getElementById('cf-val')?.value);
   const date=document.getElementById('cf-date')?.value;
   // For mealheiro sobras, who/val come from separate fields — skip generic validation
   const mealSubCheck=cfDir==='mealheiro'&&(document.querySelector('#meal-subtype-wheel .cf-opt.on')?.dataset?.sub||'corrente')!=='corrente';
-  if(!mealSubCheck){
+  // As t-shirts têm o seu próprio formulário (preços por tipologia): o valor
+  // não vem de um campo, é calculado — a validação genérica não se aplica.
+  if(cfDir!=='tshirts'&&!mealSubCheck){
     if(!who){toast('Seleciona a pessoa','bad');return;}
     if(!val||val<=0){toast('Valor inválido','bad');return;}
   }
@@ -2865,6 +2929,9 @@ async function saveCashFlow(){
       document.getElementById('pay-save').disabled=false;
       toast(permErrorMsg(e),'bad');
     }
+    return;
+  } else if(cfDir==='tshirts'){
+    await tshirtCfSave();
     return;
   } else if(cfDir==='mealheiro'){
     const mealSub=document.querySelector('#meal-subtype-wheel .cf-opt.on')?.dataset?.sub||'corrente';
@@ -3260,7 +3327,12 @@ function editCfEntry(source,idx){
       <div class="inline-row" style="margin-top:14px">
         <div><label>Tipo</label>
           <select id="ecf-tipo" onchange="ecfTipoChanged()">
-            ${['Gerais','Bebidas','Almoço','Jantar','Renda','Cerveja'].map(t=>`<option value="${t}"${t===d.tipo?' selected':''}>${t}</option>`).join('')}
+            ${/* A fatura das t-shirts entra pelo cash-flow 👕 e é o único sítio
+                  onde se lhe mexe: aqui só se mostra o tipo, para não se
+                  poder trocar por engano (e mandar o dinheiro para o rateio
+                  das refeições, que é o que este tipo evita). */
+              (d.tipo===TS_TIPO_DESP?[TS_TIPO_DESP]:['Gerais','Bebidas','Almoço','Jantar','Renda','Cerveja'])
+                .map(t=>`<option value="${t}"${t===d.tipo?' selected':''}>${t}</option>`).join('')}
           </select>
         </div>
         <div><label>Valor (€)</label><input type="number" id="ecf-val" step="0.01" value="${d.valor}" inputmode="decimal"></div>
@@ -3821,7 +3893,12 @@ async function limparCashflows(){
   }
 
   const avisoSobras=mealKeep.length?('\n\n('+(tinhaSobras?'Mantêm-se':'Transitam-se')+' '+mealKeep.length+' sobra(s) do ano anterior — não se apagam.)'):'';
-  if(!confirm('RESET CASH-FLOWS — '+ano+'\n\nVai apagar:\n· '+nDesp+' despesa(s)\n· '+nMeal+' mealheiro(s)\n· '+nPag+' pagamento(s)/reembolso(s)'+avisoSobras+'\n\nSó afeta o ano '+ano+'. Esta ação NÃO pode ser desfeita.\n\nConfirmar?'))return;
+  // A fatura das t-shirts é uma despesa: se se apaga, têm de cair também os
+  // preços por tipologia — senão os membros continuavam a ser cobrados por uma
+  // despesa que já não existe. As encomendas (👕) não se tocam.
+  const tinhaTsCf=TS_CF_COLS&&(DATA.despesas||[]).some(d=>d.tipo===TS_TIPO_DESP);
+  const avisoTs=tinhaTsCf?'\n\n(A fatura das t-shirts também sai: os preços por tipologia voltam a zero e deixa de ser cobrada a ninguém. As encomendas mantêm-se.)':'';
+  if(!confirm('RESET CASH-FLOWS — '+ano+'\n\nVai apagar:\n· '+nDesp+' despesa(s)\n· '+nMeal+' mealheiro(s)\n· '+nPag+' pagamento(s)/reembolso(s)'+avisoSobras+avisoTs+'\n\nSó afeta o ano '+ano+'. Esta ação NÃO pode ser desfeita.\n\nConfirmar?'))return;
   // Repor na lista os artigos que estavam "comprados" (as despesas vão desaparecer;
   // sem isto ficariam órfãos). A rede de segurança no cliente já os mostraria como
   // pendentes, mas aqui limpa-se também o estado na BD.
@@ -3831,6 +3908,12 @@ async function limparCashflows(){
       await queueWrite(()=>sbReq('PATCH',`shoplist?id=in.(${boughtIds.join(',')})`,{estado:'pendente',compra_id:null,cf_desc:null,comprado_em:null}));
       DATA.shoplist.forEach(it=>{if(it.estado==='comprado')Object.assign(it,{estado:'pendente',compraId:null,cfDesc:null,compradoEm:null});});
     }catch(e){toast('Aviso: artigos da lista não repostos — '+e.message,'bad');}
+  }
+  if(tinhaTsCf){
+    try{
+      await queueWrite(()=>sbReq('PATCH',`eventos?id=eq.${DATA._sbId}`,{tshirt_preco_homem:0,tshirt_preco_mulher:0,tshirt_preco_crianca:0,tshirt_desconto:0}));
+      Object.assign(DATA.evento,{tshirtPrecoHomem:0,tshirtPrecoMulher:0,tshirtPrecoCrianca:0,tshirtDesconto:0});
+    }catch(e){toast('Aviso: preços das t-shirts não repostos — '+e.message,'bad');}
   }
   DATA.despesas=[];DATA.mealheiros=mealKeep;DATA.pagamentos=[];
   const ok=await pushToGitHub('Reset cash-flows '+ano);
@@ -10692,6 +10775,7 @@ function renderHeroSubtotals(){
   const guestPay=rnd(CALC.membros.reduce((a,m)=>a+m.AA,0),2);
   if(guestPay>0) recItems.push({label:'Convidados',val:guestPay});
   if(CALC.mealTot>0) recItems.push({label:'Mealheiro',val:CALC.mealTot});
+  if(CALC.tsTot>0) recItems.push({label:'T-shirts',val:CALC.tsTot});
   if(CALC.quotaTot>0) recItems.push({label:'Quota Extra',val:CALC.quotaTot});
   if(CALC.missaoTot>0) recItems.push({label:'Missão Poupança',val:CALC.missaoTot});
 
@@ -10743,6 +10827,7 @@ function toggleHeroDetail(){
 let TSHIRTS_TABLE=false;   // BD já tem tshirt_tamanhos/tshirts?
 let TS_IMPUT_COL=false;    // BD já tem tshirts.imputado_a? (db/tshirts_imputacao.sql)
 let TS_LOCK_COL=false;     // BD já tem eventos.tshirts_trancadas? (db/tshirts_trancar.sql)
+let TS_CF_COLS=false;      // BD já tem os preços/desconto no evento? (db/tshirts_cashflow.sql)
 let TS_TAMS=[];            // grelha global [{id,tipo,tamanho,ordem,preco}]
 let TS_TAB='minhas';       // sub-separador do painel: minhas | todas
 let _tsFiltro=null;        // {tipo,tamanho} — linha do resumo em foco (de quem são estas)
@@ -10756,8 +10841,31 @@ function tsTamCmp(a,b){return tsTipoIdx(a.tipo)-tsTipoIdx(b.tipo)||(a.ordem||0)-
 function tsArr(){if(DATA&&!DATA.tshirts)DATA.tshirts=[];return (DATA&&DATA.tshirts)||[];}
 function tsTamsDe(tipo){return TS_TAMS.filter(t=>t.tipo===tipo);}
 function tsTiposAtivos(){return TS_TIPOS.filter(t=>tsTamsDe(t).length);}
-function tsPreco(tipo,tamanho){const t=TS_TAMS.find(x=>x.tipo===tipo&&x.tamanho===tamanho);return t?(+t.preco||0):0;}
-function tsTemPrecos(){return TS_TAMS.some(t=>(+t.preco||0)>0);}
+/* PREÇO — manda o preço por TIPOLOGIA definido na fatura (cash-flow das
+   t-shirts, guardado no evento). O preço por tamanho da grelha continua a
+   valer como estimativa enquanto não houver fatura; assim que o admin lança
+   os preços da tipologia, é esse o número em todo o lado (painel, PDF e
+   contas), para não haver dois valores diferentes para a mesma t-shirt. */
+function tsPrecoTipoEv(evento,tipo){
+  if(!evento)return 0;
+  const v={'Homem':+evento.tshirtPrecoHomem||0,'Mulher':+evento.tshirtPrecoMulher||0,'Criança':+evento.tshirtPrecoCrianca||0}[tipo];
+  return v>0?v:0;
+}
+function tsPrecoEv(evento,tipo,tamanho){
+  const pt=tsPrecoTipoEv(evento,tipo);
+  if(pt>0)return pt;
+  const t=TS_TAMS.find(x=>x.tipo===tipo&&x.tamanho===tamanho);
+  return t?(+t.preco||0):0;
+}
+function tsPrecoTipo(tipo){return tsPrecoTipoEv(DATA&&DATA.evento,tipo);}
+function tsPreco(tipo,tamanho){return tsPrecoEv(DATA&&DATA.evento,tipo,tamanho);}
+function tsTemPrecos(){return TS_TIPOS.some(t=>tsPrecoTipo(t)>0)||TS_TAMS.some(t=>(+t.preco||0)>0);}
+// Quantas t-shirts por tipologia (alimenta o total da fatura)
+function tsContagemTipo(){
+  const c={};TS_TIPOS.forEach(t=>c[t]=0);
+  tsArr().forEach(it=>{if(c[it.tipo]!=null)c[it.tipo]++;});
+  return c;
+}
 function tsTotalEur(list){return rnd(list.reduce((a,it)=>a+tsPreco(it.tipo,it.tamanho),0),2);}
 // Sufixo " · 12,00 €" — só aparece se estas t-shirts tiverem mesmo preço. Uma
 // grelha meia preenchida (só um tamanho com preço) não enche o ecrã de 0,00 €.
@@ -10993,6 +11101,119 @@ function tsToggleImputSec(el){
   el.classList.toggle('open',_tsImputOpen);
   const body=el.nextElementSibling;
   if(body)body.classList.toggle('open',_tsImputOpen);
+}
+
+/* ── FATURA DAS T-SHIRTS (cash-flow 👕, só admin) ──
+   A fatura é uma despesa normal (tipo 'T-shirts') paga por alguém, mais três
+   preços — Homem, Mulher, Criança — e um desconto, guardados no evento.
+   O que cada membro paga sai dos preços × as t-shirts que lhe estão
+   imputadas; o desconto NÃO se abate a ninguém: fica como crédito do MEO
+   (entra no resultado do grupo e alivia a quota extra de todos).
+   Uma fatura por ano: se já existir, o formulário abre-a e grava por cima. */
+function tsCfDespesa(){return (DATA&&DATA.despesas||[]).find(d=>d.tipo===TS_TIPO_DESP)||null;}
+// Total bruto pelos preços que estão nas caixas (não pelos guardados)
+function tsCfBruto(){
+  const c=tsContagemTipo();
+  return rnd(TS_TIPOS.reduce((a,t)=>a+c[t]*tsCfInput(t),0),2);
+}
+function tsCfInput(tipo){
+  const id={'Homem':'ts-cf-ph','Mulher':'ts-cf-pm','Criança':'ts-cf-pc'}[tipo];
+  const el=document.getElementById(id);
+  return Math.max(0,parseFloat(String(el?el.value:'').replace(',','.'))||0);
+}
+function tsCfDesconto(){
+  const el=document.getElementById('ts-cf-desc-val');
+  return Math.max(0,parseFloat(String(el?el.value:'').replace(',','.'))||0);
+}
+function tshirtCfFormHtml(today){
+  const d=tsCfDespesa();
+  const ev=DATA.evento;
+  const c=tsContagemTipo();
+  const n=tsArr().length;
+  const val=t=>{const v=tsPrecoTipo(t);return v>0?v:'';};
+  const linha=(t,id)=>`<div class="ts-cf-row">
+      <span class="ts-cf-tipo">${tsIcon(t)} ${t}</span>
+      <span class="ts-cf-n">× ${c[t]}</span>
+      <input type="number" id="${id}" step="0.5" min="0" placeholder="0,00" inputmode="decimal" value="${val(t)}" oninput="tsCfRecalc()">
+      <span class="ts-cf-sub" id="${id}-sub">—</span>
+    </div>`;
+  return `
+    <label>Quem pagou / adiantou?</label>
+    <select id="cf-who">${memberOptions(d?d.quem:myPrimaryName())}</select>
+    <div class="inline-row" style="margin-top:14px">
+      <div><label>Data da fatura</label><input type="date" id="cf-date" value="${d&&(d.dataDesp||d.dataValor)?(d.dataDesp||d.dataValor):today}"></div>
+      <div><label>Desconto (€)</label><input type="number" id="ts-cf-desc-val" step="0.5" min="0" placeholder="0,00" inputmode="decimal" value="${(+ev.tshirtDesconto||0)>0?(+ev.tshirtDesconto):''}" oninput="tsCfRecalc()"></div>
+    </div>
+    <label style="margin-top:14px">Preço por tipologia — ${n} t-shirt${n===1?'':'s'} encomendada${n===1?'':'s'}</label>
+    <div class="ts-cf-precos">
+      ${linha('Homem','ts-cf-ph')}
+      ${linha('Mulher','ts-cf-pm')}
+      ${linha('Criança','ts-cf-pc')}
+    </div>
+    <div class="ts-cf-tot" id="ts-cf-tot"></div>
+    <div class="field-hint sf">O preço de cada t-shirt vai ao saldo de quem a leva (pela imputação 💳 do separador 👕). O <b>desconto</b> não se abate a ninguém: fica como crédito do MEO e alivia a quota extra de todos.</div>
+    <label>Descritivo <span class="cf-desc-count" id="cf-desc-count">0/30</span></label>
+    <input type="text" id="cf-desc" placeholder="Ex: Serigrafia XPTO — fatura 123" maxlength="30" value="${d?escHtml(d.desc||''):''}" oninput="updDescCount('cf')">
+    ${d?'<div class="field-hint sf">Já há uma fatura de t-shirts este ano — guardar substitui-a.</div>':''}`;
+}
+function tsCfRecalc(){
+  const c=tsContagemTipo();
+  TS_TIPOS.forEach(t=>{
+    const id={'Homem':'ts-cf-ph','Mulher':'ts-cf-pm','Criança':'ts-cf-pc'}[t];
+    const sub=document.getElementById(id+'-sub');
+    if(sub){const v=rnd(c[t]*tsCfInput(t),2);sub.textContent=v>0?eur(v):'—';}
+  });
+  const bruto=tsCfBruto(),desc=tsCfDesconto(),tot=rnd(bruto-desc,2);
+  const el=document.getElementById('ts-cf-tot');
+  if(el)el.innerHTML=`<span>A pagar</span><b class="${tot<0?'neg':''}">${eur(tot)}</b>`+
+    (desc>0?`<i>${eur(bruto)} − ${eur(desc)} de desconto</i>`:'');
+  const cnt=document.getElementById('cf-desc-count');
+  if(cnt&&typeof updDescCount==='function')updDescCount('cf');
+}
+async function tshirtCfSave(){
+  const btn=document.getElementById('pay-save');
+  const falha=msg=>{toast(msg,'bad');if(btn)btn.disabled=false;};
+  if(!isAdmin())return falha('Só o admin regista a fatura das t-shirts');
+  if(!TS_CF_COLS)return falha('Falta correr a migração db/tshirts_cashflow.sql');
+  if(!DATA||!DATA._sbId)return falha('Sem ligação à base de dados — recarrega a página');
+  const who=document.getElementById('cf-who')?.value;
+  const date=document.getElementById('cf-date')?.value;
+  if(!who)return falha('Indica quem pagou a fatura');
+  if(!date)return falha('Indica a data da fatura');
+  const precos={'Homem':tsCfInput('Homem'),'Mulher':tsCfInput('Mulher'),'Criança':tsCfInput('Criança')};
+  if(!TS_TIPOS.some(t=>precos[t]>0))return falha('Indica pelo menos um preço');
+  const bruto=tsCfBruto(),desconto=tsCfDesconto(),total=rnd(bruto-desconto,2);
+  if(total<0)return falha('O desconto é maior do que o total das t-shirts');
+  const desc=(document.getElementById('cf-desc')?.value||'').trim().slice(0,30)||'T-shirts';
+  const existente=tsCfDespesa();
+  setSync('load','a guardar…');
+  try{
+    // 1) os preços/desconto do ano — é deles que sai a cobrança a cada membro
+    await queueWrite(()=>sbReq('PATCH',`eventos?id=eq.${DATA._sbId}`,{
+      tshirt_preco_homem:precos['Homem'],tshirt_preco_mulher:precos['Mulher'],
+      tshirt_preco_crianca:precos['Criança'],tshirt_desconto:desconto}));
+    Object.assign(DATA.evento,{tshirtPrecoHomem:precos['Homem'],tshirtPrecoMulher:precos['Mulher'],
+      tshirtPrecoCrianca:precos['Criança'],tshirtDesconto:desconto});
+    // 2) a fatura em si (despesa). Uma por ano: se já existe, grava por cima.
+    const row={quem:who,data_desp:date,data_valor:date,descricao:desc,tipo:TS_TIPO_DESP,valor:total};
+    if(existente&&existente._id){
+      await queueWrite(()=>sbReq('PATCH',`despesas?id=eq.${existente._id}`,row));
+      Object.assign(existente,{quem:who,dataDesp:date,dataValor:date,desc,valor:total});
+    }else{
+      const ins=await queueWrite(()=>sbReq('POST','despesas',[Object.assign({evento_id:DATA._sbId},row)],{Prefer:'return=representation'}));
+      DATA.despesas.push({_id:ins&&ins[0]?ins[0].id:null,quem:who,dataDesp:date,dataValor:date,desc,tipo:TS_TIPO_DESP,valor:total,obs:'',compraId:null});
+    }
+    syncMirror();marcaGuardado();
+    if(btn)btn.disabled=false;
+    closePayModal();
+    CALC=calcular(JSON.parse(JSON.stringify(DATA)));
+    renderAll();
+    toast(`Fatura das t-shirts registada ✓ — ${eur(total)}`,'ok');
+  }catch(e){
+    setSync('err','erro ao guardar');
+    if(btn)btn.disabled=false;
+    toast(permErrorMsg(e),'bad');
+  }
 }
 
 /* ── Modal: adicionar / editar um pedido ── */
@@ -11530,6 +11751,7 @@ function buildGeneralReport(){
   const gp=rnd(ms.reduce((a,m)=>a+m.AA,0),2);
   if(gp>0) h+=`<tr><td>Convidados</td><td class="right">${eur(gp)}</td></tr>`;
   if(CALC.mealTot>0) h+=`<tr><td>Mealheiro</td><td class="right">${eur(CALC.mealTot)}</td></tr>`;
+  if(CALC.tsTot>0) h+=`<tr><td>T-shirts (cobradas aos membros)</td><td class="right">${eur(CALC.tsTot)}</td></tr>`;
   if(CALC.missaoTot>0) h+=`<tr><td>Missão Poupança</td><td class="right">${eur(CALC.missaoTot)}</td></tr>`;
   h+=`<tr style="border-top:2px solid #ddd;font-weight:700"><td><b>Total Receitas</b></td><td class="right pos"><b>${eur(CALC.totReceitas)}</b></td></tr>`;
   h+='</table>';
@@ -11750,6 +11972,7 @@ function saldosMembrosHtml(){
   const cRef=rnd(CALC.totRefMembros||0,2);
   const cConv=rnd((CALC.membros||[]).reduce((a,m)=>a+(m.AA||0),0),2);
   const cMeal=rnd(CALC.mealTot||0,2);
+  const cTs=rnd(CALC.tsTot||0,2);
   // ordem cronológica dos slots (segundo refeicoesDef)
   const ord={};(DATA.refeicoesDef||[]).forEach((rd,i)=>{ord[rd.dia+'|'+rd.ref]=i;});
   const nrm=r=>r==='Tarde'?'Lanche':r;
@@ -11764,14 +11987,17 @@ function saldosMembrosHtml(){
     const refeCome=rnd(refsCome.reduce((a,x)=>a+x.v,0),2);
     const refeBebe=rnd(refsBebe.reduce((a,x)=>a+x.v,0),2);
     const convsList=[...(m._convs||[])].sort((a,b)=>oKey(a)-oKey(b)).map(x=>({k:`${x.nome}${x.n>1?' ×'+x.n:''} — ${x.dia} · ${x.ref}`,v:rnd(x.q,2)}));
-    return{nome:m.nome,i:ms.indexOf(m),_m:m,refeCome,refeBebe,amigos,poup,quota,fator:(m.fatorEf!=null?m.fatorEf:m.fator)||0,outras:rnd(m.T||0,2),refsCome,refsBebe,convsList,tot:rnd(refeCome+refeBebe+amigos+poup+quota,2)};
+    // T-shirts imputadas: uma dividida aparece com a fração ao lado
+    const tshirts=rnd(m.TS||0,2);
+    const tshirtsList=(m._tshirts||[]).map(x=>({k:`${x.nome} — ${x.tipo} ${x.tamanho}${x.partes>1?` (1/${x.partes})`:''}`,v:rnd(x.v,2)}));
+    return{nome:m.nome,i:ms.indexOf(m),_m:m,refeCome,refeBebe,amigos,poup,quota,tshirts,tshirtsList,fator:(m.fatorEf!=null?m.fatorEf:m.fator)||0,outras:rnd(m.T||0,2),refsCome,refsBebe,convsList,tot:rnd(refeCome+refeBebe+amigos+poup+quota+tshirts,2)};
   });
   // Ordem: próprio → cônjuge → restantes (ordem alfabética)
   const _meuR=meuNomePrincipal();
   const _conjR=MY_NAMES.filter(n=>n!==_meuR);
   const _rankR=n=>n===_meuR?0:(_conjR.includes(n)?1:2);
   rows.sort((a,b)=>{const ra=_rankR(a.nome),rb=_rankR(b.nome);if(ra!==rb)return ra-rb;return a.nome.localeCompare(b.nome,'pt');});
-  const T=rows.reduce((a,g)=>({refeCome:a.refeCome+g.refeCome,refeBebe:a.refeBebe+g.refeBebe,amigos:a.amigos+g.amigos,poup:a.poup+g.poup,quota:a.quota+g.quota,tot:a.tot+g.tot}),{refeCome:0,refeBebe:0,amigos:0,poup:0,quota:0,tot:0});
+  const T=rows.reduce((a,g)=>({refeCome:a.refeCome+g.refeCome,refeBebe:a.refeBebe+g.refeBebe,amigos:a.amigos+g.amigos,poup:a.poup+g.poup,quota:a.quota+g.quota,tshirts:a.tshirts+g.tshirts,tot:a.tot+g.tot}),{refeCome:0,refeBebe:0,amigos:0,poup:0,quota:0,tshirts:0,tot:0});
   // agregado do grupo por dia/refeição
   const aggRCome={},aggRBebe={},aggC={};
   ms.forEach(m=>{
@@ -11781,6 +12007,11 @@ function saldosMembrosHtml(){
   T.refsCome=Object.values(aggRCome).sort((a,b)=>oKey(a)-oKey(b)).map(a=>({k:`${a.dia} · ${a.ref} — ${a.n} 🧑`,v:rnd(a.v,2)}));
   T.refsBebe=Object.values(aggRBebe).sort((a,b)=>oKey(a)-oKey(b)).map(a=>({k:`${a.dia} · ${a.ref} — ${a.n} 🧑`,v:rnd(a.v,2)}));
   T.convsList=Object.values(aggC).sort((a,b)=>oKey(a)-oKey(b)).map(a=>({k:`${a.dia} · ${a.ref} — ${a.n} conv.`,v:rnd(a.v,2)}));
+  // T-shirts do grupo: agrupadas por tipologia (é assim que a fatura vem)
+  const aggTS={};
+  ms.forEach(m=>(m._tshirts||[]).forEach(x=>{(aggTS[x.tipo]=aggTS[x.tipo]||{tipo:x.tipo,n:0,v:0});aggTS[x.tipo].n+=1/x.partes;aggTS[x.tipo].v+=x.v;}));
+  T.tshirtsList=Object.values(aggTS).sort((a,b)=>tsTipoIdx(a.tipo)-tsTipoIdx(b.tipo))
+    .map(a=>({k:`${tsIcon(a.tipo)} ${a.tipo} — ${Number(rnd(a.n,2)).toLocaleString('pt-PT',{maximumFractionDigits:2})}`,v:rnd(a.v,2)}));
 
   const expIt=(icon,lbl,total,list)=>{
     if(!list||!list.length||total<=0.005)
@@ -11848,6 +12079,7 @@ function saldosMembrosHtml(){
       ${expIt('🍽','Refeições',g.refeCome,g.refsCome)}
       ${g.refeBebe>0.005?expIt('🍺','Só bebida',g.refeBebe,g.refsBebe):''}
       ${expIt('👥','Amigos',g.amigos,g.convsList)}
+      ${g.tshirts>0.005?expIt('👕','T-shirts',g.tshirts,g.tshirtsList):''}
       ${grupo?expIt('➕','Quota Extra',g.quota,g.quotaList):quotaDet(g)}
       ${grupo?expIt('🐖','Poupança',g.poup,g.poupList):poupDet(g)}
       ${grupo?'':mvHtml(g._m)}
@@ -11861,7 +12093,7 @@ function saldosMembrosHtml(){
         <li><b>Homens</b> — ≥ limiar de presença <b>1.00</b>; veio &gt;1× <b>0.50</b>; veio 1× <b>0.25</b>; nunca <b>0</b>.</li>
         <li><b>Mulheres</b> — ≥ limiar <b>0.25</b>; veio &gt;1× <b>0.20</b>; veio 1× <b>0.10</b>; nunca <b>0</b>.</li>
       </ul>
-      <p style="font-variant-numeric:tabular-nums">Total a repartir = <b>${eur(cDesp)}</b> <i style="color:var(--faint)">(despesas)</i> − <b>${eur(cRef)}</b> <i style="color:var(--faint)">(receita de refeições dos membros)</i> − <b>${eur(cConv)}</b> <i style="color:var(--faint)">(receita convidados)</i> − <b>${eur(cMeal)}</b> <i style="color:var(--faint)">(receita mealheiros)</i> + <b>${eur(fundo)}</b> <i style="color:var(--faint)">(fundo de reserva)</i> = <b>${eur(BN3)}</b>.</p>
+      <p style="font-variant-numeric:tabular-nums">Total a repartir = <b>${eur(cDesp)}</b> <i style="color:var(--faint)">(despesas)</i> − <b>${eur(cRef)}</b> <i style="color:var(--faint)">(receita de refeições dos membros)</i> − <b>${eur(cConv)}</b> <i style="color:var(--faint)">(receita convidados)</i> − <b>${eur(cMeal)}</b> <i style="color:var(--faint)">(receita mealheiros)</i>${cTs>0.005?` − <b>${eur(cTs)}</b> <i style="color:var(--faint)">(t-shirts cobradas)</i>`:''} + <b>${eur(fundo)}</b> <i style="color:var(--faint)">(fundo de reserva)</i> = <b>${eur(BN3)}</b>.</p>
       <p style="font-variant-numeric:tabular-nums">Quota do membro = <b>${eur(BN3)}</b> × fator ÷ soma dos fatores.</p>
       <p style="border-top:1px solid var(--line);padding-top:9px"><b>Poupança</b> — sobre o valor final de cada membro (já depois da quota extra) acrescem dois valores:</p>
       <ul style="margin:6px 0 0;padding-left:18px;line-height:1.55">
@@ -11899,7 +12131,7 @@ function saldosMembrosHtml(){
         <div class="av" style="background:var(--gold)">Σ</div>
         <div class="nm">Total do Grupo<small>${rows.length} membros</small></div>
         <div class="amt">${eur(rnd(T.tot,2))}</div><span class="rs-arrow">▼</span>
-      </div>${det({refeCome:rnd(T.refeCome,2),refeBebe:rnd(T.refeBebe,2),amigos:rnd(T.amigos,2),poup:rnd(T.poup,2),quota:rnd(T.quota,2),refsCome:T.refsCome,refsBebe:T.refsBebe,convsList:T.convsList,quotaList,poupList},true)}</div>`;
+      </div>${det({refeCome:rnd(T.refeCome,2),refeBebe:rnd(T.refeBebe,2),amigos:rnd(T.amigos,2),poup:rnd(T.poup,2),quota:rnd(T.quota,2),tshirts:rnd(T.tshirts,2),tshirtsList:T.tshirtsList,refsCome:T.refsCome,refsBebe:T.refsBebe,convsList:T.convsList,quotaList,poupList},true)}</div>`;
   }
   h+='</div>';
   return h;

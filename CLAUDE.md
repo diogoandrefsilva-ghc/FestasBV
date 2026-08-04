@@ -90,8 +90,17 @@ Uma linha de `convidados` pode valer **várias bocas**: guarda-se o nome de quem
 - Migração: `db/convidados_acompanhantes.sql`. Tolerante: sem ela, `CONV_AC_COLS=false`, os campos ficam escondidos e cada convidado vale 1 pessoa.
 
 ## T-shirts (separador 👕)
-Levantamento das t-shirts a encomendar. **Hoje não entra em nenhuma conta** — quotas, saldos e cash-flows ignoram isto.
-> **Previsto (ainda NÃO implementado — não avançar sem o dono decidir):** a fatura das t-shirts vai ser um **cash-flow pago por alguém** e o valor entra no **saldo individual** de cada membro segundo a imputação (`imputadoA`), e não pela fórmula das quotas (fator/presenças). Falta saber como vem a fatura e como se formam os preços — sobretudo o que fazer quando o total faturado não bate certo com a soma da grelha (portes, descontos). A peça de imputação já existe para alimentar isto; o que falta é o canal de imputação direta no `calcular()`.
+Levantamento das t-shirts a encomendar **e** a fatura delas, que **entra nas contas** (desde `db/tshirts_cashflow.sql`).
+
+### A fatura (cash-flow 👕, só admin)
+Uma despesa de `tipo='T-shirts'` paga por alguém, mais **três preços — Homem, Mulher, Criança** — e um **desconto**, guardados no evento (`tshirt_preco_*`, `tshirt_desconto`). Valor da despesa = Σ(nº × preço) − desconto.
+- **Cada t-shirt é cobrada a quem lhe está imputada**, ao preço da tipologia, e entra no `m.V` como as refeições e os convidados. Partilhada = partes iguais, arredondamento no fim. Aparece no detalhe do saldo (`👕 T-shirts`), na ficha do membro e no relatório por pessoa.
+- **Não passa pela fórmula das quotas.** A despesa sai da bolsa indireta (`F20`/`baseIndireta`) e da base da quota extra (`baseQuota` desconta o `tsTot`) — senão o dinheiro das t-shirts espalhava-se por toda a gente pelo fator/presenças, que é o que isto evita. Se mexeres no `calcular()`, não desfaças isto.
+- **O desconto não se abate a ninguém**: os membros pagam o preço de tabela e a diferença fica como **saldo credor do MEO** (entra no `saldoGrupo` e alivia a quota extra de todos). Por isso não existe como termo no `calcular()` — é só a diferença entre o cobrado (`tsTot`) e o pago (`totTSdesp`).
+- `tsTot` é a **soma do que caiu nos membros**, nunca a soma dos preços: nomes fora do plantel não geram cobrança e assim as contas do grupo fecham sempre.
+- **Uma fatura por ano** — o formulário abre a que existir e grava por cima. O tipo `T-shirts` fica trancado no editor genérico de cash-flows, para não se poder trocar por outro (e mandar o dinheiro para o rateio).
+- Sem preços definidos não se cobra nada: as encomendas voltam a ser só levantamento. O **Reset cash-flows** põe os preços a zero junto com as despesas.
+- O preço por tipologia **manda sobre** o preço por tamanho da grelha (que fica como estimativa enquanto não há fatura), para não haver dois valores para a mesma t-shirt.
 - Uma linha = **uma t-shirt**: nome de quem a veste + tipologia (Homem/Mulher/Criança) + tamanho. Cada um mete quantas quiser; mexe nas suas e nas do cônjuge, o admin em tudo.
 - A **grelha de tamanhos** (`tshirt_tamanhos`) é global e só do admin (Definições › T-shirts); o **preço** é opcional — com tudo a 0 a app não fala em dinheiro.
 - `tamanho` guarda-se como **texto, não FK**: apagar um tamanho da grelha não mexe nas encomendas já feitas (ficam marcadas "fora da grelha").
@@ -99,7 +108,7 @@ Levantamento das t-shirts a encomendar. **Hoje não entra em nenhuma conta** —
 - **Trancar a encomenda** (`eventos.tshirts_trancadas`, `db/tshirts_trancar.sql`): quando a encomenda já seguiu, o admin fecha-a em Definições › T-shirts e a partir daí só ele mexe. É **por ano** e independente do fecho de contas. Imposto no servidor: as policies "self" exigem `tshirts_abertas()`. Sem a migração, `TS_LOCK_COL=false` e o interruptor fica escondido.
 - **Quem pede** só é escolhível pelo admin; para os outros o campo fica trancado no próprio nome (a editar, mantém quem lá está — pode ser o cônjuge).
 - Relatório PDF próprio (`buildTshirtsReport`): pedidos por pessoa (colunas de largura fixa, iguais em todos os quadros) + total por tipologia/tamanho, e o "Por conta de" a fechar.
-- Migração: `db/tshirts.sql`. Tolerante: sem ela, `TSHIRTS_TABLE=false` e o separador nem aparece.
+- Migrações: `db/tshirts.sql` (tolerante: sem ela `TSHIRTS_TABLE=false` e o separador nem aparece) e `db/tshirts_cashflow.sql` (sem ela `TS_CF_COLS=false`, o cash-flow 👕 fica escondido e as t-shirts não entram em conta nenhuma).
 
 ## Crianças (filhos + convidados-criança)
 **Não pagam nada.** Não entram no `calcular()` — existem só para se saber quantas bocas há por refeição (compras/cozinha). Se mexeres em quotas ou saldos, as crianças não têm de aparecer lá.
