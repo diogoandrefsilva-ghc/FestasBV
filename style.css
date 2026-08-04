@@ -1275,9 +1275,6 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
    Selo discreto no cartão (só o emoji: 🎁 / 📦) e, no modal de adicionar, as
    duas origens como cartões-chip a toda a largura. */
 .stk-org{flex:0 0 auto;font-size:12px;line-height:1;opacity:.9}
-/* Botão de adicionar no cabeçalho do Stock: compacto, para o título "Gestão de
-   Stock" continuar numa linha só em ecrãs estreitos */
-#view-stock .cmp-hdr .btn.stk-add{padding:8px 11px;font-size:12.5px;white-space:nowrap}
 .stk-org-pick{display:flex;gap:8px;margin-top:6px}
 .stk-org-pick .sd-chip{flex:1 1 0;min-width:0;flex-direction:column;align-items:flex-start;gap:3px;padding:9px 11px;border-radius:13px;text-align:left}
 .stk-org-pick .sd-chip b{font-size:13px;font-weight:700;color:var(--ink)}
@@ -1596,16 +1593,22 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .catsug-art{flex:1;font-size:13px;min-width:0;overflow-wrap:anywhere}
 .catsug-row select{flex:0 0 46%;max-width:46%;margin-top:0}
 
-/* Cabeçalho da Shop List / do Stock: título à esquerda, ações à direita.
-   O `margin-left:auto` é o que as segura no canto superior DIREITO quando o
-   título é comprido e a fila passa para a linha de baixo — sem ele o
-   space-between do cabeçalho encostava-as à esquerda. */
-.cmp-hdr-acts{display:flex;align-items:center;gap:8px;flex:0 1 auto;flex-wrap:wrap;justify-content:flex-end;margin-left:auto}
-/* Ações secundárias só com ícone (📷 ler foto, ✨ normalizar/categorizar,
-   🔎 pesquisar): quadradas, sem texto. São todas de admin ou de uso diário —
-   quem cá anda sabe o que fazem, e escritas por extenso empurravam o ＋ Artigo
-   para uma segunda linha e tiravam as ações do canto superior direito. */
-.cmp-hdr-acts .btn.hdr-ico{padding-left:10px;padding-right:10px;letter-spacing:0;white-space:nowrap;background:var(--panel2);border:1px solid var(--line);color:var(--muted)}
+/* Cabeçalho da Shop List / do Stock: título à esquerda, ações à direita, tudo
+   na MESMA linha — é para lá caberem que os botões são todos só ícone.
+   O `margin-left:auto` segura-as no canto direito mesmo quando não cabem e a
+   fila desce de linha (o space-between do cabeçalho encostava-as à esquerda).
+   As folgas são curtas de propósito: com quatro botões na Shop List são elas
+   que decidem se a linha aguenta um ecrã de 360px. */
+.cmp-hdr{gap:8px}
+.cmp-hdr-acts{display:flex;align-items:center;gap:7px;flex:0 1 auto;flex-wrap:wrap;justify-content:flex-end;margin-left:auto}
+/* Ações só com ícone (📷 ler foto, ✨ normalizar/categorizar, 🔎 pesquisar,
+   ＋ adicionar): quadradas, sem texto. Sendo uma app de uso diário — e as de
+   arrumação só de admin — quem cá anda sabe o que fazem; por extenso não
+   cabiam na linha do título. O que fazem está no title/aria-label. O ＋ da
+   Shop List fica verde (é A ação do separador); o do Stock continua discreto,
+   que ali o stock entra sobretudo pelas compras. */
+.cmp-hdr-acts .btn.hdr-ico{padding-left:9px;padding-right:9px;letter-spacing:0;white-space:nowrap;background:var(--panel2);border:1px solid var(--line);color:var(--muted)}
+.cmp-hdr-acts .btn.prim.hdr-ico{background:var(--barrete);border-color:var(--barrete);color:#fff}
 
 /* ── Pesquisa de artigos (Shop List + Stock) ──
    Botão 🔎 no cabeçalho + caixa de filtro por baixo dos sub-separadores. O

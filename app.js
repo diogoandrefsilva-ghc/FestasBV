@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v188 · 2026-08-03 · Pesquisa 🔎 na Shop List e no Stock; ações do cabeçalho só com ícone, encostadas ao canto superior direito';
+const APP_BUILD = 'v188 · 2026-08-03 · Pesquisa 🔎 na Shop List e no Stock; cabeçalhos com as ações só em ícone, na mesma linha do título';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -6231,7 +6231,7 @@ function renderCompras(){
       ${isAdmin()?`<button class="btn write-action hdr-ico" id="shop-norm-btn" aria-label="Normalizar artigos" onclick="shopNormOpen()" title="Normalizar: juntar grafias do mesmo artigo (chouriço/chouriços…), categorizar o que falta, pedidos repetidos e despensa">✨</button>`:''}
       ${SHOP_TAB!=='hist'?buscaBtn(SHOP_BUSCA,'toggleShopBusca'):''}
       <button class="btn write-action lfoto-btn hdr-ico" data-busy="⏳" aria-label="Adicionar artigos a partir de uma foto da lista" onclick="listaFotoPick()" title="Ler uma foto da lista (câmara ou galeria) e adicionar os artigos de uma vez" ${canW&&!fechadas?'':'disabled'}>📷</button>
-      <button class="btn prim write-action" onclick="openShopItemModal()" ${canW?'':'disabled'}>＋ Artigo</button>
+      <button class="btn prim write-action hdr-ico" aria-label="Adicionar artigo" title="Adicionar artigo à lista" onclick="openShopItemModal()" ${canW?'':'disabled'}>＋</button>
     </div>
   </div>`;
 
@@ -6451,10 +6451,10 @@ function renderStock(){
   const aiBtn=(CATS_TABLE&&canEdit&&catNamesPorCategorizar().length)
     ?`<button class="btn write-action hdr-ico" id="stk-catsug-btn" aria-label="Sugerir categorias" onclick="catSugerir()" title="Pedir à AI categorias para os artigos que ainda não têm">✨</button>`:'';
   // Stock que não veio de compras (ofertas, sobras do ano anterior)
-  const addBtn=canEdit?`<button class="btn ghost write-action stk-add" id="stk-add-btn" onclick="stkAddOpen()" title="Stock que não veio de compras (ofertas, ano anterior)">＋ Stock</button>`:'';
+  const addBtn=canEdit?`<button class="btn ghost write-action stk-add hdr-ico" id="stk-add-btn" aria-label="Adicionar stock" onclick="stkAddOpen()" title="Adicionar stock que não veio de compras (ofertas, sobras do ano anterior)">＋</button>`:'';
   // 🔎 só quando há stock: numa lista vazia não há nada para procurar
   const buscaB=arrTodos.length?buscaBtn(STOCK_BUSCA,'toggleStockBusca'):'';
-  let h=`<div class="cmp-hdr"><div class="cmp-hdr-title sf">🧺 Gestão de Stock</div><div class="cmp-hdr-acts">${buscaB}${addBtn}${aiBtn}</div></div>`;
+  let h=`<div class="cmp-hdr"><div class="cmp-hdr-title sf">🧺 Stock</div><div class="cmp-hdr-acts">${buscaB}${addBtn}${aiBtn}</div></div>`;
   h+=`<div class="note" style="margin-top:2px;margin-bottom:8px">${canEdit?'Toca num artigo para o alocar às refeições e categorias — as contas recalculam sozinhas.':'Toca num artigo para ver como está alocado às refeições e categorias.'}</div>`;
   if(!arrTodos.length){el.innerHTML=h+`<div class="empty sf">Ainda não há stock. Regista uma compra itemizada, importa uma fatura${canEdit?' ou usa <b>＋ Stock</b> para o que não foi comprado (ofertas, sobras do ano anterior)':''}.</div>`;return;}
   if(STOCK_BUSCA)h+=buscaCaixa('stk-busca',STOCK_Q,'Procurar artigo, marca ou categoria…','setStockQ');
