@@ -307,6 +307,7 @@ body.no-write .write-action{display:none!important}
 /* Detalhe em modo consulta (não-admin): campos bloqueados */
 .modal.ro-fields input,.modal.ro-fields select,.modal.ro-fields textarea{pointer-events:none!important;opacity:.7;background:var(--panel2)}
 .modal.ro-fields .cfq,.modal.ro-fields .cf-quando,.modal.ro-fields .sd-chip,.modal.ro-fields .sd-list{pointer-events:none!important;opacity:.7}
+.modal.ro-fields .cfp-toggle,.modal.ro-fields .cfp-btn,.modal.ro-fields .cfp-del{pointer-events:none!important;opacity:.5}
 .pres-btn.locked{opacity:.4;cursor:default;pointer-events:none}
 .pres-day-hdr.past{opacity:.55}
 .pres-day-hdr.today{color:var(--campino)}
@@ -943,6 +944,24 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .cf-quando-hint{font-size:11px;color:var(--faint);margin-top:6px;line-height:1.4}
 .cf-desc-count{float:right;font-size:10.5px;font-weight:600;color:var(--faint);letter-spacing:.02em}
 .cf-desc-count.full{color:#B5453B}
+/* Despesa paga por vários — uma linha por pagador (quem + quanto pôs) */
+.cfp-toggle{width:100%;margin-top:8px;padding:9px 12px;border-radius:10px;border:1.5px dashed var(--line);background:transparent;color:var(--barrete);font-size:12.5px;font-weight:700;cursor:pointer;transition:.15s;font-family:inherit}
+.cfp-toggle:active{background:rgba(30,122,77,.06);transform:scale(.98)}
+.cfp-box{margin-top:4px;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:11px 12px}
+.cfp-hdr{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-bottom:7px}
+.cfp-row{display:flex;gap:7px;align-items:center;margin-bottom:7px}
+/* `.modal input,select{width:100%;padding:12px}` (acima) apanha estes campos —
+   daí a especificidade e as medidas próprias: numa linha cabem três coisas. */
+.cfp-row select.cfp-who{flex:1 1 auto;width:auto;min-width:0;padding:9px 26px 9px 10px;font-size:14px;background-position:right 8px center}
+.cfp-row input.cfp-val{flex:0 0 88px;width:88px;padding:9px 10px;font-size:14px;text-align:right}
+.cfp-del{flex:0 0 30px;height:30px;border-radius:8px;border:1px solid var(--line);background:#FFFDF6;color:var(--muted);font-size:13px;line-height:1;cursor:pointer;transition:.15s;padding:0}
+.cfp-del:active{transform:scale(.92);color:var(--red)}
+.cfp-actions{display:flex;gap:7px;margin-top:9px}
+.cfp-btn{flex:1;padding:8px 6px;border-radius:9px;border:1px solid var(--line);background:#FFFDF6;color:var(--muted);font-size:11.5px;font-weight:700;cursor:pointer;transition:.15s;font-family:inherit}
+.cfp-btn:active{transform:scale(.97);border-color:var(--barrete);color:var(--barrete)}
+.cfp-hint{font-size:11px;color:var(--faint);margin-top:8px;line-height:1.45}
+.cfp-hint.ok{color:var(--green);font-weight:600}
+.cfp-hint.bad{color:var(--red);font-weight:600}
 
 /* ═══ COMPRAS / SHOPLIST ═══ */
 /* Com o 📷 são três ações no cabeçalho da Shop List (Normalizar · Foto ·
