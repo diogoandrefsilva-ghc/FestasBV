@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v188 · 2026-08-03 · Pesquisa 🔎 na Shop List e no Stock; cabeçalhos com as ações só em ícone, na mesma linha do título';
+const APP_BUILD = 'v189 · 2026-08-04 · Detalhar despesa do cash-flow sem fatura e sem a lista: itens à mão e despesas previstas itemizadas';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -1599,8 +1599,8 @@ function renderCashFlows(){
       // Com um destino filtrado, a linha que fez a compra entrar na lista fica
       // marcada — é a resposta a "o que é que esta compra tem a ver com isto?"
       const lines=subs.map(l=>`<div class="cft-sub${cfFilterDest!=='all'&&l.key===cfFilterDest?' on':''}"><span>${shopTipoIcon(l.sub)} ${l.sub}${l.dia?' · '+l.dia:''}${l.obs?' · <i>'+escHtml(l.obs)+'</i>':''}</span>${one?'':`<span>−${eur(l.valor)}</span>`}</div>`).join('');
-      return `<div class="card cft-card b-despesa" onclick="openCompra('${cf.compraId}')">
-        <div class="cft-kind k-despesa sf">🛒 Compra · lista</div>
+      return `<div class="card cft-card b-despesa${cf.prevista?' cft-prevista':''}" onclick="openCompra('${cf.compraId}')">
+        <div class="cft-kind k-despesa sf">${cf.prevista?'📌 Prevista · detalhada':'🛒 Compra · lista'}</div>
         <div class="cft-l1"><div class="cft-title">${escHtml(cf.line1)}</div><span class="cft-v neg">−${eur(cf.valor)}</span></div>
         ${cf.line2?`<div class="cft-meta">${truncRef(cf.line2)}</div>`:''}
         ${subs.length?`<div class="cft-subs"><div class="cft-subs-h sf">onde entra</div>${lines}</div>`:''}
@@ -1655,7 +1655,7 @@ function groupCompraCfs(list){
     if(cf.type==='despesa'&&cf.compraId){
       let g=byId[cf.compraId];
       if(!g){
-        g={type:'despesa',isCompra:true,compraId:cf.compraId,date:cf.date,icon:'🛒',label:'Compra',
+        g={type:'despesa',isCompra:true,compraId:cf.compraId,date:cf.date,icon:'🛒',label:'Compra',prevista:cf.prevista,
            line1:'',line2:cf.line2,valor:0,sign:'neg',people:cf.people?[...cf.people]:[],lines:[],dests:[],_desc:''};
         byId[cf.compraId]=g;out.push(g);
       }
@@ -1666,7 +1666,7 @@ function groupCompraCfs(list){
       if(!g._desc&&cf.line1&&cf.line1!=='Compras'&&cf.line1!=='(sem descrição)')g._desc=cf.line1;
     }else out.push(cf);
   });
-  out.forEach(g=>{if(g.isCompra){g.line1=g._desc||'Compra da lista';g.subN=g.lines.length;}});
+  out.forEach(g=>{if(g.isCompra){g.line1=g._desc||(g.prevista?'Despesa prevista':'Compra da lista');g.subN=g.lines.length;}});
   return out;
 }
 
@@ -2451,7 +2451,7 @@ function updateCfForm(){
       <input type="text" id="cf-desc" placeholder="Ex: Continente — Bacalhau" maxlength="30" oninput="updDescCount('cf')">
       <label>Observações</label>
       <textarea id="cf-obs" placeholder="Detalhe adicional (opcional)" rows="2"></textarea>
-      ${STOCK_TABLE?`<button class="btn ghost" style="width:100%;margin-top:14px" onclick="cfAbrirCompraFatura()">🧾 Importar / detalhar fatura →<span style="display:block;font-size:11px;font-weight:400;color:var(--muted);margin-top:2px;text-transform:none;letter-spacing:0">detalhar itens e alocar a refeições/tipos (stock)</span></button>`:''}`;
+      ${STOCK_TABLE?`<button class="btn ghost" style="width:100%;margin-top:14px" onclick="cfAbrirDetalhe()">🧾 Detalhar por artigo →<span style="display:block;font-size:11px;font-weight:400;color:var(--muted);margin-top:2px;text-transform:none;letter-spacing:0">itens e preços — à mão ou a partir da fatura</span></button>`:''}`;
     setTimeout(cfTipoChanged,10);
   } else if(cfDir==='mealheiro'){
     f.innerHTML=`
@@ -6858,15 +6858,25 @@ async function purgeShopItem(id){   // apagar definitivamente do histórico (só
    Os artigos escolhidos (picker) são marcados como comprados e ligados ao
    mesmo compra_id; cada linha vira uma despesa. */
 let compraEdit={id:null,lines:[],lotes:[],det:false};
-function openCompra(compraId){
+/* opts (só na entrada pelo cash-flow, ver cfAbrirDetalhe):
+   detalhe=true → itemização de uma despesa: o picker da lista fica fechado e por
+   marcar, o detalhe abre com uma linha em branco e aparece o 📅/📌.
+   prevista=true → despesa ainda não paga; tipo/obs vêm do cash-flow. */
+function openCompra(compraId,opts){
   if(!shopCanWrite()){toast('Sem permissão','bad');return;}
   if(contasFechadas()&&!compraId){toast('Contas fechadas — só pagamentos de dívidas','bad');return;}
   const isEdit=!!compraId;
+  const o=opts||{};
   // det = "preço por artigo" (defeito nas compras novas): preenche-se qtd+€ por
   // artigo e as linhas de despesa geram-se sozinhas. Na edição abre no separador
   // que corresponde ao que a compra tem (lotes → por artigo; senão por totais) —
   // os dois tabuladores ficam disponíveis e AMBAS as partes são gravadas.
-  compraEdit={id:compraId||null,lines:[],lotes:[],det:!isEdit||stockArr().some(l=>l.compraId===compraId)};
+  // Prevista: na edição lê-se do que está gravado (despesa sem data de despesa)
+  const prevGrav=isEdit&&(DATA.despesas||[]).some(d=>d.compraId===compraId&&!d.dataDesp);
+  compraEdit={id:compraId||null,lines:[],lotes:[],det:!isEdit||stockArr().some(l=>l.compraId===compraId),
+    detalhe:!!o.detalhe,prevista:!!o.prevista||prevGrav,
+    tipoPrev:(prevGrav?((DATA.despesas||[]).find(d=>d.compraId===compraId)||{}).tipo:o.tipo)||'Gerais',
+    obsPrev:prevGrav?'':(o.obs||'')};
   const linked=isEdit?shopArr().filter(x=>x.compraId===compraId):[];
   // Linhas: (edição) reconstruídas das despesas da compra; (nova) semeadas dos meus artigos
   if(isEdit){
@@ -6896,14 +6906,22 @@ function openCompra(compraId){
   // não têm policy de self-update/delete). Criar uma compra nova é permitido a membros.
   const ro=isEdit&&!isAdmin();
   // Em consulta o título não promete edição: é só "Detalhe Compra".
-  document.getElementById('shop-buy-title').textContent=isEdit?(ro?'Detalhe Compra':'Editar Compra'):'Registar Compra';
-  document.getElementById('shop-buy-save').textContent=isEdit?'Guardar':'Registar compra';
+  document.getElementById('shop-buy-title').textContent=isEdit?(ro?'Detalhe Compra':'Editar Compra'):(o.detalhe?'Detalhar Despesa':'Registar Compra');
+  document.getElementById('shop-buy-save').textContent=isEdit?'Guardar':(o.detalhe?'Registar despesa':'Registar compra');
   document.getElementById('shop-buy-del').style.display=(isEdit&&isAdmin())?'':'none';
   document.getElementById('shop-buy-save').style.display=ro?'none':'';
   const who0=isEdit?((DATA.despesas.find(d=>d.compraId===compraId)||{}).quem||myPrimaryName()):myPrimaryName();
   document.getElementById('shop-buy-who').innerHTML=isAdmin()?memberOptions(who0):myMemberOptions(who0);
   const date0=isEdit?((DATA.despesas.find(d=>d.compraId===compraId)||{}).dataDesp||new Date().toISOString().slice(0,10)):new Date().toISOString().slice(0,10);
-  document.getElementById('shop-buy-date').value=date0;
+  document.getElementById('shop-buy-date').value=compraEdit.prevista?'':date0;
+  // 📅/📌 só onde faz sentido: a detalhar uma despesa do cash-flow, ou a editar
+  // uma que ficou prevista. Registar a compra da lista é sempre coisa já paga.
+  const qw=document.getElementById('sb-quando'),qh=document.getElementById('sb-quando-hint');
+  const mostraQuando=(!ro)&&(o.detalhe||compraEdit.prevista);
+  if(qw)qw.style.display=mostraQuando?'':'none';
+  if(qh)qh.style.display=mostraQuando?'':'none';
+  const dw=document.getElementById('shop-buy-date-wrap');if(dw)dw.style.display='';   // limpa um 📌 anterior
+  if(mostraQuando)shopBuyQuandoApply(compraEdit.prevista?'prevista':'real');
   const desc0=isEdit?((DATA.despesas.find(d=>d.compraId===compraId&&d.desc&&d.desc!=='Compras')||{}).desc||''):'';
   document.getElementById('shop-buy-desc').value=desc0;
   shopBuyDescCount();
@@ -6915,7 +6933,9 @@ function openCompra(compraId){
   const pend=shopArr().filter(x=>shopIsPending(x)||(shopIsRemoved(x)&&shopMine(x)));
   // Em consulta o picker não se mexe: mostrar os pendentes só encheria a lista
   // de artigos que nada têm a ver com esta compra — ficam os que lhe ficaram ligados.
-  const pickItems=ro?linked:(isEdit?linked.concat(pend.filter(x=>x.compraId!==compraId)):pend);
+  // Prevista: nada da lista pode ser marcado — dar por comprado o que ainda não
+  // se comprou tirava o pedido da lista de quem tem de o ir buscar.
+  const pickItems=compraEdit.prevista?[]:(ro?linked:(isEdit?linked.concat(pend.filter(x=>x.compraId!==compraId)):pend));
   // O picker vive num bloco recolhível DEPOIS do detalhe por artigo (junto ao
   // "＋ Artigo fora da lista") — abre sozinho quando ainda nada está marcado.
   let pl='';
@@ -6925,9 +6945,12 @@ function openCompra(compraId){
     // os meus" (comportamento antigo) para o picker não abrir vazio. Os restantes
     // ficam listados mas por marcar — dá para os juntar à mão. Na edição: os que
     // já estão ligados a esta compra.
+    // A detalhar uma despesa do cash-flow ninguém pré-marca nada: a despesa é o
+    // que o utilizador vier a escrever, não o carrinho da lista. O bloco fica
+    // fechado e por marcar — quem quiser fechar pedidos da lista abre-o.
     const mineOwn=pickItems.filter(it=>shopMineOwn(it));
     const anyCart=mineOwn.some(it=>it.noCarrinho);
-    const defOn=it=>shopMineOwn(it)&&(!anyCart||it.noCarrinho);
+    const defOn=it=>!o.detalhe&&shopMineOwn(it)&&(!anyCart||it.noCarrinho);
     const nOn=pickItems.filter(it=>isEdit?it.compraId===compraId:defOn(it)).length;
     let rows='';
     pickItems.slice().sort((a,b)=>a.artigo.localeCompare(b.artigo,'pt')).forEach(it=>{
@@ -6937,22 +6960,27 @@ function openCompra(compraId){
         <span>${escHtml(it.artigo)}${ql?' <i>('+escHtml(ql)+')</i>':''}${shopIsRemoved(it)?' ⚠️':''}</span>
         <span class="cmp-badge">${shopTipoIcon(it.tipo)}${shopIsMeal(it.tipo)&&it.dataValor?' '+fmtDiaMes(it.dataValor):' '+it.tipo}</span></label>`;
     });
-    pl=`<details class="pick-det"${(nOn&&!ro)?'':' open'}>
+    pl=`<details class="pick-det" id="shop-buy-pick"${(nOn&&!ro)||o.detalhe?'':' open'}>
       <summary>🛒 Artigos da lista <span class="cmp-count" id="shop-pick-count">${ro?pickItems.length:nOn+'/'+pickItems.length}</span><span class="pick-chev">›</span></summary>
       ${rows}
       ${ro?'':'<div class="note" style="margin:6px 0 12px">Os artigos marcados saem da lista e ficam ligados a esta compra.</div>'}
     </details>`;
   }
   document.getElementById('shop-buy-body').innerHTML=(ro?'<div class="note" style="margin-bottom:10px">🔒 Só o administrador pode editar uma compra já registada.</div>':'')+
-    `<div class="cmp-sort" style="margin-top:14px">
+    // Prevista já gravada: os artigos vivem nas observações da despesa, não em
+    // lotes — reabrir o "preço por artigo" só daria para os somar duas vezes.
+    ((compraEdit.prevista&&isEdit)?'':`<div class="cmp-sort" style="margin-top:14px">
       <span class="sd-chip" id="shop-mode-det" onclick="compraSetMode(true)">💶 Preço por artigo</span>
       <span class="sd-chip" id="shop-mode-tot" onclick="compraSetMode(false)">∑ Só totais</span>
-    </div>`+
+    </div>`)+
     '<div id="shop-buy-lotes"></div>'+pl+
     '<div id="shop-buy-lines-sec"><div class="cmp-pick sf" style="margin-top:14px">Repartição do valor</div><div id="shop-buy-lines"></div>'+
     (ro?'':'<button class="btn ghost" id="shop-buy-addline" style="width:100%;margin-top:8px" onclick="compraAddLine()">＋ Outro gasto</button>')+'</div>';
   if(!isEdit)compraSeedLines();
   compraRenderLines();
+  // A detalhar uma despesa: uma linha em branco à espera do 1.º artigo — sem
+  // isto o modal abria vazio e o "＋ Artigo fora da lista" passava despercebido.
+  if(o.detalhe&&!compraEdit.lotes.length)compraEdit.lotes.push({free:true,artigo:'',qtd:'',valor:'',destino:compraDestPad(),keys:[]});
   compraRefreshLotes();
   compraApplyMode();
 
@@ -6968,6 +6996,29 @@ function openCompra(compraId){
   document.body.classList.add('no-scroll');
 }
 function closeShopBuyModal(){document.getElementById('shop-buy-bg').classList.remove('show');document.body.classList.remove('no-scroll');}
+/* 📅 Com data ↔ 📌 Prevista (só na itemização de uma despesa do cash-flow).
+   Prevista = ainda não foi comprado: sem data de pagamento, sem artigos da lista
+   e — ver saveCompra — sem lotes de stock. */
+function shopBuyQuandoApply(q){
+  const on=q==='prevista';
+  compraEdit.prevista=on;
+  document.querySelectorAll('#sb-quando .cfq').forEach(el=>el.classList.toggle('on',el.dataset.q===q));
+  const w=document.getElementById('shop-buy-date-wrap');if(w)w.style.display=on?'none':'';
+  const h=document.getElementById('sb-quando-hint');
+  if(h)h.textContent=on?'Ainda não comprado — entra nas contas, mas sem data de pagamento nem entrada em stock.':'Despesa já realizada, com data conhecida.';
+  const d=document.getElementById('shop-buy-date');
+  if(d){if(on)d.value='';else if(!d.value)d.value=new Date().toISOString().slice(0,10);}
+  const pick=document.getElementById('shop-buy-pick');
+  if(pick){
+    pick.style.display=on?'none':'';
+    if(on){pick.querySelectorAll('.shop-pick:checked').forEach(c=>{c.checked=false;});pick.open=false;}
+  }
+}
+function setShopBuyQuando(q){
+  shopBuyQuandoApply(q);
+  compraPickChanged();   // refaz lotes/linhas com o picker já limpo
+  compraRenderLotes();
+}
 // Alterna "preço por artigo" ↔ "só totais": mostra/esconde as secções e refaz
 // as linhas de detalhe (no modo por artigo entram também os artigos de tipo)
 function compraSetMode(det){compraEdit.det=!!det;compraRefreshLotes();compraSeedLines();compraApplyMode();}
@@ -7207,8 +7258,11 @@ function compraLoteHtml(l,i){
   const head=`<div class="lote-head">${name}${tag}${l.free?`<button class="lote-x" title="Remover" onclick="compraDelLote(${i})">✕</button>`:''}</div>`;
   // Uma só linha: qtd + preço + destino (o destino desce para o bloco de split
   // quando o artigo está dividido por vários destinos)
-  const hasSplit=!!(l.splits&&l.splits.length);
-  const destInline=(STOCK_TABLE&&!hasSplit)
+  // Prevista: sem destino por artigo — não há stock a alocar e o tipo da
+  // despesa é um só, escolhido à cabeça (compraPrevTipoHtml).
+  const prev=!!compraEdit.prevista;
+  const hasSplit=!prev&&!!(l.splits&&l.splits.length);
+  const destInline=(STOCK_TABLE&&!prev&&!hasSplit)
     ?destBtnHtml(l.destino,`compraDestPick(${i})`)+`<button class="lote-split-btn" title="Dividir por vários destinos" onclick="compraLoteAddSplit(${i})">⇄</button>`
     :'';
   const fields=`<div class="lote-row">
@@ -7238,7 +7292,7 @@ function compraLoteHtml(l,i){
     ?`<div class="lote-hint">📝 Pediste <b>${escHtml(String(l._qtdPedida))}</b> no carrinho; o talão tem <b>${escHtml(l.qtd||'—')}</b> — é esta que entra em stock.</div>`:'';
   // Ligação manual ao pedido genérico (só nos lotes livres/extras): guarda o
   // stock debaixo de "Batatas Fritas" mantendo a marca em `artigo`
-  const reqInline=(STOCK_TABLE&&l.free)?(()=>{
+  const reqInline=(STOCK_TABLE&&!prev&&l.free)?(()=>{
     const nomes=[...new Set(shopArr().filter(it=>!shopIsRemoved(it)).map(it=>it.artigo))].sort((a,b)=>a.localeCompare(b,'pt'));
     const cur=l._listArt||'';
     const known=nomes.some(n=>shopSameArtigo(n,cur));
@@ -7262,13 +7316,25 @@ function compraRenderLotes(){
   // preço ficar em branco). Fica visível na revisão, antes de registar.
   const miss=ls.filter(l=>!l.free&&l._fat==='miss');
   const missWarn=miss.length?`<div class="lote-miss-warn">⚠️ <b>${miss.length} artigo(s) do carrinho não apareceram na fatura.</b> Se deixares o preço em branco, ficam na lista <b>por tratar</b> (não são dados como comprados):<ul>${miss.map(l=>'<li>'+escHtml(l.artigo)+(l.qtd?' <i style="color:var(--muted);font-style:normal">('+escHtml(l.qtd)+')</i>':'')+'</li>').join('')}</ul></div>`:'';
+  const prev=!!compraEdit.prevista;
   cont.innerHTML=`<div class="cmp-pick sf" style="margin-top:14px">💶 Preço por artigo</div>`+
+    (prev?compraPrevTipoHtml():'')+
     ls.map((l,i)=>compraLoteHtml(l,i)).join('')+
     missWarn+
-    `<button class="btn ghost" style="width:100%;margin-top:8px" onclick="compraAddLote()">＋ Artigo fora da lista</button>`+
-    '<div class="note">A app propõe o destino de cada artigo (refeição ou tipo) — confirma ou muda. Podes dividir um artigo por vários destinos com ⇄. Reajustas tudo depois no separador 🧺 Stock.</div>'+
-    faturaExtrasHtml();
+    `<button class="btn ghost" style="width:100%;margin-top:8px" onclick="compraAddLote()">＋ ${prev?'Outro artigo':'Artigo fora da lista'}</button>`+
+    (prev
+      ?'<div class="note">📌 Prevista: os artigos ficam como <b>detalhe da despesa</b> — não entram no 🧺 Stock nem dão pedidos da lista por comprados. Quando pagares, edita a despesa e mete a data.</div>'
+      :'<div class="note">A app propõe o destino de cada artigo (refeição ou tipo) — confirma ou muda. Podes dividir um artigo por vários destinos com ⇄. Reajustas tudo depois no separador 🧺 Stock.</div>')+
+    (prev?'':faturaExtrasHtml());
   compraUpdateTotal();
+}
+/* Tipo da despesa prevista: um só para o detalhe todo (o destino por artigo não
+   se aplica — nada disto vai a stock). Refeições entram como tipo puro, sem dia:
+   uma prevista sem data-valor cai no rateio indireto, como as do cash-flow. */
+function compraPrevTipoHtml(){
+  const t=compraEdit.tipoPrev||'Gerais';
+  return `<div class="lote-req-inline" style="margin:0 0 8px">🧾 tipo de despesa <select onchange="compraEdit.tipoPrev=this.value">${
+    SHOP_TIPOS.map(x=>`<option value="${x}"${x===t?' selected':''}>${shopTipoIcon(x)} ${x}</option>`).join('')}</select></div>`;
 }
 function compraSplitNoteUpd(i){const l=(compraEdit.lotes||[])[i];const el=document.getElementById('split-note-'+i);if(l&&el)el.innerHTML=compraSplitNote(l);}
 function compraLoteSplitQty(i,j,v){const l=(compraEdit.lotes||[])[i];if(!l||!l.splits||!l.splits[j])return;l.splits[j].qtd=v;compraSplitNoteUpd(i);}
@@ -7288,9 +7354,16 @@ function compraLoteDelSplit(i,j){
 }
 function compraDestPick(i){const l=(compraEdit.lotes||[])[i];if(!l)return;openDestPicker(l.destino,v=>{l.destino=v;l.splits=null;compraRenderLotes();},'Alocar '+(l.artigo||'artigo'));}
 function compraSplitDestPick(i,j){const l=(compraEdit.lotes||[])[i];if(!l||!l.splits||!l.splits[j])return;openDestPicker(l.splits[j].destino,v=>{l.splits[j].destino=v;compraRenderLotes();},'Destino');}
+/* Destino de defeito de um artigo escrito à mão. A vir do cash-flow herda o tipo
+   que lá estava escolhido (Gerais/Bebidas/Cerveja — as refeições precisam de dia,
+   que só o seletor de destino sabe dar). */
+function compraDestPad(){
+  const t=compraEdit&&compraEdit.tipoPrev;
+  return ['Gerais','Bebidas','Cerveja'].includes(t)?t:'Gerais';
+}
 function compraAddLote(){
   compraEdit.lotes=compraEdit.lotes||[];
-  compraEdit.lotes.push({free:true,artigo:'',qtd:'',valor:'',destino:'Gerais',keys:[]});
+  compraEdit.lotes.push({free:true,artigo:'',qtd:'',valor:'',destino:compraDestPad(),keys:[]});
   compraRenderLotes();
 }
 function compraDelLote(i){const l=compraEdit.lotes[i];if(!l||!l.free)return;compraEdit.lotes.splice(i,1);compraRenderLotes();}
@@ -7597,21 +7670,27 @@ async function listaFotoApply(){
    o modo "preço por artigo" — matching difuso com os artigos marcados; linhas
    sem correspondência entram como artigos fora da lista. O utilizador revê
    sempre antes de registar. */
-/* Despesa de cash-flow → itemização/fatura: uma despesa com fatura é, por baixo,
-   uma compra sem artigos de lista (mesmo compra_id, entra em Comprados + Stock e
-   fica movível). Herda quem/data/descritivo do cash-flow e abre logo o seletor. */
-function cfAbrirCompraFatura(){
+/* Despesa de cash-flow → itemização: uma despesa detalhada é, por baixo, uma
+   compra sem artigos de lista (mesmo compra_id, entra em Comprados + Stock e
+   fica movível). Herda quem/data/descritivo/tipo do cash-flow.
+   NÃO abre a câmara nem pré-marca a lista de compras: detalhar uma despesa não
+   é registar o carrinho da lista — muita despesa não tem fatura nenhuma (e a
+   prevista nem foi paga ainda). Quem tiver fatura carrega no 📷 lá dentro;
+   quem não tiver escreve os artigos, que já vêm com uma linha em branco. */
+function cfAbrirDetalhe(){
   const who=(document.getElementById('cf-who')||{}).value||'';
   const date=(document.getElementById('cf-date')||{}).value||'';
   const desc=((document.getElementById('cf-desc')||{}).value||'').trim();
+  const obs=((document.getElementById('cf-obs')||{}).value||'').trim();
+  const tipo=(document.getElementById('cf-tipo')||{}).value||'Gerais';
+  const prevista=isCfPrevista('cf');
   closePayModal();
-  openCompra(null);
+  openCompra(null,{detalhe:true,prevista,tipo,obs});
   const w=document.getElementById('shop-buy-who');
   if(who&&w&&[...w.options].some(o=>o.value===who))w.value=who;
   const d=document.getElementById('shop-buy-date');if(date&&d)d.value=date;
   const e=document.getElementById('shop-buy-desc');if(desc&&e){e.value=desc.slice(0,30);shopBuyDescCount();}
   compraSetMode(true);   // itemização = modo "preço por artigo"
-  faturaPick();
 }
 function faturaPick(){const i=document.getElementById('fatura-file');if(i)i.click();}
 async function faturaChosen(inp){
@@ -7847,13 +7926,15 @@ async function saveCompra(){
   const who=document.getElementById('shop-buy-who').value;
   const date=document.getElementById('shop-buy-date').value;
   const desc=(document.getElementById('shop-buy-desc').value||'').trim().slice(0,30);
+  const prevista=!!compraEdit.prevista;
   if(!who){toast('Quem pagou?','bad');return;}
-  if(!date){toast('Indica a data','bad');return;}
+  if(!prevista&&!date){toast('Indica a data','bad');return;}
   if(!isAdmin()&&!MY_NAMES.includes(who)){toast('Só podes registar compras tuas ou do cônjuge','bad');return;}
   // Detalhe por artigo: lotes de stock (qtd+€, alocados por FIFO) e despesas
   // diretas por tipo/refeição (tipoFix e artigos fora da lista com destino tipo)
   const det=!!compraEdit.det;
   const lotes=[];const tipoRows={};const naoDetetados=[];   // tipoRows: 'Tipo'|'Tipo|data' → artigos; naoDetetados: artigos do carrinho sem preço
+  const prevItens=[];   // prevista: artigos que ficam só como detalhe da despesa
   const byBrandParents=[];   // pedidos cobertos por marcas (só ficam "comprados" se alguma marca for confirmada)
   // "Só totais" numa compra nova: o detalhe está escondido → não entra no registo
   for(const l of ((det||isEdit)?(compraEdit.lotes||[]):[])){
@@ -7871,6 +7952,9 @@ async function saveCompra(){
       continue;
     }
     if(!artigo){toast('Indica o nome do artigo detalhado','bad');return;}
+    // Prevista: ainda não foi comprado, logo não é stock nem cobre pedidos —
+    // os artigos ficam como detalhe (observações) de uma única despesa.
+    if(prevista){prevItens.push({artigo,qtd:(l.qtd||'').trim(),valor:v});continue;}
     if(STOCK_TABLE){
       // Unificado: TODO item detalhado vira um lote movível. O destino/split
       // guia a alocação (refeição, tipo puro, ou FIFO se ficar "por alocar").
@@ -7905,8 +7989,17 @@ async function saveCompra(){
     const vazia=(!v||v<=0)&&!(ln.obs||'').trim();
     if(vazia&&(lotes.length||Object.keys(tipoRows).length||compraEdit.lines.length>1))continue;
     if(!v||v<=0){toast(`Preenche o valor de "${shopGroupLabel(ln.tipo,ln.dataValor)}"`,'bad');return;}
-    if(shopIsMeal(ln.tipo)&&!ln.dataValor){toast(`Escolhe a refeição em "${ln.tipo}"`,'bad');return;}
-    rows.push({tipo:ln.tipo,data_valor:shopIsMeal(ln.tipo)?ln.dataValor:null,valor:v,obs:(ln.obs||'').trim()});
+    // Prevista não tem data-valor (é isso que a mantém fora da alocação direta),
+    // por isso também não se lhe exige a refeição.
+    if(!prevista&&shopIsMeal(ln.tipo)&&!ln.dataValor){toast(`Escolhe a refeição em "${ln.tipo}"`,'bad');return;}
+    rows.push({tipo:ln.tipo,data_valor:(!prevista&&shopIsMeal(ln.tipo))?ln.dataValor:null,valor:v,obs:(ln.obs||'').trim()});
+  }
+  // Detalhe de uma despesa prevista → uma linha só, com os artigos por escrito
+  if(prevItens.length){
+    const lista=prevItens.map(x=>x.artigo+(x.qtd?' ('+x.qtd+')':'')).join(', ');
+    rows.push({tipo:compraEdit.tipoPrev||'Gerais',data_valor:null,
+      valor:rnd(prevItens.reduce((a,x)=>a+x.valor,0),2),
+      obs:[(compraEdit.obsPrev||'').trim(),lista].filter(Boolean).join(' · ')});
   }
   // Despesas diretas geradas do detalhe: uma linha por tipo (ou tipo+refeição)
   for(const k in tipoRows){
@@ -7916,8 +8009,9 @@ async function saveCompra(){
   // O valor dos lotes entra numa linha "🧺 Stock" (Gerais → bolsa comum); o
   // calcular() move depois o alocado para as refeições via stock_lotes
   if(lotes.length)rows.push({tipo:'Gerais',data_valor:null,valor:rnd(lotes.reduce((a,l)=>a+l.valor,0),2),obs:STOCK_OBS});
-  if(!rows.length){toast(det?'Preenche o € dos artigos (ou marca artigos da lista)':'Adiciona pelo menos uma linha','bad');return;}
-  const checkedIds=[...document.querySelectorAll('.shop-pick:checked')].map(c=>+c.value);
+  if(!rows.length){toast(prevista?'Preenche o nome e o € de pelo menos um artigo':(det?'Preenche o € dos artigos (ou marca artigos da lista)':'Adiciona pelo menos uma linha'),'bad');return;}
+  // Prevista não fecha pedidos da lista (o picker nem aparece)
+  const checkedIds=prevista?[]:[...document.querySelectorAll('.shop-pick:checked')].map(c=>+c.value);
   // Artigos marcados no carrinho mas não detetados na fatura (sem preço): ficam
   // por tratar (não comprados). Avisa e confirma antes de registar.
   const missIds=new Set(shopArr().filter(x=>checkedIds.includes(x._id)&&naoDetetados.some(n=>shopSameArtigo(n.artigo,x.artigo))).map(x=>x._id));
@@ -7936,7 +8030,7 @@ async function saveCompra(){
       DATA.despesas=(DATA.despesas||[]).filter(d=>d.compraId!==compraId);
     }
     // Cria uma despesa por linha
-    const payload=rows.map(r=>({evento_id:DATA._sbId,quem:who,data_desp:date,data_valor:r.data_valor,descricao:desc||'Compras',tipo:r.tipo,valor:r.valor,observacoes:r.obs||null,compra_id:compraId}));
+    const payload=rows.map(r=>({evento_id:DATA._sbId,quem:who,data_desp:prevista?null:date,data_valor:r.data_valor,descricao:desc||'Compras',tipo:r.tipo,valor:r.valor,observacoes:r.obs||null,compra_id:compraId}));
     const ins=await queueWrite(()=>sbReq('POST','despesas',payload,{Prefer:'return=representation'}));
     payload.forEach((r,i)=>DATA.despesas.push({_id:ins&&ins[i]?ins[i].id:null,quem:r.quem,dataDesp:r.data_desp,dataValor:r.data_valor,desc:r.descricao,tipo:r.tipo,valor:r.valor,obs:r.observacoes||'',compraId:compraId}));
     // Lotes de stock: substitui os da compra e aloca por FIFO (cada lote já vê
@@ -7991,7 +8085,7 @@ async function saveCompra(){
     syncMirror();marcaGuardado();
     btn.disabled=false;closeShopBuyModal();
     CALC=calcular(JSON.parse(JSON.stringify(DATA)));renderAll();
-    toast(isEdit?'Compra atualizada ✓':'Compra registada ✓','ok');
+    toast(isEdit?'Compra atualizada ✓':(prevista?'Despesa prevista registada ✓':'Compra registada ✓'),'ok');
   }catch(e){setSync('err','erro ao guardar');btn.disabled=false;toast(permErrorMsg(e),'bad');}
 }
 

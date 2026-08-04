@@ -51,6 +51,20 @@ Registar um pagamento de dívida continua a ser um ato do admin — o que mudou 
 - O admin é avisado pelo Telegram porque o pedido escreve no `historico` (`tipo:'pagamento'`); as Edge Functions não foram tocadas — a frase vem redigida da app, como todas.
 - Migração: `db/pagamentos_pendentes.sql`. Tolerante: sem ela, `PAGPEND_TABLE=false` e a opção volta a ser só do admin.
 
+## Detalhar uma despesa do cash-flow (🧾 Detalhar por artigo)
+Botão no formulário de despesa do cash-flow. Por baixo é uma **compra sem artigos de lista** (mesmo `compra_id`), mas a entrada é outra e **não se comporta como registar o carrinho**:
+- **Não abre a câmara.** Abria (`faturaPick()` no arranque) e quem não tem fatura ficava sem saída. O 📷 continua lá dentro, para quem tiver.
+- **Não pré-marca a lista de compras.** O bloco "🛒 Artigos da lista" fica **fechado e por marcar** (`defOn` devolve `false` com `detalhe:true`) — a despesa é o que a pessoa escrever, não o carrinho dela. Quem quiser fechar pedidos da lista abre o bloco.
+- Abre já com **uma linha de artigo em branco**; herda quem/data/descritivo/**tipo**/observações do cash-flow.
+
+### 📌 Prevista itemizada
+O 📅/📌 do cash-flow segue para o modal da compra (`sb-quando`, só visível a detalhar uma despesa ou a editar uma que ficou prevista — registar a compra da lista é sempre coisa já paga).
+- **Prevista não é compra.** `data_desp` fica a `null` e os artigos **não geram lotes de stock**: dar entrada em stock do que ainda não se comprou fazia a lista dar pedidos por cobertos e mandava quem vai às compras de mãos a abanar. Ficam como **detalhe (observações) de uma única despesa**, com o tipo escolhido à cabeça (`compraPrevTipoHtml`) — nunca destino por artigo.
+- **Também não fecha pedidos da lista**: o picker nem aparece e `checkedIds` é forçado a vazio.
+- Sem `data_valor` (nem para Almoço/Jantar), tal como a prevista do cash-flow — é isso que a mantém fora da alocação direta e a faz cair no rateio indireto (F20).
+- Ao editar uma prevista já gravada os tabuladores 💶/∑ desaparecem: os artigos vivem nas observações, e reabrir o "preço por artigo" só daria para os somar duas vezes. Quando for paga, mete-se a data em 📅 e ela passa a movimento datado (**sem** virar stock — isso quer o registo normal da compra).
+- Editar despesas continua a ser **só do admin** (as despesas não têm policy de self-update). Nada de novo, mas conta: quem regista uma prevista não a fecha sozinho.
+
 ## Artigos de despensa (🫙)
 Há **dois tipos de artigo** na lista de compras e antes disto eram tratados como um só:
 - **Consumível** — a procura escala com as refeições (carne, batatas, ovos). Dois pedidos para dias diferentes **não são duplicados** — é por isso que o passo dos Pedidos Repetidos se recusa a juntar entre refeições (`shopRepFusiveis`). Não mexer nisso.
