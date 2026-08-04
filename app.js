@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v189 · 2026-08-04 · Detalhar despesa do cash-flow sem fatura e sem a lista: itens à mão e despesas previstas itemizadas';
+const APP_BUILD = 'v190 · 2026-08-04 · Detalhar despesa fala em stock, não na lista; artigos herdam a refeição do cash-flow';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -6876,7 +6876,7 @@ function openCompra(compraId,opts){
   compraEdit={id:compraId||null,lines:[],lotes:[],det:!isEdit||stockArr().some(l=>l.compraId===compraId),
     detalhe:!!o.detalhe,prevista:!!o.prevista||prevGrav,
     tipoPrev:(prevGrav?((DATA.despesas||[]).find(d=>d.compraId===compraId)||{}).tipo:o.tipo)||'Gerais',
-    obsPrev:prevGrav?'':(o.obs||'')};
+    dataValorPrev:o.dataValor||'',obsPrev:prevGrav?'':(o.obs||'')};
   const linked=isEdit?shopArr().filter(x=>x.compraId===compraId):[];
   // Linhas: (edição) reconstruídas das despesas da compra; (nova) semeadas dos meus artigos
   if(isEdit){
@@ -6961,9 +6961,9 @@ function openCompra(compraId,opts){
         <span class="cmp-badge">${shopTipoIcon(it.tipo)}${shopIsMeal(it.tipo)&&it.dataValor?' '+fmtDiaMes(it.dataValor):' '+it.tipo}</span></label>`;
     });
     pl=`<details class="pick-det" id="shop-buy-pick"${(nOn&&!ro)||o.detalhe?'':' open'}>
-      <summary>🛒 Artigos da lista <span class="cmp-count" id="shop-pick-count">${ro?pickItems.length:nOn+'/'+pickItems.length}</span><span class="pick-chev">›</span></summary>
+      <summary>${o.detalhe?'🔗 Responde a pedidos da lista?':'🛒 Artigos da lista'} <span class="cmp-count" id="shop-pick-count">${ro?pickItems.length:nOn+'/'+pickItems.length}</span><span class="pick-chev">›</span></summary>
       ${rows}
-      ${ro?'':'<div class="note" style="margin:6px 0 12px">Os artigos marcados saem da lista e ficam ligados a esta compra.</div>'}
+      ${ro?'':`<div class="note" style="margin:6px 0 12px">${o.detalhe?'Opcional. Marca só os pedidos que <b>esta</b> despesa fecha — esses saem da lista e ficam ligados a ela.':'Os artigos marcados saem da lista e ficam ligados a esta compra.'}</div>`}
     </details>`;
   }
   document.getElementById('shop-buy-body').innerHTML=(ro?'<div class="note" style="margin-bottom:10px">🔒 Só o administrador pode editar uma compra já registada.</div>':'')+
@@ -7296,7 +7296,7 @@ function compraLoteHtml(l,i){
     const nomes=[...new Set(shopArr().filter(it=>!shopIsRemoved(it)).map(it=>it.artigo))].sort((a,b)=>a.localeCompare(b,'pt'));
     const cur=l._listArt||'';
     const known=nomes.some(n=>shopSameArtigo(n,cur));
-    const opts=`<option value="">— pedido próprio —</option>`+
+    const opts=`<option value="">— não é da lista —</option>`+
       nomes.map(n=>`<option value="${escHtml(n)}"${shopSameArtigo(n,cur)?' selected':''}>${escHtml(n)}</option>`).join('')+
       (cur&&!known?`<option value="${escHtml(cur)}" selected>${escHtml(cur)}</option>`:'');
     return `<div class="lote-req-inline">🔗 pertence a <select onchange="compraLoteSetReq(${i},this.value)">${opts}</select></div>`;
@@ -7317,13 +7317,20 @@ function compraRenderLotes(){
   const miss=ls.filter(l=>!l.free&&l._fat==='miss');
   const missWarn=miss.length?`<div class="lote-miss-warn">⚠️ <b>${miss.length} artigo(s) do carrinho não apareceram na fatura.</b> Se deixares o preço em branco, ficam na lista <b>por tratar</b> (não são dados como comprados):<ul>${miss.map(l=>'<li>'+escHtml(l.artigo)+(l.qtd?' <i style="color:var(--muted);font-style:normal">('+escHtml(l.qtd)+')</i>':'')+'</li>').join('')}</ul></div>`:'';
   const prev=!!compraEdit.prevista;
-  cont.innerHTML=`<div class="cmp-pick sf" style="margin-top:14px">💶 Preço por artigo</div>`+
+  // Quem vem do cash-flow não vem da lista: o que está a fazer é meter artigos
+  // em 🧺 Stock. Ligar a um pedido da lista é opcional (🔗 no artigo, ou o bloco
+  // dos pedidos mais abaixo) — por isso aqui não se fala em "fora da lista",
+  // que só faz sentido a quem partiu do carrinho.
+  const dtl=!!compraEdit.detalhe;
+  cont.innerHTML=`<div class="cmp-pick sf" style="margin-top:14px">${prev?'💶 Preço por artigo':dtl?'🧺 Artigos desta despesa':'💶 Preço por artigo'}</div>`+
     (prev?compraPrevTipoHtml():'')+
     ls.map((l,i)=>compraLoteHtml(l,i)).join('')+
     missWarn+
-    `<button class="btn ghost" style="width:100%;margin-top:8px" onclick="compraAddLote()">＋ ${prev?'Outro artigo':'Artigo fora da lista'}</button>`+
+    `<button class="btn ghost" style="width:100%;margin-top:8px" onclick="compraAddLote()">＋ ${(prev||dtl)?'Artigo':'Artigo fora da lista'}</button>`+
     (prev
       ?'<div class="note">📌 Prevista: os artigos ficam como <b>detalhe da despesa</b> — não entram no 🧺 Stock nem dão pedidos da lista por comprados. Quando pagares, edita a despesa e mete a data.</div>'
+      :dtl
+      ?'<div class="note">Cada artigo entra em <b>🧺 Stock</b> com o destino que lhe deres (refeição ou tipo) — divides por vários com ⇄ e reajustas depois no separador Stock. Se algum responde a um pedido da lista, liga-o em <b>🔗 pertence a</b> ou marca-o mais abaixo.</div>'
       :'<div class="note">A app propõe o destino de cada artigo (refeição ou tipo) — confirma ou muda. Podes dividir um artigo por vários destinos com ⇄. Reajustas tudo depois no separador 🧺 Stock.</div>')+
     (prev?'':faturaExtrasHtml());
   compraUpdateTotal();
@@ -7354,11 +7361,13 @@ function compraLoteDelSplit(i,j){
 }
 function compraDestPick(i){const l=(compraEdit.lotes||[])[i];if(!l)return;openDestPicker(l.destino,v=>{l.destino=v;l.splits=null;compraRenderLotes();},'Alocar '+(l.artigo||'artigo'));}
 function compraSplitDestPick(i,j){const l=(compraEdit.lotes||[])[i];if(!l||!l.splits||!l.splits[j])return;openDestPicker(l.splits[j].destino,v=>{l.splits[j].destino=v;compraRenderLotes();},'Destino');}
-/* Destino de defeito de um artigo escrito à mão. A vir do cash-flow herda o tipo
-   que lá estava escolhido (Gerais/Bebidas/Cerveja — as refeições precisam de dia,
-   que só o seletor de destino sabe dar). */
+/* Destino de defeito de um artigo escrito à mão. A vir do cash-flow herda o que
+   lá estava escolhido: o tipo, e a refeição quando a data-valor casa mesmo com
+   uma refeição definida (senão o destino ficava a apontar para lado nenhum). */
 function compraDestPad(){
-  const t=compraEdit&&compraEdit.tipoPrev;
+  const t=(compraEdit&&compraEdit.tipoPrev)||'Gerais';
+  const dv=(compraEdit&&compraEdit.dataValorPrev)||'';
+  if(shopIsMeal(t))return (dv&&dvMeals(t).some(r=>r.data===dv))?t+'|'+dv:'Gerais';
   return ['Gerais','Bebidas','Cerveja'].includes(t)?t:'Gerais';
 }
 function compraAddLote(){
@@ -7683,9 +7692,10 @@ function cfAbrirDetalhe(){
   const desc=((document.getElementById('cf-desc')||{}).value||'').trim();
   const obs=((document.getElementById('cf-obs')||{}).value||'').trim();
   const tipo=(document.getElementById('cf-tipo')||{}).value||'Gerais';
+  const dataValor=(document.getElementById('cf-date2')||{}).value||'';
   const prevista=isCfPrevista('cf');
   closePayModal();
-  openCompra(null,{detalhe:true,prevista,tipo,obs});
+  openCompra(null,{detalhe:true,prevista,tipo,dataValor,obs});
   const w=document.getElementById('shop-buy-who');
   if(who&&w&&[...w.options].some(o=>o.value===who))w.value=who;
   const d=document.getElementById('shop-buy-date');if(date&&d)d.value=date;
