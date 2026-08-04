@@ -252,8 +252,10 @@ body.read-only .fab.green,body.contas-fechadas .fab.green{display:none!important
 .cf-opt:active{transform:scale(.95)}
 .cf-opt.on{border-color:var(--barrete);background:rgba(30,122,77,.09)}
 .cf-opt .cf-icon{font-size:22px;line-height:1}
-/* Etiqueta acompanha a largura do ecrã (a mais longa é "Pagar Dívida") — nunca quebra */
-.cf-opt .cf-lbl{font-size:clamp(7px,2.45vw,9.5px);font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.01em;text-align:center;line-height:1.2;white-space:nowrap}
+/* Etiqueta acompanha a largura do ecrã (a mais longa é "Pagar Dívida") — nunca
+   quebra, por isso o teto tem de dar para essa: com 5 tipos visíveis a coluna
+   fica em ~62px num telemóvel de 390px e a 9.5px o "Pagar Dívida" transbordava */
+.cf-opt .cf-lbl{font-size:clamp(6.5px,2.05vw,8.2px);font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0;text-align:center;line-height:1.2;white-space:nowrap}
 .cf-opt.on .cf-lbl{color:var(--barrete)}
 
 /* Inline row (value + date on same line) */

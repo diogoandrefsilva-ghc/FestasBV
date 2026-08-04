@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v193 · 2026-08-04 · Ícone novo da app (PWA): touro com a t-shirt MEO Alcochete 2026, agora também em 192/512 e com versão maskable para o Android';
+const APP_BUILD = 'v194 · 2026-08-04 · Cash Flows: etiqueta dos tipos um pouco mais pequena — o "Pagar Dívida" já não corta no telemóvel';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
