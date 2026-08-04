@@ -63,9 +63,10 @@ Duas datas, duas perguntas diferentes — e é isso que o segmentado do cash-flo
 
 ### 📌 Encomendado: a provisória vista da cozinha
 Uma provisória mexe em dinheiro, mas quem cozinha quer saber **com o que pode contar**. Três sítios mostram-na, e nenhum deles a dá por comprada:
-- **Custo da refeição** (`dirDetBody`): linha com 📌 e os artigos por baixo, lidos das **observações** — é lá que vive o detalhe de uma provisória itemizada (é uma despesa só, sem lotes). Sem isto via-se "Talho do Rui — 141 €" e mais nada.
+- **Uma marca só, não um alarme**: `*` à frente do nome, cor dourada e **uma legenda no fim do bloco** (`msl-leg-prov` / `rdc-det-leg`). Nada de 📌 por linha, etiqueta no título e caixa de aviso — é tudo a mesma informação repetida quatro vezes.
+- **Custo da refeição** (`dirDetBody`): aqui a linha é a **despesa** (cada linha tem de casar com um €), com os artigos por baixo, lidos das **observações** — é lá que vive o detalhe de uma provisória itemizada (é uma despesa só, sem lotes).
 - **Pedidos da lista ligados à provisória** (`shopEncomenda`): o picker do modal da compra **passou a valer no modo 📌**, mas com outro significado — os marcados ficam `estado='pendente'` **com `compra_id`** (a mesma escrita do "para stock"), nunca `comprado`. Ficam 📌 **encomendados**: saem do "Em falta"/carrinho **exatamente como o coberto por stock** (não há nada a comprar, e deixá-los lá era o convite a comprar duas vezes) e aparecem no bloco de baixo do cartão da refeição.
-- **Bloco 🧺 do cartão da refeição**: passa a "Comprado e encomendado" quando há provisórios, com **nota obrigatória** — o bloco chama-se Comprado e aquilo não foi comprado.
+- **Bloco 🧺 do cartão da refeição**: **artigo a artigo** (`provArtigos` parte as observações), não "estabelecimento + artigos por baixo" — quem cozinha lê ingredientes, não talões. O nome do sítio e o total vão para a legenda, que é onde ainda fazem falta. Sem itemização (provisória escrita só no cash-flow, sem `compra_id`) fica a própria despesa: é tudo o que existe.
 - **Quando a provisória é paga** (mete-se a data em 📅), deixa de ser provisória: os pedidos ligados **voltam à lista** por comprar. É a verdade — ninguém registou a compra, logo não há stock. É também o que faz o ciclo fechar: regista-se a compra a sério e aí sim os pedidos fecham e o stock entra.
 - Apagar a compra já soltava os pedidos ligados (`deleteCompra`); desmarcá-los no picker também (`toRelease`). Nada disto é novo — a provisória entra pelo mesmo caminho.
 

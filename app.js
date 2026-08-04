@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v197 · 2026-08-04 · Despesa paga por vários: no cash-flow da despesa — e na fatura das t-shirts — dá para repartir o que cada um pôs do bolso (uma linha por pagador, um cartão só nos Cash Flows), com divisão igual num toque';
+const APP_BUILD = 'v198 · 2026-08-04 · Provisórios na refeição sem alarido: artigo a artigo, com * e uma legenda no fim do bloco em vez de um aviso por linha';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -1309,13 +1309,19 @@ function renderAll(){
         // (o que veio de oferta/ano anterior entra na mesma, mas a 0 € — leva o
         // ícone da origem em vez do 🧺 para se perceber porque não custa nada)
         stockArr().forEach(l=>{if(!stockBacked(l)||!(l.qtd>0))return;const om=origemMeta(l);(l.alocacoes||[]).forEach(a=>{if(a.tipo===rd.ref&&a.data===rd.data&&+a.qtd>0)dirItems.push({desc:(om?om.ic:'🧺')+' '+l.artigo+' ('+loteQtdLabel(l,+a.qtd)+')',quem:om?om.lbl:'',valor:rnd(l.valor/l.qtd*a.qtd,2)});});});
-        /* Provisória: 📌 à cabeça e os artigos por baixo. O detalhe dela vive nas
-           observações (é uma despesa só, sem lotes), por isso sem esta linha a
-           refeição mostrava "Talho do Rui — 141 €" e mais nada. */
-        const dirDetBody=dirItems.length?`<div class="rdc-det-body">${dirItems.map(it=>{
+        /* Provisória: * à frente, cor própria e os artigos por baixo — o detalhe
+           dela vive nas observações (é uma despesa só, sem lotes), senão a
+           refeição mostrava "Talho do Rui — 141 €" e mais nada. Aqui a linha
+           continua a ser a DESPESA, não o artigo: esta é a conta do dinheiro e
+           cada linha tem de casar com um valor. A legenda do * fecha o bloco. */
+        let temProvDir=false;
+        const dirRows=dirItems.map(it=>{
           const prov=it.tipo!==undefined&&despProvisoria(it);
-          return `<div class="rdc-det-it${prov?' prov':''}"><span class="k">${prov?'📌 ':''}${escHtml(it.desc||'(sem descrição)')}${it.quem?`<small> · ${escHtml(it.quem)}</small>`:''}${(prov&&it.obs)?`<small class="rdc-det-obs">${escHtml(it.obs)}</small>`:''}</span><span class="v">${eur(it.valor||0)}</span></div>`;
-        }).join('')}</div>`:'';
+          if(prov)temProvDir=true;
+          const arts=prov?provArtigos(it).map(a=>a.artigo+(a.qtd?' ('+a.qtd+')':'')).join(', '):'';
+          return `<div class="rdc-det-it${prov?' prov':''}"><span class="k">${prov?'*':''}${escHtml(it.desc||'(sem descrição)')}${it.quem?`<small> · ${escHtml(it.quem)}</small>`:''}${arts?`<small class="rdc-det-obs">${escHtml(arts)}</small>`:''}</span><span class="v">${eur(it.valor||0)}</span></div>`;
+        }).join('');
+        const dirDetBody=dirItems.length?`<div class="rdc-det-body">${dirRows}${temProvDir?'<div class="rdc-det-leg"><b>*</b> provisório — ainda por comprar</div>':''}</div>`:'';
         let dirChipsRow='';
         if(dirTot>0){
           const drChip=`<div class="rdc-chips"><span class="rc cv">Despesa Refeição ${eur(dirTot)}</span></div>`;
@@ -5853,6 +5859,21 @@ function shopIsCovered(it){
   if(c)return c.aloc>0.0005&&c.falta<=0.0005;
   return mealStockAllocAnyFor(it.artigo,it.tipo,it.dataValor);
 }
+/* Artigos de uma despesa provisória. Vivem nas observações — "Artigo (qtd),
+   Artigo (qtd)", como saveCompra as escreve — porque uma provisória é UMA
+   despesa só, sem lotes; é a única forma de os mostrar um a um. Havendo nota
+   escrita à mão, ela vem antes e separada por " · " (daí ficar-se com o último
+   troço). Sem compra_id não houve itemização nenhuma: as observações são texto
+   livre e não se parte nada. */
+function provArtigos(d){
+  if(!d||!d.compraId)return [];
+  const s=String(d.obs||'').split(' · ').pop().trim();
+  if(!s)return [];
+  return s.split(/\s*,\s*/).filter(Boolean).map(t=>{
+    const m=t.match(/^(.*?)\s*\(([^()]*)\)$/);
+    return m?{artigo:m[1],qtd:m[2]}:{artigo:t,qtd:''};
+  });
+}
 /* Pedido da lista ligado a uma despesa PROVISÓRIA: já está encomendado (alguém
    contou com ele e já lhe sabe o preço), mas não foi comprado nem entrou em
    stock — por isso continua pendente. O que isto evita é a compra a dobrar:
@@ -6125,8 +6146,9 @@ function shopItemCard(it,mineView,noBadge,grouped,noLoja){
   if(covered){
     right='<span class="cmp-chip stock">🧺 em stock</span>';
   }else if(enc){
-    right='<span class="cmp-chip prov">📌 encomendado</span>';
-    sub+=`<div class="cmp-sub">📌 ${escHtml(enc.desc||'despesa provisória')} — ainda por comprar</div>`;
+    // Uma marca só: o chip. Qual a despesa fica no title — na lista o que
+    // interessa é "não compres isto", não o nome do talho.
+    right=`<span class="cmp-chip prov" title="${escHtml(enc.desc||'')} — provisório, ainda por comprar">* encomendado</span>`;
   }else if(mineView){
     // Checklist de compras: a bolinha marca "já está no carrinho físico".
     // Este estado é só para orientação de quem trata — os outros não o veem.
@@ -6419,8 +6441,9 @@ function mealShopSection(rd){
     // Coberto pelo stock conta como resolvido: não há nada a tratar nem a
     // comprar (é assim que a despensa já comprada aparece no bloco Comprado)
     const cob=!shopIsBought(it)&&shopIsCovered(it);
-    // Encomendado numa provisória: também não há nada a tratar — mas ainda não
-    // está cá, e a linha di-lo (📌, não ✓).
+    // Encomendado numa provisória: também não há nada a tratar. Marca-se só com
+    // * e a cor — a legenda no fim do bloco explica uma vez por todas (um aviso
+    // por linha era ruído, e são todos a mesma coisa).
     const enc=(!shopIsBought(it)&&!cob)?shopEncomenda(it):null;
     const done=shopIsBought(it)||cob||!!enc;
     const qtdTxt=shopQtyLabel(it);
@@ -6430,7 +6453,6 @@ function mealShopSection(rd){
     // resolver — o ＋🛒 da Shop List em botão de talão, um toque e o artigo é
     // meu. Em refeições passadas não há nada a tratar: fica só a constatação.
     const st=cob?'<span class="msl-st ok">🧺 em stock</span>'
-      :enc?`<span class="msl-st prov" title="${escHtml(enc.desc||'')} — despesa provisória, ainda por comprar">📌 encomendado</span>`
       :done?''
       :it.tratadoPor?mslWho(it.tratadoPor)
       :past?'<span class="msl-st falta">por tratar</span>'
@@ -6438,8 +6460,8 @@ function mealShopSection(rd){
     // Dica de stock: quanto está coberto, ou stock livre por alocar (botão de um
     // toque para alocar o livre a esta refeição). Ver shopStockHint/shopHintHtml.
     const hint=(!done&&!past)?shopHintHtml(it,'msl-hint',true):'';
-    return `<div class="msl-it${dim?' msl-dim':''}" onclick="openShopItemModal(${it._id})">
-      ${mslLead(it.artigo,qtdTxt,isDespensa(it.artigo))}${st}${hint}</div>`;
+    return `<div class="msl-it${dim?' msl-dim':''}${enc?' prov':''}" onclick="openShopItemModal(${it._id})"${enc?` title="${escHtml(enc.desc||'')} — provisório"`:''}>
+      ${mslLead((enc?'*':'')+it.artigo,qtdTxt,isDespensa(it.artigo))}${st}${hint}</div>`;
   };
   /* A loja NÃO vai em cada linha: nesta lista estreita a etiqueta caía para
      baixo numas linhas e não noutras (leitura aos solavancos). Vai antes como
@@ -6478,20 +6500,27 @@ function mealShopSection(rd){
   const despCoberto=items.filter(it=>!shopIsBought(it)&&shopIsCovered(it)&&isDespensa(it.artigo)
     &&!alocs.some(x=>shopSameArtigo(x.l.artigo,it.artigo)));
   const bought=items.filter(it=>shopIsBought(it)&&!temLote(it)).concat(despCoberto);
+  /* Artigo a artigo, como as outras linhas do bloco — quem cozinha lê ingredientes,
+     não talões. O nome do estabelecimento (e o total) ficam na legenda do fim: uma
+     linha "Talho do Rui 141 €" com os artigos por baixo obrigava a ler duas vezes
+     para saber o que havia. Sem itemização (provisória escrita só no cash-flow)
+     não há artigos nenhuns e fica a própria despesa, que é tudo o que existe. */
+  let nProvArts=0;
   const provLines=provs.map(({d,i})=>{
     const abre=d.compraId?`openCompra('${d.compraId}')`:`openCfDetail('despesas',${i})`;
-    return `<div class="msl-it prov" onclick="${abre}">
-      ${mslLead('📌 '+(d.desc||'Despesa provisória'),'')}<span class="msl-st prov">${eur(d.valor)}</span>
-      ${d.obs?`<div class="msl-prov-obs">${escHtml(d.obs)}</div>`:''}</div>`;
+    const arts=provArtigos(d);
+    nProvArts+=arts.length||1;
+    if(!arts.length)return `<div class="msl-it prov" onclick="${abre}" title="Provisório">
+      ${mslLead('*'+(d.desc||'Despesa provisória'),'')}<span class="msl-st prov">${eur(d.valor)}</span></div>`;
+    return arts.map(a=>`<div class="msl-it prov" onclick="${abre}" title="${escHtml(d.desc||'')} — provisório">
+      ${mslLead('*'+a.artigo,a.qtd)}</div>`).join('');
   }).join('');
   const nProv=enc.length+provs.length;
-  const nComp=alocs.length+bought.length+nProv;
-  // `tag` = etiqueta pequena a seguir ao título (o título é em maiúsculas
-  // espaçadas e não aguenta mais palavras sem partir em dois num ecrã estreito)
-  const det=(sub,lbl,cnt,body,tag)=>{
+  const nComp=alocs.length+bought.length+enc.length+nProvArts;
+  const det=(sub,lbl,cnt,body)=>{
     const k=key+sub;
     return `<details class="rdc-det msl-det"${MEAL_SHOP_OPEN[k]?' open':''} ontoggle="MEAL_SHOP_OPEN['${k}']=this.open">
-      <summary><span class="rdc-lbl">${lbl}</span>${tag||''}${cnt?`<span class="msl-count">${cnt}</span>`:''}<span class="rdc-det-arrow">›</span></summary>
+      <summary><span class="rdc-lbl">${lbl}</span>${cnt?`<span class="msl-count">${cnt}</span>`:''}<span class="rdc-det-arrow">›</span></summary>
       <div class="rdc-det-body">${body}</div>
     </details>`;
   };
@@ -6504,12 +6533,13 @@ function mealShopSection(rd){
       <button class="cmp-mini prim write-action msl-add" onclick="openShopItemModal(null,'${rd.ref}','${rd.data}')">＋ Ingrediente</button>
       <button class="cmp-mini prim write-action msl-add lfoto-btn" title="Ler uma foto da lista" onclick="listaFotoPick('${rd.ref}','${rd.data}')">📷 Foto</button>
     </div>`:'')):'';
-  // A nota é obrigatória com provisórios lá dentro: o bloco chama-se "Comprado"
-  // e isto ainda não foi comprado — sem ela, o cozinheiro dava a carne por posta.
-  const provNota=nProv?`<div class="msl-nota-prov">📌 <b>Provisório</b> — ainda não comprado nem em 🧺 Stock. Já conta no custo da refeição; quando for pago, regista-se a compra.</div>`:'';
+  /* Legenda do asterisco, uma só para o bloco todo — o bloco chama-se "Comprado"
+     e aquilo ainda não foi. Leva o estabelecimento e o total de cada provisória,
+     que é o que saiu das linhas ao passarem a artigo a artigo. */
+  const provQuem=provs.map(({d})=>`${escHtml(d.desc||'despesa provisória')} · ${eur(d.valor)}`).join(' · ');
+  const provLeg=nProv?`<div class="msl-leg-prov"><b>*</b> provisório — ainda por comprar${provQuem?': '+provQuem:''}</div>`:'';
   const compDet=nComp?det('|c','🧺 Comprado',nComp,
-    alocLines+bought.map(it=>lineOf(it,false)).join('')+enc.map(it=>lineOf(it,false)).join('')+provLines+provNota,
-    nProv?'<span class="msl-prov-tag">e 📌 encomendado</span>':''):'';
+    alocLines+bought.map(it=>lineOf(it,false)).join('')+enc.map(it=>lineOf(it,false)).join('')+provLines+provLeg):'';
   return `<div class="rdc sf msl" onclick="event.stopPropagation()">${past?compDet+listaDet:listaDet+compDet}</div>`;
 }
 
