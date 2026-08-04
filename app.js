@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v194 · 2026-08-04 · Cash Flows: etiqueta dos tipos um pouco mais pequena — o "Pagar Dívida" já não corta no telemóvel';
+const APP_BUILD = 'v195 · 2026-08-04 · Provisórias na cozinha: os artigos aparecem no custo da refeição, os pedidos da lista podem ficar 📌 encomendados (sem serem dados por comprados) e o bloco Comprado mostra o que está encomendado, com nota';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -1303,7 +1303,13 @@ function renderAll(){
         // (o que veio de oferta/ano anterior entra na mesma, mas a 0 € — leva o
         // ícone da origem em vez do 🧺 para se perceber porque não custa nada)
         stockArr().forEach(l=>{if(!stockBacked(l)||!(l.qtd>0))return;const om=origemMeta(l);(l.alocacoes||[]).forEach(a=>{if(a.tipo===rd.ref&&a.data===rd.data&&+a.qtd>0)dirItems.push({desc:(om?om.ic:'🧺')+' '+l.artigo+' ('+loteQtdLabel(l,+a.qtd)+')',quem:om?om.lbl:'',valor:rnd(l.valor/l.qtd*a.qtd,2)});});});
-        const dirDetBody=dirItems.length?`<div class="rdc-det-body">${dirItems.map(it=>`<div class="rdc-det-it"><span class="k">${escHtml(it.desc||'(sem descrição)')}${it.quem?`<small> · ${escHtml(it.quem)}</small>`:''}</span><span class="v">${eur(it.valor||0)}</span></div>`).join('')}</div>`:'';
+        /* Provisória: 📌 à cabeça e os artigos por baixo. O detalhe dela vive nas
+           observações (é uma despesa só, sem lotes), por isso sem esta linha a
+           refeição mostrava "Talho do Rui — 141 €" e mais nada. */
+        const dirDetBody=dirItems.length?`<div class="rdc-det-body">${dirItems.map(it=>{
+          const prov=it.tipo!==undefined&&despProvisoria(it);
+          return `<div class="rdc-det-it${prov?' prov':''}"><span class="k">${prov?'📌 ':''}${escHtml(it.desc||'(sem descrição)')}${it.quem?`<small> · ${escHtml(it.quem)}</small>`:''}${(prov&&it.obs)?`<small class="rdc-det-obs">${escHtml(it.obs)}</small>`:''}</span><span class="v">${eur(it.valor||0)}</span></div>`;
+        }).join('')}</div>`:'';
         let dirChipsRow='';
         if(dirTot>0){
           const drChip=`<div class="rdc-chips"><span class="rc cv">Despesa Refeição ${eur(dirTot)}</span></div>`;
@@ -5585,6 +5591,17 @@ function shopIsCovered(it){
   if(c)return c.aloc>0.0005&&c.falta<=0.0005;
   return mealStockAllocAnyFor(it.artigo,it.tipo,it.dataValor);
 }
+/* Pedido da lista ligado a uma despesa PROVISÓRIA: já está encomendado (alguém
+   contou com ele e já lhe sabe o preço), mas não foi comprado nem entrou em
+   stock — por isso continua pendente. O que isto evita é a compra a dobrar:
+   quem vê a lista sabe que aquele artigo já tem dono. Devolve a despesa (para
+   se poder dizer QUAL encomenda) ou null.
+   Assim que a provisória for paga, deixa de o ser e o pedido volta ao normal —
+   ainda ninguém o registou como compra, que é o que o faz entrar em stock. */
+function shopEncomenda(it){
+  if(!it||!it.compraId||shopIsBought(it)||shopIsRemoved(it))return null;
+  return (DATA.despesas||[]).find(d=>d.compraId===it.compraId&&despProvisoria(d))||null;
+}
 /* Modelo "lista durável": um pedido de refeição comprado PARA STOCK (a sua
    compra gerou um lote deste artigo) não é um fim — é uma necessidade cuja
    cobertura deriva da alocação do stock à refeição. Por isso não fica
@@ -5829,6 +5846,9 @@ function shopItemCard(it,mineView,noBadge,grouped,noLoja){
   // sem botão, sem chip de "quem trata" (a dica verde diz "coberto pelo stock").
   // Se a alocação mudar, o pedido volta sozinho ao estado normal.
   const covered=shopIsCovered(it);
+  // Encomendado numa provisória: como o coberto pelo stock, não há nada a
+  // comprar — mas ainda não está cá, por isso continua na lista (não some).
+  const enc=covered?null:shopEncomenda(it);
   let check='',right='',sub='';
   // "pedido por" aparece SEMPRE que se sabe quem pediu: também nas linhas de um
   // artigo agrupado (cada refeição pode ter sido pedida por outra pessoa) e nos
@@ -5842,6 +5862,9 @@ function shopItemCard(it,mineView,noBadge,grouped,noLoja){
   if(it.criadoPor)sub=`<div class="cmp-sub">pedido por ${escHtml(it.criadoPor)}</div>`;
   if(covered){
     right='<span class="cmp-chip stock">🧺 em stock</span>';
+  }else if(enc){
+    right='<span class="cmp-chip prov">📌 encomendado</span>';
+    sub+=`<div class="cmp-sub">📌 ${escHtml(enc.desc||'despesa provisória')} — ainda por comprar</div>`;
   }else if(mineView){
     // Checklist de compras: a bolinha marca "já está no carrinho físico".
     // Este estado é só para orientação de quem trata — os outros não o veem.
@@ -5860,7 +5883,7 @@ function shopItemCard(it,mineView,noBadge,grouped,noLoja){
   if(removed)sub=`<div class="cmp-sub alert">⚠️ removido por ${escHtml(it.cfDesc||'?')}${mineView?' — abre para largar':''}</div>`;
   // Dica de stock: no coberto o chip "em stock" já o diz (não se repete); nos
   // outros, a dica normal — incl. o botão de um toque para alocar o livre.
-  const hint=covered?'':shopHintHtml(it,'cmp-hint');
+  const hint=(covered||enc)?'':shopHintHtml(it,'cmp-hint');
   // A dica sai da coluna do artigo e vai para uma linha própria, a toda a largura
   // por baixo do cartão: assim não colide com o badge da refeição nem com o
   // botão do carrinho (nem fica cortada com "…").
@@ -6115,9 +6138,18 @@ function mealShopSection(rd){
     });
   });
   alocs.sort((a,b)=>a.l.artigo.localeCompare(b.l.artigo,'pt'));
+  /* 📌 Despesas provisórias desta refeição: ainda não foram compradas nem
+     entraram em stock, mas o custo já está contado na refeição — por isso
+     aparecem no bloco de baixo, para o cozinheiro saber com o que pode contar.
+     Os artigos que a compõem vivem nas observações (uma provisória é uma
+     despesa só), daí a sub-linha. */
+  const provs=[];
+  (DATA.despesas||[]).forEach((d,i)=>{
+    if(despProvisoria(d)&&d.tipo===rd.ref&&d.dataValor===rd.data)provs.push({d,i});
+  });
   const past=rd.data<hojeISO();
   const canAdd=shopCanWrite()&&!contasFechadas()&&!past;
-  if(!items.length&&!alocs.length&&!canAdd)return '';
+  if(!items.length&&!alocs.length&&!provs.length&&!canAdd)return '';
   const key=rd.data+'|'+rd.ref;
   const alocLines=alocs.map(x=>`<div class="msl-it stk" onclick="openLoteModal(${x.l._id})">
       ${mslLead(x.l.artigo,loteQtdLabel(x.l,x.qtd))}<span class="msl-st ok">${x.org?x.org.ic+' '+escHtml(x.org.lbl):eur(x.val)}</span></div>`).join('');
@@ -6125,7 +6157,10 @@ function mealShopSection(rd){
     // Coberto pelo stock conta como resolvido: não há nada a tratar nem a
     // comprar (é assim que a despensa já comprada aparece no bloco Comprado)
     const cob=!shopIsBought(it)&&shopIsCovered(it);
-    const done=shopIsBought(it)||cob;
+    // Encomendado numa provisória: também não há nada a tratar — mas ainda não
+    // está cá, e a linha di-lo (📌, não ✓).
+    const enc=(!shopIsBought(it)&&!cob)?shopEncomenda(it):null;
+    const done=shopIsBought(it)||cob||!!enc;
     const qtdTxt=shopQtyLabel(it);
     // Sem "riscado": um artigo comprado é uma linha normal do bloco Comprado,
     // igual às dos lotes — o bloco onde está já diz tudo
@@ -6133,6 +6168,7 @@ function mealShopSection(rd){
     // resolver — o ＋🛒 da Shop List em botão de talão, um toque e o artigo é
     // meu. Em refeições passadas não há nada a tratar: fica só a constatação.
     const st=cob?'<span class="msl-st ok">🧺 em stock</span>'
+      :enc?`<span class="msl-st prov" title="${escHtml(enc.desc||'')} — despesa provisória, ainda por comprar">📌 encomendado</span>`
       :done?''
       :it.tratadoPor?mslWho(it.tratadoPor)
       :past?'<span class="msl-st falta">por tratar</span>'
@@ -6165,7 +6201,10 @@ function mealShopSection(rd){
   // Pedidos COBERTOS pelo stock saem dos pendentes: a linha do lote no bloco
   // Comprado já os representa; se a alocação for desfeita, voltam sozinhos (a
   // cobertura é derivada — o pedido de stock nunca fica 'comprado').
-  const pend=items.filter(it=>!shopIsBought(it)&&!shopIsCovered(it));
+  // Encomendados numa provisória: saem dos pendentes (já têm dono e preço) e
+  // vão para o bloco de baixo, com 📌 — não com ✓.
+  const enc=items.filter(it=>!shopIsBought(it)&&!shopIsCovered(it)&&shopEncomenda(it));
+  const pend=items.filter(it=>!shopIsBought(it)&&!shopIsCovered(it)&&!shopEncomenda(it));
   // "Sem lote" = sem NENHUM lote do artigo em stock (não só os alocados a esta
   // refeição): se o admin mover a alocação para outra refeição, o pedido não
   // pode reaparecer aqui como "comprado" — os lotes são a fonte de verdade.
@@ -6177,11 +6216,20 @@ function mealShopSection(rd){
   const despCoberto=items.filter(it=>!shopIsBought(it)&&shopIsCovered(it)&&isDespensa(it.artigo)
     &&!alocs.some(x=>shopSameArtigo(x.l.artigo,it.artigo)));
   const bought=items.filter(it=>shopIsBought(it)&&!temLote(it)).concat(despCoberto);
-  const nComp=alocs.length+bought.length;
-  const det=(sub,lbl,cnt,body)=>{
+  const provLines=provs.map(({d,i})=>{
+    const abre=d.compraId?`openCompra('${d.compraId}')`:`openCfDetail('despesas',${i})`;
+    return `<div class="msl-it prov" onclick="${abre}">
+      ${mslLead('📌 '+(d.desc||'Despesa provisória'),'')}<span class="msl-st prov">${eur(d.valor)}</span>
+      ${d.obs?`<div class="msl-prov-obs">${escHtml(d.obs)}</div>`:''}</div>`;
+  }).join('');
+  const nProv=enc.length+provs.length;
+  const nComp=alocs.length+bought.length+nProv;
+  // `tag` = etiqueta pequena a seguir ao título (o título é em maiúsculas
+  // espaçadas e não aguenta mais palavras sem partir em dois num ecrã estreito)
+  const det=(sub,lbl,cnt,body,tag)=>{
     const k=key+sub;
     return `<details class="rdc-det msl-det"${MEAL_SHOP_OPEN[k]?' open':''} ontoggle="MEAL_SHOP_OPEN['${k}']=this.open">
-      <summary><span class="rdc-lbl">${lbl}</span>${cnt?`<span class="msl-count">${cnt}</span>`:''}<span class="rdc-det-arrow">›</span></summary>
+      <summary><span class="rdc-lbl">${lbl}</span>${tag||''}${cnt?`<span class="msl-count">${cnt}</span>`:''}<span class="rdc-det-arrow">›</span></summary>
       <div class="rdc-det-body">${body}</div>
     </details>`;
   };
@@ -6194,7 +6242,12 @@ function mealShopSection(rd){
       <button class="cmp-mini prim write-action msl-add" onclick="openShopItemModal(null,'${rd.ref}','${rd.data}')">＋ Ingrediente</button>
       <button class="cmp-mini prim write-action msl-add lfoto-btn" title="Ler uma foto da lista" onclick="listaFotoPick('${rd.ref}','${rd.data}')">📷 Foto</button>
     </div>`:'')):'';
-  const compDet=nComp?det('|c','🧺 Comprado',nComp,alocLines+bought.map(it=>lineOf(it,false)).join('')):'';
+  // A nota é obrigatória com provisórios lá dentro: o bloco chama-se "Comprado"
+  // e isto ainda não foi comprado — sem ela, o cozinheiro dava a carne por posta.
+  const provNota=nProv?`<div class="msl-nota-prov">📌 <b>Provisório</b> — ainda não comprado nem em 🧺 Stock. Já conta no custo da refeição; quando for pago, regista-se a compra.</div>`:'';
+  const compDet=nComp?det('|c','🧺 Comprado',nComp,
+    alocLines+bought.map(it=>lineOf(it,false)).join('')+enc.map(it=>lineOf(it,false)).join('')+provLines+provNota,
+    nProv?'<span class="msl-prov-tag">e 📌 encomendado</span>':''):'';
   return `<div class="rdc sf msl" onclick="event.stopPropagation()">${past?compDet+listaDet:listaDet+compDet}</div>`;
 }
 
@@ -6327,10 +6380,15 @@ function renderCompras(){
      carrinho). O Histórico não tem pesquisa — lá manda a data. */
   const buscando=SHOP_BUSCA&&!!SHOP_Q.trim()&&SHOP_TAB!=='hist';
   const qOk=it=>!buscando||buscaMatch(SHOP_Q,it.artigo,shopLojaTxt(it));
-  const mineTodos=act.filter(x=>!shopIsCovered(x)&&shopMineOwn(x));              // o carrinho inteiro (é ele que a compra leva, não o filtrado)
+  /* Encomendado numa provisória sai destas listas pela mesma razão que o coberto
+     pelo stock: não há nada a comprar. Deixá-lo em "Em falta" era o convite a
+     comprá-lo outra vez — que é justamente o que a encomenda evita. Continua
+     visível no cartão da refeição, no bloco de baixo, com 📌 e a nota. */
+  const encomendado=x=>!!shopEncomenda(x);   // (enc é o encoder de URLs — não lhe roubar o nome)
+  const mineTodos=act.filter(x=>!shopIsCovered(x)&&!encomendado(x)&&shopMineOwn(x));   // o carrinho inteiro (é ele que a compra leva, não o filtrado)
   const mine=mineTodos.filter(qOk).sort(sortF);                                  // a MINHA checklist pessoal (só o diferencial por comprar)
-  const falta=act.filter(x=>!x.tratadoPor&&!shopIsRemoved(x)&&!shopIsCovered(x)&&qOk(x)).sort(sortF);  // livres, por tratar (e não cobertos pelo stock)
-  const carrinhos=act.filter(x=>x.tratadoPor&&!shopIsRemoved(x)&&!shopIsCovered(x)&&qOk(x)).sort(sortF);// já no carrinho de alguém (só o que ainda falta comprar)
+  const falta=act.filter(x=>!x.tratadoPor&&!shopIsRemoved(x)&&!shopIsCovered(x)&&!encomendado(x)&&qOk(x)).sort(sortF);  // livres, por tratar (e não cobertos pelo stock/encomenda)
+  const carrinhos=act.filter(x=>x.tratadoPor&&!shopIsRemoved(x)&&!shopIsCovered(x)&&!encomendado(x)&&qOk(x)).sort(sortF);// já no carrinho de alguém (só o que ainda falta comprar)
   const removidos=act.filter(x=>shopIsRemoved(x)&&!x.tratadoPor).sort(sortF);    // histórico de removidos
 
   let h='';
@@ -7045,9 +7103,10 @@ function openCompra(compraId,opts){
   const pend=shopArr().filter(x=>shopIsPending(x)||(shopIsRemoved(x)&&shopMine(x)));
   // Em consulta o picker não se mexe: mostrar os pendentes só encheria a lista
   // de artigos que nada têm a ver com esta compra — ficam os que lhe ficaram ligados.
-  // Provisória: nada da lista pode ser marcado — dar por comprado o que ainda não
-  // se comprou tirava o pedido da lista de quem tem de o ir buscar.
-  const pickItems=compraEdit.prov?[]:(ro?linked:(isEdit?linked.concat(pend.filter(x=>x.compraId!==compraId)):pend));
+  // Numa provisória o picker vale na mesma, mas quer dizer outra coisa: os
+  // marcados NÃO ficam comprados, ficam encomendados (ver shopEncomenda) —
+  // continuam na lista, só não os compra mais ninguém.
+  const pickItems=ro?linked:(isEdit?linked.concat(pend.filter(x=>x.compraId!==compraId)):pend);
   // O picker vive num bloco recolhível DEPOIS do detalhe por artigo (junto ao
   // "＋ Artigo fora da lista") — abre sozinho quando ainda nada está marcado.
   let pl='';
@@ -7069,13 +7128,15 @@ function openCompra(compraId,opts){
       const on=isEdit?it.compraId===compraId:defOn(it);
       const ql=shopQtyLabel(it);
       rows+=`<label class="cmp-pick-row"><input type="checkbox" class="shop-pick" value="${it._id}" ${on?'checked':''} onchange="compraPickChanged()">
-        <span>${escHtml(it.artigo)}${ql?' <i>('+escHtml(ql)+')</i>':''}${shopIsRemoved(it)?' ⚠️':''}</span>
+        <span>${escHtml(it.artigo)}${ql?' <i>('+escHtml(ql)+')</i>':''}${shopIsRemoved(it)?' ⚠️':''}${shopEncomenda(it)?' <i title="Já encomendado noutra despesa provisória">📌</i>':''}</span>
         <span class="cmp-badge">${shopTipoIcon(it.tipo)}${shopIsMeal(it.tipo)&&it.dataValor?' '+fmtDiaMes(it.dataValor):' '+it.tipo}</span></label>`;
     });
+    // Os textos do bloco mudam com o 📅/📌 (que se pode trocar depois de o modal
+    // estar aberto), por isso ficam em elementos com id — ver shopPickTextos.
     pl=`<details class="pick-det" id="shop-buy-pick"${(nOn&&!ro)||o.detalhe?'':' open'}>
-      <summary>${o.detalhe?'🔗 Responde a pedidos da lista?':'🛒 Artigos da lista'} <span class="cmp-count" id="shop-pick-count">${ro?pickItems.length:nOn+'/'+pickItems.length}</span><span class="pick-chev">›</span></summary>
+      <summary><span id="shop-pick-lbl"></span> <span class="cmp-count" id="shop-pick-count">${ro?pickItems.length:nOn+'/'+pickItems.length}</span><span class="pick-chev">›</span></summary>
       ${rows}
-      ${ro?'':`<div class="note" style="margin:6px 0 12px">${o.detalhe?'Opcional. Marca só os pedidos que <b>esta</b> despesa fecha — esses saem da lista e ficam ligados a ela.':'Os artigos marcados saem da lista e ficam ligados a esta compra.'}</div>`}
+      ${ro?'':`<div class="note" id="shop-pick-note" style="margin:6px 0 12px"></div>`}
     </details>`;
   }
   document.getElementById('shop-buy-body').innerHTML=(ro?'<div class="note" style="margin-bottom:10px">🔒 Só o administrador pode editar uma compra já registada.</div>':'')+
@@ -7088,6 +7149,7 @@ function openCompra(compraId,opts){
     '<div id="shop-buy-lotes"></div>'+pl+
     '<div id="shop-buy-lines-sec"><div class="cmp-pick sf" style="margin-top:14px">Repartição do valor</div><div id="shop-buy-lines"></div>'+
     (ro?'':'<button class="btn ghost" id="shop-buy-addline" style="width:100%;margin-top:8px" onclick="compraAddLine()">＋ Outro gasto</button>')+'</div>';
+  shopPickTextos();
   if(!isEdit)compraSeedLines();
   compraRenderLines();
   // A detalhar uma despesa: uma linha em branco à espera do 1.º artigo — sem
@@ -7121,11 +7183,22 @@ function shopBuyQuandoApply(q){
   if(h)h.textContent=on?'Ainda não comprado — entra nas contas, mas sem data de pagamento nem entrada em stock.':'Despesa já feita, com data de pagamento conhecida.';
   const d=document.getElementById('shop-buy-date');
   if(d){if(on)d.value='';else if(!d.value)d.value=new Date().toISOString().slice(0,10);}
-  const pick=document.getElementById('shop-buy-pick');
-  if(pick){
-    pick.style.display=on?'none':'';
-    if(on){pick.querySelectorAll('.shop-pick:checked').forEach(c=>{c.checked=false;});pick.open=false;}
-  }
+  shopPickTextos();
+}
+/* O bloco dos pedidos da lista faz três coisas diferentes conforme o contexto,
+   e o 📅/📌 troca-se com o modal já aberto — daí os textos serem postos aqui:
+   · compra normal  → os marcados SAEM da lista (ficam comprados);
+   · detalhar (📅)  → opcional, fecha os pedidos que esta despesa responde;
+   · provisória (📌) → os marcados FICAM na lista, marcados como encomendados. */
+function shopPickTextos(){
+  const prov=!!compraEdit.prov,dtl=!!compraEdit.detalhe;
+  const l=document.getElementById('shop-pick-lbl');
+  const n=document.getElementById('shop-pick-note');
+  if(l)l.textContent=prov?'📌 Já está encomendado na lista?':(dtl?'🔗 Responde a pedidos da lista?':'🛒 Artigos da lista');
+  if(n)n.innerHTML=prov
+    ?'Opcional. Os marcados <b>ficam na lista</b>, assinalados como <b>📌 encomendados</b> — não são dados por comprados nem entram em stock, mas ninguém os vai comprar outra vez. Fecham-se quando registares a compra a sério.'
+    :dtl?'Opcional. Marca só os pedidos que <b>esta</b> despesa fecha — esses saem da lista e ficam ligados a ela.'
+    :'Os artigos marcados saem da lista e ficam ligados a esta compra.';
 }
 function setShopBuyQuando(q){
   shopBuyQuandoApply(q);
@@ -8080,7 +8153,9 @@ async function saveCompra(){
       // fica na lista por tratar e avisa-se abaixo. Avulso em branco é ignorado.
       // Só em compras NOVAS: na edição um € vazio não solta artigos (podem
       // estar cobertos pelas linhas de repartição).
-      if(det&&!isEdit&&artigo&&!l.free){
+      // Numa provisória não há fatura nem "por tratar": um pedido marcado sem
+      // preço fica encomendado na mesma (é uma encomenda, não um talão).
+      if(det&&!isEdit&&artigo&&!l.free&&!prov){
         if(l._byBrand)byBrandParents.push({artigo,qtd:l.qtd||''});
         else naoDetetados.push({artigo,qtd:l.qtd||''});
       }
@@ -8148,8 +8223,9 @@ async function saveCompra(){
   // calcular() move depois o alocado para as refeições via stock_lotes
   if(lotes.length)rows.push({tipo:'Gerais',data_valor:null,valor:rnd(lotes.reduce((a,l)=>a+l.valor,0),2),obs:STOCK_OBS});
   if(!rows.length){toast(prov?'Preenche o nome e o € de pelo menos um artigo':(det?'Preenche o € dos artigos (ou marca artigos da lista)':'Adiciona pelo menos uma linha'),'bad');return;}
-  // Provisória não fecha pedidos da lista (o picker nem aparece)
-  const checkedIds=prov?[]:[...document.querySelectorAll('.shop-pick:checked')].map(c=>+c.value);
+  // Provisória não FECHA pedidos da lista — liga-os (ficam encomendados, ver
+  // shopEncomenda). O que se marca aqui é o mesmo; o que se lhes faz é que muda.
+  const checkedIds=[...document.querySelectorAll('.shop-pick:checked')].map(c=>+c.value);
   // Artigos marcados no carrinho mas não detetados na fatura (sem preço): ficam
   // por tratar (não comprados). Avisa e confirma antes de registar.
   const missIds=new Set(shopArr().filter(x=>checkedIds.includes(x._id)&&naoDetetados.some(n=>shopSameArtigo(n.artigo,x.artigo))).map(x=>x._id));
@@ -8203,8 +8279,11 @@ async function saveCompra(){
     const mk=it=>it.tipo+'|'+it.dataValor;
     const isStockNeed=it=>STOCK_TABLE&&shopIsMeal(it.tipo)&&it.dataValor
       &&lotes.some(l=>(l.keys||[]).includes(mk(it))&&shopSameArtigo(l._listArt||l.artigo,it.artigo));
-    const toStock=shopArr().filter(x=>toBuy.includes(x._id)&&isStockNeed(x)).map(x=>x._id);
-    const toClosed=toBuy.filter(id=>!toStock.includes(id));
+    // Provisória: nenhum pedido fecha — todos ficam pendentes e ligados (a mesma
+    // escrita do "para stock", que é exatamente o estado que se quer: na lista,
+    // com compra_id, sem carrinho e sem data de compra).
+    const toStock=prov?toBuy.slice():shopArr().filter(x=>toBuy.includes(x._id)&&isStockNeed(x)).map(x=>x._id);
+    const toClosed=prov?[]:toBuy.filter(id=>!toStock.includes(id));
     const toRelease=prevLinked.filter(id=>!toBuy.includes(id));
     if(toClosed.length){
       await queueWrite(()=>sbReq('PATCH',`shoplist?id=in.(${toClosed.join(',')})`,{estado:'comprado',compra_id:compraId,cf_desc:desc||'Compras',comprado_em:compradoEm,no_carrinho:false}));
