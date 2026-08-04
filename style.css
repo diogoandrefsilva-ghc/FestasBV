@@ -834,6 +834,10 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .rdc-det-it:last-child{border-bottom:none}
 .rdc-det-it .k{color:var(--muted);min-width:0}
 .rdc-det-it .k small{color:var(--faint)}
+/* Despesa provisória no detalhe dos custos: os artigos vêm das observações e
+   ficam em linha própria por baixo (é o único sítio onde o detalhe dela existe) */
+.rdc-det-it.prov .k{color:var(--gold)}
+.rdc-det-obs{display:block;color:var(--faint);line-height:1.4;margin-top:1px}
 .rdc-det-it .v{font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums;white-space:nowrap}
 .refdef-actions{display:flex;gap:4px;flex-shrink:0}
 .refdef-del{width:26px;height:26px;border-radius:7px;border:1px solid var(--line);background:transparent;color:var(--red);font-size:13px;display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:.5;transition:.12s}
@@ -1178,6 +1182,16 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .msl-st.ok{color:var(--green)}
 .msl-st.falta{color:#9A6E0E;font-style:italic}
 .msl-empty{font-size:12px;color:var(--faint);padding:6px 0}
+/* 📌 Provisório dentro do bloco "Comprado": encomendado mas ainda não cá.
+   A cor do 📌 (dourado) e o picotado dizem-no antes de se ler a nota. */
+.msl-st.prov{color:var(--gold);font-weight:600}
+/* Etiqueta a seguir ao título do bloco (o "e 📌 encomendado"): margin-right:auto
+   para ficar colada ao título e empurrar contagem+seta para a direita */
+.msl-prov-tag{font-size:10.5px;font-weight:600;color:var(--gold);margin:2px auto 0 6px;white-space:nowrap;letter-spacing:0;text-transform:none}
+.msl-it.prov{border-left:2px dashed rgba(168,123,20,.5);padding-left:7px;margin-left:-2px}
+.msl-prov-obs{flex:0 0 100%;font-size:11px;color:var(--faint);line-height:1.4;margin-top:1px}
+.msl-nota-prov{margin-top:9px;padding:7px 9px;border:1px dashed rgba(168,123,20,.45);border-radius:8px;background:rgba(168,123,20,.05);font-size:11px;color:var(--muted);line-height:1.45}
+.msl-nota-prov b{color:var(--gold)}
 /* Fecho do talão: o total por extenso, entre picotados */
 .msl-foot{display:flex;justify-content:center;margin-top:9px;padding-top:8px;border-top:1.5px dashed rgba(110,75,25,.3);font-family:var(--display);font-size:12.5px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--faint)}
 /* Acrescentar ingrediente é a ação MENOS usada desta lista (lê-se dezenas de
@@ -1885,6 +1899,9 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 /* Chip "em stock" — pedido coberto pelo stock (verde, sem ação; defensivo) */
 .cmp-chip.stock{background:rgba(30,122,77,.13);border-color:rgba(30,122,77,.3);color:var(--green)}
 #view-compras .cmp-chip.stock::before{background:var(--green);box-shadow:inset 0 0 0 1px rgba(30,122,77,.5)}
+/* Encomendado numa despesa provisória: já tem dono e preço, mas não está cá */
+.cmp-chip.prov{background:rgba(168,123,20,.13);border-color:rgba(168,123,20,.32);color:var(--gold)}
+#view-compras .cmp-chip.prov::before{background:var(--gold);box-shadow:inset 0 0 0 1px rgba(168,123,20,.5)}
 #view-compras .cmp-claimed .cmp-chip{background:rgba(30,122,77,.13);border-color:rgba(30,122,77,.3);color:var(--green)}
 #view-compras .cmp-claimed .cmp-chip::before{box-shadow:inset 0 0 0 1px rgba(30,122,77,.5)}
 

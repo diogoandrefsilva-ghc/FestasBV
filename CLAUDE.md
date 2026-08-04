@@ -61,6 +61,14 @@ Duas datas, duas perguntas diferentes — e é isso que o segmentado do cash-flo
 - **Fechar contas continua travado enquanto houver provisórias** (`temDespesasPendentes`, agora por `data_desp`). Ter refeição não as torna pagas.
 - Sem migração: as duas colunas já eram `null`-áveis e os anos antigos têm `data_desp` em todas as linhas.
 
+### 📌 Encomendado: a provisória vista da cozinha
+Uma provisória mexe em dinheiro, mas quem cozinha quer saber **com o que pode contar**. Três sítios mostram-na, e nenhum deles a dá por comprada:
+- **Custo da refeição** (`dirDetBody`): linha com 📌 e os artigos por baixo, lidos das **observações** — é lá que vive o detalhe de uma provisória itemizada (é uma despesa só, sem lotes). Sem isto via-se "Talho do Rui — 141 €" e mais nada.
+- **Pedidos da lista ligados à provisória** (`shopEncomenda`): o picker do modal da compra **passou a valer no modo 📌**, mas com outro significado — os marcados ficam `estado='pendente'` **com `compra_id`** (a mesma escrita do "para stock"), nunca `comprado`. Ficam 📌 **encomendados**: saem do "Em falta"/carrinho **exatamente como o coberto por stock** (não há nada a comprar, e deixá-los lá era o convite a comprar duas vezes) e aparecem no bloco de baixo do cartão da refeição.
+- **Bloco 🧺 do cartão da refeição**: passa a "Comprado e encomendado" quando há provisórios, com **nota obrigatória** — o bloco chama-se Comprado e aquilo não foi comprado.
+- **Quando a provisória é paga** (mete-se a data em 📅), deixa de ser provisória: os pedidos ligados **voltam à lista** por comprar. É a verdade — ninguém registou a compra, logo não há stock. É também o que faz o ciclo fechar: regista-se a compra a sério e aí sim os pedidos fecham e o stock entra.
+- Apagar a compra já soltava os pedidos ligados (`deleteCompra`); desmarcá-los no picker também (`toRelease`). Nada disto é novo — a provisória entra pelo mesmo caminho.
+
 ## Detalhar uma despesa do cash-flow (🧾 Detalhar por artigo)
 Botão no formulário de despesa do cash-flow. Por baixo é uma **compra sem artigos de lista** (mesmo `compra_id`), mas a entrada é outra e **não se comporta como registar o carrinho**:
 - **Não abre a câmara.** Abria (`faturaPick()` no arranque) e quem não tem fatura ficava sem saída. O 📷 continua lá dentro, para quem tiver.
