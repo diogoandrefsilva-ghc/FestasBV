@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v198 · 2026-08-04 · Provisórios na refeição sem alarido: artigo a artigo, com * e uma legenda no fim do bloco em vez de um aviso por linha';
+const APP_BUILD = 'v199 · 2026-08-04 · Provisórias: a fatura pode ser importada (os extras deixaram de estar escondidos), cada artigo é uma linha de despesa — reabre itemizada e leva o € para o custo da refeição — e o picker já não abre escancarado na edição';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -1318,8 +1318,16 @@ function renderAll(){
         const dirRows=dirItems.map(it=>{
           const prov=it.tipo!==undefined&&despProvisoria(it);
           if(prov)temProvDir=true;
-          const arts=prov?provArtigos(it).map(a=>a.artigo+(a.qtd?' ('+a.qtd+')':'')).join(', '):'';
-          return `<div class="rdc-det-it${prov?' prov':''}"><span class="k">${prov?'*':''}${escHtml(it.desc||'(sem descrição)')}${it.quem?`<small> · ${escHtml(it.quem)}</small>`:''}${arts?`<small class="rdc-det-obs">${escHtml(arts)}</small>`:''}</span><span class="v">${eur(it.valor||0)}</span></div>`;
+          const arts=prov?provArtigos(it):[];
+          // Uma despesa por artigo: o artigo é o nome da linha e o sítio onde se
+          // compra desce para a nota — assim cada linha casa com o seu €. Nas
+          // provisórias antigas (tudo numa despesa) fica o descritivo em cima e
+          // os artigos por baixo, que é o melhor que aqueles dados dão.
+          const um=arts.length===1;
+          const nome=um?arts[0].artigo+(arts[0].qtd?' ('+arts[0].qtd+')':''):(it.desc||'(sem descrição)');
+          const meta=[um&&it.desc?it.desc:'',it.quem||''].filter(Boolean).join(' · ');
+          const lista=arts.length>1?arts.map(a=>a.artigo+(a.qtd?' ('+a.qtd+')':'')).join(', '):'';
+          return `<div class="rdc-det-it${prov?' prov':''}"><span class="k">${prov?'*':''}${escHtml(nome)}${meta?`<small> · ${escHtml(meta)}</small>`:''}${lista?`<small class="rdc-det-obs">${escHtml(lista)}</small>`:''}</span><span class="v">${eur(it.valor||0)}</span></div>`;
         }).join('');
         const dirDetBody=dirItems.length?`<div class="rdc-det-body">${dirRows}${temProvDir?'<div class="rdc-det-leg"><b>*</b> provisório — ainda por comprar</div>':''}</div>`:'';
         let dirChipsRow='';
@@ -5859,12 +5867,13 @@ function shopIsCovered(it){
   if(c)return c.aloc>0.0005&&c.falta<=0.0005;
   return mealStockAllocAnyFor(it.artigo,it.tipo,it.dataValor);
 }
-/* Artigos de uma despesa provisória. Vivem nas observações — "Artigo (qtd),
-   Artigo (qtd)", como saveCompra as escreve — porque uma provisória é UMA
-   despesa só, sem lotes; é a única forma de os mostrar um a um. Havendo nota
-   escrita à mão, ela vem antes e separada por " · " (daí ficar-se com o último
-   troço). Sem compra_id não houve itemização nenhuma: as observações são texto
-   livre e não se parte nada. */
+/* Artigos de uma despesa provisória. Uma provisória itemizada grava UMA DESPESA
+   POR ARTIGO (mesmo compra_id) — "Artigo (qtd)" nas observações, preço no valor —
+   e é isso que a deixa reabrir tal como foi escrita, sem stock pelo meio. As
+   antigas traziam todos os artigos numa despesa só, separados por vírgula; por
+   isso isto continua a devolver uma lista. Havendo nota escrita à mão, ela vem
+   antes, separada por " · " (daí ficar-se com o último troço). Sem compra_id não
+   houve itemização: as observações são texto livre e não se parte nada. */
 function provArtigos(d){
   if(!d||!d.compraId)return [];
   const s=String(d.obs||'').split(' · ').pop().trim();
@@ -5873,6 +5882,12 @@ function provArtigos(d){
     const m=t.match(/^(.*?)\s*\(([^()]*)\)$/);
     return m?{artigo:m[1],qtd:m[2]}:{artigo:t,qtd:''};
   });
+}
+/* A nota escrita à mão numa provisória (o que vem antes do " · " dos artigos).
+   Sem ela, reabrir e voltar a gravar apagava as observações do utilizador. */
+function provNotaTxt(d){
+  const p=String((d&&d.obs)||'').split(' · ');
+  return p.length>1?p.slice(0,-1).join(' · ').trim():'';
 }
 /* Pedido da lista ligado a uma despesa PROVISÓRIA: já está encomendado (alguém
    contou com ele e já lhe sabe o preço), mas não foi comprado nem entrou em
@@ -6512,6 +6527,11 @@ function mealShopSection(rd){
     nProvArts+=arts.length||1;
     if(!arts.length)return `<div class="msl-it prov" onclick="${abre}" title="Provisório">
       ${mslLead('*'+(d.desc||'Despesa provisória'),'')}<span class="msl-st prov">${eur(d.valor)}</span></div>`;
+    // Uma despesa por artigo (o normal desde que as provisórias se gravam assim)
+    // → o € da linha é o do artigo, como nas outras linhas do bloco. Nas antigas,
+    // com tudo numa despesa só, não há preço por artigo para mostrar.
+    if(arts.length===1)return `<div class="msl-it prov" onclick="${abre}" title="${escHtml(d.desc||'')} — provisório">
+      ${mslLead('*'+arts[0].artigo,arts[0].qtd)}<span class="msl-st prov">${eur(d.valor)}</span></div>`;
     return arts.map(a=>`<div class="msl-it prov" onclick="${abre}" title="${escHtml(d.desc||'')} — provisório">
       ${mslLead('*'+a.artigo,a.qtd)}</div>`).join('');
   }).join('');
@@ -6536,7 +6556,11 @@ function mealShopSection(rd){
   /* Legenda do asterisco, uma só para o bloco todo — o bloco chama-se "Comprado"
      e aquilo ainda não foi. Leva o estabelecimento e o total de cada provisória,
      que é o que saiu das linhas ao passarem a artigo a artigo. */
-  const provQuem=provs.map(({d})=>`${escHtml(d.desc||'despesa provisória')} · ${eur(d.valor)}`).join(' · ');
+  // Agrupado por descritivo: uma provisória de 5 artigos são 5 despesas, e a
+  // legenda tem de dizer "Talho do Rui · 141 €", não o talho cinco vezes.
+  const porQuem={};
+  provs.forEach(({d})=>{const k=d.desc||'despesa provisória';porQuem[k]=rnd((porQuem[k]||0)+d.valor,2);});
+  const provQuem=Object.keys(porQuem).map(k=>`${escHtml(k)} · ${eur(porQuem[k])}`).join(' · ');
   const provLeg=nProv?`<div class="msl-leg-prov"><b>*</b> provisório — ainda por comprar${provQuem?': '+provQuem:''}</div>`:'';
   const compDet=nComp?det('|c','🧺 Comprado',nComp,
     alocLines+bought.map(it=>lineOf(it,false)).join('')+enc.map(it=>lineOf(it,false)).join('')+provLines+provLeg):'';
@@ -7335,13 +7359,32 @@ function openCompra(compraId,opts){
   // destinada a uma refeição, e reabri-la não a pode fazer perder o destino.
   const provGrav=isEdit&&(DATA.despesas||[]).some(d=>d.compraId===compraId&&!d.dataDesp);
   const dProv=provGrav?((DATA.despesas||[]).find(d=>d.compraId===compraId)||{}):null;
-  compraEdit={id:compraId||null,lines:[],lotes:[],det:!isEdit||stockArr().some(l=>l.compraId===compraId),
+  compraEdit={id:compraId||null,lines:[],lotes:[],
+    // Provisória gravada abre SEMPRE por artigo: é assim que foi escrita (uma
+    // linha de despesa por artigo) e é o ecrã de onde saiu.
+    det:!isEdit||provGrav||stockArr().some(l=>l.compraId===compraId),
     detalhe:!!o.detalhe,prov:!!o.prov||provGrav,
     tipoProv:(dProv?dProv.tipo:o.tipo)||'Gerais',
-    dataValorProv:(dProv?dProv.dataValor:o.dataValor)||'',obsProv:provGrav?'':(o.obs||'')};
+    dataValorProv:(dProv?dProv.dataValor:o.dataValor)||'',obsProv:provGrav?provNotaTxt(dProv):(o.obs||'')};
   const linked=isEdit?shopArr().filter(x=>x.compraId===compraId):[];
   // Linhas: (edição) reconstruídas das despesas da compra; (nova) semeadas dos meus artigos
-  if(isEdit){
+  if(isEdit&&provGrav){
+    /* Provisória: cada despesa É um artigo (nome e quantidade nas observações,
+       preço no valor) — reconstrói-se o detalhe tal e qual, sem "repartição do
+       valor" pelo meio. Uma provisória antiga trazia todos os artigos numa
+       despesa só: aí fica uma linha com o que lá está escrito, para se poder
+       separar à mão. Ver saveCompra. */
+    // O destino já vai preenchido com o da provisória (tipo/refeição): não serve
+    // de nada enquanto ela for provisória, mas se aqui se trocar 📌 → 📅 os
+    // artigos passam a lotes de stock e vão parar à refeição certa.
+    const destProv=compraDestPad();
+    (DATA.despesas||[]).filter(d=>d.compraId===compraId).forEach(d=>{
+      const a=provArtigos(d);
+      compraEdit.lotes.push(a.length===1
+        ?{free:true,artigo:a[0].artigo,qtd:a[0].qtd,valor:d.valor,destino:destProv,keys:[]}
+        :{free:true,artigo:a.map(x=>x.artigo+(x.qtd?' ('+x.qtd+')':'')).join(', '),qtd:'',valor:d.valor,destino:destProv,keys:[]});
+    });
+  }else if(isEdit){
     // A linha "🧺 Stock" não é editável à mão — é regenerada a partir dos lotes
     (DATA.despesas||[]).filter(d=>d.compraId===compraId&&!(d.tipo==='Gerais'&&(d.obs||'')===STOCK_OBS)).forEach(d=>{
       compraEdit.lines.push({tipo:d.tipo,dataValor:d.dataValor||null,valor:d.valor,obs:d.obs||''});
@@ -7360,8 +7403,10 @@ function openCompra(compraId,opts){
     });
   }
   // Compra nova: as linhas semeiam-se dos artigos MARCADOS no picker (ver
-  // compraSeedLines, chamada depois de o picker existir no DOM)
-  if(isEdit&&!compraEdit.lines.length)compraEdit.lines.push({tipo:'Gerais',dataValor:null,valor:'',obs:''});
+  // compraSeedLines, chamada depois de o picker existir no DOM).
+  // Numa provisória não há linhas de repartição nenhumas — o valor está nos
+  // artigos — e uma linha em branco só serviria para travar o gravar.
+  if(isEdit&&!provGrav&&!compraEdit.lines.length)compraEdit.lines.push({tipo:'Gerais',dataValor:null,valor:'',obs:''});
 
   // Cabeçalho
   // Editar/apagar uma compra já registada mexe em despesas → só admin (as despesas
@@ -7425,7 +7470,10 @@ function openCompra(compraId,opts){
     });
     // Os textos do bloco mudam com o 📅/📌 (que se pode trocar depois de o modal
     // estar aberto), por isso ficam em elementos com id — ver shopPickTextos.
-    pl=`<details class="pick-det" id="shop-buy-pick"${(nOn&&!ro)||o.detalhe?'':' open'}>
+    // Abre sozinho só onde é o passo seguinte: numa compra NOVA da lista. A
+    // editar, uma despesa sem pedidos ligados abria uma parede de checkboxes de
+    // todos os pedidos pendentes do ano, que não é o que se veio cá fazer.
+    pl=`<details class="pick-det" id="shop-buy-pick"${(nOn&&!ro)||o.detalhe||isEdit?'':' open'}>
       <summary><span id="shop-pick-lbl"></span> <span class="cmp-count" id="shop-pick-count">${ro?pickItems.length:nOn+'/'+pickItems.length}</span><span class="pick-chev">›</span></summary>
       ${rows}
       ${ro?'':`<div class="note" id="shop-pick-note" style="margin:6px 0 12px"></div>`}
@@ -7810,7 +7858,10 @@ function compraRenderLotes(){
       :dtl
       ?'<div class="note">Cada artigo entra em <b>🧺 Stock</b> com o destino que lhe deres (refeição ou tipo) — divides por vários com ⇄ e reajustas depois no separador Stock. Se algum responde a um pedido da lista, liga-o em <b>🔗 pertence a</b> ou marca-o mais abaixo.</div>'
       :'<div class="note">A app propõe o destino de cada artigo (refeição ou tipo) — confirma ou muda. Podes dividir um artigo por vários destinos com ⇄. Reajustas tudo depois no separador 🧺 Stock.</div>')+
-    (prev?'':faturaExtrasHtml());
+    /* Os extras da fatura valem TAMBÉM na provisória. Estavam escondidos, e como
+       numa provisória nada do carrinho casa com o talão, TODAS as linhas lidas
+       caíam aqui — a fatura era lida e não aparecia nada no ecrã. */
+    faturaExtrasHtml();
   compraUpdateTotal();
 }
 /* Destino da despesa provisória: um só para o detalhe todo (o destino por artigo
@@ -8486,7 +8537,8 @@ async function saveCompra(){
   // Modo por totais: validar linhas (totalmente vazias são ignoradas se houver
   // mais alguma coisa). Na edição as linhas entram SEMPRE — o tabulador ativo
   // só muda a vista, não o que se grava.
-  if(!det||isEdit)for(const ln of compraEdit.lines){
+  // Provisória: não há linhas de repartição — o valor vive nos artigos (abaixo).
+  if(!prov&&(!det||isEdit))for(const ln of compraEdit.lines){
     const v=rnd(parseFloat(ln.valor),2);
     const vazia=(!v||v<=0)&&!(ln.obs||'').trim();
     if(vazia&&(lotes.length||Object.keys(tipoRows).length||compraEdit.lines.length>1))continue;
@@ -8496,15 +8548,22 @@ async function saveCompra(){
     if(shopIsMeal(ln.tipo)&&!ln.dataValor){toast(`Escolhe a refeição em "${ln.tipo}"`,'bad');return;}
     rows.push({tipo:ln.tipo,data_valor:shopIsMeal(ln.tipo)?ln.dataValor:null,valor:v,obs:(ln.obs||'').trim()});
   }
-  // Detalhe de uma despesa provisória → uma linha só, com os artigos por escrito
+  /* Despesa provisória: UMA LINHA DE DESPESA POR ARTIGO (mesmo compra_id, como
+     numa compra normal), em vez de uma despesa só com os artigos amontoados nas
+     observações. É isto que faz a provisória reabrir tal como foi escrita — com
+     nome, quantidade e preço de cada artigo — e o que dá a cada artigo um € seu
+     no custo da refeição. Nada disto vira stock: continuam a ser despesas.
+     A nota escrita à mão vai na primeira linha (`nota · Artigo (qtd)`). */
   if(provItens.length){
     const tipoP=compraEdit.tipoProv||'Gerais';
     const dvP=shopIsMeal(tipoP)?(compraEdit.dataValorProv||''):'';
     if(shopIsMeal(tipoP)&&dvMeals(tipoP).length&&!dvP){toast(`Escolhe a ${tipoP.toLowerCase()} a que esta despesa pertence`,'bad');return;}
-    const lista=provItens.map(x=>x.artigo+(x.qtd?' ('+x.qtd+')':'')).join(', ');
-    rows.push({tipo:tipoP,data_valor:dvP||null,
-      valor:rnd(provItens.reduce((a,x)=>a+x.valor,0),2),
-      obs:[(compraEdit.obsProv||'').trim(),lista].filter(Boolean).join(' · ')});
+    const nota=(compraEdit.obsProv||'').trim();
+    provItens.forEach((x,i)=>{
+      const art=x.artigo+(x.qtd?' ('+x.qtd+')':'');
+      rows.push({tipo:tipoP,data_valor:dvP||null,valor:x.valor,
+        obs:(i===0&&nota)?nota+' · '+art:art});
+    });
   }
   // Despesas diretas geradas do detalhe: uma linha por tipo (ou tipo+refeição)
   for(const k in tipoRows){
