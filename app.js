@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v188 · 2026-08-03 · Pesquisa: botão 🔎 na Shop List e no Stock filtra a lista por nome de artigo (e loja/marca/categoria)';
+const APP_BUILD = 'v188 · 2026-08-03 · Pesquisa 🔎 na Shop List e no Stock; cabeçalhos com as ações só em ícone, na mesma linha do título';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -4218,7 +4218,7 @@ async function admCatDelete(){
    antes de gravar — cada linha pode ser corrigida no próprio modal. */
 let _catSug=null;   // [{artigo,key,catId}]
 // Nomes em uso ainda sem categoria. soCompras=true limita à lista/carrinho
-// (é o âmbito do 🔤 Normalizar da Shop List); sem isso apanha também o stock.
+// (é o âmbito do ✨ Normalizar da Shop List); sem isso apanha também o stock.
 function catNamesPorCategorizar(soCompras){
   const seen={};
   const add=n=>{const k=shopArtKey(n);if(!k||seen[k]||ART_CATS[k])return;seen[k]=n;};
@@ -4258,10 +4258,10 @@ async function catSugerir(){
   const nomes=catNamesPorCategorizar();
   if(!nomes.length){toast('Está tudo categorizado 🎉','ok');return;}
   const btn=document.getElementById('stk-catsug-btn');
-  if(btn){btn.disabled=true;btn.textContent='⏳ A pensar…';}
+  if(btn){btn.disabled=true;btn.textContent='⏳';}   // idem: botão só-ícone
   try{catSugOpen(nomes,await catSugFetch(nomes));}
   catch(e){toast('Sugestões falharam: '+(e.message||e),'bad');}
-  finally{if(btn){btn.disabled=false;btn.textContent='✨ Categorias';}}
+  finally{if(btn){btn.disabled=false;btn.textContent='✨';}}
 }
 function catSugRender(){
   const com=_catSug.filter(s=>s.catId).length;
@@ -4295,7 +4295,7 @@ async function catSugApply(){
   btn.disabled=false;
 }
 
-/* ═══ ARTIGOS DE DESPENSA (3.º passo do 🔤 Normalizar) ═══
+/* ═══ ARTIGOS DE DESPENSA (3.º passo do ✨ Normalizar) ═══
    Há dois tipos de artigo na lista e a app tratava-os como um só:
    · CONSUMÍVEL — a procura escala com as refeições. Três jantares com carne
      precisam de três vezes a carne; dois pedidos para dias diferentes NÃO são
@@ -4460,7 +4460,7 @@ async function despApply(){
   }catch(e){setSync('err','erro ao guardar');toast(permErrorMsg(e),'bad');if(btn)btn.disabled=false;}
 }
 /* Marcar/desmarcar um artigo a partir do detalhe (só admin) — o atalho para os
-   casos que a deteção não apanha, sem esperar pelo 🔤 Normalizar. */
+   casos que a deteção não apanha, sem esperar pelo ✨ Normalizar. */
 async function despSetFromModal(){
   if(!DESP_TABLE||!isAdmin())return;
   const artigo=(document.getElementById('shop-artigo').value||'').trim();
@@ -4612,7 +4612,7 @@ async function shopNormOpen(){
   const nomes=Object.values(stats).map(s=>s.name);
   if(nomes.length<2){toast('Poucos artigos para normalizar','ok');return;}
   const btn=document.getElementById('shop-norm-btn');
-  if(btn){btn.disabled=true;btn.textContent='⏳ A analisar…';}
+  if(btn){btn.disabled=true;btn.textContent='⏳';}   // só o ampulheta: o botão é só-ícone e não pode crescer
   let groups=null,viaAI=false,aiErr='';
   _normCats=null;_normDesp=null;
   const comCats=CATS_TABLE&&CATEGORIAS.length>0;
@@ -4645,7 +4645,7 @@ async function shopNormOpen(){
     aiErr=e.message||String(e);
     groups=shopNormGroups();
   }
-  if(btn){btn.disabled=false;btn.textContent='🔤 Normalizar';}
+  if(btn){btn.disabled=false;btn.textContent='✨';}
   _normViaAI=viaAI;
   if(!groups||!groups.length){
     _normGroups=null;
@@ -4835,7 +4835,7 @@ function shopCatPendentes(){
   if(!CATS_TABLE||!CATEGORIAS.length||!isAdmin())return 0;
   return catNamesPorCategorizar(true).length;
 }
-/* 2.ª metade do botão 🔤 Normalizar: com os nomes já arrumados, propõe as
+/* 2.ª metade do botão ✨ Normalizar: com os nomes já arrumados, propõe as
    categorias que faltam no mesmo modal ✨ do Stock. As sugestões vieram de
    borla no pedido da normalização; só se não vierem (função fatura-ocr ainda
    antiga) é que se faz um segundo pedido. */
@@ -4858,7 +4858,7 @@ async function shopCatStep(juntados){
   catSugOpen(nomes,map);
 }
 
-/* ═══ PEDIDOS REPETIDOS (2.º passo do 🔤 Normalizar) ═══
+/* ═══ PEDIDOS REPETIDOS (2.º passo do ✨ Normalizar) ═══
    Com os nomes já unificados, o mesmo artigo aparece muitas vezes na lista —
    pedido por pessoas diferentes, cada uma com a sua ideia de embalagem ("lata
    250 ml", "garrafa 1,5 L", ou nada). Quem vai às compras vê três linhas de
@@ -6228,10 +6228,10 @@ function renderCompras(){
   h+=`<div class="cmp-hdr">
     <div class="cmp-hdr-title sf">🛒 Shop List</div>
     <div class="cmp-hdr-acts">
-      ${isAdmin()?`<button class="btn write-action" id="shop-norm-btn" onclick="shopNormOpen()" title="Juntar grafias do mesmo artigo (chouriço/chouriços…) e categorizar o que falta">🔤 Normalizar</button>`:''}
+      ${isAdmin()?`<button class="btn write-action hdr-ico" id="shop-norm-btn" aria-label="Normalizar artigos" onclick="shopNormOpen()" title="Normalizar: juntar grafias do mesmo artigo (chouriço/chouriços…), categorizar o que falta, pedidos repetidos e despensa">✨</button>`:''}
       ${SHOP_TAB!=='hist'?buscaBtn(SHOP_BUSCA,'toggleShopBusca'):''}
       <button class="btn write-action lfoto-btn hdr-ico" data-busy="⏳" aria-label="Adicionar artigos a partir de uma foto da lista" onclick="listaFotoPick()" title="Ler uma foto da lista (câmara ou galeria) e adicionar os artigos de uma vez" ${canW&&!fechadas?'':'disabled'}>📷</button>
-      <button class="btn prim write-action" onclick="openShopItemModal()" ${canW?'':'disabled'}>＋ Artigo</button>
+      <button class="btn prim write-action hdr-ico" aria-label="Adicionar artigo" title="Adicionar artigo à lista" onclick="openShopItemModal()" ${canW?'':'disabled'}>＋</button>
     </div>
   </div>`;
 
@@ -6449,12 +6449,12 @@ function renderStock(){
   const canEdit=isAdmin();
   // ✨: pedir à AI categorias para o que ainda não tem (só admin, com migração)
   const aiBtn=(CATS_TABLE&&canEdit&&catNamesPorCategorizar().length)
-    ?`<button class="btn write-action" id="stk-catsug-btn" onclick="catSugerir()">✨ Categorias</button>`:'';
+    ?`<button class="btn write-action hdr-ico" id="stk-catsug-btn" aria-label="Sugerir categorias" onclick="catSugerir()" title="Pedir à AI categorias para os artigos que ainda não têm">✨</button>`:'';
   // Stock que não veio de compras (ofertas, sobras do ano anterior)
-  const addBtn=canEdit?`<button class="btn ghost write-action stk-add" id="stk-add-btn" onclick="stkAddOpen()" title="Stock que não veio de compras (ofertas, ano anterior)">＋ Stock</button>`:'';
+  const addBtn=canEdit?`<button class="btn ghost write-action stk-add hdr-ico" id="stk-add-btn" aria-label="Adicionar stock" onclick="stkAddOpen()" title="Adicionar stock que não veio de compras (ofertas, sobras do ano anterior)">＋</button>`:'';
   // 🔎 só quando há stock: numa lista vazia não há nada para procurar
   const buscaB=arrTodos.length?buscaBtn(STOCK_BUSCA,'toggleStockBusca'):'';
-  let h=`<div class="cmp-hdr"><div class="cmp-hdr-title sf">🧺 Gestão de Stock</div><div class="cmp-hdr-acts">${buscaB}${addBtn}${aiBtn}</div></div>`;
+  let h=`<div class="cmp-hdr"><div class="cmp-hdr-title sf">🧺 Stock</div><div class="cmp-hdr-acts">${buscaB}${addBtn}${aiBtn}</div></div>`;
   h+=`<div class="note" style="margin-top:2px;margin-bottom:8px">${canEdit?'Toca num artigo para o alocar às refeições e categorias — as contas recalculam sozinhas.':'Toca num artigo para ver como está alocado às refeições e categorias.'}</div>`;
   if(!arrTodos.length){el.innerHTML=h+`<div class="empty sf">Ainda não há stock. Regista uma compra itemizada, importa uma fatura${canEdit?' ou usa <b>＋ Stock</b> para o que não foi comprado (ofertas, sobras do ano anterior)':''}.</div>`;return;}
   if(STOCK_BUSCA)h+=buscaCaixa('stk-busca',STOCK_Q,'Procurar artigo, marca ou categoria…','setStockQ');
