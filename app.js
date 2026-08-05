@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v206 · 2026-08-05 · Registar compra do carrinho já dá para marcar 📌 provisória (falta pagar, não falta comprar) — o segmentado passa a estar em qualquer compra, e os textos deixam de prometer o que já não é verdade';
+const APP_BUILD = 'v207 · 2026-08-05 · Shop List exporta-se em PDF (🖨): tudo o que falta comprar e o que já está em carrinhos, numa folha só — uma linha por artigo, com a quantidade total, quem trata e o que já há em stock';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -6928,6 +6928,7 @@ function renderCompras(){
     <div class="cmp-hdr-acts">
       ${isAdmin()?`<button class="btn write-action hdr-ico" id="shop-norm-btn" aria-label="Normalizar artigos" onclick="shopNormOpen()" title="Normalizar: juntar grafias do mesmo artigo (chouriço/chouriços…), categorizar o que falta, pedidos repetidos e despensa">✨</button>`:''}
       ${SHOP_TAB!=='hist'?buscaBtn(SHOP_BUSCA,'toggleShopBusca'):''}
+      <button class="btn hdr-ico" aria-label="Exportar a lista em PDF" title="Exportar a lista em PDF — tudo o que falta comprar e o que já está em carrinhos, numa folha" onclick="generatePDF('shoplist')">🖨</button>
       <button class="btn write-action lfoto-btn hdr-ico" data-busy="⏳" aria-label="Adicionar artigos a partir de uma foto da lista" onclick="listaFotoPick()" title="Ler uma foto da lista (câmara ou galeria) e adicionar os artigos de uma vez" ${canW&&!fechadas?'':'disabled'}>📷</button>
       <button class="btn prim write-action hdr-ico" aria-label="Adicionar artigo" title="Adicionar artigo à lista" onclick="openShopItemModal()" ${canW?'':'disabled'}>＋</button>
     </div>
@@ -12388,6 +12389,10 @@ function openReports(){
       📄 Relatório Geral
     </button>
     <p style="font-size:11px;color:var(--faint);margin-top:-4px">Receitas, despesas, todos os cash-flows e o resumo de gastos por membro.</p>
+    <button class="btn prim" onclick="generatePDF('shoplist')" style="display:flex;align-items:center;justify-content:center;gap:8px">
+      🛒 Lista de Compras
+    </button>
+    <p style="font-size:11px;color:var(--faint);margin-top:-4px">Tudo o que falta comprar e o que já está no carrinho de alguém, condensado numa folha.</p>
 ${TSHIRTS_TABLE?`
     <button class="btn prim" onclick="generatePDF('tshirts')" style="display:flex;align-items:center;justify-content:center;gap:8px">
       👕 Encomenda de T-shirts
@@ -12465,6 +12470,25 @@ function generatePDF(type){
     table.gastos-membro th{font-size:8px;letter-spacing:.02em;padding:5px 5px;white-space:nowrap}
     table.gastos-membro td{padding:5px 5px}
     table.gastos-membro td:first-child{white-space:nowrap;font-size:10.5px}
+    /* Shop List — folha condensada para levar às compras (ver buildShopReport) */
+    .sl-doc h1{font-size:18px}
+    .sl-doc .subtitle{font-size:11px;margin-bottom:4px}
+    .sl-cols{column-count:2;column-gap:16px}
+    .sl-cols.sl-3{column-count:3;column-gap:12px;font-size:9.5px}
+    .sl-cols.sl-tight{font-size:8px;column-gap:10px}
+    .sl-cols.sl-tight .sl-row{padding:.5px 0}
+    .sl-cols.sl-tight .sl-grp{margin-bottom:7px}
+    .sl-grp{break-inside:avoid;page-break-inside:avoid;margin:0 0 9px}
+    .sl-grp-h{display:flex;align-items:center;gap:5px;font-size:.85em;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#2a9d6a;border-bottom:1.5px solid #50b96e;padding-bottom:2px;margin-bottom:3px}
+    .sl-grp-h .sl-n{margin-left:auto;color:#999}
+    .sl-row{display:flex;align-items:baseline;gap:5px;padding:1.5px 0;border-bottom:1px dotted #e8e8e8;break-inside:avoid;page-break-inside:avoid}
+    .sl-box{flex:0 0 auto;display:inline-block;width:8px;height:8px;border:1px solid #999;border-radius:2px;vertical-align:baseline}
+    .sl-box.on{background:#50b96e;border-color:#3d9a58}
+    .sl-nm{flex:1 1 auto;line-height:1.35}
+    .sl-meta{font-style:normal;font-size:.82em;color:#8a8a8a}
+    .sl-q{flex:0 0 auto;font-weight:700;white-space:nowrap}
+    .sl-leg{font-size:8.5px;color:#999;margin:0 0 9px}
+    .sl-done{margin-top:10px;padding-top:6px;border-top:1px solid #ddd;font-size:9px;color:#777;line-height:1.5}
     .section{margin-bottom:8px}
     .badge{display:inline-block;font-size:9px;font-weight:700;padding:1px 6px;border-radius:4px}
     .badge-green{background:#e8f9f1;color:#2a9d6a}.badge-red{background:#fff0f0;color:#e04545}.badge-blue{background:#eef5ff;color:#3a7dd6}
@@ -12477,6 +12501,8 @@ function generatePDF(type){
     body=buildGeneralReport();
   } else if(type==='tshirts'){
     body=buildTshirtsReport();
+  } else if(type==='shoplist'){
+    body=buildShopReport();
   } else {
     body=buildPersonReport(pessoa);
   }
@@ -12503,6 +12529,158 @@ function generatePDF(type){
   frame.srcdoc=docHtml;
   ov.querySelector('#pdfClose').onclick=()=>ov.remove();
   ov.querySelector('#pdfPrint').onclick=()=>{frame.contentWindow.focus();frame.contentWindow.print();};
+}
+
+/* ── Resumo da Shop List numa folha (🖨 no cabeçalho das Compras) ─────────
+   Para levar no bolso: ninguém percorre o supermercado com o telemóvel na mão a
+   saltar entre sub-separadores. O que na app são três listas (em falta · já em
+   carrinhos · o meu carrinho) é aqui UMA só, com uma caixa por artigo — quem
+   compra quer o corredor inteiro de uma vez e, em cada linha, saber se já há
+   alguém a tratar dela.
+   - **Uma linha por ARTIGO**, não por pedido: os pedidos do mesmo nome juntam-se
+     e a quantidade é a soma (`shopSumQtys`) — três linhas de "Batatas" numa
+     folha é espaço gasto a repetir o nome, e o que se quer é o total a levar.
+     Na despensa é o MÁXIMO (`shopDespQty`), como em todo o lado.
+   - **Manda a ordenação escolhida** nos chips (loja/refeição/artigo/categoria):
+     é a viagem que a pessoa decidiu fazer. A **pesquisa não filtra** — exporta-se
+     a lista, não a vista (a mesma regra do "registar a compra leva o carrinho
+     todo").
+   - **Coberto pelo stock e encomendado ficam fora** da lista e vão para um
+     rodapé pequeno: não há nada a comprar, mas convém saber porque é que o
+     artigo não aparece. Mesma regra do ecrã.
+   Condensado a sério: 2 colunas, 3 quando a lista cresce, e corpo mais pequeno
+   quando é mesmo grande — o objetivo é caber numa folha. */
+function buildShopReport(){
+  const ano=DATA.evento.ano||'';
+  const evNome=(DATA.evento.nome||'MEO').replace(/\s*\d{4}\s*/g,'').trim()||'MEO';
+  const pend=shopArr().filter(it=>shopIsPending(it));    // sem comprados nem removidos
+  const tratados=[],comprar=[];
+  pend.forEach(it=>{
+    const cov=shopIsCovered(it);
+    const enc=cov?null:shopEncomenda(it);
+    if(cov)tratados.push({it,txt:shopCobDecl(it)==='ok'?'coberto':'em stock'});
+    else if(enc)tratados.push({it,txt:'encomendado'});
+    else comprar.push(it);
+  });
+
+  const ord={};SHOP_TIPOS.forEach((t,i)=>ord[t]=i);
+  const byArt=SHOP_ORDER==='art';
+  const byCat=SHOP_ORDER==='cat'&&CATS_TABLE;
+  const byLoja=SHOP_ORDER==='loja'&&shopHasLojas(comprar);
+
+  // Uma linha da folha. `opt.dest` = mostrar a que refeições se destina (só
+  // quando o cabeçalho do grupo não o diz); `opt.loja` = idem para a loja.
+  const slRow=(items,opt)=>{
+    opt=opt||{};
+    const it=items[0];
+    // Um pedido só → a etiqueta do costume (traz a embalagem: "4 × saco"). Vários
+    // → o total (na despensa, o máximo), a que se cola a embalagem quando é a
+    // mesma em todos: "12" sozinho não diz se são garrafas se caixas.
+    const tams=[];items.forEach(x=>{const t=(x.tamanho||'').trim();if(t&&tams.indexOf(t)<0)tams.push(t);});
+    let qtd=shopQtyLabel(it);
+    if(items.length>1){
+      qtd=opt.desp?shopDespQty(items):shopSumQtys(items);
+      if(qtd&&tams.length===1)qtd+=' × '+tams[0];
+      else if(!qtd&&tams.length===1)qtd=tams[0];
+    }
+    const meta=[];
+    if(opt.dest){
+      const ds=[];
+      items.forEach(x=>{
+        const l=shopIsMeal(x.tipo)&&x.dataValor?`${shopTipoIcon(x.tipo)} ${fmtDiaMes(x.dataValor)}`:`${shopTipoIcon(x.tipo)} ${x.tipo}`;
+        if(ds.indexOf(l)<0)ds.push(l);
+      });
+      if(ds.length)meta.push(escHtml(ds.join(' · ')));
+    }
+    if(opt.loja){
+      const l=shopLojaTxt(items.find(x=>shopLojaTxt(x))||{});
+      if(l)meta.push('🏬 '+escHtml(l));
+    }
+    const quem=[];items.forEach(x=>{if(x.tratadoPor&&quem.indexOf(x.tratadoPor)<0)quem.push(x.tratadoPor);});
+    if(quem.length)meta.push('🛒 '+escHtml(quem.join(', ')));
+    // A dica de stock é a MESMA frase do ecrã ("3 kg já em stock — falta comprar
+    // 2 kg"): é ela que impede comprar outra vez o que já está na garagem. Sem
+    // ela a folha mandava comprar o pedido inteiro.
+    const dicas=[];
+    items.forEach(x=>{const sh=shopStockHint(x);if(sh&&dicas.indexOf(sh.txt)<0)dicas.push(sh.txt);});
+    if(dicas.length)meta.push(escHtml(dicas.join(' · ')));
+    // Caixa já ticada: quem leva o artigo marcou-o como apanhado. É informação
+    // de quem anda nas compras e é justamente para isso que a folha serve.
+    const feito=items.every(x=>x.tratadoPor&&x.noCarrinho);
+    return `<div class="sl-row"><i class="sl-box${feito?' on':''}"></i><span class="sl-nm">${escHtml(it.artigo)}${opt.desp?' 🫙':''}${meta.length?` <i class="sl-meta">${meta.join(' · ')}</i>`:''}</span><span class="sl-q">${qtd?escHtml(qtd):''}</span></div>`;
+  };
+  // Um bloco: cabeçalho + as linhas dos artigos, por ordem alfabética. Conta as
+  // linhas e os blocos para se saber, no fim, quão apertada tem de ser a folha.
+  let nLinhas=0,nBlocos=0;
+  const bloco=(label,items,opt)=>{
+    const g={},order=[];
+    items.forEach(it=>{const k=shopArtKey(it.artigo);if(!g[k]){g[k]=[];order.push(k);}g[k].push(it);});
+    order.sort((a,b)=>g[a][0].artigo.localeCompare(g[b][0].artigo,'pt'));
+    nLinhas+=order.length;nBlocos++;
+    return `<div class="sl-grp"><div class="sl-grp-h">${label}<span class="sl-n">${order.length}</span></div>${order.map(k=>slRow(g[k],opt)).join('')}</div>`;
+  };
+
+  // Despensa à cabeça, como no ecrã: lista curta e fixa, despacha-se de uma vez
+  const desp=[],norm=[];
+  comprar.forEach(it=>(isDespensa(it.artigo)?desp:norm).push(it));
+  let blocos='';
+  // A despensa tem bloco próprio, fora da ordenação escolhida (como no ecrã) —
+  // por isso a loja mostra-se sempre: aqui nunca há cabeçalho de loja a dizê-la.
+  if(desp.length)blocos+=bloco('🫙 Despensa',desp,{desp:true,dest:true,loja:true});
+  if(norm.length){
+    if(byLoja){
+      const lojas={},order=[];
+      norm.forEach(it=>{const l=shopLojaTxt(it),k=l?shopLojaKey(l):'\uffff';if(!lojas[k]){lojas[k]={nome:l,items:[]};order.push(k);}lojas[k].items.push(it);});
+      order.sort((a,b)=>((a==='\uffff'?1:0)-(b==='\uffff'?1:0))||lojas[a].nome.localeCompare(lojas[b].nome,'pt'));
+      order.forEach(k=>{blocos+=bloco(k==='\uffff'?'🛒 '+SHOP_SEM_LOJA:'🏬 '+escHtml(lojas[k].nome),lojas[k].items,{dest:true});});
+    }else if(byCat){
+      const cats={},order=[];
+      norm.forEach(it=>{const c=artCat(it.artigo),k=c?'c'+c.id:'\uffff';if(!cats[k]){cats[k]={nome:c?c.nome:'Outros',items:[]};order.push(k);}cats[k].items.push(it);});
+      order.sort((a,b)=>((a==='\uffff'?1:0)-(b==='\uffff'?1:0))||cats[a].nome.localeCompare(cats[b].nome,'pt'));
+      order.forEach(k=>{blocos+=bloco(`${catEmoji(cats[k].nome)} ${escHtml(cats[k].nome)}`,cats[k].items,{dest:true,loja:true});});
+    }else if(byArt){
+      blocos+=bloco('🔤 Artigos',norm,{dest:true,loja:true});
+    }else{
+      const gs={},order=[];
+      norm.forEach(it=>{const k=shopGroupKey(it);if(!gs[k]){gs[k]={it,items:[]};order.push(k);}gs[k].items.push(it);});
+      order.sort((a,b)=>(ord[gs[a].it.tipo]-ord[gs[b].it.tipo])||((gs[a].it.dataValor||'').localeCompare(gs[b].it.dataValor||'')));
+      order.forEach(k=>{blocos+=bloco(shopGroupLabel(gs[k].it.tipo,gs[k].it.dataValor),gs[k].items,{loja:true});});
+    }
+  }
+
+  // Peso da folha: cada cabeçalho de bloco vale por quase duas linhas (tem o
+  // traço e o espaço por baixo). É o que decide entre 2 e 3 colunas e, já muito
+  // grande, o corpo mais pequeno — antes de deixar passar para a 2.ª folha.
+  const peso=nLinhas+nBlocos*1.8;
+  const cols='sl-cols'+(peso>140?' sl-3 sl-tight':peso>90?' sl-3':'');
+
+  let h=`<div class="sl-doc"><h1>🛒 Shop List — ${evNome} ${ano}</h1>`;
+  // Contam-se ARTIGOS distintos, não linhas: por refeição o mesmo artigo aparece
+  // num bloco por refeição e o número do topo mudava com a ordenação escolhida.
+  const nArt=new Set(comprar.map(it=>shopArtKey(it.artigo))).size;
+  const nCarr=new Set(comprar.filter(it=>it.tratadoPor).map(it=>shopArtKey(it.artigo))).size;
+  const sub=[`${nArt} artigo${nArt===1?'':'s'} por comprar`];
+  if(nCarr)sub.push(`${nCarr} em carrinhos`);
+  if(tratados.length)sub.push(`${tratados.length} já tratado${tratados.length===1?'':'s'}`);
+  h+=`<div class="subtitle">${DATA.evento.datas?escHtml(DATA.evento.datas)+' · ':''}${sub.join(' · ')}</div>`;
+  if(!comprar.length){
+    h+=tratados.length
+      ?'<p>Nada por comprar — o stock e as encomendas já cobrem a lista.</p>'
+      :'<p>A lista de compras está vazia.</p>';
+  }else{
+    // A legenda usa as MESMAS caixas das linhas (e não ☐/▪, que o tipo de letra
+    // desenha de outra maneira) — senão não se percebe que fala delas.
+    h+=`<div class="sl-leg"><i class="sl-box"></i> por apanhar · <i class="sl-box on"></i> já no carrinho de quem o leva · 🛒 quem trata · 🫙 despensa (uma embalagem serve todas as refeições)</div>`;
+    h+=`<div class="${cols}">${blocos}</div>`;
+  }
+  if(tratados.length){
+    const g={},order=[];
+    tratados.forEach(t=>{const k=shopArtKey(t.it.artigo);if(!g[k]){g[k]=t;order.push(k);}});
+    h+=`<div class="sl-done"><b>Não comprar — já tratado:</b> `
+      +order.map(k=>`${escHtml(g[k].it.artigo)} <i>(${g[k].txt})</i>`).join(' · ')+'</div>';
+  }
+  h+=`<div class="footer">Lista gerada em ${new Date().toLocaleString('pt-PT')} · ${evNome} ${ano}</div></div>`;
+  return h;
 }
 
 /* Relatório da encomenda de t-shirts: o que cada pessoa pediu + o total por

@@ -114,6 +114,14 @@ A app deduz sozinha se um pedido já está coberto: soma o stock alocado àquela
 - **E a app deixou de ficar calada**: havendo stock deste artigo alocado a esta refeição mas noutra unidade, a linha di-lo (`5 kg alocado — em embalagens, não dá para comparar`) em vez de contar 0 e parecer que nada aconteceu — que era o comportamento antigo e o que fazia a funcionalidade parecer avariada. Idem para stock livre noutra unidade.
 - Migração: `db/cobertura.sql`. Tolerante: sem ela, `COB_COL=false`, o bloco fica escondido e a cobertura é só a deduzida.
 
+## Shop List em PDF (🖨 no cabeçalho das Compras)
+A folha que se leva ao supermercado — ninguém percorre os corredores a saltar entre sub-separadores no telemóvel. `buildShopReport()` (secção Relatórios/PDF), também acessível em 📊 Relatórios.
+- **Uma lista só**: o que na app são três (em falta · já em carrinhos · o meu carrinho) junta-se, com o `🛒 Nome` de quem trata em cada linha. Quem compra quer o corredor inteiro de uma vez.
+- **Uma linha por ARTIGO, não por pedido**: os pedidos do mesmo nome juntam-se e a quantidade é a **soma** (`shopSumQtys`); na despensa é o **máximo** (`shopDespQty`), como em todo o lado. Três linhas de "Batatas" numa folha é espaço gasto a repetir o nome.
+- **Manda a ordenação escolhida** nos chips (loja/refeição/artigo/categoria) — é a viagem que a pessoa decidiu fazer. A **pesquisa não filtra**: exporta-se a lista, não a vista (a mesma regra do "registar a compra leva o carrinho todo").
+- **Coberto pelo stock e encomendado ficam fora** da lista e vão para um rodapé pequeno ("não comprar — já tratado"): não há nada a comprar, mas convém saber porque é que o artigo não aparece. A **dica de stock** (`shopStockHint`) vai na linha — é ela que evita comprar de novo o que já está na garagem.
+- **Cabe numa folha**: 2 colunas, 3 quando a lista cresce, corpo mais pequeno quando é mesmo grande (`peso` = linhas + cabeçalhos). Testado até ~150 artigos numa página A4.
+
 ## Artigos de despensa (🫙)
 Há **dois tipos de artigo** na lista de compras e antes disto eram tratados como um só:
 - **Consumível** — a procura escala com as refeições (carne, batatas, ovos). Dois pedidos para dias diferentes **não são duplicados** — é por isso que o passo dos Pedidos Repetidos se recusa a juntar entre refeições (`shopRepFusiveis`). Não mexer nisso.
