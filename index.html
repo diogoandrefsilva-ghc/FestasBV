@@ -425,7 +425,8 @@ setTimeout(function(){ if (window.fbvEsconderSplash) window.fbvEsconderSplash();
 </div>
 <input type="file" id="lista-file" accept="image/*,application/pdf" style="display:none" onchange="listaFotoChosen(this)">
 
-<!-- ✨ Normalizar grafias de artigos (juntar chouriço/chouriços, 1000ml/1L, …) -->
+<!-- ✨ Normalizar artigos: juntar grafias (chouriço/chouriços, 1000ml/1L, …) e
+     escrever direito os nomes soltos (agua → Água, coca cola → Coca-Cola) -->
 <div class="modal-bg" id="shopnorm-bg">
   <div class="modal" id="shopnorm-modal">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
@@ -436,7 +437,7 @@ setTimeout(function(){ if (window.fbvEsconderSplash) window.fbvEsconderSplash();
     <div id="shopnorm-list"></div>
     <div class="mbtns">
       <button class="btn ghost" onclick="shopNormClose()">Cancelar</button>
-      <button class="btn prim" id="shopnorm-save" onclick="shopNormApply()">Juntar</button>
+      <button class="btn prim" id="shopnorm-save" onclick="shopNormApply()">Arrumar</button>
     </div>
     <div class="note">Só mexe nos nomes dos pedidos da lista — os nomes detalhados dos talões ficam intactos no stock, só a ligação ao pedido acompanha.</div>
   </div>
