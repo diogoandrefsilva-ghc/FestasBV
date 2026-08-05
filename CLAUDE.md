@@ -105,6 +105,14 @@ O 📅/📌 do cash-flow segue para o modal da compra (`sb-quando`, só visível
 - **A fatura (📷) vale aqui**, e agora ainda mais: é com ela que se fecha o valor final ao passar a 📅.
 - Editar despesas continua a ser **só do admin** (as despesas não têm policy de self-update). Quem regista uma provisória não a fecha sozinho.
 
+## Cobertura dita à mão (🧺 "este pedido está tratado?")
+A app deduz sozinha se um pedido já está coberto: soma o stock alocado àquela refeição e compara com o pedido. Só que isso **exige a mesma unidade** (`sameUnit`) — "3 kg" contra "5 kg" faz-se, "2 embalagens" contra "5 kg" não.
+- **Nunca se adivinha a conversão.** Ninguém sabe quantos kg tem uma embalagem, e errar aqui não dá erro nenhum: dá uma lista a dizer "está tratado" e uma cozinha sem batatas. Quem sabe é quem lá esteve — a coluna `shoplist.cobertura` é onde ele o diz. `''` = a app deduz (como sempre) · `'ok'` = coberto · **qualquer outro texto** = o que ainda falta ("1 kg"), livre de propósito (a unidade do que falta pode não ser a do pedido).
+- **Dito à mão manda** (`shopCobDecl` em `shopIsCovered`/`shopStockHint`): com declaração, nem se pergunta ao stock. `'ok'` risca o pedido na lista e tira-o do "por comprar"; "falta X" mantém-no por comprar, com a nota.
+- **Só se escreve no detalhe do pedido** — nenhum caminho automático lhe toca, senão uma alocação de stock apagava o que uma pessoa declarou. Por isso o `saveShopItem` é o único sítio que grava a coluna.
+- **E a app deixou de ficar calada**: havendo stock deste artigo alocado a esta refeição mas noutra unidade, a linha di-lo (`5 kg alocado — em embalagens, não dá para comparar`) em vez de contar 0 e parecer que nada aconteceu — que era o comportamento antigo e o que fazia a funcionalidade parecer avariada. Idem para stock livre noutra unidade.
+- Migração: `db/cobertura.sql`. Tolerante: sem ela, `COB_COL=false`, o bloco fica escondido e a cobertura é só a deduzida.
+
 ## Artigos de despensa (🫙)
 Há **dois tipos de artigo** na lista de compras e antes disto eram tratados como um só:
 - **Consumível** — a procura escala com as refeições (carne, batatas, ovos). Dois pedidos para dias diferentes **não são duplicados** — é por isso que o passo dos Pedidos Repetidos se recusa a juntar entre refeições (`shopRepFusiveis`). Não mexer nisso.

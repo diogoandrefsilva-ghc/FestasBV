@@ -1736,6 +1736,13 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .shop-desp-lbl{flex:1;min-width:0;font-size:13px;font-weight:700;color:var(--ink)}
 .shop-desp-wrap .norm-sw:disabled{opacity:.5;cursor:default}
 .shop-desp-wrap .note{margin-top:6px}
+/* "Este pedido está tratado?" — a cobertura dita à mão, quando as unidades do
+   pedido e do stock não se comparam. Mesmo desenho do bloco da despensa. */
+.shop-cob-wrap{margin-top:12px;border:1px solid var(--line);border-radius:11px;padding:10px 12px;background:var(--panel2)}
+.shop-cob-hd{display:flex;align-items:center;gap:10px}
+.shop-cob-lbl{flex:1;min-width:0;font-size:13px;font-weight:700;color:var(--ink)}
+.shop-cob-wrap .cmp-sort{flex-wrap:wrap;gap:6px}
+.shop-cob-wrap input[type=text]{margin-bottom:0}
 /* Bloco de despensa na Shop List: cabeçalho próprio, com a razão de existir
    escrita ao lado — quem chega à lista tem de perceber num relance porque é
    que o azeite aparece uma vez só. */

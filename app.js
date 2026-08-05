@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v204 · 2026-08-05 · Pedido tratado fica na lista, riscado (coberto pelo stock ou encomendado) em vez de saltar para o bloco de baixo — a contagem passa a ser do que falta; e o 🔗 do artigo volta a aparecer nas provisórias';
+const APP_BUILD = 'v205 · 2026-08-05 · Cobertura de um pedido dita à mão (coberto / falta ___) para quando as unidades não se comparam — "2 embalagens" vs "5 kg" — e a lista deixa de ficar calada quando há stock alocado que não sabe comparar';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -123,6 +123,11 @@ let DESP_BEBIDA_COL=false;
 // SHOP_LOJA_COL=false: o campo e a ordenação por loja ficam escondidos e nunca
 // se grava a coluna — a app funciona exatamente como antes.
 let SHOP_LOJA_COL=false;
+// shoplist já tem a coluna 'cobertura' (migração db/cobertura.sql)? É onde uma
+// pessoa DIZ que um pedido está coberto (ou quanto falta) quando as unidades do
+// pedido e do stock não são comparáveis — "2 embalagens" vs "5 kg". Sem ela,
+// COB_COL=false e a cobertura é só a que a app deduz das alocações.
+let COB_COL=false;
 // stock_lotes já tem a coluna 'tamanho' (a embalagem, como nos pedidos da
 // lista: "6 × 2,5 kg")? Sem a migração, STOCK_TAM_COL=false: o campo não
 // aparece e nunca se grava — a app funciona exatamente como antes.
@@ -2101,7 +2106,7 @@ async function carregar(){
     const sel='*,membros(*,presencas(*)),refeicoes_def(*),despesas(*),convidados(*),mealheiros(*),pagamentos(*)';
     // shoplist vai numa fetch SEPARADA e tolerante a falha: se a tabela ainda
     // não existir (migração por correr) o resto da app continua a funcionar.
-    const [res,uaRes,cjRes,vlRes,slRes,stRes,ctRes,acRes,adRes,npRes,flRes,fpRes,ccRes,sljRes,cpRes,stmRes,ttRes,tsRes,tiRes,ppRes,dgRes,dbRes]=await Promise.all([
+    const [res,uaRes,cjRes,vlRes,slRes,stRes,ctRes,acRes,adRes,npRes,flRes,fpRes,ccRes,sljRes,cobRes,cpRes,stmRes,ttRes,tsRes,tiRes,ppRes,dgRes,dbRes]=await Promise.all([
       sbFetch(`${SB_URL}/rest/v1/eventos?select=${encodeURIComponent(sel)}&order=ano.asc`,{headers:sbHeaders(),cache:'no-store'}),
       sbFetch(`${SB_URL}/rest/v1/user_amigos?select=email,amigo`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null),
       sbFetch(`${SB_URL}/rest/v1/conjuges?select=amigo_a,amigo_b`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null),
@@ -2127,6 +2132,8 @@ async function carregar(){
       sbFetch(`${SB_URL}/rest/v1/convidados?select=crianca&limit=1`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null),
       // sonda à coluna shoplist.loja (db/shoplist.sql): 200 = já existe
       sbFetch(`${SB_URL}/rest/v1/shoplist?select=loja&limit=1`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null),
+      // sonda à coluna shoplist.cobertura (db/cobertura.sql): a cobertura dita à mão
+      sbFetch(`${SB_URL}/rest/v1/shoplist?select=cobertura&limit=1`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null),
       // sonda às colunas convidados.adultos/criancas (db/convidados_acompanhantes.sql)
       sbFetch(`${SB_URL}/rest/v1/convidados?select=adultos,criancas&limit=1`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null),
       // sonda à coluna stock_lotes.tamanho (a embalagem do lote): 200 = já existe
@@ -2179,6 +2186,8 @@ async function carregar(){
     // Idem para a composição do convidado: sem as colunas, vale 1 pessoa
     CONV_AC_COLS=!!(cpRes&&cpRes.ok);
     SHOP_LOJA_COL=!!(sljRes&&sljRes.ok);
+    // Cobertura dita à mão: sem a coluna, só vale a que a app deduz do stock
+    COB_COL=!!(cobRes&&cobRes.ok);
     // Despesa paga por vários: sem a coluna, cada despesa continua a ter um dono só
     DESP_GRUPO_COL=!!(dgRes&&dgRes.ok);
     // Bebida alocada à refeição: sem a coluna, a despesa avulsa não se marca
@@ -2229,7 +2238,7 @@ async function carregar(){
       filhosPres:fpByEv[ev.id]||{},
       mealheiros:(ev.mealheiros||[]).map(m=>({quem:m.quem,data:m.data,valor:N(m.valor),subtipo:m.subtipo,desc:m.descricao})),
       pagamentos:(ev.pagamentos||[]).map(p=>({de:p.de,para:p.para,valor:N(p.valor),ref:p.ref,data:p.data,extra:N(p.extra)})),
-      shoplist:(shopByEv[ev.id]||[]).map(s=>({_id:s.id,artigo:s.artigo,quantidade:s.quantidade||'',tamanho:s.tamanho||'',loja:s.loja||'',tipo:s.tipo,dataValor:s.data_valor,estado:s.estado||'pendente',tratadoPor:s.tratado_por||null,noCarrinho:!!s.no_carrinho,compraId:s.compra_id||null,cfDesc:s.cf_desc||null,valor:s.valor!=null?N(s.valor):null,criadoPor:s.criado_por||'',criadoEm:s.criado_em,compradoEm:s.comprado_em})),
+      shoplist:(shopByEv[ev.id]||[]).map(s=>({_id:s.id,artigo:s.artigo,quantidade:s.quantidade||'',tamanho:s.tamanho||'',loja:s.loja||'',tipo:s.tipo,dataValor:s.data_valor,estado:s.estado||'pendente',tratadoPor:s.tratado_por||null,noCarrinho:!!s.no_carrinho,compraId:s.compra_id||null,cfDesc:s.cf_desc||null,cobertura:s.cobertura||'',valor:s.valor!=null?N(s.valor):null,criadoPor:s.criado_por||'',criadoEm:s.criado_em,compradoEm:s.comprado_em})),
       stockLotes:(stockByEv[ev.id]||[]).map(l=>({_id:l.id,compraId:l.compra_id,artigo:l.artigo,qtd:N(l.qtd),unidade:l.unidade||'',tamanho:l.tamanho||'',valor:N(l.valor),alocacoes:Array.isArray(l.alocacoes)?l.alocacoes:[],_listArt:l.lista_artigo||null,criadoEm:l.criado_em})),
       tshirts:(tsByEv[ev.id]||[]).map(t=>({_id:t.id,membro:t.membro,nome:t.nome,tipo:t.tipo,tamanho:t.tamanho,imputadoA:Array.isArray(t.imputado_a)?t.imputado_a.filter(Boolean):[],criadoPor:t.criado_por||'',criadoEm:t.criado_em}))
     }));
@@ -5988,11 +5997,54 @@ function shopItemCoverage(it){
   const aloc=mealStockAllocFor(it.artigo,q.u,it.tipo,it.dataValor);
   return {need,aloc,falta:Math.max(0,rnd(need-aloc,3)),u:q.u};
 }
+/* Cobertura DITA À MÃO (db/cobertura.sql). Devolve:
+     ''      nada dito → vale o que a app deduz do stock
+     'ok'    coberto, ponto final
+     texto   o que ainda falta, como a pessoa escreveu ("1 kg")
+   Existe porque a dedução automática só funciona com unidades comparáveis: um
+   pedido de "2 embalagens" e um lote de "5 kg" não se somam, e adivinhar a
+   conversão seria pior do que não saber — daria a lista por tratada e a cozinha
+   sem batatas. Quem sabe é quem lá esteve; isto é onde o diz. */
+function shopCobDecl(it){
+  if(!COB_COL||!it)return '';
+  const v=String(it.cobertura||'').trim();
+  return v.toLowerCase()==='ok'?'ok':v;
+}
+/* Stock livre deste artigo em unidades DIFERENTES da do pedido — para dizer
+   "há 5 kg por alocar" a quem pediu "2 embalagens", em vez de silêncio. */
+function stockAnyFreeLabel(artigo,uPedido){
+  const por={};
+  stockArr().forEach(l=>{
+    if(!stockBacked(l)||!shopSameArtigo(loteReqArtigo(l),artigo)||sameUnit(l.unidade,uPedido))return;
+    const aloc=(l.alocacoes||[]).reduce((a,x)=>a+(+x.qtd||0),0);
+    const livre=Math.max(0,rnd(l.qtd-aloc,3));
+    if(livre>0.0005)por[l.unidade||'']=rnd((por[l.unidade||'']||0)+livre,3);
+  });
+  const ks=Object.keys(por);
+  return ks.length?ks.map(u=>fmtQty(por[u],u)).join(' + '):'';
+}
+/* Quanto deste artigo está alocado a esta refeição, em QUALQUER unidade, para
+   o caso em que ela não bate com a do pedido — é o que permite dizer "há 5 kg
+   alocados aqui" em vez de ficar calado. Agrega por unidade. */
+function mealStockAllocLabel(artigo,ref,data){
+  const por={};
+  stockArr().forEach(l=>{
+    if(!stockBacked(l)||!shopSameArtigo(loteReqArtigo(l),artigo))return;
+    (l.alocacoes||[]).forEach(a=>{if(a.tipo===ref&&a.data===data&&+a.qtd>0)por[l.unidade||'']=rnd((por[l.unidade||'']||0)+(+a.qtd),3);});
+  });
+  const ks=Object.keys(por);
+  return ks.length?ks.map(u=>fmtQty(por[u],u)).join(' + '):'';
+}
 /* Pedido pendente totalmente coberto pelo stock alocado à sua refeição —
    sai do "falta quem trate" (não há nada a comprar) mas continua visível;
    se a alocação mudar, volta sozinho. Sem qtd numérica: cobertura binária. */
 function shopIsCovered(it){
-  if(!STOCK_TABLE||!shopIsPending(it))return false;
+  if(!shopIsPending(it))return false;
+  // Dito à mão manda sobre o que se deduz: 'ok' cobre, "falta X" não cobre
+  // (e nesse caso nem se pergunta ao stock — a pessoa já respondeu).
+  const dec=shopCobDecl(it);
+  if(dec)return dec==='ok';
+  if(!STOCK_TABLE)return false;
   // Despensa: uma embalagem serve o evento todo, por isso basta HAVER lote
   // comprado do artigo — não se exige alocação a esta refeição em particular,
   // que é justamente o trabalho manual que a marca de despensa evita.
@@ -6082,7 +6134,11 @@ async function persistStockNeedsFix(ids){
      está atribuído a outras);
    - falta e não há livre → aviso de que falta comprar. */
 function shopStockHint(it){
-  if(!STOCK_TABLE||shopIsRemoved(it)||shopIsBought(it))return null;
+  if(shopIsRemoved(it)||shopIsBought(it))return null;
+  const dec=shopCobDecl(it);
+  if(dec==='ok')return {ok:true,txt:'coberto — dito à mão'};
+  if(dec)return {ok:false,txt:`falta ${dec}`};
+  if(!STOCK_TABLE)return null;
   const c=shopItemCoverage(it);
   if(!c){
     // Sem quantidade numérica: cobertura binária (há/não há alocação à refeição)
@@ -6093,6 +6149,16 @@ function shopStockHint(it){
   const cob=rnd(Math.min(c.aloc,c.need),3);
   if(c.falta<=0.0005)   // alocação cobre a necessidade
     return c.aloc>0.0005?{ok:true,txt:`🧺 pedido coberto pelo stock (${fmtQty(cob,c.u)})`}:null;
+  /* Unidades que não se comparam: há stock DESTE artigo alocado a ESTA refeição,
+     mas noutra unidade — a conta acima deu 0 alocado e, sem isto, a linha ficava
+     calada como se nada tivesse acontecido. Não se adivinha a conversão: diz-se
+     o que há e quem sabe que decida (o bloco "cobre isto?" no detalhe). */
+  if(c.aloc<=0.0005){
+    const outra=mealStockAllocLabel(it.artigo,it.tipo,it.dataValor);
+    if(outra)return {ok:false,txt:`🧺 ${outra} alocado — em ${c.u}, não dá para comparar com o pedido`};
+    const livre=stockAnyFreeLabel(it.artigo,c.u);
+    if(livre)return {ok:false,txt:`🧺 há ${livre} em stock por alocar — noutra unidade`};
+  }
   // Há falta: se houver stock livre, oferece alocá-lo (até à falta); senão, comprar
   const podeAlocar=rnd(Math.min(stockFreeFor(it.artigo,c.u),c.falta),3);
   if(podeAlocar>0.0005){
@@ -6312,7 +6378,9 @@ function shopItemCard(it,mineView,noBadge,grouped,noLoja){
   const lojaRow=lojaTxt?`<div class="cmp-loja-row"><span class="cmp-loja">${escHtml(lojaTxt)}</span></div>`:'';
   if(it.criadoPor)sub=`<div class="cmp-sub">pedido por ${escHtml(it.criadoPor)}</div>`;
   if(covered){
-    right='<span class="cmp-chip stock">🧺 em stock</span>';
+    right=shopCobDecl(it)==='ok'
+      ?'<span class="cmp-chip stock" title="Coberto — dito à mão">✓ coberto</span>'
+      :'<span class="cmp-chip stock">🧺 em stock</span>';
   }else if(enc){
     // Uma marca só: o chip. Qual a despesa fica no title — na lista o que
     // interessa é "não compres isto", não o nome do talho.
@@ -6619,7 +6687,7 @@ function mealShopSection(rd){
     // Sem dono: em vez de dizer "falta quem trate", dá-se logo o botão de o
     // resolver — o ＋🛒 da Shop List em botão de talão, um toque e o artigo é
     // meu. Em refeições passadas não há nada a tratar: fica só a constatação.
-    const st=cob?'<span class="msl-st ok">🧺 em stock</span>'
+    const st=cob?`<span class="msl-st ok">${shopCobDecl(it)==='ok'?'coberto':'🧺 em stock'}</span>`
       :enc?`<span class="msl-st prov" title="${escHtml(enc.desc||'')} — despesa provisória">encomendado</span>`
       :done?''
       :it.tratadoPor?mslWho(it.tratadoPor)
@@ -7199,6 +7267,7 @@ function openShopItemModal(id,presetTipo,presetData){
     const ll=document.getElementById('shop-loja-list');
     if(ll&&SHOP_LOJA_COL)ll.innerHTML=shopLojaNomes().map(n=>`<option value="${escHtml(n)}">`).join('');
   }
+  shopCobFill(it);
   document.getElementById('shop-tipo').value=it?it.tipo:(presetTipo||'Gerais');
   // Contexto de refeição trancado: esconde tipo+refeições e mostra o destino fixo
   document.getElementById('shop-tipo-wrap').style.display=shopCtxLock?'none':'';
@@ -7318,6 +7387,63 @@ function shopCatSync(){
     :(g?`Sugerida a partir de "${g.nome}" — confirma antes de guardar.`:'');
   note.style.display=note.textContent?'':'none';
 }
+/* ── Cobertura dita à mão (db/cobertura.sql) ──────────────────────────
+   Três estados, um chip cada: deixa a app decidir · coberto · falta ___.
+   Só aparece num pedido JÁ EXISTENTE e ainda por comprar: num artigo a nascer
+   não há nada para cobrir, e num comprado a pergunta já não se põe.
+   O estado vive no dataset do bloco até se gravar, como o resto do modal. */
+let _cobEstado='';   // '' | 'ok' | texto do que falta
+function shopCobPend(){return _cobEstado==='ok'?'ok':(_cobEstado||'').trim();}
+function shopCobFill(it){
+  const wrap=document.getElementById('shop-cob-wrap');if(!wrap)return;
+  const mostra=COB_COL&&!!it&&!shopIsBought(it)&&!shopIsRemoved(it)&&shopCanWrite();
+  wrap.style.display=mostra?'':'none';
+  _cobEstado=mostra?shopCobDecl(it):'';
+  if(mostra)shopCobPaint(it);
+}
+function shopCobPaint(it){
+  const dec=_cobEstado;
+  const falta=dec&&dec!=='ok';
+  const on=(id,v)=>{const e=document.getElementById(id);if(e)e.classList.toggle('on',v);};
+  on('shop-cob-auto',!dec);on('shop-cob-ok',dec==='ok');on('shop-cob-falta',!!falta);
+  const inp=document.getElementById('shop-cob-txt');
+  if(inp){inp.style.display=falta?'':'none';if(falta&&inp.value!==dec)inp.value=dec;}
+  const n=document.getElementById('shop-cob-note');
+  if(!n)return;
+  // Em automático, dizer o que a app está a deduzir agora — é a informação que
+  // faz decidir se vale a pena dizer alguma coisa à mão.
+  if(!dec){
+    const sh=it?shopStockHint(it):null;
+    n.innerHTML='A app decide pelo stock alocado a esta refeição'+(sh?`: <b>${escHtml(String(sh.txt).replace(/^\s*🧺\s*/,''))}</b>.`:'. Neste momento não há nada alocado.')
+      +'<br>Usa os outros dois quando as unidades não se comparam — "2 embalagens" e "5 kg" não se somam.';
+  }else if(dec==='ok'){
+    n.innerHTML='Fica <b>riscado</b> na lista da refeição, com a nota "coberto". Não conta para o "por comprar".';
+  }else{
+    n.innerHTML=dec.trim()
+      ?'Continua <b>por comprar</b> na lista, com a nota do que falta.'
+      :'Escreve <b>quanto falta</b> — em branco, volta ao automático.';
+  }
+}
+function shopCobSet(v){
+  const it=editingItemId!=null?shopArr().find(x=>x._id===editingItemId):null;
+  if(v==='falta'){
+    const inp=document.getElementById('shop-cob-txt');
+    _cobEstado=(inp&&inp.value.trim())||' ';   // espaço = "falta, ainda não disse quanto"
+    shopCobPaint(it);
+    if(inp){inp.style.display='';inp.focus();}
+    return;
+  }
+  _cobEstado=v;
+  shopCobPaint(it);
+}
+function shopCobTxt(v){
+  _cobEstado=v.trim()||' ';
+  const n=document.getElementById('shop-cob-note');
+  if(n)n.innerHTML=v.trim()
+    ?'Continua <b>por comprar</b> na lista, com a nota do que falta.'
+    :'Escreve <b>quanto falta</b> — em branco, volta ao automático.';
+}
+
 async function saveShopItem(){
   if(!DATA._sbId){toast('Sem ligação — recarrega a página','bad');return;}
   // Rede de segurança da capitalização: o onchange do campo já a aplica, mas
@@ -7348,6 +7474,9 @@ async function saveShopItem(){
       const patch={artigo,quantidade:qtd,tamanho:tam||null,tipo,data_valor:dataValor};
       const local={artigo,quantidade:qtd,tamanho:tam,tipo,dataValor};
       if(SHOP_LOJA_COL){patch.loja=loja||null;local.loja=loja;}
+      // Cobertura dita à mão: só se grava a partir daqui (nenhum caminho
+      // automático lhe toca — uma alocação de stock não apaga o que a pessoa disse)
+      if(COB_COL){const c=shopCobPend();patch.cobertura=c||null;local.cobertura=c;}
       // Admin pode reatribuir quem trata (puxar/largar por outrem)
       if(it&&isAdmin()&&document.getElementById('shop-claim-wrap').style.display!=='none'){
         const nv=document.getElementById('shop-claim').value||null;

@@ -221,6 +221,17 @@ setTimeout(function(){ if (window.fbvEsconderSplash) window.fbvEsconderSplash();
       <datalist id="shop-loja-list"></datalist>
       <div class="note" style="margin-top:4px">Onde se costuma encontrar / onde preferes que se compre. É só uma indicação para quem vai às compras.</div>
     </div>
+    <!-- Cobertura dita à mão (db/cobertura.sql): só num pedido já existente -->
+    <div id="shop-cob-wrap" class="shop-cob-wrap" style="display:none">
+      <div class="shop-cob-hd"><span class="shop-cob-lbl">🧺 Este pedido está tratado?</span></div>
+      <div class="cmp-sort" style="margin:8px 0 0">
+        <span class="sd-chip" id="shop-cob-auto" onclick="shopCobSet('')">deixa a app decidir</span>
+        <span class="sd-chip" id="shop-cob-ok" onclick="shopCobSet('ok')">coberto ✓</span>
+        <span class="sd-chip" id="shop-cob-falta" onclick="shopCobSet('falta')">falta…</span>
+      </div>
+      <input type="text" id="shop-cob-txt" maxlength="30" placeholder="Quanto falta? Ex: 1 kg" style="display:none;margin-top:8px" oninput="shopCobTxt(this.value)">
+      <div class="note" id="shop-cob-note" style="margin-top:6px"></div>
+    </div>
     <div id="shop-ctx-lock" class="shop-ctx-lock" style="display:none"></div>
     <div id="shop-tipo-wrap">
       <label>Tipo de despesa</label>
