@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v211 · 2026-08-05 · Adeus artigos de despensa: o conceito era redundante com as Despesas Gerais e só confundia — o azeite passa a ser um artigo como os outros, com a cobertura dita a partir do stock quando fizer falta';
+const APP_BUILD = 'v212 · 2026-08-05 · Um artigo do stock cujo nome não bate com nenhum pedido ("Folhas de Louro (Margão)" ↔ "Louro") deixa de ser um beco: pergunta-se ali a que pedido responde, e os pedidos sem quantidade voltam a listar-se no painel dos pedidos';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -8833,10 +8833,18 @@ function openLoteModal(id){
   // pode diferir do produto (Lays). Dá contexto para alocar: compras ↔ pedidos.
   const dem=stockDemandFor(editingLote.reqLink||editingLote.artigo,editingLote.u);
   const needKeys=Object.keys(dem).sort((a,b)=>(a.split('|')[1]).localeCompare(b.split('|')[1])||a.localeCompare(b));
+  /* Pedidos SEM quantidade escrita (o louro, o sal, a salsa) não entram no
+     stockDemandFor — que trabalha com números — e este painel dizia "sem pedidos"
+     precisamente onde mais falta faz saber quem pediu. Listam-se sem números,
+     que é o que há para saber. (Era o que a marca de despensa fazia por dentro;
+     sem ela, passa a valer para qualquer artigo.) */
+  const semQtd=needKeys.length?[]:loteCobPedidos().filter(it=>shopIsMeal(it.tipo)&&it.dataValor);
   const needRows=needKeys.length?needKeys.map(k=>{
     const a=destinoAloc(k,0);const ic=shopTipoIcon(a.tipo);
     return `<div class="lote-need-row">${ic} ${escHtml(diaAbrev(a.data)+' '+fmtDiaMes(a.data))} · <b>${escHtml(fmtQty(dem[k],editingLote.u))}</b></div>`;
   }).join('')
+    :semQtd.length?semQtd.map(it=>
+      `<div class="lote-need-row">${shopTipoIcon(it.tipo)} ${escHtml(diaAbrev(it.dataValor)+' '+fmtDiaMes(it.dataValor))} · <i class="lote-need-semq">pediu${shopQtyLabel(it)?' '+escHtml(shopQtyLabel(it)):''}</i></div>`).join('')
     :`<div class="lote-need-row empty">— sem pedidos na lista —</div>`;
   const semCusto=lotes.length>0&&lotes.every(loteSemCompra);
   // Compras e Pedidos deixam de disputar meia largura cada: empilham-se e abrem
@@ -8855,7 +8863,10 @@ function openLoteModal(id){
     `<div class="lote-sum">Em stock: <b>${escHtml(fmtQty(totQ,editingLote.u))}</b> · <b>${semCusto?'sem custo':eur(totV)}</b></div>`+
     `<div class="lote-acc">
       ${loteAccSec('cmp',anyOrg?'📦':'🛒',anyOrg?'Origem':'Compras',totQ,cmpSum,comprasRows)}
-      ${loteAccSec('need','📋','Pedidos na lista',demTot,'',needRows)}
+      ${loteAccSec('need','📋','Pedidos na lista',
+        (!needKeys.length&&semQtd.length)?null:demTot,
+        (!needKeys.length&&semQtd.length)?`${semQtd.length} ${semQtd.length===1?'refeição':'refeições'}`:'',
+        needRows)}
     </div>`;
   const canEdit=isAdmin()&&!contasFechadas();
   // A categoria e a ligação ao pedido são edição do artigo: vivem no painel ✏️.
@@ -9185,11 +9196,38 @@ function loteCobPedidos(){
       &&nomes.some(n=>shopSameArtigo(n,it.artigo)))
     .sort((a,b)=>(a.dataValor||'').localeCompare(b.dataValor||'')||a.tipo.localeCompare(b.tipo,'pt'));
 }
+/* Nomes distintos dos pedidos pendentes da lista — para ligar um artigo cujo
+   nome não bate com nenhum ("Folhas de Louro (Margão)" ↔ "Louro"). */
+function loteCobNomesLista(){
+  const eu=[editingLote&&editingLote.reqName,editingLote&&editingLote.product].filter(Boolean);
+  const n=[...new Set(shopArr().filter(it=>shopIsPending(it)&&!shopIsRemoved(it)).map(it=>it.artigo))]
+    .filter(x=>!eu.some(e=>shopSameArtigo(e,x)));
+  return n.sort((a,b)=>a.localeCompare(b,'pt'));
+}
 function loteCobFill(){
   const wrap=document.getElementById('lote-cob-wrap');if(!wrap)return;
-  const its=(COB_COL&&isAdmin()&&!contasFechadas())?loteCobPedidos():[];
-  wrap.style.display=its.length?'':'none';
-  if(!its.length)return;
+  const podeMexer=COB_COL&&isAdmin()&&!contasFechadas();
+  const its=podeMexer?loteCobPedidos():[];
+  /* Sem correspondência pelo NOME não há nada para tratar — e é justamente aí
+     que se está encalhado: o stock diz "Folhas de Louro (Margão)", a lista diz
+     "Louro", e a app não tem como saber que são a mesma coisa. Em vez de o bloco
+     desaparecer (e deixar-te sem saída visível), pergunta-se logo aqui a que
+     pedido é que o artigo responde. É a mesma ligação do ✏️ "🔗 Cobre o pedido
+     de" — só que oferecida onde a pergunta nasce. */
+  const nomes=(podeMexer&&!its.length)?loteCobNomesLista():[];
+  wrap.style.display=(its.length||nomes.length)?'':'none';
+  if(!its.length){
+    if(!nomes.length)return;
+    const nota=document.getElementById('lote-cob-nota');
+    if(nota)nota.innerHTML=`Nenhum pedido da lista se chama <b>${escHtml(editingLote.product||editingLote.reqName)}</b>. Se este artigo responde a algum, diz qual — e a partir daí podes dá-lo por tratado.`;
+    document.getElementById('lote-cob-list').innerHTML=
+      `<div class="lote-cob-it"><div class="lote-req-inline">🔗 responde ao pedido de
+        <select onchange="loteReqChanged(this.value)">
+          <option value="">— escolhe —</option>
+          ${nomes.map(n=>`<option value="${escHtml(n)}">${escHtml(n)}</option>`).join('')}
+        </select></div></div>`;
+    return;
+  }
   const nota=document.getElementById('lote-cob-nota');
   if(nota)nota.innerHTML='A app já dá por tratado o que consegue comparar. Marca aqui o que ela não consegue — <b>"2 embalagens" e "5 kg" não se somam</b> — e o pedido fica riscado na lista da refeição.';
   const cont=document.getElementById('lote-cob-list');
