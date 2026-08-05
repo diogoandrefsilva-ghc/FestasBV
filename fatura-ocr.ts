@@ -226,6 +226,10 @@ Regras:
 // para o admin rever e aprovar antes de gravar.
 // Com `categorias`, aproveita-se a mesma chamada para classificar os nomes (o
 // botão da app faz as duas coisas de seguida) — evita um segundo pedido.
+// Devolve ainda `ortografia`: nomes que estão sozinhos (nada a juntar) mas mal
+// escritos — acentos, maiúsculas, grafia de marcas. A app tem dicionário local
+// para o essencial ("agua" → "Água") e funciona sem isto; a AI é o que apanha o
+// que o dicionário não conhece.
 // Com `despensa`, a mesma chamada devolve ainda quais dos nomes são artigos que
 // se compram UMA vez para o evento todo (a app colapsa os pedidos das várias
 // refeições numa linha só). É só uma sugestão: o admin confirma sempre, e a app
@@ -246,7 +250,8 @@ Nomes:
 ${artigos.map((a) => `  - ${a}`).join("\n")}
 
 Responde APENAS com um objeto JSON com esta forma exata:
-{"grupos": [{"nome": string, "variantes": [string, string, ...]}]${
+{"grupos": [{"nome": string, "variantes": [string, string, ...]}],
+ "ortografia": [{"artigo": string, "nome": string}]${
   cats.length ? `,
  "sugestoes": [{"artigo": string, "categoria": string|null}]` : ""
 }${desp ? `,
@@ -256,7 +261,16 @@ Regras:
 - Inclui só grupos com 2 OU MAIS variantes distintas. Se não houver nada para
   juntar, devolve {"grupos": []}.
 - "variantes": os nomes EXATAMENTE como aparecem na lista (copia tal e qual).
-- "nome": o nome final sugerido para todo o grupo.${cats.length ? `
+- "nome": o nome final sugerido para todo o grupo.
+- "ortografia": nomes MAL ESCRITOS e como deviam ficar — acentos em falta
+  ("agua" → "Água", "acucar" → "Açúcar"), maiúsculas ("azeite" → "Azeite",
+  "COSTELETAS" → "Costeletas"), grafia de marcas ("coca cola" → "Coca-Cola",
+  "nestle" → "Nestlé", "super bock" → "Super Bock"), erros de escrita óbvios.
+  "artigo" copiado tal e qual da lista acima (ou um "nome" final de um grupo).
+  É SÓ ortografia: não mudes o produto, não acrescentes nem tires palavras
+  (quantidades, tamanhos, marcas e variantes ficam como estão) e não passes ao
+  singular — juntar grafias é trabalho dos "grupos". Nomes já bem escritos não
+  entram. Se não houver nenhum, devolve [].${cats.length ? `
 - "sugestoes": além dos grupos, classifica os artigos em categorias. Uma entrada
   por CADA nome da lista acima (com "artigo" exatamente igual ao nome dado) e
   ainda uma por cada "nome" final que sugerires nos grupos. "categoria" é

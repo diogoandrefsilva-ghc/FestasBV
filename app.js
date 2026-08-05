@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v206 · 2026-08-05 · Registar compra do carrinho já dá para marcar 📌 provisória (falta pagar, não falta comprar) — o segmentado passa a estar em qualquer compra, e os textos deixam de prometer o que já não é verdade';
+const APP_BUILD = 'v207 · 2026-08-05 · O ✨ Normalizar já escreve os nomes direitinhos: acentos, maiúsculas e grafia de marcas (agua → Água, coca cola → Coca-Cola), por dicionário local que corre sem AI, para nomes que estão sozinhos e não tinham grafia nenhuma para juntar';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -5071,6 +5071,115 @@ function shopNormLoose(s){
   return t.replace(/[^a-z0-9]+/g,' ').trim()
     .split(' ').map(w=>w.length>3&&w.endsWith('s')?w.slice(0,-1):w).join(' ');
 }
+/* ── Escrever direito (ortografia dos nomes) ──
+   Juntar grafias só resolve metade do problema: um artigo pode estar escrito
+   uma vez só e à mesma mal escrito ("agua", "coca cola", "AZEITE"). Isto é um
+   eixo à parte do "juntar" — mexe num nome sozinho — e por isso é LOCAL e
+   determinístico: acentos, maiúsculas e a grafia das marcas não se adivinham,
+   e assim funciona offline e igual em todos os telemóveis. A AI acrescenta o
+   que escapar (chave `ortografia` da fatura-ocr), mas nunca é precisa.
+   REGRA DE OURO: só se toca em MAIÚSCULAS/ACENTOS/GRAFIA. Nada de tirar,
+   acrescentar ou trocar palavras — quantidades, tamanhos e marcas ficam como
+   estão. Passar ao singular e juntar sinónimos é trabalho dos grupos. */
+// Chave de procura: minúsculas e sem acentos (a mesma normalização do shopArtKey)
+function nbKey(s){return String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');}
+/* Palavras/marcas que se escrevem de uma maneira só. Chave = forma sem acentos
+   em minúsculas; chaves com espaço casam também com hífen ("coca-cola"). Só
+   entra aqui o que o title-case não resolve: acentos e nomes próprios. */
+const NOME_DIC={
+  // bebidas e marcas
+  'coca cola':'Coca-Cola','cocacola':'Coca-Cola','coca colas':'Coca-Cola',
+  'pepsi':'Pepsi','fanta':'Fanta','sprite':'Sprite','sumol':'Sumol','seven up':'7Up','7up':'7Up',
+  'ice tea':'Ice Tea','icetea':'Ice Tea','nestea':'Nestea','red bull':'Red Bull','monster':'Monster',
+  'super bock':'Super Bock','sagres':'Sagres','heineken':'Heineken','somersby':'Somersby',
+  'compal':'Compal','nestle':'Nestlé','nescafe':'Nescafé','delta':'Delta','lipton':'Lipton',
+  'agua das pedras':'Água das Pedras','licor beirao':'Licor Beirão',
+  // acentos que toda a gente come
+  'agua':'Água','aguas':'Águas','gas':'Gás','acucar':'Açúcar','acucares':'Açúcares',
+  'oleo':'Óleo','oleos':'Óleos','cafe':'Café','cafes':'Cafés','cha':'Chá','chas':'Chás',
+  'pao':'Pão','paes':'Pães','feijao':'Feijão','feijoes':'Feijões','grao':'Grão',
+  'limao':'Limão','limoes':'Limões','melao':'Melão','meloes':'Melões','maca':'Maçã','macas':'Maçãs',
+  'pessego':'Pêssego','pessegos':'Pêssegos','abobora':'Abóbora','brocolos':'Brócolos','brocolis':'Brócolos',
+  'rucula':'Rúcula','hortela':'Hortelã','manjericao':'Manjericão','oregaos':'Orégãos','oregao':'Orégão',
+  'oreganos':'Orégãos','pimentao':'Pimentão','pimentoes':'Pimentões','alho frances':'Alho-Francês',
+  'frances':'Francês','couve flor':'Couve-Flor','noz moscada':'Noz-Moscada',
+  'piri piri':'Piri-Piri','piripiri':'Piri-Piri','chourico':'Chouriço','chouricos':'Chouriços',
+  'salpicao':'Salpicão','camarao':'Camarão','camaroes':'Camarões','ameijoas':'Amêijoas',
+  'macarrao':'Macarrão','requeijao':'Requeijão','melancia':'Melancia',
+  'lixivia':'Lixívia','alcool':'Álcool','carvao':'Carvão','guardanapos':'Guardanapos'
+};
+// Palavras pequenas que ficam em minúscula no meio do nome (chave sem acentos)
+const NB_MINOR=new Set(['de','do','da','dos','das','e','com','sem','em','no','na','nos','nas',
+  'ao','aos','a','o','os','as','um','uma','uns','umas','para','por','ou']);
+// Unidades: ficam exatamente como quem escreveu ("1,5 L" não vira "1,5 L" nem "L"→"l")
+const NB_UNID=new Set(['kg','g','gr','grs','mg','l','lt','lts','ml','cl','dl',
+  'un','uni','und','unid','unids','uns','cx','pct','emb','pack','packs']);
+function nbPalavra(w,primeira,sepAntes){
+  if(/\d/.test(w))return w;                       // "1,5", "500g", "7up" — não se toca
+  if(/['’]$/.test(sepAntes)&&!primeira)return w;  // "Lay's" — o que vem depois da plica fica
+  const low=w.toLowerCase();
+  if(!primeira&&NB_UNID.has(low))return w;
+  if(!primeira&&NB_MINOR.has(nbKey(w)))return low;
+  return w.charAt(0).toUpperCase()+w.slice(1).toLowerCase();
+}
+/* Devolve o nome bem escrito. Se já estiver bem escrito devolve-o igual — é
+   assim que se sabe que não há nada a propor. */
+function shopNomeBonito(s){
+  const raw=String(s||'').replace(/\s+/g,' ').trim();
+  if(!raw)return '';
+  const parts=raw.split(/([^\p{L}\p{N}]+)/u);   // pares = palavras, ímpares = separadores
+  const out=[];let i=0,primeira=true;
+  while(i<parts.length){
+    if(i%2===1){out.push(parts[i]);i++;continue;}
+    const w=parts[i];
+    if(!w){i++;continue;}
+    // Expressões de várias palavras primeiro (as mais longas ganham)
+    let achou=false;
+    for(let n=3;n>=1&&!achou;n--){
+      const fim=i+(n-1)*2;
+      if(fim>=parts.length)continue;
+      const ws=[];let ok=true;
+      for(let k=0;k<n;k++){
+        const wk=parts[i+k*2];
+        if(!wk){ok=false;break;}
+        ws.push(wk);
+        // só se juntam palavras separadas por espaço ou hífen
+        if(k<n-1&&!/^[\s-]+$/.test(parts[i+k*2+1]||'')){ok=false;break;}
+      }
+      if(!ok)continue;
+      const hit=NOME_DIC[nbKey(ws.join(' '))];
+      if(!hit)continue;
+      out.push(hit);i=fim+1;primeira=false;achou=true;
+    }
+    if(achou)continue;
+    out.push(nbPalavra(w,primeira,parts[i-1]||''));
+    primeira=false;i++;
+  }
+  return out.join('').replace(/\s+/g,' ').trim();
+}
+/* Cartões de "escrever direito": um por nome que está sozinho (não entrou em
+   nenhum grupo de juntar) e que se escreve de outra maneira. `aiOrto` é o que a
+   AI sugeriu (opcional); o dicionário local trata o resto e passa por cima de
+   tudo o que a AI devolva — é ele que garante que "Água" é "Água". */
+function shopNormOrtoGroups(stats,groups,aiOrto){
+  const usados=new Set();
+  (groups||[]).forEach(g=>g.variants.forEach(v=>usados.add(shopArtKey(v.name))));
+  const out=[];
+  Object.keys(stats).forEach(k=>{
+    if(usados.has(k))return;
+    const st=stats[k];
+    // A sugestão da AI só entra se for MESMO só ortografia: com a mesma chave
+    // solta ficam de fora as que trocam, tiram ou acrescentam palavras (juntar
+    // e renomear é trabalho dos grupos, revisto cartão a cartão)
+    const ai=aiOrto&&aiOrto[k];
+    const base=(ai&&shopNormLoose(ai)===shopNormLoose(st.name))?ai:st.name;
+    const alvo=shopNomeBonito(base);
+    if(!alvo||alvo===st.name)return;
+    out.push({variants:[{name:st.name,count:st.count}],canon:alvo,apply:true,orto:true});
+  });
+  out.sort((a,b)=>b.variants[0].count-a.variants[0].count||a.canon.localeCompare(b.canon,'pt'));
+  return out;
+}
 // Agrupa os nomes usados (lista + stock) pela chave solta. Uma "grafia" =
 // nome distinto para a app (shopArtKey); só interessam grupos com ≥2 grafias.
 function shopNormGroups(){
@@ -5091,7 +5200,7 @@ function shopNormGroups(){
     const vs=Object.values(map[lk]);
     if(vs.length<2)return;
     vs.sort((a,b)=>b.count-a.count||b.name.length-a.name.length);
-    groups.push({lk,variants:vs,canon:vs[0].name,apply:true});
+    groups.push({lk,variants:vs,canon:shopNomeBonito(vs[0].name)||vs[0].name,apply:true});
   });
   // Mais grafias primeiro (os mais "sujos" ao cimo)
   groups.sort((a,b)=>b.variants.length-a.variants.length||b.variants.reduce((s,v)=>s+v.count,0)-a.variants.reduce((s,v)=>s+v.count,0));
@@ -5126,7 +5235,9 @@ function shopNormFromAI(grupos,stats){
     if(variants.length<2)return;
     variants.sort((a,b)=>b.count-a.count||b.name.length-a.name.length);
     const nome=(g&&g.nome||'').trim();
-    out.push({variants,canon:nome||variants[0].name,apply:true});
+    // O nome final também vai à ortografia: um grupo bem juntado com o nome
+    // final em minúsculas continuava a deixar a lista mal escrita
+    out.push({variants,canon:shopNomeBonito(nome)||variants[0].name,apply:true});
   });
   out.sort((a,b)=>b.variants.length-a.variants.length);
   return out;
@@ -5136,13 +5247,18 @@ async function shopNormOpen(){
   if(contasFechadas()){toast('Contas fechadas','bad');return;}
   const stats=shopNormNameStats();
   const nomes=Object.values(stats).map(s=>s.name);
-  if(nomes.length<2){toast('Poucos artigos para normalizar','ok');return;}
+  // Um nome só chega: mesmo sem nada para juntar, pode estar mal escrito
+  if(!nomes.length){toast('Nenhum artigo na lista','ok');return;}
   const btn=document.getElementById('shop-norm-btn');
   if(btn){btn.disabled=true;btn.textContent='⏳';}   // só o ampulheta: o botão é só-ícone e não pode crescer
-  let groups=null,viaAI=false,aiErr='';
+  let groups=null,viaAI=false,aiErr='',aiOrto=null;
   _normCats=null;_normDesp=null;
   const comCats=CATS_TABLE&&CATEGORIAS.length>0;
+  // Com um nome só não há nada para a AI juntar (a função até recusa): fica-se
+  // pelo dicionário local, que é quem trata de o escrever direito
+  const comAI=nomes.length>1;
   try{
+    if(!comAI)throw new Error('um artigo só');
     // AI primeiro: agrupa por significado (marca vs genérico, sinónimos…) e,
     // se houver dicionário de categorias, classifica os nomes no mesmo pedido
     const req={normalizar:nomes.slice(0,200)};
@@ -5165,6 +5281,15 @@ async function shopNormOpen(){
       _normDesp={};
       d.despensa.forEach(n=>{const k=shopArtKey(n);if(k)_normDesp[k]=true;});
     }
+    // Ortografia: a função pode ainda não responder isto — o dicionário local
+    // trata do essencial na mesma (e passa-lhe por cima quando responde)
+    if(Array.isArray(d&&d.ortografia)){
+      aiOrto={};
+      d.ortografia.forEach(o=>{
+        const k=shopArtKey(o&&o.artigo),nm=((o&&o.nome)||'').trim();
+        if(k&&nm&&stats[k])aiOrto[k]=nm;
+      });
+    }
     viaAI=true;
   }catch(e){
     // Sem AI (offline/erro) → heurística local (plurais, unidades, pontuação)
@@ -5173,16 +5298,19 @@ async function shopNormOpen(){
   }
   if(btn){btn.disabled=false;btn.textContent='✨';}
   _normViaAI=viaAI;
-  if(!groups||!groups.length){
+  // Escrever direito: sempre, com AI ou sem ela — é um dicionário local
+  groups=(groups||[]).concat(shopNormOrtoGroups(stats,groups,aiOrto));
+  if(!groups.length){
     _normGroups=null;
     // Nomes já arrumados: salta o passo dos nomes e segue para os restantes
     if(viaAI&&shopFluxoTemPassos()){shopFluxoDepoisDosNomes(null);return;}
-    toast(viaAI?'Nada a arrumar — grafias e categorias em dia 🎉'
-      :('Sugestões AI falharam ('+aiErr+') e nada básico a juntar'),viaAI?'ok':'bad');
+    toast(viaAI?'Nada a arrumar — grafias, escrita e categorias em dia 🎉'
+      :comAI?('Sugestões AI falharam ('+aiErr+') e nada básico a arrumar')
+      :'Nada a arrumar — o nome está bem escrito 🎉',viaAI||!comAI?'ok':'bad');
     return;
   }
   _normGroups=groups;
-  if(!viaAI)toast('AI indisponível — sugestões básicas (offline)','bad');
+  if(!viaAI&&comAI)toast('AI indisponível — sugestões básicas (offline)','bad');
   shopNormRender();
   document.getElementById('shopnorm-bg').classList.add('show');
   document.body.classList.add('no-scroll');
@@ -5193,22 +5321,25 @@ async function shopNormOpen(){
    força width:100%/appearance:none a qualquer input dentro de um modal. */
 function shopNormRender(){
   if(!_normGroups)return;
-  const nTot=_normGroups.length;
+  const nTot=_normGroups.length,nOrto=_normGroups.filter(g=>g.orto).length,nJunt=nTot-nOrto;
+  const partes=[];
+  if(nJunt)partes.push(`${nJunt} grupo${nJunt===1?'':'s'} de grafias parecidas${_normViaAI?' (sugestão da AI)':' (deteção básica)'}`);
+  if(nOrto)partes.push(`${nOrto} nome${nOrto===1?'':'s'} para escrever direito (acentos, maiúsculas, marcas)`);
   const info=document.getElementById('shopnorm-info');
-  if(info)info.textContent=`${nTot} grupo${nTot===1?'':'s'} de grafias parecidas na lista de compras${_normViaAI?', sugerido'+(nTot===1?'':'s')+' pela AI':' (deteção básica)'}. Confirma o nome final de cada grupo — ou desliga os que devem ficar como estão.${shopCatPendentes()?' A seguir revês as categorias em falta.':''}`;
+  if(info)info.textContent=`${partes.join(' e ')} na lista de compras. Confirma o nome final de cada cartão — ou desliga os que devem ficar como estão.${shopCatPendentes()?' A seguir revês as categorias em falta.':''}`;
   const bar=`<div class="norm-bar">
     <span class="norm-bar-n" id="shopnorm-count"></span>
     <button type="button" class="norm-bar-btn" id="shopnorm-all" onclick="shopNormAll()"></button>
   </div>`;
   const cards=_normGroups.map((g,i)=>{
-    const canK=shopArtKey(g.canon),dis=g.apply?'':' disabled';
+    const dis=g.apply?'':' disabled';
     const opts=g.variants.map(v=>
-      `<button type="button" class="norm-opt${shopArtKey(v.name)===canK?' sel':''}" data-n="${escHtml(v.name)}" onclick="shopNormPick(${i},this.dataset.n)"${dis}>`+
+      `<button type="button" class="norm-opt${normMesmoNome(g,v.name,g.canon)?' sel':''}" data-n="${escHtml(v.name)}" onclick="shopNormPick(${i},this.dataset.n)"${dis}>`+
       `<span class="norm-dot"></span><span class="norm-opt-n">${escHtml(v.name)}</span><span class="norm-opt-c">${v.count}×</span></button>`).join('');
     return `<div class="norm-card${g.apply?'':' off'}">
       <div class="norm-card-hd">
         <span class="norm-card-lbl">${shopNormCardLbl(g)}</span>
-        <button type="button" class="norm-sw${g.apply?' on':''}" role="switch" aria-checked="${g.apply?'true':'false'}" aria-label="Juntar este grupo" onclick="shopNormToggle(${i})"><i></i></button>
+        <button type="button" class="norm-sw${g.apply?' on':''}" role="switch" aria-checked="${g.apply?'true':'false'}" aria-label="${g.orto?'Escrever direito este nome':'Juntar este grupo'}" onclick="shopNormToggle(${i})"><i></i></button>
       </div>
       <input class="norm-canon" value="${escHtml(g.canon)}" placeholder="nome final" oninput="shopNormCanon(${i},this.value)"${dis}>
       <div class="norm-opts-lbl">${shopNormOptsLbl(g)}</div>
@@ -5218,19 +5349,29 @@ function shopNormRender(){
   document.getElementById('shopnorm-list').innerHTML=bar+cards;
   shopNormBarUpd();
 }
-function shopNormCardLbl(g){return g.apply?`Juntar ${g.variants.length} grafias em`:'Fica como está';}
-function shopNormOptsLbl(g){return g.apply?'Grafias na lista — toca para escolher':'Grafias que ficam separadas';}
+function shopNormCardLbl(g){
+  if(!g.apply)return 'Fica como está';
+  return g.orto?'Escrever direito':`Juntar ${g.variants.length} grafias em`;
+}
+function shopNormOptsLbl(g){
+  if(g.orto)return g.apply?'Como está escrito na lista — toca para o manter':'Fica escrito assim';
+  return g.apply?'Grafias na lista — toca para escolher':'Grafias que ficam separadas';
+}
+/* Nos grupos de juntar, "o mesmo nome" é à maneira da app (shopArtKey ignora
+   maiúsculas e acentos). Nos de ortografia é precisamente isso que está em
+   causa — "agua" e "Água" têm a mesma chave —, por isso ali compara-se letra a
+   letra, senão a grafia velha aparecia sempre marcada como escolhida. */
+function normMesmoNome(g,a,b){return g&&g.orto?a===b:shopArtKey(a)===shopArtKey(b);}
 function shopNormCard(i){return document.querySelectorAll('#shopnorm-list .norm-card')[i]||null;}
 // Marca a opção que bate certo com o nome final (sem re-render: o campo de
 // texto está a ser escrito e não pode perder o foco)
-function shopNormMarkSel(card,name){
-  const k=shopArtKey(name);
-  card.querySelectorAll('.norm-opt').forEach(b=>b.classList.toggle('sel',shopArtKey(b.dataset.n||'')===k));
+function shopNormMarkSel(card,name,g){
+  card.querySelectorAll('.norm-opt').forEach(b=>b.classList.toggle('sel',normMesmoNome(g,b.dataset.n||'',name)));
 }
 function shopNormCanon(i,val){
   if(!_normGroups||!_normGroups[i])return;
   _normGroups[i].canon=val;
-  const card=shopNormCard(i);if(card)shopNormMarkSel(card,val);
+  const card=shopNormCard(i);if(card)shopNormMarkSel(card,val,_normGroups[i]);
 }
 function shopNormPick(i,name){
   if(!_normGroups||!_normGroups[i])return;
@@ -5238,7 +5379,7 @@ function shopNormPick(i,name){
   const card=shopNormCard(i);
   if(!card){shopNormRender();return;}
   const inp=card.querySelector('.norm-canon');if(inp)inp.value=name;
-  shopNormMarkSel(card,name);
+  shopNormMarkSel(card,name,_normGroups[i]);
 }
 function shopNormToggle(i){
   const g=_normGroups&&_normGroups[i];if(!g)return;
@@ -5263,11 +5404,12 @@ function shopNormAll(){
 function shopNormBarUpd(){
   const gs=_normGroups||[],nOn=gs.filter(g=>g.apply).length,nTot=gs.length;
   const c=document.getElementById('shopnorm-count');
-  if(c)c.textContent=`${nOn} de ${nTot} para juntar`;
+  // "arrumar" e não "juntar": há cartões que só corrigem a escrita de um nome
+  if(c)c.textContent=`${nOn} de ${nTot} para arrumar`;
   const all=document.getElementById('shopnorm-all');
   if(all)all.textContent=nOn<nTot?'Ligar todos':'Desligar todos';
   const save=document.getElementById('shopnorm-save');
-  if(save){save.disabled=!nOn;save.textContent=nOn?`Juntar ${nOn} grupo${nOn===1?'':'s'}`:'Nada selecionado';}
+  if(save){save.disabled=!nOn;save.textContent=nOn?`Arrumar ${nOn} nome${nOn===1?'':'s'}`:'Nada selecionado';}
 }
 function shopNormClose(){
   document.getElementById('shopnorm-bg').classList.remove('show');
@@ -5330,7 +5472,7 @@ async function shopNormApply(){
     syncMirror();marcaGuardado();
     if(CALC)CALC=calcular(JSON.parse(JSON.stringify(DATA)));
     shopNormClose();
-    toast(`${nItems} artigo(s) normalizados em ${nGroups} grupo(s) ✓${nHerd?` · ${nHerd} categoria(s) seguiram o nome`:''}`,'ok');
+    toast(`${nItems} pedido(s) arrumados em ${nGroups} nome(s) ✓${nHerd?` · ${nHerd} categoria(s) seguiram o nome`:''}`,'ok');
     renderShopViews();
     if(STOCK_TABLE&&TAB==='stock')renderStock();
     shopFluxoDepoisDosNomes(juntados);   // passos seguintes: repetidos → categorias
