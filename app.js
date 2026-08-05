@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v205 · 2026-08-05 · Cobertura de um pedido dita à mão (coberto / falta ___) para quando as unidades não se comparam — "2 embalagens" vs "5 kg" — e a lista deixa de ficar calada quando há stock alocado que não sabe comparar';
+const APP_BUILD = 'v206 · 2026-08-05 · Registar compra do carrinho já dá para marcar 📌 provisória (falta pagar, não falta comprar) — o segmentado passa a estar em qualquer compra, e os textos deixam de prometer o que já não é verdade';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -7712,10 +7712,13 @@ function openCompra(compraId,opts){
   document.getElementById('shop-buy-who').innerHTML=isAdmin()?memberOptions(who0):myMemberOptions(who0);
   const date0=isEdit?((DATA.despesas.find(d=>d.compraId===compraId)||{}).dataDesp||new Date().toISOString().slice(0,10)):new Date().toISOString().slice(0,10);
   document.getElementById('shop-buy-date').value=compraEdit.prov?'':date0;
-  // 📅/📌 só onde faz sentido: a detalhar uma despesa do cash-flow, ou a editar
-  // uma que ficou provisória. Registar a compra da lista é sempre coisa já paga.
+  /* 📅/📌 em qualquer compra que se esteja a escrever. Já só valia a detalhar
+     uma despesa do cash-flow, de quando a provisória era outra coisa (não dava
+     stock); desde que é "uma compra a sério, só falta pagá-la", registar o
+     carrinho de uma compra ainda por pagar é o mesmo ato — o talho já entregou
+     a carne e a fatura vem no fim do mês. Em consulta não se mostra. */
   const qw=document.getElementById('sb-quando'),qh=document.getElementById('sb-quando-hint');
-  const mostraQuando=(!ro)&&(o.detalhe||compraEdit.prov);
+  const mostraQuando=!ro;
   if(qw)qw.style.display=mostraQuando?'':'none';
   if(qh)qh.style.display=mostraQuando?'':'none';
   const dw=document.getElementById('shop-buy-date-wrap');if(dw)dw.style.display='';   // limpa um 📌 anterior
@@ -7731,9 +7734,9 @@ function openCompra(compraId,opts){
   const pend=shopArr().filter(x=>shopIsPending(x)||(shopIsRemoved(x)&&shopMine(x)));
   // Em consulta o picker não se mexe: mostrar os pendentes só encheria a lista
   // de artigos que nada têm a ver com esta compra — ficam os que lhe ficaram ligados.
-  // Numa provisória o picker vale na mesma, mas quer dizer outra coisa: os
-  // marcados NÃO ficam comprados, ficam encomendados (ver shopEncomenda) —
-  // continuam na lista, só não os compra mais ninguém.
+  // O picker é o mesmo em 📅 e em 📌: numa provisória os artigos entram em stock
+  // e os pedidos marcados fecham como em qualquer compra — o que fica por fazer
+  // é o pagamento, não a ida às compras.
   const pickItems=ro?linked:(isEdit?linked.concat(pend.filter(x=>x.compraId!==compraId)):pend);
   // O picker vive num bloco recolhível DEPOIS do detalhe por artigo (junto ao
   // "＋ Artigo fora da lista") — abre sozinho quando ainda nada está marcado.
@@ -7771,9 +7774,11 @@ function openCompra(compraId,opts){
     </details>`;
   }
   document.getElementById('shop-buy-body').innerHTML=(ro?'<div class="note" style="margin-bottom:10px">🔒 Só o administrador pode editar uma compra já registada.</div>':'')+
-    // Provisória já gravada: os artigos vivem nas observações da despesa, não em
-    // lotes — reabrir o "preço por artigo" só daria para os somar duas vezes.
-    ((compraEdit.prov&&isEdit)?'':`<div class="cmp-sort" style="margin-top:14px">
+    /* Provisória do formato ANTIGO: os artigos vivem nas observações da despesa,
+       não em lotes, e reabrir o "preço por artigo" só daria para os somar duas
+       vezes. As de agora têm lotes como qualquer compra — e os dois tabuladores
+       valem-lhes tal e qual (o 📌 é sobre o pagamento, não sobre os artigos). */
+    (provAntiga?'':`<div class="cmp-sort" style="margin-top:14px">
       <span class="sd-chip" id="shop-mode-det" onclick="compraSetMode(true)">💶 Preço por artigo</span>
       <span class="sd-chip" id="shop-mode-tot" onclick="compraSetMode(false)">∑ Só totais</span>
     </div>`)+
@@ -7816,19 +7821,18 @@ function shopBuyQuandoApply(q){
   if(d){if(on)d.value='';else if(!d.value)d.value=new Date().toISOString().slice(0,10);}
   shopPickTextos();
 }
-/* O bloco dos pedidos da lista faz três coisas diferentes conforme o contexto,
-   e o 📅/📌 troca-se com o modal já aberto — daí os textos serem postos aqui:
-   · compra normal  → os marcados SAEM da lista (ficam comprados);
-   · detalhar (📅)  → opcional, fecha os pedidos que esta despesa responde;
-   · provisória (📌) → os marcados FICAM na lista, marcados como encomendados. */
+/* O bloco dos pedidos da lista diz duas coisas diferentes conforme se venha do
+   carrinho ou do cash-flow — e o texto é posto aqui (e não no HTML) porque o
+   📅/📌 se troca com o modal já aberto. O 📌 NÃO muda o que acontece aos
+   pedidos: numa provisória os artigos entram em stock e os pedidos fecham como
+   em qualquer compra; o que falta é o pagamento, não a mercadoria. */
 function shopPickTextos(){
-  const prov=!!compraEdit.prov,dtl=!!compraEdit.detalhe;
+  const dtl=!!compraEdit.detalhe;
   const l=document.getElementById('shop-pick-lbl');
   const n=document.getElementById('shop-pick-note');
-  if(l)l.textContent=prov?'📌 Já está encomendado na lista?':(dtl?'🔗 Responde a pedidos da lista?':'🛒 Artigos da lista');
-  if(n)n.innerHTML=prov
-    ?'Opcional. Os marcados <b>ficam na lista</b>, assinalados como <b>📌 encomendados</b> — não são dados por comprados nem entram em stock, mas ninguém os vai comprar outra vez. Fecham-se quando registares a compra a sério.'
-    :dtl?'Opcional. Marca só os pedidos que <b>esta</b> despesa fecha — esses saem da lista e ficam ligados a ela.'
+  if(l)l.textContent=dtl?'🔗 Responde a pedidos da lista?':'🛒 Artigos da lista';
+  if(n)n.innerHTML=dtl
+    ?'Opcional. Marca só os pedidos que <b>esta</b> despesa fecha — esses saem da lista e ficam ligados a ela.'
     :'Os artigos marcados saem da lista e ficam ligados a esta compra.';
 }
 function setShopBuyQuando(q){
@@ -8151,15 +8155,19 @@ function compraRenderLotes(){
   // dos pedidos mais abaixo) — por isso aqui não se fala em "fora da lista",
   // que só faz sentido a quem partiu do carrinho.
   const dtl=!!compraEdit.detalhe;
-  cont.innerHTML=`<div class="cmp-pick sf" style="margin-top:14px">${prev?'💶 Preço por artigo':dtl?'🧺 Artigos desta despesa':'💶 Preço por artigo'}</div>`+
+  /* O rótulo e a nota seguem DE ONDE SE VEIO (carrinho ou cash-flow), não do
+     📅/📌: agora o 📌 vale nos dois sítios e não muda nada do que se faz aos
+     artigos. Quem veio do carrinho continua a ter "fora da lista" (há uma lista
+     de onde estar fora); quem veio do cash-flow, não. A nota do 📌 acrescenta-se
+     às outras — diz o que o 📌 é, não o que fazer com os artigos. */
+  cont.innerHTML=`<div class="cmp-pick sf" style="margin-top:14px">${dtl&&!prev?'🧺 Artigos desta despesa':'💶 Preço por artigo'}</div>`+
     ls.map((l,i)=>compraLoteHtml(l,i)).join('')+
     missWarn+
-    `<button class="btn ghost" style="width:100%;margin-top:8px" onclick="compraAddLote()">＋ ${(prev||dtl)?'Artigo':'Artigo fora da lista'}</button>`+
-    (prev
-      ?'<div class="note">📌 Provisória: <b>igual a uma compra</b> — os artigos entram em 🧺 Stock, respondem aos pedidos da lista e contam no custo do destino que lhes deres (divides por vários com ⇄). A única diferença é o dinheiro: fica sem data de pagamento e marcada 📌 nos cash-flows, para saberes que ainda não pagaste e que o valor pode ser ajustado. Quando pagares, troca para 📅 e mete o valor final.</div>'
-      :dtl
+    `<button class="btn ghost" style="width:100%;margin-top:8px" onclick="compraAddLote()">＋ ${dtl?'Artigo':'Artigo fora da lista'}</button>`+
+    (dtl
       ?'<div class="note">Cada artigo entra em <b>🧺 Stock</b> com o destino que lhe deres (refeição ou tipo) — divides por vários com ⇄ e reajustas depois no separador Stock. Se algum responde a um pedido da lista, liga-o em <b>🔗 pertence a</b> ou marca-o mais abaixo.</div>'
       :'<div class="note">A app propõe o destino de cada artigo (refeição ou tipo) — confirma ou muda. Podes dividir um artigo por vários destinos com ⇄. Reajustas tudo depois no separador 🧺 Stock.</div>')+
+    (prev?'<div class="note">📌 <b>Provisória</b>: os artigos entram em 🧺 Stock e respondem aos pedidos da lista como em qualquer compra. A diferença é só o dinheiro — fica sem data de pagamento e marcada 📌 nos cash-flows, para saberes que ainda não pagaste e que o valor pode ser ajustado. Quando pagares, troca para 📅 e mete o valor final.</div>':'')+
     /* Os extras da fatura valem TAMBÉM na provisória. Estavam escondidos, e como
        numa provisória nada do carrinho casa com o talão, TODAS as linhas lidas
        caíam aqui — a fatura era lida e não aparecia nada no ecrã. */
@@ -8778,9 +8786,9 @@ async function saveCompra(){
       // fica na lista por tratar e avisa-se abaixo. Avulso em branco é ignorado.
       // Só em compras NOVAS: na edição um € vazio não solta artigos (podem
       // estar cobertos pelas linhas de repartição).
-      // Numa provisória não há fatura nem "por tratar": um pedido marcado sem
-      // preço fica encomendado na mesma (é uma encomenda, não um talão).
-      if(det&&!isEdit&&artigo&&!l.free&&!prov){
+      // Vale na provisória como em qualquer compra: sem preço não há artigo —
+      // o que falta numa provisória é o pagamento, não saber o que se trouxe.
+      if(det&&!isEdit&&artigo&&!l.free){
         if(l._byBrand)byBrandParents.push({artigo,qtd:l.qtd||''});
         else naoDetetados.push({artigo,qtd:l.qtd||''});
       }
@@ -8968,7 +8976,7 @@ async function saveCompra(){
     syncMirror();marcaGuardado();
     btn.disabled=false;closeShopBuyModal();
     CALC=calcular(JSON.parse(JSON.stringify(DATA)));renderAll();
-    toast(isEdit?'Compra atualizada ✓':(prov?'Despesa provisória registada ✓':'Compra registada ✓'),'ok');
+    toast(isEdit?'Compra atualizada ✓':(prov?'Compra provisória registada ✓ — falta pagar':'Compra registada ✓'),'ok');
   }catch(e){setSync('err','erro ao guardar');btn.disabled=false;toast(permErrorMsg(e),'bad');}
 }
 
