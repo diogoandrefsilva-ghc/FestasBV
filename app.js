@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v201 · 2026-08-05 · Provisória com destino por artigo (refeição, tipo ou 🍻 bebida) e ⇄ para dividir por vários — o que a compra normal já fazia; o destino único à cabeça saiu';
+const APP_BUILD = 'v202 · 2026-08-05 · Provisória passa a ser uma compra a sério: os artigos entram em 🧺 Stock e respondem aos pedidos da lista — 📌 marca só o que falta, o pagamento (e o valor pode ainda ser ajustado)';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -1332,7 +1332,7 @@ function renderAll(){
         // (o que veio de oferta/ano anterior entra na mesma, mas a 0 € — leva o
         // ícone da origem em vez do 🧺 para se perceber porque não custa nada).
         // As marcadas como bebida vão para o balde da bebida, não para o da comida.
-        stockArr().forEach(l=>{if(!stockBacked(l)||!(l.qtd>0))return;const om=origemMeta(l);(l.alocacoes||[]).forEach(a=>{if(a.tipo===rd.ref&&a.data===rd.data&&+a.qtd>0)(a.bebida?bebItems:dirItems).push({desc:(om?om.ic:'🧺')+' '+l.artigo+' ('+loteQtdLabel(l,+a.qtd)+')',quem:om?om.lbl:'',valor:rnd(l.valor/l.qtd*a.qtd,2)});});});
+        stockArr().forEach(l=>{if(!stockBacked(l)||!(l.qtd>0))return;const om=origemMeta(l);const pv=loteProvisorio(l);(l.alocacoes||[]).forEach(a=>{if(a.tipo===rd.ref&&a.data===rd.data&&+a.qtd>0)(a.bebida?bebItems:dirItems).push({desc:(om?om.ic:'🧺')+' '+l.artigo+' ('+loteQtdLabel(l,+a.qtd)+')',quem:om?om.lbl:'',valor:rnd(l.valor/l.qtd*a.qtd,2),_prov:pv});});});
         /* Provisória: * à frente, cor própria e os artigos por baixo — o detalhe
            dela vive nas observações (é uma despesa só, sem lotes), senão a
            refeição mostrava "Talho do Rui — 141 €" e mais nada. Aqui a linha
@@ -1340,9 +1340,10 @@ function renderAll(){
            cada linha tem de casar com um valor. A legenda do * fecha o bloco. */
         let temProvDir=false;
         const mkRows=items=>items.map(it=>{
-          const prov=it.tipo!==undefined&&despProvisoria(it);
+          // Despesa provisória, ou artigo de stock de uma compra por pagar
+          const prov=it._prov||(it.tipo!==undefined&&despProvisoria(it));
           if(prov)temProvDir=true;
-          const arts=prov?provArtigos(it):[];
+          const arts=(prov&&it.tipo!==undefined)?provArtigos(it):[];
           // Uma despesa por artigo: o artigo é o nome da linha e o sítio onde se
           // compra desce para a nota — assim cada linha casa com o seu €. Nas
           // provisórias antigas (tudo numa despesa) fica o descritivo em cima e
@@ -1358,7 +1359,7 @@ function renderAll(){
           if(!(tot>0))return '';
           const chip=`<div class="rdc-chips"><span class="rc cv">${lbl} ${eur(tot)}</span></div>`;
           if(!items.length)return chip;
-          const body=`<div class="rdc-det-body">${mkRows(items)}${temProvDir?'<div class="rdc-det-leg"><b>*</b> provisório — ainda por comprar</div>':''}</div>`;
+          const body=`<div class="rdc-det-body">${mkRows(items)}${temProvDir?'<div class="rdc-det-leg"><b>*</b> ainda por pagar — o valor pode mudar</div>':''}</div>`;
           return `<details class="rdc-det rdc-det-chips" onclick="event.stopPropagation()"><summary>${chip}<span class="rdc-det-arrow">›</span></summary>${body}</details>`;
         };
         costDet+=`<details class="rdc rdc-fold sf">
@@ -2983,11 +2984,12 @@ function dvFaltaRefeicao(prefix,tipo){
 function cfTipoChanged(){dvSync('cf');}
 function cfSyncDataValor(){dvSyncFromDate('cf');}
 function cfMealChanged(){dvMealChanged('cf');}
-/* Efetiva = já foi paga (tem data de despesa). Provisória = ainda não, mas já se
-   sabe o valor — e pode já saber-se a que refeição/dia se destina. */
+/* Efetiva = já foi paga (tem data de despesa). Provisória = ainda não paga e o
+   valor pode ser ajustado — mas entra nas contas na mesma, e o que já estiver
+   em casa entra em stock como qualquer compra (ver saveCompra). */
 const CF_QUANDO_HINT={
   efet:'Despesa já feita, com data de pagamento conhecida.',
-  prov:'Ainda não paga — entra nas contas na mesma. Diz a refeição (ou o dia) a que se destina.'
+  prov:'Ainda não paga e o valor pode mudar — entra nas contas na mesma. Diz a refeição (ou o dia) a que se destina.'
 };
 function isCfProv(prefix){
   return document.querySelector(`#${prefix}-quando .cfq.on`)?.dataset?.q==='prov';
@@ -5803,6 +5805,15 @@ const STOCK_ORIGENS={
 function loteOrigem(l){const m=/^x-(oferta|anterior)-/.exec((l&&l.compraId)||'');return m?m[1]:null;}
 function loteSemCompra(l){return !!loteOrigem(l);}
 function origemMeta(l){return STOCK_ORIGENS[loteOrigem(l)]||null;}
+/* Lote de uma compra ainda POR PAGAR (📌). O artigo está cá — conta para o
+   stock, cobre pedidos e entra no custo da refeição como qualquer outro; o que
+   falta é o dinheiro sair, e o valor pode ainda ser ajustado. É por isso que a
+   marca é do cash-flow e não do stock: aqui é só um aviso de que o € não é final. */
+function loteProvisorio(l){
+  if(!l||loteSemCompra(l))return false;
+  const ds=(DATA&&DATA.despesas||[]).filter(d=>d.compraId===l.compraId);
+  return ds.length>0&&ds.every(despProvisoria);
+}
 // Lote órfão (compra apagada/limpa): sai das contas e das vistas.
 // O stock sem compra não depende de despesa nenhuma — está sempre de pé.
 function stockBacked(l){return loteSemCompra(l)||(DATA.despesas||[]).some(d=>d.compraId===l.compraId);}
@@ -6248,8 +6259,9 @@ function shopItemCard(it,mineView,noBadge,grouped,noLoja){
   // sem botão, sem chip de "quem trata" (a dica verde diz "coberto pelo stock").
   // Se a alocação mudar, o pedido volta sozinho ao estado normal.
   const covered=shopIsCovered(it);
-  // Encomendado numa provisória: como o coberto pelo stock, não há nada a
-  // comprar — mas ainda não está cá, por isso continua na lista (não some).
+  /* Encomendado numa provisória SEM stock (formato antigo, ou sem a tabela):
+     não há nada a comprar, mas também não há lote que o cubra — por isso o
+     pedido continua na lista com a marca. Tendo stock, quem o cobre é o lote. */
   const enc=covered?null:shopEncomenda(it);
   let check='',right='',sub='';
   // "pedido por" aparece SEMPRE que se sabe quem pediu: também nas linhas de um
@@ -6267,7 +6279,7 @@ function shopItemCard(it,mineView,noBadge,grouped,noLoja){
   }else if(enc){
     // Uma marca só: o chip. Qual a despesa fica no title — na lista o que
     // interessa é "não compres isto", não o nome do talho.
-    right=`<span class="cmp-chip prov" title="${escHtml(enc.desc||'')} — provisório, ainda por comprar">* encomendado</span>`;
+    right=`<span class="cmp-chip prov" title="${escHtml(enc.desc||'')} — despesa provisória, ainda por pagar">* encomendado</span>`;
   }else if(mineView){
     // Checklist de compras: a bolinha marca "já está no carrinho físico".
     // Este estado é só para orientação de quem trata — os outros não o veem.
@@ -6541,11 +6553,11 @@ function mealShopSection(rd){
     });
   });
   alocs.sort((a,b)=>a.l.artigo.localeCompare(b.l.artigo,'pt'));
-  /* 📌 Despesas provisórias desta refeição: ainda não foram compradas nem
-     entraram em stock, mas o custo já está contado na refeição — por isso
-     aparecem no bloco de baixo, para o cozinheiro saber com o que pode contar.
-     Os artigos que a compõem vivem nas observações (uma provisória é uma
-     despesa só), daí a sub-linha. */
+  /* 📌 Despesas provisórias desta refeição que NÃO viraram stock (formato
+     antigo, ou escritas só no cash-flow): o custo já está contado na refeição,
+     por isso aparecem no bloco de baixo para o cozinheiro saber com o que pode
+     contar. As que viraram stock não passam por aqui — aparecem como o resto do
+     stock, que é o que são. Os artigos vivem nas observações, daí a sub-linha. */
   const provs=[];
   (DATA.despesas||[]).forEach((d,i)=>{
     if(despProvisoria(d)&&d.tipo===rd.ref&&d.dataValor===rd.data)provs.push({d,i});
@@ -6976,7 +6988,9 @@ function stockArticleCard(g){
   const marcas=(g.marcas&&g.marcas.length)?`<div class="stk-marcas">${g.marcas.map(m=>escHtml(m)).join(' · ')}</div>`:'';
   // Selo de origem: parte (ou tudo) deste artigo não veio de uma compra
   const origs=[...new Set(g.lotes.map(loteOrigem).filter(Boolean))];
-  const orgTag=origs.length?`<span class="stk-org" title="${escHtml(origs.map(o=>STOCK_ORIGENS[o].lbl).join(' · '))}">${origs.map(o=>STOCK_ORIGENS[o].ic).join('')}</span>`:'';
+  const orgTag=(origs.length?`<span class="stk-org" title="${escHtml(origs.map(o=>STOCK_ORIGENS[o].lbl).join(' · '))}">${origs.map(o=>STOCK_ORIGENS[o].ic).join('')}</span>`:'')
+    // Por pagar: o artigo está cá, o € é que ainda não é final
+    +(g.lotes.some(loteProvisorio)?'<span class="stk-org" title="Ainda por pagar — o valor é provisório">📌</span>':'');
   // Com filtro de estado abre o lote que tem essa parte (não o primeiro do grupo)
   const tgt=(st==='all'?null:g.lotes.find(l=>stockGroupEstados(stockAggAlocs([l])).has(st)))||g.lotes[0];
   return `<div class="stk-card stk-tap" onclick="openLoteModal(${tgt._id})">
@@ -7464,20 +7478,26 @@ function openCompra(compraId,opts){
   // O tipo E a data-valor vêm da despesa gravada — uma provisória pode estar
   // destinada a uma refeição, e reabri-la não a pode fazer perder o destino.
   const provGrav=isEdit&&(DATA.despesas||[]).some(d=>d.compraId===compraId&&!d.dataDesp);
+  /* Provisória do formato ANTIGO: uma despesa por artigo e nenhum lote de stock
+     (era a regra até a provisória passar a dar entrada em stock). Reabre-se pelo
+     caminho próprio; ao gravar converte-se sozinha para o formato normal. */
+  const provAntiga=provGrav&&!stockArr().some(l=>l.compraId===compraId);
   const dProv=provGrav?((DATA.despesas||[]).find(d=>d.compraId===compraId)||{}):null;
   compraEdit={id:compraId||null,lines:[],lotes:[],
     // Provisória gravada abre SEMPRE por artigo: é assim que foi escrita (uma
     // linha de despesa por artigo) e é o ecrã de onde saiu.
-    det:!isEdit||provGrav||stockArr().some(l=>l.compraId===compraId),
+    det:!isEdit||provAntiga||stockArr().some(l=>l.compraId===compraId),
     detalhe:!!o.detalhe,prov:!!o.prov||provGrav,
     // Semente do destino de DEFEITO dos artigos escritos à mão (compraDestPad):
     // o que vinha do cash-flow, ou o que a provisória gravada já tinha. Não é o
     // destino da despesa — esse é de cada artigo, e vem da linha dele.
     tipoProv:(dProv?dProv.tipo:o.tipo)||'Gerais',
-    dataValorProv:(dProv?dProv.dataValor:o.dataValor)||'',obsProv:provGrav?provNotaTxt(dProv):(o.obs||'')};
+    // A nota escrita à mão só vive nas observações no formato antigo (colada ao
+    // artigo). No normal as observações são o STOCK_OBS, que não é nota nenhuma.
+    dataValorProv:(dProv?dProv.dataValor:o.dataValor)||'',obsProv:provAntiga?provNotaTxt(dProv):(o.obs||'')};
   const linked=isEdit?shopArr().filter(x=>x.compraId===compraId):[];
   // Linhas: (edição) reconstruídas das despesas da compra; (nova) semeadas dos meus artigos
-  if(isEdit&&provGrav){
+  if(isEdit&&provAntiga){
     /* Provisória: cada despesa É um artigo (nome e quantidade nas observações,
        preço no valor) — reconstrói-se o detalhe tal e qual, sem "repartição do
        valor" pelo meio. Uma provisória antiga trazia todos os artigos numa
@@ -7517,7 +7537,7 @@ function openCompra(compraId,opts){
   // compraSeedLines, chamada depois de o picker existir no DOM).
   // Numa provisória não há linhas de repartição nenhumas — o valor está nos
   // artigos — e uma linha em branco só serviria para travar o gravar.
-  if(isEdit&&!provGrav&&!compraEdit.lines.length)compraEdit.lines.push({tipo:'Gerais',dataValor:null,valor:'',obs:''});
+  if(isEdit&&!provAntiga&&!compraEdit.lines.length)compraEdit.lines.push({tipo:'Gerais',dataValor:null,valor:'',obs:''});
 
   // Cabeçalho
   // Editar/apagar uma compra já registada mexe em despesas → só admin (as despesas
@@ -7631,7 +7651,7 @@ function shopBuyQuandoApply(q){
   document.querySelectorAll('#sb-quando .cfq').forEach(el=>el.classList.toggle('on',el.dataset.q===q));
   const w=document.getElementById('shop-buy-date-wrap');if(w)w.style.display=on?'none':'';
   const h=document.getElementById('sb-quando-hint');
-  if(h)h.textContent=on?'Ainda não comprado — entra nas contas, mas sem data de pagamento nem entrada em stock.':'Despesa já feita, com data de pagamento conhecida.';
+  if(h)h.textContent=on?'Ainda não paga — o valor é provisório. Os artigos entram em stock na mesma.':'Despesa já feita, com data de pagamento conhecida.';
   const d=document.getElementById('shop-buy-date');
   if(d){if(on)d.value='';else if(!d.value)d.value=new Date().toISOString().slice(0,10);}
   shopPickTextos();
@@ -7974,7 +7994,7 @@ function compraRenderLotes(){
     missWarn+
     `<button class="btn ghost" style="width:100%;margin-top:8px" onclick="compraAddLote()">＋ ${(prev||dtl)?'Artigo':'Artigo fora da lista'}</button>`+
     (prev
-      ?'<div class="note">📌 Provisória: cada artigo conta no custo do destino que lhe deres (refeição ou tipo) — divides por vários com ⇄. Como ainda não foi comprado, não entra no 🧺 Stock nem dá pedidos da lista por comprados. Quando pagares, troca aqui para 📅 e os artigos entram em stock.</div>'
+      ?'<div class="note">📌 Provisória: <b>igual a uma compra</b> — os artigos entram em 🧺 Stock, respondem aos pedidos da lista e contam no custo do destino que lhes deres (divides por vários com ⇄). A única diferença é o dinheiro: fica sem data de pagamento e marcada 📌 nos cash-flows, para saberes que ainda não pagaste e que o valor pode ser ajustado. Quando pagares, troca para 📅 e mete o valor final.</div>'
       :dtl
       ?'<div class="note">Cada artigo entra em <b>🧺 Stock</b> com o destino que lhe deres (refeição ou tipo) — divides por vários com ⇄ e reajustas depois no separador Stock. Se algum responde a um pedido da lista, liga-o em <b>🔗 pertence a</b> ou marca-o mais abaixo.</div>'
       :'<div class="note">A app propõe o destino de cada artigo (refeição ou tipo) — confirma ou muda. Podes dividir um artigo por vários destinos com ⇄. Reajustas tudo depois no separador 🧺 Stock.</div>')+
@@ -8605,11 +8625,11 @@ async function saveCompra(){
       continue;
     }
     if(!artigo){toast('Indica o nome do artigo detalhado','bad');return;}
-    /* Provisória: ainda não foi comprado, logo não é stock nem cobre pedidos —
-       mas o DESTINO de cada artigo conta na mesma, e é ele que diz a que
-       refeição (ou tipo) o € pertence. Dividido por vários destinos, o valor
-       reparte-se pelas quantidades do split. */
-    if(prov){
+    /* Provisória SEM tabela de stock: não há onde meter o artigo, por isso ele
+       fica como despesa (uma por artigo), com o destino a dizer a que refeição
+       pertence. Havendo stock, a provisória segue o caminho normal logo abaixo
+       — os artigos já estão em casa, o que falta é pagá-los. */
+    if(prov&&!STOCK_TABLE){
       const sp=(l.splits&&l.splits.length)?l.splits.filter(x=>parseFloat(String(x.qtd).replace(',','.'))>0):null;
       if(sp&&sp.length>1){
         const qs=sp.map(x=>parseFloat(String(x.qtd).replace(',','.'))||0);
@@ -8656,7 +8676,12 @@ async function saveCompra(){
   // mais alguma coisa). Na edição as linhas entram SEMPRE — o tabulador ativo
   // só muda a vista, não o que se grava.
   // Provisória: não há linhas de repartição — o valor vive nos artigos (abaixo).
-  if(!prov&&(!det||isEdit))for(const ln of compraEdit.lines){
+  /* As linhas de repartição valem também na provisória do formato normal: lá o
+     valor vive nos lotes e na linha 🧺 Stock, tal como numa compra, por isso uma
+     linha escrita aqui é uma despesa a mais e não uma soma a dobrar. Só o
+     formato antigo as dispensa — nele o valor ESTÁ nos artigos (que são as
+     despesas), e aí `lines` vem vazio de qualquer maneira. */
+  if((!det||isEdit))for(const ln of compraEdit.lines){
     const v=rnd(parseFloat(ln.valor),2);
     const vazia=(!v||v<=0)&&!(ln.obs||'').trim();
     if(vazia&&(lotes.length||Object.keys(tipoRows).length||compraEdit.lines.length>1))continue;
@@ -8756,11 +8781,13 @@ async function saveCompra(){
     const mk=it=>it.tipo+'|'+it.dataValor;
     const isStockNeed=it=>STOCK_TABLE&&shopIsMeal(it.tipo)&&it.dataValor
       &&lotes.some(l=>(l.keys||[]).includes(mk(it))&&shopSameArtigo(l._listArt||l.artigo,it.artigo));
-    // Provisória: nenhum pedido fecha — todos ficam pendentes e ligados (a mesma
-    // escrita do "para stock", que é exatamente o estado que se quer: na lista,
-    // com compra_id, sem carrinho e sem data de compra).
-    const toStock=prov?toBuy.slice():shopArr().filter(x=>toBuy.includes(x._id)&&isStockNeed(x)).map(x=>x._id);
-    const toClosed=prov?[]:toBuy.filter(id=>!toStock.includes(id));
+    /* A provisória trata os pedidos como qualquer compra: o artigo está em casa,
+       logo o pedido está respondido — o que falta é o pagamento, e isso é
+       matéria do cash-flow, não da lista. Sem stock onde os pôr (o caso raro),
+       ficam pendentes e ligados, que era o comportamento antigo. */
+    const semStock=prov&&!STOCK_TABLE;
+    const toStock=semStock?toBuy.slice():shopArr().filter(x=>toBuy.includes(x._id)&&isStockNeed(x)).map(x=>x._id);
+    const toClosed=semStock?[]:toBuy.filter(id=>!toStock.includes(id));
     const toRelease=prevLinked.filter(id=>!toBuy.includes(id));
     if(toClosed.length){
       await queueWrite(()=>sbReq('PATCH',`shoplist?id=in.(${toClosed.join(',')})`,{estado:'comprado',compra_id:compraId,cf_desc:desc||'Compras',comprado_em:compradoEm,no_carrinho:false}));
