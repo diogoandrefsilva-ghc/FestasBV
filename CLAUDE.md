@@ -125,6 +125,11 @@ A folha que se leva ao supermercado — ninguém percorre os corredores a saltar
 - **Coberto pelo stock e encomendado ficam fora** da lista e vão para um rodapé pequeno ("não comprar — já tratado"): não há nada a comprar, mas convém saber porque é que o artigo não aparece. A **dica de stock** (`shopStockHint`) vai na linha — é ela que evita comprar de novo o que já está na garagem.
 - **Cabe numa folha**: 2 colunas, 3 quando a lista cresce, corpo mais pequeno quando é mesmo grande (`peso` = linhas + cabeçalhos). Testado até ~150 artigos numa página A4.
 
+## Pedidos repetidos (✨ Normalizar, 2.º passo)
+Mostra artigos pedidos mais do que uma vez, para se acertar a embalagem/quantidade e, querendo, **juntar** pedidos num só. Duas regras de entrada, e as duas existem porque sem elas o passo chamava "repetido" ao funcionamento normal da lista:
+- **Só o repetido DENTRO DA MESMA REFEIÇÃO** (`repetidoNaMesmaRef`). O mesmo ingrediente pedido para três jantares não é repetição — três jantares com cebola precisam de cebola três vezes. Sem isto, o ecrã enchia-se de cartões com o botão de juntar apagado (juntar só acontece entre pedidos da mesma refeição, ver `shopRepFusiveis`), a dizer "repetido" a quem fez tudo bem.
+- **Já tratado fica de fora**: além do comprado/removido e do que está no carrinho de alguém, saem os **cobertos pelo stock** e os **ditos à mão** (`shopIsCovered`/`shopEncomenda`) — a mesma regra do "Em falta". Aparecerem aqui alhos e cebolas que já estavam resolvidos era ruído pelo qual ninguém podia fazer nada.
+
 ## Escrever direito os nomes (✨ Normalizar, 1.º passo)
 O ✨ Normalizar tem **dois eixos independentes** e é preciso não os confundir: **juntar** grafias do mesmo produto (dois nomes → um) e **escrever direito** um nome que está sozinho ("agua", "coca cola", "AZEITE"). Juntar sem escrever direito deixava a lista cheia de minúsculas e acentos comidos; e um artigo escrito uma vez só nunca formava grupo nenhum, logo nunca era tocado.
 - **Regra de ouro (`shopNomeBonito`): só MAIÚSCULAS, ACENTOS e GRAFIA.** Nada de tirar, acrescentar ou trocar palavras — quantidades, tamanhos, marcas e variantes ficam como estão, e passar ao singular ou juntar sinónimos é trabalho dos grupos. Se um dia isto crescer para "melhorar o nome", passa a ser outra coisa e mistura duas revisões diferentes no mesmo cartão.

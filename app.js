@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v212 · 2026-08-05 · Um artigo do stock cujo nome não bate com nenhum pedido ("Folhas de Louro (Margão)" ↔ "Louro") deixa de ser um beco: pergunta-se ali a que pedido responde, e os pedidos sem quantidade voltam a listar-se no painel dos pedidos';
+const APP_BUILD = 'v213 · 2026-08-05 · Pedidos Repetidos deixa de chamar "repetido" ao normal: só mostra o que está pedido duas vezes para a MESMA refeição, e ignora o que já está tratado (coberto pelo stock ou dito à mão)';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -5335,7 +5335,10 @@ function shopRepSoma(qs){
 function shopRepGrupos(){
   const map={};
   shopArr().forEach(it=>{
-    if(it._id==null||!shopIsPending(it)||it.noCarrinho)return;
+    // Já tratado não é matéria deste passo: além do comprado/removido e do que
+    // está no carrinho de alguém, ficam de fora os cobertos pelo stock e os que
+    // alguém deu por tratados à mão — a mesma regra do "Em falta".
+    if(it._id==null||!shopIsPending(it)||it.noCarrinho||shopIsCovered(it)||shopEncomenda(it))return;
     const k=shopArtKey(it.artigo);if(!k)return;
     (map[k]=map[k]||{artigo:it.artigo,key:k,fundir:false,itens:[]}).itens.push({
       id:it._id,
@@ -5344,7 +5347,17 @@ function shopRepGrupos(){
       tipo:it.tipo,dataValor:it.dataValor||'',quem:it.criadoPor||'',tratadoPor:it.tratadoPor||''
     });
   });
-  const out=Object.values(map).filter(g=>g.itens.length>1);
+  /* Só interessa o repetido DENTRO DA MESMA REFEIÇÃO — é o único caso em que há
+     alguma coisa a fazer (juntar dois pedidos, ou acertar a embalagem para se
+     poderem juntar). O mesmo ingrediente pedido para três jantares diferentes
+     não é repetição nenhuma: é o funcionamento normal da lista, e enchia este
+     passo de cartões com o botão de juntar apagado — a dizer "repetido" a quem
+     fez tudo bem. */
+  const repetidoNaMesmaRef=g=>{
+    const n={};
+    return g.itens.some(it=>{const k=it.tipo+'|'+it.dataValor;n[k]=(n[k]||0)+1;return n[k]>1;});
+  };
+  const out=Object.values(map).filter(g=>g.itens.length>1&&repetidoNaMesmaRef(g));
   // Divergentes ao cimo: são os que precisam mesmo de olhos
   out.forEach(g=>{g.divergem=new Set(g.itens.map(i=>shopTamKey(i.tam))).size>1;});
   out.sort((a,b)=>(b.divergem?1:0)-(a.divergem?1:0)||b.itens.length-a.itens.length||a.artigo.localeCompare(b.artigo,'pt'));
@@ -5396,7 +5409,7 @@ function shopRepRender(){
   if(!_repGrupos)return;
   const n=_repGrupos.length,nDiv=_repGrupos.filter(g=>g.divergem).length;
   const info=document.getElementById('shoprep-info');
-  if(info)info.textContent=`${n} artigo${n===1?'':'s'} pedido${n===1?'':'s'} mais do que uma vez${nDiv?` — ${nDiv} com tamanhos diferentes`:''}. Acerta o tamanho e a quantidade onde fizer sentido; juntar pedidos é opcional.`;
+  if(info)info.textContent=`${n} artigo${n===1?'':'s'} pedido${n===1?'':'s'} mais do que uma vez para a MESMA refeição${nDiv?` — ${nDiv} com tamanhos diferentes`:''}. Acerta o tamanho e a quantidade onde fizer sentido; juntar pedidos é opcional.`;
   document.getElementById('shoprep-list').innerHTML=_repGrupos.map((g,i)=>{
     const rows=g.itens.map((it,j)=>{
       const meta=[it.quem||'alguém',shopGroupLabel(it.tipo,it.dataValor)];
