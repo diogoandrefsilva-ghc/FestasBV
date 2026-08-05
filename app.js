@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v202 · 2026-08-05 · Provisória passa a ser uma compra a sério: os artigos entram em 🧺 Stock e respondem aos pedidos da lista — 📌 marca só o que falta, o pagamento (e o valor pode ainda ser ajustado)';
+const APP_BUILD = 'v203 · 2026-08-05 · Cartão da compra volta a mostrar artigo a artigo com o seu € (lido dos lotes, com quantidade) — acima de 8 artigos resume por destino';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -1708,7 +1708,7 @@ function renderCashFlows(){
       const one=subs.length===1;
       // Com um destino filtrado, a linha que fez a compra entrar na lista fica
       // marcada — é a resposta a "o que é que esta compra tem a ver com isto?"
-      const lines=subs.map(l=>`<div class="cft-sub${cfFilterDest!=='all'&&l.key===cfFilterDest?' on':''}"><span>${shopTipoIcon(l.sub)} ${l.sub}${l.dia?' · '+l.dia:''}${l.obs?' · <i>'+escHtml(l.obs)+'</i>':''}</span>${one?'':`<span>−${eur(l.valor)}</span>`}</div>`).join('');
+      const lines=subs.map(l=>`<div class="cft-sub${cfFilterDest!=='all'&&l.key===cfFilterDest?' on':''}"><span>${l.ic||shopTipoIcon(l.sub)} ${l.sub}${l.dia?' · '+l.dia:''}${l.obs?' · <i>'+escHtml(l.obs)+'</i>':''}</span>${one?'':`<span>−${eur(l.valor)}</span>`}</div>`).join('');
       return `<div class="card cft-card b-despesa${cf.prov?' cft-prov':''}" onclick="openCompra('${cf.compraId}')">
         <div class="cft-kind k-despesa sf">${cf.prov?'📌 Provisória · detalhada':'🛒 Compra · lista'}</div>
         <div class="cft-l1"><div class="cft-title">${escHtml(cf.line1)}</div><span class="cft-v neg">−${eur(cf.valor)}</span></div>
@@ -1844,12 +1844,49 @@ function cfStockDestMap(compraId,total){
   return out;
 }
 // Mesma repartição, já em linhas para o cartão da compra
+const CF_STOCK_MAX_ITENS=8;   // acima disto o cartão vira lista de supermercado
 function cfStockSplit(compraId,total){
   const m=cfStockDestMap(compraId,total);
-  return Object.keys(m).sort(destKeyCmp).map(k=>{
-    const d=destinoAloc(k,0);
-    return{key:k,sub:d.tipo,dia:d.data?`${dataToDia(d.data)} ${fmtDiaMes(d.data)}`:'',valor:m[k],obs:''};
+  const dest=k=>{const d=destinoAloc(k,0);
+    return{key:k,sub:d.tipo,dia:d.data?`${dataToDia(d.data)} ${fmtDiaMes(d.data)}`:'',
+      // bebida da refeição: ícone composto, senão liam-se duas linhas "Jantar"
+      // iguais quando a mesma refeição leva comida e bebida
+      ic:alocIsBebida(d)?DEST_BEB_ICON+shopTipoIcon(d.tipo):''};};
+  /* Artigo a artigo: é o que se quer ler num cartão de compra — "Acém (3,5 kg)
+     88 €", não "Jantar 141 €". Sai dos lotes, que guardam nome, quantidade e
+     unidade em campos próprios. Numa compra grande isto encheria o ecrã, por
+     isso acima de CF_STOCK_MAX_ITENS colapsa-se por destino (com a contagem). */
+  const itens=[];
+  stockArr().filter(l=>l.compraId===compraId&&+l.qtd>0).forEach(l=>{
+    const unit=l.valor/l.qtd;
+    (l.alocacoes||[]).forEach(a=>{
+      const k=alocToDestino(a);if(!k||!(+a.qtd>0))return;
+      const v=rnd(unit*(+a.qtd||0),2);if(v<=0)return;
+      itens.push({k,artigo:l.artigo,qtd:loteQtdLabel(l,+a.qtd),valor:v});
+    });
   });
+  // Só detalha o que o mapa reconhece: o resto (valor sem lote) fica na sua linha,
+  // e assim as sub-linhas continuam a somar o total do cartão.
+  const detalha=itens.length>0&&itens.length<=CF_STOCK_MAX_ITENS&&itens.every(x=>m[x.k]!=null);
+  const porDest={};itens.forEach(x=>{(porDest[x.k]=porDest[x.k]||[]).push(x);});
+  const out=[];
+  Object.keys(m).sort(destKeyCmp).forEach(k=>{
+    const ls=porDest[k]||[];
+    // Destino sem lotes (o valor que sobrou, por alocar) fica na sua linha:
+    // detalhar só o que se conhece mantém a soma igual ao total do cartão.
+    if(!detalha||!ls.length){
+      out.push({...dest(k),valor:m[k],obs:ls.length>1?`${ls.length} artigos`:''});
+      return;
+    }
+    // o arredondamento do mapa manda: a última linha do destino leva o resto
+    let resto=m[k];
+    ls.forEach((x,i)=>{
+      const v=(i===ls.length-1)?rnd(resto,2):Math.min(x.valor,resto);
+      resto=rnd(resto-v,2);
+      out.push({...dest(k),valor:v,obs:x.artigo+(x.qtd?` (${x.qtd})`:'')});
+    });
+  });
+  return out;
 }
 
 /* Destinos que uma despesa toca — mesmo vocabulário do seletor "Alocar a…":
