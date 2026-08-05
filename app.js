@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v203 · 2026-08-05 · Cartão da compra volta a mostrar artigo a artigo com o seu € (lido dos lotes, com quantidade) — acima de 8 artigos resume por destino';
+const APP_BUILD = 'v204 · 2026-08-05 · Pedido tratado fica na lista, riscado (coberto pelo stock ou encomendado) em vez de saltar para o bloco de baixo — a contagem passa a ser do que falta; e o 🔗 do artigo volta a aparecer nas provisórias';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -6606,21 +6606,21 @@ function mealShopSection(rd){
   const alocLines=alocs.map(x=>`<div class="msl-it stk" onclick="openLoteModal(${x.l._id})">
       ${mslLead(x.l.artigo,loteQtdLabel(x.l,x.qtd))}<span class="msl-st ok">${x.org?x.org.ic+' '+escHtml(x.org.lbl):eur(x.val)}</span></div>`).join('');
   const lineOf=(it,dim)=>{
-    // Coberto pelo stock conta como resolvido: não há nada a tratar nem a
-    // comprar (é assim que a despensa já comprada aparece no bloco Comprado)
+    /* Tratado ≠ comprado. Um pedido coberto pelo stock (ou encomendado numa
+       provisória do formato antigo, que não gera lotes) continua PENDENTE —
+       ninguém o fechou — por isso fica na lista da refeição, RISCADO, em vez de
+       saltar para o bloco de baixo: a lista lê-se como uma lista de compras, com
+       o que falta a negro e o que está tratado riscado. A nota da direita diz o
+       que o trata. Desfeita a alocação, desrisca-se sozinho. */
     const cob=!shopIsBought(it)&&shopIsCovered(it);
-    // Encomendado numa provisória: também não há nada a tratar. Marca-se só com
-    // * e a cor — a legenda no fim do bloco explica uma vez por todas (um aviso
-    // por linha era ruído, e são todos a mesma coisa).
     const enc=(!shopIsBought(it)&&!cob)?shopEncomenda(it):null;
     const done=shopIsBought(it)||cob||!!enc;
     const qtdTxt=shopQtyLabel(it);
-    // Sem "riscado": um artigo comprado é uma linha normal do bloco Comprado,
-    // igual às dos lotes — o bloco onde está já diz tudo
     // Sem dono: em vez de dizer "falta quem trate", dá-se logo o botão de o
     // resolver — o ＋🛒 da Shop List em botão de talão, um toque e o artigo é
     // meu. Em refeições passadas não há nada a tratar: fica só a constatação.
     const st=cob?'<span class="msl-st ok">🧺 em stock</span>'
+      :enc?`<span class="msl-st prov" title="${escHtml(enc.desc||'')} — despesa provisória">encomendado</span>`
       :done?''
       :it.tratadoPor?mslWho(it.tratadoPor)
       :past?'<span class="msl-st falta">por tratar</span>'
@@ -6628,8 +6628,8 @@ function mealShopSection(rd){
     // Dica de stock: quanto está coberto, ou stock livre por alocar (botão de um
     // toque para alocar o livre a esta refeição). Ver shopStockHint/shopHintHtml.
     const hint=(!done&&!past)?shopHintHtml(it,'msl-hint',true):'';
-    return `<div class="msl-it${dim?' msl-dim':''}${enc?' prov':''}" onclick="openShopItemModal(${it._id})"${enc?` title="${escHtml(enc.desc||'')} — provisório"`:''}>
-      ${mslLead((enc?'*':'')+it.artigo,qtdTxt,isDespensa(it.artigo))}${st}${hint}</div>`;
+    return `<div class="msl-it${dim?' msl-dim':''}${(cob||enc)?' msl-riscado':''}" onclick="openShopItemModal(${it._id})"${enc?` title="${escHtml(enc.desc||'')} — provisório"`:''}>
+      ${mslLead(it.artigo,qtdTxt,isDespensa(it.artigo))}${st}${hint}</div>`;
   };
   /* A loja NÃO vai em cada linha: nesta lista estreita a etiqueta caía para
      baixo numas linhas e não noutras (leitura aos solavancos). Vai antes como
@@ -6647,27 +6647,19 @@ function mealShopSection(rd){
     return order.map(k=>`<div class="msl-grp${k==='none'?' none':''}"><i class="msl-grp-ic"></i><span class="msl-grp-t">${k==='none'?SHOP_SEM_LOJA:escHtml(g[k].nome)}</span><span class="msl-grp-n">${g[k].items.length}</span></div>`
       +g[k].items.map(it=>lineOf(it,past)).join('')).join('');
   };
-  // Dois blocos independentes: 📝 a lista (pendentes) e 🧺 o que já foi comprado
-  // para a refeição (lotes alocados c/ € + artigos comprados sem lote — um pedido
-  // comprado cujo artigo tem lote é redundante: a linha do lote mostra qtd e €).
-  // Pedidos COBERTOS pelo stock saem dos pendentes: a linha do lote no bloco
-  // Comprado já os representa; se a alocação for desfeita, voltam sozinhos (a
-  // cobertura é derivada — o pedido de stock nunca fica 'comprado').
-  // Encomendados numa provisória: saem dos pendentes (já têm dono e preço) e
-  // vão para o bloco de baixo, com 📌 — não com ✓.
-  const enc=items.filter(it=>!shopIsBought(it)&&!shopIsCovered(it)&&shopEncomenda(it));
-  const pend=items.filter(it=>!shopIsBought(it)&&!shopIsCovered(it)&&!shopEncomenda(it));
-  // "Sem lote" = sem NENHUM lote do artigo em stock (não só os alocados a esta
-  // refeição): se o admin mover a alocação para outra refeição, o pedido não
-  // pode reaparecer aqui como "comprado" — os lotes são a fonte de verdade.
+  /* Dois blocos independentes: 🛒 a LISTA (tudo o que ainda é pedido — o que
+     falta a negro, o que já está tratado riscado) e 🧺 o que já é DINHEIRO para
+     esta refeição (lotes alocados c/ € e despesas provisórias do formato antigo).
+     Coberto pelo stock fica na LISTA, riscado: continua pendente, ninguém o
+     fechou, e é da lista que o cozinheiro lê o que falta. Isto também resolve
+     sozinho o caso da despensa comprada mas alocada a outra refeição, que antes
+     precisava de ser reposta à mão neste cartão para não desaparecer. */
+  const pend=items.filter(it=>!shopIsBought(it));
+  const porComprar=pend.filter(it=>!shopIsCovered(it)&&!shopEncomenda(it)).length;
+  // "Sem lote" = sem NENHUM lote do artigo em stock: um pedido comprado cujo
+  // artigo tem lote é redundante (a linha do lote já mostra qtd e €).
   const temLote=it=>stockArr().some(l=>stockBacked(l)&&(shopSameArtigo(loteReqArtigo(l),it.artigo)||faturaScore(it.artigo,loteReqArtigo(l))>=0.5));
-  /* Despensa já comprada: a embalagem existe mas pode estar alocada a OUTRA
-     refeição, e então não vem nas linhas de `alocs`. Sem isto a linha sumia
-     deste cartão e o cozinheiro deixava de saber que o prato leva azeite — que
-     é precisamente o que a marca de despensa promete não fazer. */
-  const despCoberto=items.filter(it=>!shopIsBought(it)&&shopIsCovered(it)&&isDespensa(it.artigo)
-    &&!alocs.some(x=>shopSameArtigo(x.l.artigo,it.artigo)));
-  const bought=items.filter(it=>shopIsBought(it)&&!temLote(it)).concat(despCoberto);
+  const bought=items.filter(it=>shopIsBought(it)&&!temLote(it));
   /* Artigo a artigo, como as outras linhas do bloco — quem cozinha lê ingredientes,
      não talões. O nome do estabelecimento (e o total) ficam na legenda do fim: uma
      linha "Talho do Rui 141 €" com os artigos por baixo obrigava a ler duas vezes
@@ -6688,8 +6680,8 @@ function mealShopSection(rd){
     return arts.map(a=>`<div class="msl-it prov" onclick="${abre}" title="${escHtml(d.desc||'')} — provisório">
       ${mslLead('*'+a.artigo,a.qtd)}</div>`).join('');
   }).join('');
-  const nProv=enc.length+provs.length;
-  const nComp=alocs.length+bought.length+enc.length+nProvArts;
+  const nProv=provs.length;
+  const nComp=alocs.length+bought.length+nProvArts;
   const det=(sub,lbl,cnt,body)=>{
     const k=key+sub;
     return `<details class="rdc-det msl-det"${MEAL_SHOP_OPEN[k]?' open':''} ontoggle="MEAL_SHOP_OPEN['${k}']=this.open">
@@ -6699,8 +6691,10 @@ function mealShopSection(rd){
   };
   // Fecho de talão: o total da lista dito por extenso, como num recibo — dá
   // fim ao rolo de artigos em vez de o deixar a cair no botão de acrescentar.
-  const foot=pend.length?`<div class="msl-foot"><span>${pend.length} ${pend.length===1?'artigo':'artigos'} por comprar</span></div>`:'';
-  const listaDet=(pend.length||canAdd)?det('|l',past?'📝 Não comprado':'🛒 Lista de compras',pend.length||'',
+  // A contagem é do que FALTA (os riscados já estão tratados) — é a resposta a
+  // "quanto falta comprar", não a "quantas linhas tem a lista".
+  const foot=pend.length?`<div class="msl-foot"><span>${porComprar?`${porComprar} ${porComprar===1?'artigo':'artigos'} por comprar`:'tudo tratado ✓'}</span></div>`:'';
+  const listaDet=(pend.length||canAdd)?det('|l',past?'📝 Não comprado':'🛒 Lista de compras',porComprar||'',
     (pend.length?listaHtml(pend)+foot:'<div class="msl-empty">Ainda sem ingredientes nesta lista.</div>')+
     (canAdd?`<div class="msl-add-row">
       <button class="cmp-mini prim write-action msl-add" onclick="openShopItemModal(null,'${rd.ref}','${rd.data}')">＋ Ingrediente</button>
@@ -6716,7 +6710,7 @@ function mealShopSection(rd){
   const provQuem=Object.keys(porQuem).map(k=>`${escHtml(k)} · ${eur(porQuem[k])}`).join(' · ');
   const provLeg=nProv?`<div class="msl-leg-prov"><b>*</b> provisório — ainda por comprar${provQuem?': '+provQuem:''}</div>`:'';
   const compDet=nComp?det('|c','🧺 Comprado',nComp,
-    alocLines+bought.map(it=>lineOf(it,false)).join('')+enc.map(it=>lineOf(it,false)).join('')+provLines+provLeg):'';
+    alocLines+bought.map(it=>lineOf(it,false)).join('')+provLines+provLeg):'';
   return `<div class="rdc sf msl" onclick="event.stopPropagation()">${past?compDet+listaDet:listaDet+compDet}</div>`;
 }
 
@@ -7994,9 +7988,11 @@ function compraLoteHtml(l,i){
   // Pediste X no carrinho mas o talão traz Y → o talão manda no stock
   const qtyHint=(!l.free&&l._fat==='warn'&&l._qtdPedida)
     ?`<div class="lote-hint">📝 Pediste <b>${escHtml(String(l._qtdPedida))}</b> no carrinho; o talão tem <b>${escHtml(l.qtd||'—')}</b> — é esta que entra em stock.</div>`:'';
-  // Ligação manual ao pedido genérico (só nos lotes livres/extras): guarda o
-  // stock debaixo de "Batatas Fritas" mantendo a marca em `artigo`
-  const reqInline=(STOCK_TABLE&&!prev&&l.free)?(()=>{
+  /* Ligação manual ao pedido genérico (só nos lotes livres/extras): guarda o
+     stock debaixo de "Batatas Fritas" mantendo a marca em `artigo`. Vale também
+     na provisória — ela gera lotes como qualquer compra, e é aqui que se diz,
+     artigo a artigo, a que pedido da lista é que ele responde. */
+  const reqInline=(STOCK_TABLE&&l.free)?(()=>{
     const nomes=[...new Set(shopArr().filter(it=>!shopIsRemoved(it)).map(it=>it.artigo))].sort((a,b)=>a.localeCompare(b,'pt'));
     const cur=l._listArt||'';
     const known=nomes.some(n=>shopSameArtigo(n,cur));

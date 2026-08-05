@@ -1208,6 +1208,11 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 /* Provisório dentro do bloco "Comprado": o artigo está encomendado mas ainda
    não está cá. Marca-se só com * e a cor — a legenda no fim do bloco explica-o
    uma vez; um aviso por linha era ruído, são todas a mesma coisa. */
+/* Pedido tratado (coberto pelo stock ou encomendado): fica na lista, riscado.
+   O risco é no NOME, não na linha toda — a nota da direita ("em stock",
+   "encomendado") é o que explica porquê e tem de continuar a ler-se. */
+.msl-it.msl-riscado .msl-nm{text-decoration:line-through;text-decoration-thickness:1.5px;color:var(--faint);font-weight:600}
+.msl-it.msl-riscado .msl-q{color:var(--faint);text-decoration:line-through}
 .msl-it.prov .msl-nm{color:var(--gold)}
 .msl-st.prov{color:var(--gold);font-weight:600}
 .msl-leg-prov{margin-top:8px;padding-top:7px;border-top:1px solid rgba(168,123,20,.25);font-size:11px;color:var(--faint);line-height:1.4}
