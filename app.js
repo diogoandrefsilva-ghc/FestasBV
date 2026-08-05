@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v213 · 2026-08-05 · Pedidos Repetidos deixa de chamar "repetido" ao normal: só mostra o que está pedido duas vezes para a MESMA refeição, e ignora o que já está tratado (coberto pelo stock ou dito à mão)';
+const APP_BUILD = 'v214 · 2026-08-06 · A folha das compras (🖨) lê-se a direito no telemóvel (uma coluna à largura toda) e as colunas do papel passam a ser feitas à mão — o iPhone ignorava-as e mandava a lista para duas páginas; o destino na linha é só a refeição, e dá para picar os artigos antes de imprimir';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -12278,11 +12278,16 @@ function generatePDF(type){
     /* Shop List — folha condensada para levar às compras (ver buildShopReport) */
     .sl-doc h1{font-size:18px}
     .sl-doc .subtitle{font-size:11px;margin-bottom:4px}
-    .sl-cols{column-count:2;column-gap:16px}
-    .sl-cols.sl-3{column-count:3;column-gap:12px;font-size:9.5px}
-    .sl-cols.sl-tight{font-size:8px;column-gap:10px}
-    .sl-cols.sl-tight .sl-row{padding:.5px 0}
-    .sl-cols.sl-tight .sl-grp{margin-bottom:7px}
+    /* As colunas são feitas à mão (uma sl-col por coluna, com os blocos já
+       repartidos no JS) e NÃO com column-count: o WebKit do iPhone
+       ignora o multicol ao paginar para impressão, e a folha saía numa coluna
+       só, esticada por duas páginas — justamente o contrário do que se quer. */
+    .sl-cols{display:flex;align-items:flex-start;gap:16px}
+    .sl-col{flex:1 1 0;min-width:0}
+    .sl-cols.sl-sm{font-size:9.5px;gap:12px}
+    .sl-cols.sl-xs{font-size:8px;gap:10px}
+    .sl-cols.sl-xs .sl-row{padding:.5px 0}
+    .sl-cols.sl-xs .sl-grp{margin-bottom:7px}
     .sl-grp{break-inside:avoid;page-break-inside:avoid;margin:0 0 9px}
     .sl-grp-h .sl-cont{margin-left:auto;font-weight:400;text-transform:none;letter-spacing:0;color:#999}
     .sl-grp-h{display:flex;align-items:center;gap:5px;font-size:.85em;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#2a9d6a;border-bottom:1.5px solid #50b96e;padding-bottom:2px;margin-bottom:3px}
@@ -12294,6 +12299,22 @@ function generatePDF(type){
     .sl-meta{font-style:normal;font-size:.82em;color:#8a8a8a}
     .sl-q{flex:0 0 auto;font-weight:700;white-space:nowrap}
     .sl-leg{font-size:8.5px;color:#999;margin:0 0 9px}
+    /* Picar na pré-visualização (ver o <script> do buildShopReport) */
+    .sl-row.picked .sl-nm,.sl-row.picked .sl-q{text-decoration:line-through;color:#b0b0b0}
+    .sl-row.picked .sl-box{background:#1a1a2e;border-color:#1a1a2e}
+    .sl-pick-hint{color:#2a9d6a;font-weight:700;cursor:pointer}
+    .sl-clr{color:#8a8a8a;cursor:pointer;text-decoration:underline}
+    /* No ECRÃ estreito (o telemóvel de quem abre a pré-visualização) a folha é
+       UMA coluna à largura toda, com o corpo a tamanho normal: em duas colunas
+       de 180px cada linha partia-se em três e ficava um emaranhado. As colunas
+       e o corpo pequeno são para o PAPEL, onde há 800px de largura. */
+    @media screen and (max-width:640px){
+      .sl-cols,.sl-cols.sl-sm,.sl-cols.sl-xs{display:block;font-size:11px}
+      .sl-col+.sl-col{margin-top:9px}
+      .sl-cols.sl-xs .sl-row{padding:1.5px 0}
+      .sl-row{padding:3px 0}
+      .sl-box{width:11px;height:11px}
+    }
     .sl-done{margin-top:10px;padding-top:6px;border-top:1px solid #ddd;font-size:9px;color:#777;line-height:1.5}
     .section{margin-bottom:8px}
     .badge{display:inline-block;font-size:9px;font-weight:700;padding:1px 6px;border-radius:4px}
@@ -12393,9 +12414,14 @@ function buildShopReport(){
     }
     const meta=[];
     if(opt.dest){
+      /* SÓ refeições. "🧾 Gerais" e "🥤 Bebidas" não dizem nada a quem está no
+         corredor — são a bolsa comum do evento, não um dia. O que vale a pena
+         marcar na linha é o que é ESPECÍFICO de um almoço ou de um jantar
+         (é aí que falhar o artigo estraga a refeição). */
       const ds=[];
       items.forEach(x=>{
-        const l=shopIsMeal(x.tipo)&&x.dataValor?`${shopTipoIcon(x.tipo)} ${fmtDiaMes(x.dataValor)}`:`${shopTipoIcon(x.tipo)} ${x.tipo}`;
+        if(!shopIsMeal(x.tipo)||!x.dataValor)return;
+        const l=`${shopTipoIcon(x.tipo)} ${fmtDiaMes(x.dataValor)}`;
         if(ds.indexOf(l)<0)ds.push(l);
       });
       if(ds.length)meta.push(escHtml(ds.join(' · ')));
@@ -12415,11 +12441,16 @@ function buildShopReport(){
     // Caixa já ticada: quem leva o artigo marcou-o como apanhado. É informação
     // de quem anda nas compras e é justamente para isso que a folha serve.
     const feito=items.every(x=>x.tratadoPor&&x.noCarrinho);
-    return `<div class="sl-row"><i class="sl-box${feito?' on':''}"></i><span class="sl-nm">${escHtml(it.artigo)}${meta.length?` <i class="sl-meta">${meta.join(' · ')}</i>`:''}</span><span class="sl-q">${qtd?escHtml(qtd):''}</span></div>`;
+    // data-k: a chave do artigo, para o picar na pré-visualização (e para o
+    // pico valer nas duas linhas quando o mesmo artigo aparece em dois blocos).
+    return `<div class="sl-row" data-k="${escHtml(shopArtKey(it.artigo))}"><i class="sl-box${feito?' on':''}"></i><span class="sl-nm">${escHtml(it.artigo)}${meta.length?` <i class="sl-meta">${meta.join(' · ')}</i>`:''}</span><span class="sl-q">${qtd?escHtml(qtd):''}</span></div>`;
   };
-  // Um bloco: cabeçalho + as linhas dos artigos, por ordem alfabética. Conta as
-  // linhas e os blocos para se saber, no fim, quão apertada tem de ser a folha.
-  let nLinhas=0,nBlocos=0;
+  /* Um bloco: cabeçalho + as linhas dos artigos, por ordem alfabética. Cada
+     pedaço sai com o seu PESO (linhas + o cabeçalho, que vale por quase duas,
+     com o traço e o espaço por baixo) — é com ele que as colunas se repartem
+     equilibradas mais abaixo. */
+  const blocos=[];
+  let nLinhas=0;
   const MAX_BLOCO=18;   // artigos por bloco antes de o partir (ver abaixo)
   const bloco=(label,items,opt)=>{
     const g={},order=[];
@@ -12435,18 +12466,15 @@ function buildShopReport(){
        "(cont.)" com uma linha só) e cada um cabe à vontade numa coluna. */
     const nPartes=Math.ceil(order.length/MAX_BLOCO);
     const porParte=Math.ceil(order.length/nPartes);
-    let h='';
     for(let i=0;i<nPartes;i++){
       const parte=order.slice(i*porParte,(i+1)*porParte);
       if(!parte.length)continue;
-      nBlocos++;
       const cab=i===0?`${label}<span class="sl-n">${order.length}</span>`:`${label} <span class="sl-cont">(cont.)</span>`;
-      h+=`<div class="sl-grp"><div class="sl-grp-h">${cab}</div>${parte.map(k=>slRow(g[k],opt)).join('')}</div>`;
+      blocos.push({peso:parte.length+1.8,
+        html:`<div class="sl-grp"><div class="sl-grp-h">${cab}</div>${parte.map(k=>slRow(g[k],opt)).join('')}</div>`});
     }
-    return h;
   };
 
-  let blocos='';
   if(comprar.length){
     if(byCat){
       // Por CATEGORIA — o corredor do supermercado. Sem categoria vai para
@@ -12454,27 +12482,43 @@ function buildShopReport(){
       const cats={},order=[];
       comprar.forEach(it=>{const c=artCat(it.artigo),k=c?'c'+c.id:'\uffff';if(!cats[k]){cats[k]={nome:c?c.nome:'Outros',items:[]};order.push(k);}cats[k].items.push(it);});
       order.sort((a,b)=>((a==='\uffff'?1:0)-(b==='\uffff'?1:0))||cats[a].nome.localeCompare(cats[b].nome,'pt'));
-      order.forEach(k=>{blocos+=bloco(`${catEmoji(cats[k].nome)} ${escHtml(cats[k].nome)}`,cats[k].items,{dest:true,loja:true});});
+      order.forEach(k=>{bloco(`${catEmoji(cats[k].nome)} ${escHtml(cats[k].nome)}`,cats[k].items,{dest:true,loja:true});});
     }else if(byLoja){
       const lojas={},order=[];
       comprar.forEach(it=>{const l=shopLojaTxt(it),k=l?shopLojaKey(l):'\uffff';if(!lojas[k]){lojas[k]={nome:l,items:[]};order.push(k);}lojas[k].items.push(it);});
       order.sort((a,b)=>((a==='\uffff'?1:0)-(b==='\uffff'?1:0))||lojas[a].nome.localeCompare(lojas[b].nome,'pt'));
-      order.forEach(k=>{blocos+=bloco(k==='\uffff'?'🛒 '+SHOP_SEM_LOJA:'🏬 '+escHtml(lojas[k].nome),lojas[k].items,{dest:true});});
+      order.forEach(k=>{bloco(k==='\uffff'?'🛒 '+SHOP_SEM_LOJA:'🏬 '+escHtml(lojas[k].nome),lojas[k].items,{dest:true});});
     }else if(byArt){
-      blocos+=bloco('🔤 Artigos',comprar,{dest:true,loja:true});
+      bloco('🔤 Artigos',comprar,{dest:true,loja:true});
     }else{
       const gs={},order=[];
       comprar.forEach(it=>{const k=shopGroupKey(it);if(!gs[k]){gs[k]={it,items:[]};order.push(k);}gs[k].items.push(it);});
       order.sort((a,b)=>(ord[gs[a].it.tipo]-ord[gs[b].it.tipo])||((gs[a].it.dataValor||'').localeCompare(gs[b].it.dataValor||'')));
-      order.forEach(k=>{blocos+=bloco(shopGroupLabel(gs[k].it.tipo,gs[k].it.dataValor),gs[k].items,{loja:true});});
+      order.forEach(k=>{bloco(shopGroupLabel(gs[k].it.tipo,gs[k].it.dataValor),gs[k].items,{loja:true});});
     }
   }
 
-  // Peso da folha: cada cabeçalho de bloco vale por quase duas linhas (tem o
-  // traço e o espaço por baixo). É o que decide entre 2 e 3 colunas e, já muito
-  // grande, o corpo mais pequeno — antes de deixar passar para a 2.ª folha.
-  const peso=nLinhas+nBlocos*1.8;
-  const cols='sl-cols'+(peso>140?' sl-3 sl-tight':peso>90?' sl-3':'');
+  /* Peso da folha → quantas colunas e que tamanho de corpo. Duas colunas
+     chegam para a lista de um evento; três só quando ela é mesmo grande, que é
+     quando vale a pena apertar o corpo para não passar à 2.ª folha. */
+  const peso=blocos.reduce((a,b)=>a+b.peso,0);
+  const nCols=peso>90?3:2;
+  const dens=peso>140?' sl-xs':peso>90?' sl-sm':'';
+  /* Repartir os blocos pelas colunas é connosco (ver a nota do CSS): enche-se
+     cada coluna até ao seu quinhão, pela ordem das categorias — assim a folha
+     lê-se de cima abaixo, coluna a coluna, e no telemóvel (onde é tudo uma
+     coluna) sai na mesma ordem. Um bloco vai para a coluna onde desequilibra
+     menos, e nunca se abre coluna que deixe outra vazia no fim. */
+  const alvo=peso/nCols;
+  const colunas=[[]];
+  let acc=0;
+  blocos.forEach((b,i)=>{
+    const faltamCols=nCols-colunas.length, faltamBlocos=blocos.length-i;
+    if(faltamCols>0&&acc>0&&acc+b.peso/2>alvo&&faltamBlocos>=faltamCols){colunas.push([]);acc=0;}
+    colunas[colunas.length-1].push(b.html);
+    acc+=b.peso;
+  });
+  const colsHtml=colunas.map(c=>`<div class="sl-col">${c.join('')}</div>`).join('');
 
   let h=`<div class="sl-doc"><h1>🛒 Shop List — ${evNome} ${ano}</h1>`;
   // Contam-se ARTIGOS distintos, não linhas: por refeição o mesmo artigo aparece
@@ -12491,9 +12535,10 @@ function buildShopReport(){
       :'<p>A lista de compras está vazia.</p>';
   }else{
     // A legenda usa as MESMAS caixas das linhas (e não ☐/▪, que o tipo de letra
-    // desenha de outra maneira) — senão não se percebe que fala delas.
-    h+=`<div class="sl-leg"><i class="sl-box"></i> por apanhar · <i class="sl-box on"></i> já no carrinho de quem o leva · 🛒 quem trata</div>`;
-    h+=`<div class="${cols}">${blocos}</div>`;
+    // desenha de outra maneira) — senão não se percebe que fala delas. A parte
+    // de picar é `no-print`: no papel pica-se com uma caneta.
+    h+=`<div class="sl-leg"><i class="sl-box"></i> por apanhar · <i class="sl-box on"></i> já no carrinho de quem o leva · 🛒 quem trata<span class="no-print"><br><b class="sl-pick-hint">Toca numa linha para a picar</b> — fica riscada, e assim segue para o papel/PDF<span id="sl-clr-wrap" style="display:none"> · <span class="sl-clr" id="sl-clr">limpar picados</span></span></span></div>`;
+    h+=`<div class="sl-cols${dens}">${colsHtml}</div>`;
   }
   if(tratados.length){
     const g={},order=[];
@@ -12502,6 +12547,46 @@ function buildShopReport(){
       +order.map(k=>`${escHtml(g[k].it.artigo)} <i>(${g[k].txt})</i>`).join(' · ')+'</div>';
   }
   h+=`<div class="footer">Lista gerada em ${new Date().toLocaleString('pt-PT')} · ${evNome} ${ano}</div></div>`;
+  /* Picar os artigos na PRÉ-VISUALIZAÇÃO. Um PDF já gravado é papel digital —
+     não há caixas para clicar lá dentro (fazer um PDF com formulário exigia uma
+     biblioteca, e a app não tem build nem dependências). O que dá, e resolve o
+     mesmo, é picar aqui antes de imprimir/guardar: a linha fica riscada e assim
+     é que segue para o papel e para o PDF.
+     - Fica no `localStorage` DESTE aparelho (o iframe do srcdoc partilha a
+       origem da app), por ano. É uma marca pessoal de quem anda nas compras —
+       não mexe na lista nem no carrinho de ninguém, e por isso não vai à BD.
+     - A chave é o artigo (`data-k`), não a linha: o mesmo artigo em dois blocos
+       pica-se de uma vez, e o pico sobrevive a gerar a folha outra vez. */
+  h+=`<script>
+(function(){
+  var K=${JSON.stringify('festasbv_slpick_'+ano)};
+  var st={};try{st=JSON.parse(localStorage.getItem(K)||'{}')||{};}catch(e){}
+  var rows=[].slice.call(document.querySelectorAll('.sl-row'));
+  var wrap=document.getElementById('sl-clr-wrap'),clr=document.getElementById('sl-clr');
+  function sync(){
+    var n=0;rows.forEach(function(r){if(r.classList.contains('picked'))n++;});
+    if(wrap)wrap.style.display=n?'':'none';
+    try{localStorage.setItem(K,JSON.stringify(st));}catch(e){}
+  }
+  function pintar(k,on){
+    rows.forEach(function(r){if(r.getAttribute('data-k')===k)r.classList.toggle('picked',on);});
+  }
+  rows.forEach(function(r){
+    var k=r.getAttribute('data-k');
+    if(st[k])r.classList.add('picked');
+    r.addEventListener('click',function(){
+      var on=!st[k];
+      if(on)st[k]=1;else delete st[k];
+      pintar(k,on);sync();
+    });
+  });
+  if(clr)clr.addEventListener('click',function(){
+    rows.forEach(function(r){r.classList.remove('picked');});
+    st={};sync();
+  });
+  sync();
+})();
+</script>`;
   return h;
 }
 
