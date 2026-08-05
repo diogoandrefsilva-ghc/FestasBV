@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v209 · 2026-08-05 · A folha das compras (🖨) passa a vir por categoria — o corredor do supermercado — e a despensa deixa de ter bloco à parte: cai na categoria dela, com o 🫙 na linha';
+const APP_BUILD = 'v210 · 2026-08-05 · A cobertura passa a declarar-se do lado do STOCK ("que pedidos é que isto trata?") — do que está cá para o pedido; no detalhe do pedido fica só a constatação';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -7530,61 +7530,19 @@ function shopCatSync(){
     :(g?`Sugerida a partir de "${g.nome}" — confirma antes de guardar.`:'');
   note.style.display=note.textContent?'':'none';
 }
-/* ── Cobertura dita à mão (db/cobertura.sql) ──────────────────────────
-   Três estados, um chip cada: deixa a app decidir · coberto · falta ___.
-   Só aparece num pedido JÁ EXISTENTE e ainda por comprar: num artigo a nascer
-   não há nada para cobrir, e num comprado a pergunta já não se põe.
-   O estado vive no dataset do bloco até se gravar, como o resto do modal. */
-let _cobEstado='';   // '' | 'ok' | texto do que falta
-function shopCobPend(){return _cobEstado==='ok'?'ok':(_cobEstado||'').trim();}
+/* ── Cobertura dita à mão: aqui é só o ESPELHO ────────────────────────
+   Quem declara é o stock — no modal do artigo, "🔗 Que pedidos é que isto
+   trata?". O sentido é esse: parte-se do que está cá para o pedido, não do
+   pedido para o que possa estar cá. Neste ecrã fica só a constatação, com o
+   caminho para a desfazer onde ela foi feita. */
 function shopCobFill(it){
   const wrap=document.getElementById('shop-cob-wrap');if(!wrap)return;
-  const mostra=COB_COL&&!!it&&!shopIsBought(it)&&!shopIsRemoved(it)&&shopCanWrite();
-  wrap.style.display=mostra?'':'none';
-  _cobEstado=mostra?shopCobDecl(it):'';
-  if(mostra)shopCobPaint(it);
-}
-function shopCobPaint(it){
-  const dec=_cobEstado;
-  const falta=dec&&dec!=='ok';
-  const on=(id,v)=>{const e=document.getElementById(id);if(e)e.classList.toggle('on',v);};
-  on('shop-cob-auto',!dec);on('shop-cob-ok',dec==='ok');on('shop-cob-falta',!!falta);
-  const inp=document.getElementById('shop-cob-txt');
-  if(inp){inp.style.display=falta?'':'none';if(falta&&inp.value!==dec)inp.value=dec;}
-  const n=document.getElementById('shop-cob-note');
-  if(!n)return;
-  // Em automático, dizer o que a app está a deduzir agora — é a informação que
-  // faz decidir se vale a pena dizer alguma coisa à mão.
-  if(!dec){
-    const sh=it?shopStockHint(it):null;
-    n.innerHTML='A app decide pelo stock alocado a esta refeição'+(sh?`: <b>${escHtml(String(sh.txt).replace(/^\s*🧺\s*/,''))}</b>.`:'. Neste momento não há nada alocado.')
-      +'<br>Usa os outros dois quando as unidades não se comparam — "2 embalagens" e "5 kg" não se somam.';
-  }else if(dec==='ok'){
-    n.innerHTML='Fica <b>riscado</b> na lista da refeição, com a nota "coberto". Não conta para o "por comprar".';
-  }else{
-    n.innerHTML=dec.trim()
-      ?'Continua <b>por comprar</b> na lista, com a nota do que falta.'
-      :'Escreve <b>quanto falta</b> — em branco, volta ao automático.';
-  }
-}
-function shopCobSet(v){
-  const it=editingItemId!=null?shopArr().find(x=>x._id===editingItemId):null;
-  if(v==='falta'){
-    const inp=document.getElementById('shop-cob-txt');
-    _cobEstado=(inp&&inp.value.trim())||' ';   // espaço = "falta, ainda não disse quanto"
-    shopCobPaint(it);
-    if(inp){inp.style.display='';inp.focus();}
-    return;
-  }
-  _cobEstado=v;
-  shopCobPaint(it);
-}
-function shopCobTxt(v){
-  _cobEstado=v.trim()||' ';
-  const n=document.getElementById('shop-cob-note');
-  if(n)n.innerHTML=v.trim()
-    ?'Continua <b>por comprar</b> na lista, com a nota do que falta.'
-    :'Escreve <b>quanto falta</b> — em branco, volta ao automático.';
+  const dec=it?shopCobDecl(it):'';
+  wrap.style.display=dec?'':'none';
+  if(!dec)return;
+  wrap.innerHTML=dec==='ok'
+    ?'✅ <b>Tratado</b> — dito a partir do stock. Fica riscado na lista da refeição.<br><span class="cob-ro-sub">Para desfazer: 🧺 Stock › este artigo › "que pedidos é que isto trata?".</span>'
+    :`⚠️ <b>Falta ${escHtml(dec)}</b> — dito a partir do stock. Continua por comprar.<br><span class="cob-ro-sub">Para mudar: 🧺 Stock › este artigo › "que pedidos é que isto trata?".</span>`;
 }
 
 async function saveShopItem(){
@@ -7617,9 +7575,8 @@ async function saveShopItem(){
       const patch={artigo,quantidade:qtd,tamanho:tam||null,tipo,data_valor:dataValor};
       const local={artigo,quantidade:qtd,tamanho:tam,tipo,dataValor};
       if(SHOP_LOJA_COL){patch.loja=loja||null;local.loja=loja;}
-      // Cobertura dita à mão: só se grava a partir daqui (nenhum caminho
-      // automático lhe toca — uma alocação de stock não apaga o que a pessoa disse)
-      if(COB_COL){const c=shopCobPend();patch.cobertura=c||null;local.cobertura=c;}
+      // A cobertura NÃO se grava aqui: é escrita do lado do stock (loteCobSet),
+      // que é quem sabe o que está cá. Editar o pedido não lhe toca.
       // Admin pode reatribuir quem trata (puxar/largar por outrem)
       if(it&&isAdmin()&&document.getElementById('shop-claim-wrap').style.display!=='none'){
         const nv=document.getElementById('shop-claim').value||null;
@@ -9299,6 +9256,7 @@ function openLoteModal(id){
   loteCatFill();
   loteReqFill();
   loteRenderAlocs();
+  loteCobFill();
   document.getElementById('lote-bg').classList.add('show');
   document.body.classList.add('no-scroll');
 }
@@ -9598,6 +9556,67 @@ async function loteReqChanged(v){
   }catch(e){setSync('err','erro ao guardar');toast(permErrorMsg(e),'bad');loteReqFill();}
 }
 function loteMeals(){return (DATA.refeicoesDef||[]).filter(r=>shopIsMeal(r.ref));}
+/* ── "Que pedidos é que isto trata?" (db/cobertura.sql) ───────────────
+   O sentido é o natural: parte-se do que está CÁ — o stock — para os pedidos
+   da lista, e não ao contrário. A app já deduz a cobertura sozinha quando as
+   unidades se comparam (5 kg alocados contra um pedido de 3 kg); isto é para
+   quando não se comparam — "2 embalagens" contra "5 kg" — e a resposta tem de
+   vir de quem está a olhar para a mercadoria.
+   Lista os pedidos PENDENTES deste artigo (todas as refeições), cada um com
+   "trata" / "falta ___". Escreve em shoplist.cobertura, exatamente como fazia
+   o bloco que estava no detalhe do pedido — mudou o sítio, não o dado. */
+function loteCobPedidos(){
+  if(!editingLote)return [];
+  const nomes=[editingLote.reqName,editingLote.product,editingLote.reqLink].filter(Boolean);
+  return shopArr().filter(it=>shopIsPending(it)&&!shopIsRemoved(it)
+      &&nomes.some(n=>shopSameArtigo(n,it.artigo)))
+    .sort((a,b)=>(a.dataValor||'').localeCompare(b.dataValor||'')||a.tipo.localeCompare(b.tipo,'pt'));
+}
+function loteCobFill(){
+  const wrap=document.getElementById('lote-cob-wrap');if(!wrap)return;
+  const its=(COB_COL&&isAdmin()&&!contasFechadas())?loteCobPedidos():[];
+  wrap.style.display=its.length?'':'none';
+  if(!its.length)return;
+  const nota=document.getElementById('lote-cob-nota');
+  if(nota)nota.innerHTML='A app já dá por tratado o que consegue comparar. Marca aqui o que ela não consegue — <b>"2 embalagens" e "5 kg" não se somam</b> — e o pedido fica riscado na lista da refeição.';
+  const cont=document.getElementById('lote-cob-list');
+  cont.innerHTML=its.map(it=>{
+    const dec=shopCobDecl(it);
+    const falta=dec&&dec!=='ok';
+    const q=shopQtyLabel(it);
+    const onde=shopIsMeal(it.tipo)&&it.dataValor?`${shopTipoIcon(it.tipo)} ${fmtDiaMes(it.dataValor)}`:`${shopTipoIcon(it.tipo)} ${escHtml(it.tipo)}`;
+    // Sem declaração, dizer o que a app deduziu — é o que faz decidir se vale
+    // a pena marcar seja o que for.
+    const auto=shopIsCovered(it)?'a app já o dá por tratado':'a app não o dá por tratado';
+    return `<div class="lote-cob-it">
+      <div class="lote-cob-hd"><b>${escHtml(it.artigo)}</b>${q?` <i>(${escHtml(q)})</i>`:''} <span class="cmp-badge">${onde}</span>${dec?'':`<i class="lote-cob-auto">${escHtml(auto)}</i>`}</div>
+      <div class="cmp-sort" style="margin:6px 0 0">
+        <span class="sd-chip${dec?'':' on'}" onclick="loteCobSet(${it._id},'')">a app decide</span>
+        <span class="sd-chip${dec==='ok'?' on':''}" onclick="loteCobSet(${it._id},'ok')">trata ✓</span>
+        <span class="sd-chip${falta?' on':''}" onclick="loteCobSet(${it._id},'falta')">falta…</span>
+      </div>
+      ${falta?`<input type="text" class="lote-cob-txt" maxlength="30" value="${escHtml(dec)}" placeholder="Quanto falta? Ex: 1 kg" onchange="loteCobSet(${it._id},this.value)">`:''}
+    </div>`;
+  }).join('');
+}
+/* Grava já — este bloco não faz parte do "Guardar" do modal (que é das
+   alocações): são pedidos da lista, cada um a sua linha, e ficam gravados
+   à medida que se marcam. */
+async function loteCobSet(id,v){
+  const it=shopArr().find(x=>x._id===id);if(!it)return;
+  const val=v==='falta'?(shopCobDecl(it)&&shopCobDecl(it)!=='ok'?shopCobDecl(it):' '):v;
+  const txt=String(val||'').trim();
+  const antes=it.cobertura||'';
+  it.cobertura=txt;   // otimista: o ecrã responde já
+  loteCobFill();
+  try{
+    await queueWrite(()=>sbReq('PATCH',`shoplist?id=eq.${id}`,{cobertura:txt||null}));
+    syncMirror();marcaGuardado();renderShopViews();
+  }catch(e){
+    it.cobertura=antes;loteCobFill();
+    toast(permErrorMsg(e),'bad');
+  }
+}
 function loteRenderAlocs(){
   if(!editingLote)return;
   const canEdit=isAdmin()&&!contasFechadas();
