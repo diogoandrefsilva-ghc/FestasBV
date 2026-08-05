@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v200 · 2026-08-04 · Bebida da refeição: alocar bebidas a um dia como custo direto, mas repartidas por quem come E por quem só bebe — no stock (destino 🍻) e na despesa avulsa';
+const APP_BUILD = 'v201 · 2026-08-05 · Provisória com destino por artigo (refeição, tipo ou 🍻 bebida) e ⇄ para dividir por vários — o que a compra normal já fazia; o destino único à cabeça saiu';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -7470,6 +7470,9 @@ function openCompra(compraId,opts){
     // linha de despesa por artigo) e é o ecrã de onde saiu.
     det:!isEdit||provGrav||stockArr().some(l=>l.compraId===compraId),
     detalhe:!!o.detalhe,prov:!!o.prov||provGrav,
+    // Semente do destino de DEFEITO dos artigos escritos à mão (compraDestPad):
+    // o que vinha do cash-flow, ou o que a provisória gravada já tinha. Não é o
+    // destino da despesa — esse é de cada artigo, e vem da linha dele.
     tipoProv:(dProv?dProv.tipo:o.tipo)||'Gerais',
     dataValorProv:(dProv?dProv.dataValor:o.dataValor)||'',obsProv:provGrav?provNotaTxt(dProv):(o.obs||'')};
   const linked=isEdit?shopArr().filter(x=>x.compraId===compraId):[];
@@ -7480,15 +7483,17 @@ function openCompra(compraId,opts){
        valor" pelo meio. Uma provisória antiga trazia todos os artigos numa
        despesa só: aí fica uma linha com o que lá está escrito, para se poder
        separar à mão. Ver saveCompra. */
-    // O destino já vai preenchido com o da provisória (tipo/refeição): não serve
-    // de nada enquanto ela for provisória, mas se aqui se trocar 📌 → 📅 os
-    // artigos passam a lotes de stock e vão parar à refeição certa.
-    const destProv=compraDestPad();
+    /* O destino de cada artigo vem da SUA linha de despesa (tipo + data-valor +
+       bebida) — é onde ele foi gravado. As provisórias antigas, que tinham um
+       destino só para todas as linhas, reabrem na mesma certas: cada linha
+       trazia esse destino. Trocando aqui 📌 → 📅, é este destino que cada
+       artigo leva para o lote de stock. */
     (DATA.despesas||[]).filter(d=>d.compraId===compraId).forEach(d=>{
       const a=provArtigos(d);
+      const dest=alocToDestino({tipo:d.tipo,data:d.dataValor,bebida:d.bebida});
       compraEdit.lotes.push(a.length===1
-        ?{free:true,artigo:a[0].artigo,qtd:a[0].qtd,valor:d.valor,destino:destProv,keys:[]}
-        :{free:true,artigo:a.map(x=>x.artigo+(x.qtd?' ('+x.qtd+')':'')).join(', '),qtd:'',valor:d.valor,destino:destProv,keys:[]});
+        ?{free:true,artigo:a[0].artigo,qtd:a[0].qtd,valor:d.valor,destino:dest,keys:[]}
+        :{free:true,artigo:a.map(x=>x.artigo+(x.qtd?' ('+x.qtd+')':'')).join(', '),qtd:'',valor:d.valor,destino:dest,keys:[]});
     });
   }else if(isEdit){
     // A linha "🧺 Stock" não é editável à mão — é regenerada a partir dos lotes
@@ -7617,9 +7622,9 @@ function openCompra(compraId,opts){
 }
 function closeShopBuyModal(){document.getElementById('shop-buy-bg').classList.remove('show');document.body.classList.remove('no-scroll');}
 /* 📅 Efetiva ↔ 📌 Provisória (só na itemização de uma despesa do cash-flow).
-   Provisória = ainda não foi comprado: sem data de pagamento, sem artigos da lista
-   e — ver saveCompra — sem lotes de stock. A refeição/dia a que se destina fica
-   (ver compraProvDestHtml), que é o que a mantém alocada ao jantar de sábado. */
+   Provisória = ainda não foi comprado: sem data de pagamento e — ver saveCompra —
+   sem lotes de stock. O destino de cada artigo fica (é ele que a mantém alocada
+   ao jantar de sábado); os pedidos da lista que marcar ficam encomendados. */
 function shopBuyQuandoApply(q){
   const on=q==='prov';
   compraEdit.prov=on;
@@ -7896,11 +7901,15 @@ function compraLoteHtml(l,i){
   const head=`<div class="lote-head">${name}${tag}${l.free?`<button class="lote-x" title="Remover" onclick="compraDelLote(${i})">✕</button>`:''}</div>`;
   // Uma só linha: qtd + preço + destino (o destino desce para o bloco de split
   // quando o artigo está dividido por vários destinos)
-  // Provisória: sem destino por artigo — não há stock a alocar e o destino da
-  // despesa é um só, escolhido à cabeça (compraProvDestHtml).
+  /* O destino vale nos dois modos, e quer dizer o mesmo — a que refeição (ou
+     tipo) pertence este artigo. O que muda é onde ele aterra: numa compra
+     efetiva vira alocação do lote de stock; numa provisória vira o tipo/
+     data-valor da linha de despesa do artigo. Numa provisória não há stock,
+     por isso também não depende de STOCK_TABLE. */
   const prev=!!compraEdit.prov;
-  const hasSplit=!prev&&!!(l.splits&&l.splits.length);
-  const destInline=(STOCK_TABLE&&!prev&&!hasSplit)
+  const podeDest=prev||STOCK_TABLE;
+  const hasSplit=podeDest&&!!(l.splits&&l.splits.length);
+  const destInline=(podeDest&&!hasSplit)
     ?destBtnHtml(l.destino,`compraDestPick(${i})`)+`<button class="lote-split-btn" title="Dividir por vários destinos" onclick="compraLoteAddSplit(${i})">⇄</button>`
     :'';
   const fields=`<div class="lote-row">
@@ -7909,7 +7918,7 @@ function compraLoteHtml(l,i){
       ${destInline}
     </div>`;
   let destBlock='';
-  if(STOCK_TABLE&&hasSplit){
+  if(hasSplit){
     const rows=l.splits.map((s,j)=>`<div class="split-row">
         ${destBtnHtml(s.destino,`compraSplitDestPick(${i},${j})`)}
         <input class="split-qty" type="text" inputmode="decimal" placeholder="qtd" value="${escHtml(s.qtd==null?'':String(s.qtd))}" oninput="compraLoteSplitQty(${i},${j},this.value)">
@@ -7961,12 +7970,11 @@ function compraRenderLotes(){
   // que só faz sentido a quem partiu do carrinho.
   const dtl=!!compraEdit.detalhe;
   cont.innerHTML=`<div class="cmp-pick sf" style="margin-top:14px">${prev?'💶 Preço por artigo':dtl?'🧺 Artigos desta despesa':'💶 Preço por artigo'}</div>`+
-    (prev?compraProvDestHtml():'')+
     ls.map((l,i)=>compraLoteHtml(l,i)).join('')+
     missWarn+
     `<button class="btn ghost" style="width:100%;margin-top:8px" onclick="compraAddLote()">＋ ${(prev||dtl)?'Artigo':'Artigo fora da lista'}</button>`+
     (prev
-      ?'<div class="note">📌 Provisória: os artigos ficam como <b>detalhe da despesa</b> — não entram no 🧺 Stock nem dão pedidos da lista por comprados. Quando pagares, edita a despesa e mete a data.</div>'
+      ?'<div class="note">📌 Provisória: cada artigo conta no custo do destino que lhe deres (refeição ou tipo) — divides por vários com ⇄. Como ainda não foi comprado, não entra no 🧺 Stock nem dá pedidos da lista por comprados. Quando pagares, troca aqui para 📅 e os artigos entram em stock.</div>'
       :dtl
       ?'<div class="note">Cada artigo entra em <b>🧺 Stock</b> com o destino que lhe deres (refeição ou tipo) — divides por vários com ⇄ e reajustas depois no separador Stock. Se algum responde a um pedido da lista, liga-o em <b>🔗 pertence a</b> ou marca-o mais abaixo.</div>'
       :'<div class="note">A app propõe o destino de cada artigo (refeição ou tipo) — confirma ou muda. Podes dividir um artigo por vários destinos com ⇄. Reajustas tudo depois no separador 🧺 Stock.</div>')+
@@ -7975,26 +7983,6 @@ function compraRenderLotes(){
        caíam aqui — a fatura era lida e não aparecia nada no ecrã. */
     faturaExtrasHtml();
   compraUpdateTotal();
-}
-/* Destino da despesa provisória: um só para o detalhe todo (o destino por artigo
-   não se aplica — nada disto vai a stock). Sendo Almoço/Jantar escolhe-se também
-   a refeição: é a data-valor que a aloca ao jantar de sábado em vez de a deixar
-   cair no rateio indireto. Sem refeição escolhida, indireto — como antes. */
-function compraProvDestHtml(){
-  const t=compraEdit.tipoProv||'Gerais';
-  const linha=(ic,lbl,sel)=>`<div class="lote-req-inline" style="margin:0 0 8px">${ic} ${lbl} ${sel}</div>`;
-  let h=linha('🧾','tipo de despesa',`<select onchange="compraProvTipo(this.value)">${
-    SHOP_TIPOS.map(x=>`<option value="${x}"${x===t?' selected':''}>${shopTipoIcon(x)} ${x}</option>`).join('')}</select>`);
-  if(shopIsMeal(t)&&dvMeals(t).length)
-    h+=linha('📅','refeição',`<select onchange="compraEdit.dataValorProv=this.value">${dvMealOptions(t,compraEdit.dataValorProv||'')}</select>`);
-  return h;
-}
-function compraProvTipo(t){
-  compraEdit.tipoProv=t;
-  // Gerais não se aloca a refeição nenhuma; e trocar de refeição (Jantar→Almoço)
-  // não pode arrastar a data da anterior, que não é dia deste tipo.
-  if(!dvMeals(t).some(r=>r.data===compraEdit.dataValorProv))compraEdit.dataValorProv='';
-  compraRenderLotes();
 }
 function compraSplitNoteUpd(i){const l=(compraEdit.lotes||[])[i];const el=document.getElementById('split-note-'+i);if(l&&el)el.innerHTML=compraSplitNote(l);}
 function compraLoteSplitQty(i,j,v){const l=(compraEdit.lotes||[])[i];if(!l||!l.splits||!l.splits[j])return;l.splits[j].qtd=v;compraSplitNoteUpd(i);}
@@ -8617,9 +8605,27 @@ async function saveCompra(){
       continue;
     }
     if(!artigo){toast('Indica o nome do artigo detalhado','bad');return;}
-    // Provisória: ainda não foi comprado, logo não é stock nem cobre pedidos —
-    // os artigos ficam como detalhe (observações) de uma única despesa.
-    if(prov){provItens.push({artigo,qtd:(l.qtd||'').trim(),valor:v});continue;}
+    /* Provisória: ainda não foi comprado, logo não é stock nem cobre pedidos —
+       mas o DESTINO de cada artigo conta na mesma, e é ele que diz a que
+       refeição (ou tipo) o € pertence. Dividido por vários destinos, o valor
+       reparte-se pelas quantidades do split. */
+    if(prov){
+      const sp=(l.splits&&l.splits.length)?l.splits.filter(x=>parseFloat(String(x.qtd).replace(',','.'))>0):null;
+      if(sp&&sp.length>1){
+        const qs=sp.map(x=>parseFloat(String(x.qtd).replace(',','.'))||0);
+        const somaQ=qs.reduce((a,b)=>a+b,0);
+        let resto=v;
+        sp.forEach((x,j)=>{
+          // o último leva o resto: assim as parcelas somam sempre o total escrito
+          const vi=(j===sp.length-1)?rnd(resto,2):rnd(v*qs[j]/somaQ,2);
+          resto=rnd(resto-vi,2);
+          if(vi>0)provItens.push({artigo,qtd:String(x.qtd).trim(),valor:vi,destino:x.destino||''});
+        });
+      }else{
+        provItens.push({artigo,qtd:(l.qtd||'').trim(),valor:v,destino:(sp&&sp.length===1?sp[0].destino:l.destino)||''});
+      }
+      continue;
+    }
     if(STOCK_TABLE){
       // Unificado: TODO item detalhado vira um lote movível. O destino/split
       // guia a alocação (refeição, tipo puro, ou FIFO se ficar "por alocar").
@@ -8667,14 +8673,18 @@ async function saveCompra(){
      no custo da refeição. Nada disto vira stock: continuam a ser despesas.
      A nota escrita à mão vai na primeira linha (`nota · Artigo (qtd)`). */
   if(provItens.length){
-    const tipoP=compraEdit.tipoProv||'Gerais';
-    const dvP=shopIsMeal(tipoP)?(compraEdit.dataValorProv||''):'';
-    if(shopIsMeal(tipoP)&&dvMeals(tipoP).length&&!dvP){toast(`Escolhe a ${tipoP.toLowerCase()} a que esta despesa pertence`,'bad');return;}
     const nota=(compraEdit.obsProv||'').trim();
     provItens.forEach((x,i)=>{
       const art=x.artigo+(x.qtd?' ('+x.qtd+')':'');
-      rows.push({tipo:tipoP,data_valor:dvP||null,valor:x.valor,
-        obs:(i===0&&nota)?nota+' · '+art:art});
+      // Destino do artigo → tipo + data-valor da sua linha de despesa. Sem
+      // destino escolhido cai em Gerais, que é a bolsa comum (o mesmo que o
+      // "por alocar" de uma compra: ninguém disse a que refeição pertence).
+      const a=destinoAloc(x.destino,0);
+      const meal=a&&alocIsMeal(a);
+      const row={tipo:(a&&a.tipo)||'Gerais',data_valor:meal?a.data:null,valor:x.valor,
+        obs:(i===0&&nota)?nota+' · '+art:art};
+      if(DESP_BEBIDA_COL&&a&&a.bebida)row.bebida=true;
+      rows.push(row);
     });
   }
   // Despesas diretas geradas do detalhe: uma linha por tipo (ou tipo+refeição)
@@ -8707,9 +8717,13 @@ async function saveCompra(){
       DATA.despesas=(DATA.despesas||[]).filter(d=>d.compraId!==compraId);
     }
     // Cria uma despesa por linha
-    const payload=rows.map(r=>({evento_id:DATA._sbId,quem:who,data_desp:prov?null:date,data_valor:r.data_valor,descricao:desc||'Compras',tipo:r.tipo,valor:r.valor,observacoes:r.obs||null,compra_id:compraId}));
+    const payload=rows.map(r=>{
+      const row={evento_id:DATA._sbId,quem:who,data_desp:prov?null:date,data_valor:r.data_valor,descricao:desc||'Compras',tipo:r.tipo,valor:r.valor,observacoes:r.obs||null,compra_id:compraId};
+      if(DESP_BEBIDA_COL)row.bebida=!!r.bebida;
+      return row;
+    });
     const ins=await queueWrite(()=>sbReq('POST','despesas',payload,{Prefer:'return=representation'}));
-    payload.forEach((r,i)=>DATA.despesas.push({_id:ins&&ins[i]?ins[i].id:null,quem:r.quem,dataDesp:r.data_desp,dataValor:r.data_valor,desc:r.descricao,tipo:r.tipo,valor:r.valor,obs:r.observacoes||'',compraId:compraId}));
+    payload.forEach((r,i)=>DATA.despesas.push({_id:ins&&ins[i]?ins[i].id:null,quem:r.quem,dataDesp:r.data_desp,dataValor:r.data_valor,desc:r.descricao,tipo:r.tipo,valor:r.valor,obs:r.observacoes||'',compraId:compraId,bebida:!!r.bebida}));
     // Lotes de stock: substitui os da compra e aloca por FIFO (cada lote já vê
     // as alocações dos anteriores e dos lotes de outras compras)
     if(STOCK_TABLE){
