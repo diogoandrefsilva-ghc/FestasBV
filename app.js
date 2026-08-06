@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v239 · 2026-08-07 · O 🧺 Stock contava lotes e chamava-lhes “compras” — passa a dizer quantos artigos e, só havendo mais do que uma, quantas compras';
+const APP_BUILD = 'v240 · 2026-08-07 · Reabrir uma compra deixa de perder os artigos que respondem ao mesmo pedido (as batatas fritas) — era o Guardar seguinte a apagá-los';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -8042,7 +8042,16 @@ function compraRefreshLotes(){
     const lote={artigo:d.artigo,_listArt:d.artigo,qtd,valor:'',keys,tipoFix:d.tipoFix||null,dataFix:d.dataFix||null,destino,splits:null};
     if(!d.tipoFix)compraProporDestino(lote);   // propõe alocação concreta às refeições
     return lote;
-  }).concat(prev.filter(l=>!used.has(l)&&l.free));   // artigos fora da lista mantêm-se
+  /* Sobreviventes: os avulsos (como sempre) E TODOS OS LOTES JÁ GRAVADOS.
+     Cada grupo do picker adota UM lote (`used`); os outros caíam aqui se não
+     fossem `free` — e um pedido servido por várias marcas tem vários. A compra
+     do Continente reabria sem duas das três batatas fritas (9,64 €), porque o
+     grupo "Batatas Fritas" adotava a primeira e as outras duas não passavam o
+     filtro. Um lote com `_id` é uma linha real desta compra: só sai daqui pela
+     mão de alguém (o ✕, ou o separador Stock), nunca por não ter cabido num
+     grupo do picker — e sair em silêncio era pior, porque o Guardar seguinte
+     escrevia a compra sem ele. */
+  }).concat(prev.filter(l=>!used.has(l)&&(l.free||l._id!=null)));
   compraRenderLotes();
 }
 /* Opções de destino de um item detalhado: "por alocar" (FIFO), tipos puros
@@ -10343,12 +10352,20 @@ async function deleteCompra(){
   const btn=document.getElementById('shop-buy-del');btn.disabled=true;
   setSync('load','a guardar…');
   try{
-    await queueWrite(()=>sbReq('DELETE',`despesas?compra_id=eq.${enc(compraId)}`));
-    DATA.despesas=(DATA.despesas||[]).filter(d=>d.compraId!==compraId);
+    /* LOTES PRIMEIRO, despesas depois. São dois pedidos sem transação a uni-los
+       e o que falhar a meio decide qual dos dois destroços fica:
+         despesas primeiro → sobram lotes de uma compra que já não existe. Stock
+           a sério, alocado a refeições, sem um cêntimo por baixo — e ninguém dá
+           por isso. Foi o que deixou 379 € de lotes órfãos espalhados.
+         lotes primeiro → sobra a despesa, que se vê nos cash-flows e cujo
+           detalhe abre logo com o aviso de que não bate certo.
+       Entre um destroço calado e um destroço à vista, fica o à vista. */
     if(STOCK_TABLE){
       await queueWrite(()=>sbReq('DELETE',`stock_lotes?compra_id=eq.${enc(compraId)}`));
       DATA.stockLotes=stockArr().filter(l=>l.compraId!==compraId);
     }
+    await queueWrite(()=>sbReq('DELETE',`despesas?compra_id=eq.${enc(compraId)}`));
+    DATA.despesas=(DATA.despesas||[]).filter(d=>d.compraId!==compraId);
     const linked=shopArr().filter(x=>x.compraId===compraId).map(x=>x._id);
     if(linked.length){
       await queueWrite(()=>sbReq('PATCH',`shoplist?id=in.(${linked.join(',')})`,{estado:'pendente',compra_id:null,cf_desc:null,comprado_em:null}));
