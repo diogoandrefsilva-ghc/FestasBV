@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v227 · 2026-08-06 · No registo da compra, TODOS os artigos deixam editar o nome e a ligação ao pedido da lista — a app propõe, deixa de trancar';
+const APP_BUILD = 'v228 · 2026-08-06 · Cartões dos artigos da compra 23% mais baixos (uma compra de 30 artigos deixa de ser uma maratona de scroll)';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -8165,7 +8165,7 @@ function compraLoteHtml(l,i){
      20 cartões de uma compra normal era ruído em todos para servir um. */
   const nsInline=(STOCK_TABLE&&l.free)?`<label class="lote-nostock${l.noStock?' on':''}">
       <input type="checkbox" ${l.noStock?'checked':''} onchange="compraLoteNoStock(${i},this.checked)">
-      <span>🧾 só despesa — não entra em 🧺 Stock</span></label>`:'';
+      <span>🧾 só despesa — não entra em stock</span></label>`:'';
   /* A ligação ao pedido vale em TODOS os artigos, e sobretudo nos do carrinho:
      ali ela vem de um PALPITE do casamento com a fatura (já casou "Batata Frita
      Lay's sem Sal 160g" com "Salsa") e não havia como a desfazer — ficava um

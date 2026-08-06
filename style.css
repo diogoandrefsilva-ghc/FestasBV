@@ -1352,28 +1352,43 @@ button.cmp-chip.qt-tap:active{filter:brightness(.93)}
 .cmp-ln-ed:hover{opacity:1;background:rgba(30,122,77,.1)}
 /* Marcas listadas no cartão de stock (Ruffles · Lays) */
 .stk-marcas{font-size:11.5px;color:var(--muted);margin:1px 0 5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-/* Ligação manual "pertence a" no registo da compra (lotes livres) */
-.lote-req-inline{display:flex;align-items:center;gap:6px;margin-top:8px;font-size:12.5px;color:var(--muted)}
-.lote-req-inline select{flex:1;min-width:0;height:36px;border:1px solid var(--line);border-radius:8px;background:#FFFDF6;color:var(--ink);padding:0 8px;font-size:13px}
+/* Ligação "pertence a" no registo da compra (em todos os artigos) */
+/* Linha de legenda, não campo de formulário: é o que menos se toca no cartão e
+   uma caixa de 31px por artigo eram três deslizes a mais numa compra de 30.
+   Continua a ser um <select> — um toque abre o seletor nativo — e o ▾ é que diz
+   que se pode tocar, já que `.modal select` tira a seta do sistema. */
+.lote-req-inline{display:flex;align-items:center;gap:4px;margin-top:5px;font-size:11.5px;color:var(--muted)}
+.modal .lote-req-inline select{flex:1 1 auto;min-width:0;width:auto;max-width:100%;height:22px;
+  border:none;border-radius:5px;background:transparent no-repeat right 2px center/8px 5px;
+  background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 5'%3E%3Cpath d='M0 0h8L4 5z' fill='%239a8b6f'/%3E%3C/svg%3E");
+  color:var(--ink);font-weight:600;padding:0 13px 0 3px;font-size:12px;text-overflow:ellipsis}
+.modal .lote-req-inline select:active{background-color:rgba(30,122,77,.08)}
 .lote-val{flex:0 0 auto;font-size:12px;font-weight:700;color:var(--muted);font-variant-numeric:tabular-nums;min-width:52px;text-align:right}
-/* "Só despesa — não entra em stock" (saco da caixa, taxas): só nos lotes livres */
-.lote-nostock{display:flex;align-items:center;gap:7px;margin-top:8px;font-size:12.5px;color:var(--muted);cursor:pointer}
-.lote-nostock input{flex:0 0 auto;width:17px;height:17px;margin:0;accent-color:var(--green)}
-.lote-nostock.on{color:var(--ink);font-weight:600}
+/* "Só despesa — não entra em stock" (saco da caixa, taxas): só nos lotes livres.
+   text-transform/letter-spacing explícitos: `.modal label` põe MAIÚSCULAS e
+   espaçamento, e a frase partia-se em duas linhas dentro do cartão. */
+.modal label.lote-nostock{display:flex;align-items:center;gap:7px;margin:6px 0 0;font-size:12px;line-height:1.2;
+  color:var(--muted);cursor:pointer;text-transform:none;letter-spacing:0;font-weight:500}
+.lote-nostock input{flex:0 0 auto;width:16px;height:16px;margin:0;accent-color:var(--green)}
+.modal label.lote-nostock.on{color:var(--ink);font-weight:600}
 
 /* ── Itemização da fatura: cartão por artigo (registo da compra) ── */
-.lote-card{background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:9px 11px 10px;margin-bottom:7px;box-shadow:0 1px 3px rgba(80,55,20,.05)}
+/* Compacto de propósito: uma compra de supermercado traz 20 e 30 artigos, e
+   cada píxel a mais por cartão é meia dúzia de deslizes a mais a rever a lista.
+   Alturas: nome 36px · qtd/€/destino 36px · ligação 31px (esta é a que menos
+   se toca). Abaixo disto o dedo começa a falhar os campos. */
+.lote-card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:7px 9px 8px;margin-bottom:5px;box-shadow:0 1px 3px rgba(80,55,20,.05)}
 .lote-card.is-miss{border-color:rgba(168,123,20,.55);background:linear-gradient(0deg,rgba(168,123,20,.07),rgba(168,123,20,.07)),var(--panel)}
 .lote-card.is-warn{border-color:rgba(168,123,20,.42)}
 .lote-card.is-ok{border-color:rgba(30,122,77,.32)}
-.lote-head{display:flex;align-items:center;gap:8px;margin-bottom:7px}
+.lote-head{display:flex;align-items:center;gap:7px;margin-bottom:5px}
 .lote-name{flex:1;min-width:0;font-size:14px;font-weight:700;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .lote-list-art{display:block;font-size:10.5px;font-weight:500;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.lote-name-in{flex:1;min-width:0;margin:0;font-size:14px;font-weight:600}
+.lote-name-in{flex:1;min-width:0;margin:0;height:36px;padding:0 9px;font-size:13.5px;font-weight:600}
 /* Nome + a nota "na lista: X" empilhados (só onde não há o seletor 🔗) */
 .lote-name-wrap{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
 .lote-name-wrap .lote-name-in{flex:0 0 auto;width:100%}
-.lote-tag{flex:0 0 auto;font-size:10.5px;font-weight:700;letter-spacing:.01em;border-radius:20px;padding:3px 9px;white-space:nowrap}
+.lote-tag{flex:0 0 auto;font-size:10px;font-weight:700;letter-spacing:.01em;border-radius:20px;padding:2.5px 8px;white-space:nowrap}
 .lote-tag.ok{background:rgba(30,122,77,.13);color:var(--green)}
 .lote-tag.miss,.lote-tag.warn{background:rgba(168,123,20,.17);color:var(--gold)}
 .lote-x{background:transparent;border:none;color:var(--faint);font-size:15px;cursor:pointer;padding:3px 5px;line-height:1;border-radius:6px;flex:0 0 auto}
@@ -1381,12 +1396,12 @@ button.cmp-chip.qt-tap:active{filter:brightness(.93)}
 /* Uma só linha por artigo: qtd + € + destino (+ ⇄ dividir) — tudo à mesma
    altura (40px) e com letra mais pequena para "1,124 kg" não ficar cortado */
 .lote-row{display:flex;align-items:center;gap:7px}
-.lote-row .lote-qty{flex:0 0 72px;min-width:0;margin:0;text-align:center;padding:0 5px;height:40px;font-size:13px}
+.lote-row .lote-qty{flex:0 0 72px;min-width:0;margin:0;text-align:center;padding:0 5px;height:36px;font-size:13px}
 .lote-row .price-in{flex:0 0 86px;min-width:0}
-.lote-row .price-in input{margin:0;height:40px;padding-top:0;padding-bottom:0;font-size:13px}
+.lote-row .price-in input{margin:0;height:36px;padding-top:0;padding-bottom:0;font-size:13px}
 .lote-row .price-in i{font-size:12.5px}
-.lote-row .dest-btn{padding:0 8px;height:40px;font-size:12.5px;gap:5px}
-.lote-row .lote-split-btn{height:40px}
+.lote-row .dest-btn{padding:0 8px;height:36px;font-size:12.5px;gap:5px}
+.lote-row .lote-split-btn{height:36px}
 /* Ecrãs estreitos: tudo continua NUMA linha — o que encolhe é o resto, para
    o destino ter onde respirar. A 324px úteis (ecrã de 390: modal 20px +
    cartão 11px de cada lado) a qtd e o preço levavam 158px e sobravam ~50
@@ -1415,7 +1430,7 @@ button.cmp-chip.qt-tap:active{filter:brightness(.93)}
    comiam o valor à direita — "199,85" ficava "199,8" em campos estreitos */
 .price-in input[type=number]::-webkit-inner-spin-button,.price-in input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;appearance:none;margin:0}
 .price-in i{position:absolute;right:11px;top:50%;transform:translateY(-50%);font-style:normal;font-size:14px;color:var(--muted);font-weight:600;pointer-events:none}
-.lote-hint{margin-top:8px;font-size:11.5px;line-height:1.4;color:var(--gold)}
+.lote-hint{margin-top:5px;font-size:11px;line-height:1.35;color:var(--gold)}
 .lote-hint b{color:var(--ink);font-weight:700}
 /* Bloco recolhível "🛒 Artigos da lista" no registo da compra */
 .pick-det{margin-top:12px;border:1px solid var(--line);border-radius:12px;background:var(--panel);padding:0 12px}
