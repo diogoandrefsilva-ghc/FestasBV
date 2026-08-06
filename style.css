@@ -1028,8 +1028,13 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
    margens grandes) — repõe-se o aspeto de linha de lista, num painel arredondado */
 .modal label.cmp-pick-row{display:flex;margin:0;padding:12px 2px;font-size:14px;font-weight:600;letter-spacing:0;text-transform:none;color:var(--ink)}
 /* Itemização: os <label> .lote-sug não devem herdar o aspeto de rótulo
-   do modal (maiúsculas, margens grandes) */
-.modal label.lote-sug{margin:0;font-weight:400;letter-spacing:0;text-transform:none;color:var(--ink)}
+   do modal (maiúsculas, margens grandes).
+   O `display:flex` tem de vir DAQUI: `.modal label{display:block}` tem mais
+   especificidade do que `.lote-sug` e ganhava-lhe, pelo que a proposta saía
+   empilhada em quatro linhas — caixa, título, artigo e preço — em vez da linha
+   única que estava desenhada. */
+.modal label.lote-sug{margin:10px 0 0;font-weight:400;letter-spacing:0;text-transform:none;color:var(--ink);
+  display:flex;align-items:center;gap:11px}
 /* Picker do Registar Compra: mais compacto (a lista pode ter dezenas de artigos) */
 #shop-buy-body .cmp-pick-row{padding:6px 2px;gap:8px}
 #shop-buy-body .cmp-pick-row .cmp-badge{font-size:10.5px;padding:2px 6px}
@@ -1453,6 +1458,11 @@ button.cmp-chip.qt-tap:active{filter:brightness(.93)}
 .lote-sug.alt .sug-txt b{color:var(--gold)}
 .sug-txt span{font-size:12.5px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .sug-price{flex:0 0 auto;font-size:13px;font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums}
+/* "Não é" — recusar a proposta. Discreto ao lado do preço, mas com área de
+   toque a sério: é o botão que evita picar por engano o que se queria recusar */
+.sug-no{flex:0 0 auto;background:transparent;border:none;color:var(--faint);font-size:14px;
+  line-height:1;cursor:pointer;padding:6px 2px 6px 8px;border-radius:6px;margin:-6px -2px -6px 0}
+.sug-no:active{color:var(--red);background:rgba(179,64,47,.1)}
 /* Botão-seletor de destino (substitui o <select> nativo, feio no iOS) */
 .dest-btn{flex:1;min-width:0;display:flex;align-items:center;gap:8px;background:#FFFDF6;border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:13.5px;font-weight:600;color:var(--ink);cursor:pointer;text-align:left;transition:.12s}
 .dest-btn:active{background:var(--panel2);transform:scale(.99)}

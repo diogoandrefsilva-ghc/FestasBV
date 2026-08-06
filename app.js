@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v230 · 2026-08-06 · Ligar um artigo da fatura a um pedido passa a tirar-lhe o ⚠ não encontrado — a ligação feita à mão contava para nada';
+const APP_BUILD = 'v231 · 2026-08-06 · Pedido já coberto por outro artigo sai da lista, e agora dá-se ✕ a um palpite errado da leitura (a linha vai para os extras, não se perde)';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -8116,11 +8116,16 @@ function compraLoteHtml(l,i){
      0,00 € ao lado e a caixa por picar por baixo, era o cartão a dar por
      resolvido o que ainda está a perguntar — e quem lê um ✓ verde não pica. */
   const porConf=!l.free&&l._byBrand&&!!(l._subs&&l._subs.length);
-  const cobOutro=!porConf&&loteCobertoPorOutro(l);
+  /* PEDIDO JÁ COBERTO POR OUTRO ARTIGO: sai da lista. Não tem preço, não tem
+     nada para decidir e o artigo que o cobre já diz, no seu 🔗, que é a ele que
+     responde — ficar cá era uma linha a mais para percorrer numa compra de 30.
+     Devolve-se vazio em vez de se filtrar a lista: os `onclick` levam o índice
+     do lote em `compraEdit.lotes`, e filtrar dava-lhes o índice errado.
+     O objeto fica onde estava — desfeita a ligação, o cartão volta sozinho. */
+  if(!l.free&&!porConf&&loteCobertoPorOutro(l))return '';
   const tag=porConf?`<span class="lote-tag warn">☐ por confirmar</span>`
     :l._byBrand?`<span class="lote-tag ok">✓ por marcas</span>`
     :l._fat==='ok'?`<span class="lote-tag ok">✓ na fatura</span>`
-    :cobOutro?`<span class="lote-tag ok">✓ por outro artigo</span>`
     :l._fat==='miss'?`<span class="lote-tag miss">⚠ não encontrado</span>`
     :l._fat==='warn'?`<span class="lote-tag warn">⚠ qtd difere</span>`:'';
   /* O NOME EDITA-SE EM TODOS OS ARTIGOS, venham do carrinho ou da fatura.
@@ -8176,12 +8181,20 @@ function compraLoteHtml(l,i){
        "outra": é a única que há, e chamar-lhe "outra marca" ao lado de um
        0,00 € era o cartão a fazer uma pergunta que não é a que está a fazer. */
   const subTit=l._byBrand?'É esta a linha da fatura para este pedido?':'＋ Outra marca do mesmo?';
+  /* Toda a proposta leva um ✕ para se dizer que NÃO. Só havia maneira de dizer
+     que sim, e não responder não era neutro: a linha foi dada como usada no
+     casamento, logo não caía nos extras e o valor dela desaparecia da compra.
+     Recusar manda-a para os extras (é uma linha real da fatura, com dinheiro),
+     onde entra como artigo próprio se for caso disso.
+     O ✕ vive dentro do <label>, por isso trava o clique — senão recusar
+     também picava a caixa que está a recusar. */
+  const nao=cb=>`<button type="button" class="sug-no" title="Não é" onclick="event.preventDefault();event.stopPropagation();${cb}">✕</button>`;
   const fat=(!l.free&&l._sug?`<label class="lote-sug"><input type="checkbox" onchange="faturaSugToggle(${i})">
         <div class="sug-txt"><b>Corresponde a esta linha da fatura?</b><span>${escHtml(l._sug.artigo)}${l._sug.qtd?' · '+escHtml(l._sug.qtd):''}</span></div>
-        <span class="sug-price">${eur(l._sug.valor)}</span></label>`:'')+
+        <span class="sug-price">${eur(l._sug.valor)}</span>${nao(`faturaSugReject(${i})`)}</label>`:'')+
     (!l.free&&l._subs?l._subs.map((s,j)=>`<label class="lote-sug alt"><input type="checkbox" onchange="faturaSubToggle(${i},${j})">
         <div class="sug-txt"><b>${subTit}</b><span>${escHtml(s.artigo)}${s.qtd?' · '+escHtml(s.qtd):''}</span></div>
-        <span class="sug-price">${eur(s.valor)}</span></label>`).join(''):'')+
+        <span class="sug-price">${eur(s.valor)}</span>${nao(`faturaSubReject(${i},${j})`)}</label>`).join(''):'')+
     (porConf?`<div class="lote-hint">🔗 A fatura não tem nenhuma linha com este nome — foi a leitura que ligou a de cima a este pedido. <b>Pica-a</b>, senão o pedido fica por tratar e o valor dela não entra na compra.</div>`:'');
   // Pediste X no carrinho mas o talão traz Y → o talão manda no stock
   const qtyHint=(!l.free&&l._fat==='warn'&&l._qtdPedida)
@@ -8212,7 +8225,7 @@ function compraLoteHtml(l,i){
       (cur&&!known?`<option value="${escHtml(cur)}" selected>${escHtml(cur)}</option>`:'');
     return `<div class="lote-req-inline">🔗 pertence a <select onchange="compraLoteSetReq(${i},this.value)">${opts}</select></div>`;
   })():'';
-  const cls='lote-card'+(porConf?' is-warn':(l._fat==='ok'||l._byBrand||cobOutro)?' is-ok':l._fat==='miss'?' is-miss':l._fat==='warn'?' is-warn':'');
+  const cls='lote-card'+(porConf?' is-warn':(l._fat==='ok'||l._byBrand)?' is-ok':l._fat==='miss'?' is-miss':l._fat==='warn'?' is-warn':'');
   return `<div class="${cls}">${head}${fields}${qtyHint}${destBlock}${nsInline}${reqInline}${fat}</div>`;
 }
 function compraLoteSetReq(i,v){
@@ -8885,6 +8898,34 @@ function faturaSugToggle(i){
   faturaQtdRecheck(l);
   if(!l.tipoFix)compraProporDestino(l);
   compraRenderLotes();
+}
+/* Recusar uma proposta. A linha NÃO se apaga: é uma linha real da fatura e
+   levava dinheiro consigo. Vai para os extras — o sítio das linhas que a app
+   não soube encaixar — onde se marca como artigo próprio ou se deixa de fora,
+   que é a decisão que ali se toma. Sem isto não havia como dizer "não" a um
+   palpite errado (a salsa dada como marca de batatas fritas) a não ser
+   ignorá-lo, e ignorá-lo era perder o valor sem aviso. */
+function faturaPropRecusar(ln){
+  if(!ln)return;
+  (compraEdit.faturaExtras=compraEdit.faturaExtras||[]).push(ln);
+  compraRenderLotes();
+  toast('Passou para os extras da fatura, no fim da lista','ok');
+}
+function faturaSugReject(i){
+  const l=(compraEdit.lotes||[])[i];if(!l||!l._sug)return;
+  const ln=l._sug;delete l._sug;
+  l._fat='miss';   // era a única candidata: sem ela, nada na fatura lhe corresponde
+  faturaPropRecusar(ln);
+}
+function faturaSubReject(i,j){
+  const l=(compraEdit.lotes||[])[i];if(!l||!l._subs||!l._subs[j])return;
+  const ln=l._subs.splice(j,1)[0];
+  if(!l._subs.length){
+    delete l._subs;
+    // Coberto SÓ por esta marca e ela foi recusada → volta a não ter nada
+    if(l._byBrand){delete l._byBrand;l._fat='miss';}
+  }
+  faturaPropRecusar(ln);
 }
 // Confirmar um sub-artigo (outra marca do mesmo genérico): vira artigo fora da
 // lista com o destino herdado — refeição única → essa; pedido p/ várias
