@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v214 · 2026-08-06 · A folha das compras (🖨) lê-se a direito no telemóvel (uma coluna à largura toda) e as colunas do papel passam a ser feitas à mão — o iPhone ignorava-as e mandava a lista para duas páginas; o destino na linha é só a refeição, e dá para picar os artigos antes de imprimir';
+const APP_BUILD = 'v215 · 2026-08-06 · O 🖨 das Compras segue o sub-separador: no Carrinho a folha sai só com o meu carrinho, nos outros com a lista toda';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -6723,7 +6723,13 @@ function renderCompras(){
     <div class="cmp-hdr-acts">
       ${isAdmin()?`<button class="btn write-action hdr-ico" id="shop-norm-btn" aria-label="Normalizar artigos" onclick="shopNormOpen()" title="Normalizar: juntar grafias do mesmo artigo (chouriço/chouriços…), pedidos repetidos e categorias">✨</button>`:''}
       ${SHOP_TAB!=='hist'?buscaBtn(SHOP_BUSCA,'toggleShopBusca'):''}
-      <button class="btn hdr-ico" aria-label="Exportar a lista em PDF" title="Exportar a lista em PDF — tudo o que falta comprar e o que já está em carrinhos, por categoria e numa folha só" onclick="generatePDF('shoplist')">🖨</button>
+      ${(()=>{
+        // A folha segue o sub-separador em que se está: no Carrinho leva só o
+        // meu carrinho (é essa a lista que a pessoa vai fazer), nos outros leva
+        // a lista toda. Em 📊 Relatórios (fora deste ecrã) é sempre a lista toda.
+        const meu=SHOP_TAB==='carrinho';
+        return `<button class="btn hdr-ico" aria-label="Exportar em PDF" title="${meu?'Exportar o meu carrinho em PDF — só os artigos que disse que trato, por categoria':'Exportar a lista em PDF — tudo o que falta comprar e o que já está em carrinhos, por categoria e numa folha só'}" onclick="generatePDF('shoplist'${meu?",'meu'":''})">🖨</button>`;
+      })()}
       <button class="btn write-action lfoto-btn hdr-ico" data-busy="⏳" aria-label="Adicionar artigos a partir de uma foto da lista" onclick="listaFotoPick()" title="Ler uma foto da lista (câmara ou galeria) e adicionar os artigos de uma vez" ${canW&&!fechadas?'':'disabled'}>📷</button>
       <button class="btn prim write-action hdr-ico" aria-label="Adicionar artigo" title="Adicionar artigo à lista" onclick="openShopItemModal()" ${canW?'':'disabled'}>＋</button>
     </div>
@@ -12239,7 +12245,7 @@ function fmtPdfDate(ds){
   const mes=['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'][dt.getMonth()];
   return dt.getDate()+'/'+mes;
 }
-function generatePDF(type){
+function generatePDF(type,escopo){
   const pessoa=type==='pessoa'?document.getElementById('report-person')?.value:null;
   const ms=CALC.membros;
   const ano=DATA.evento.ano||'';
@@ -12329,7 +12335,7 @@ function generatePDF(type){
   } else if(type==='tshirts'){
     body=buildTshirtsReport();
   } else if(type==='shoplist'){
-    body=buildShopReport();
+    body=buildShopReport(escopo);
   } else {
     body=buildPersonReport(pessoa);
   }
@@ -12376,12 +12382,19 @@ function generatePDF(type){
    - **Coberto pelo stock e encomendado ficam fora** da lista e vão para um
      rodapé pequeno: não há nada a comprar, mas convém saber porque é que o
      artigo não aparece. Mesma regra do ecrã.
+   - **`escopo='meu'` → só o MEU carrinho.** O 🖨 segue o sub-separador onde se
+     está: no Carrinho a folha é a lista que aquela pessoa vai fazer (e aí não
+     se repete "🛒 quem trata" linha a linha, que seria sempre ela); nos outros,
+     e em 📊 Relatórios, é a lista toda.
    Condensado a sério: 2 colunas, 3 quando a lista cresce, e corpo mais pequeno
    quando é mesmo grande — o objetivo é caber numa folha. */
-function buildShopReport(){
+function buildShopReport(escopo){
+  const meu=escopo==='meu';
   const ano=DATA.evento.ano||'';
   const evNome=(DATA.evento.nome||'MEO').replace(/\s*\d{4}\s*/g,'').trim()||'MEO';
-  const pend=shopArr().filter(it=>shopIsPending(it));    // sem comprados nem removidos
+  // No escopo "meu" a folha é o carrinho DESTA pessoa — o mesmo filtro do
+  // sub-separador 🛒 Carrinho (`shopMineOwn`: o meu, não o do cônjuge).
+  const pend=shopArr().filter(it=>shopIsPending(it)&&(!meu||shopMineOwn(it)));
   const tratados=[],comprar=[];
   pend.forEach(it=>{
     const cov=shopIsCovered(it);
@@ -12430,8 +12443,10 @@ function buildShopReport(){
       const l=shopLojaTxt(items.find(x=>shopLojaTxt(x))||{});
       if(l)meta.push('🏬 '+escHtml(l));
     }
-    const quem=[];items.forEach(x=>{if(x.tratadoPor&&quem.indexOf(x.tratadoPor)<0)quem.push(x.tratadoPor);});
-    if(quem.length)meta.push('🛒 '+escHtml(quem.join(', ')));
+    if(!meu){
+      const quem=[];items.forEach(x=>{if(x.tratadoPor&&quem.indexOf(x.tratadoPor)<0)quem.push(x.tratadoPor);});
+      if(quem.length)meta.push('🛒 '+escHtml(quem.join(', ')));
+    }
     // A dica de stock é a MESMA frase do ecrã ("3 kg já em stock — falta comprar
     // 2 kg"): é ela que impede comprar outra vez o que já está na garagem. Sem
     // ela a folha mandava comprar o pedido inteiro.
@@ -12502,7 +12517,9 @@ function buildShopReport(){
      chegam para a lista de um evento; três só quando ela é mesmo grande, que é
      quando vale a pena apertar o corpo para não passar à 2.ª folha. */
   const peso=blocos.reduce((a,b)=>a+b.peso,0);
-  const nCols=peso>90?3:2;
+  // Lista curta (um carrinho, tipicamente) fica numa coluna à largura toda: é
+  // como sai impressa e lê-se melhor do que duas meias-colunas de meia dúzia.
+  const nCols=peso<=14?1:peso>90?3:2;
   const dens=peso>140?' sl-xs':peso>90?' sl-sm':'';
   /* Repartir os blocos pelas colunas é connosco (ver a nota do CSS): enche-se
      cada coluna até ao seu quinhão, pela ordem das categorias — assim a folha
@@ -12520,33 +12537,41 @@ function buildShopReport(){
   });
   const colsHtml=colunas.map(c=>`<div class="sl-col">${c.join('')}</div>`).join('');
 
-  let h=`<div class="sl-doc"><h1>🛒 Shop List — ${evNome} ${ano}</h1>`;
+  // Título diz logo o que a folha é — a do carrinho de alguém não se confunde
+  // com a lista do grupo (podem andar as duas impressas no mesmo dia).
+  const quemEu=meu?(myPrimaryName()||myOwnClaimName()||''):'';
+  let h=`<div class="sl-doc"><h1>🛒 ${meu?`O meu carrinho${quemEu?` — ${escHtml(quemEu)}`:''}`:`Shop List — ${evNome} ${ano}`}</h1>`;
   // Contam-se ARTIGOS distintos, não linhas: por refeição o mesmo artigo aparece
   // num bloco por refeição e o número do topo mudava com a ordenação escolhida.
   const nArt=new Set(comprar.map(it=>shopArtKey(it.artigo))).size;
   const nCarr=new Set(comprar.filter(it=>it.tratadoPor).map(it=>shopArtKey(it.artigo))).size;
-  const sub=[`${nArt} artigo${nArt===1?'':'s'} por comprar`];
-  if(nCarr)sub.push(`${nCarr} em carrinhos`);
+  const sub=[];
+  if(meu)sub.push(`${evNome} ${ano}`);            // no carrinho o título é o dono, o evento vem aqui
+  if(DATA.evento.datas)sub.push(escHtml(DATA.evento.datas));
+  sub.push(`${nArt} artigo${nArt===1?'':'s'} ${meu?'para comprar':'por comprar'}`);
+  if(!meu&&nCarr)sub.push(`${nCarr} em carrinhos`);
   if(tratados.length)sub.push(`${tratados.length} já tratado${tratados.length===1?'':'s'}`);
-  h+=`<div class="subtitle">${DATA.evento.datas?escHtml(DATA.evento.datas)+' · ':''}${sub.join(' · ')}</div>`;
+  h+=`<div class="subtitle">${sub.join(' · ')}</div>`;
   if(!comprar.length){
-    h+=tratados.length
+    h+=meu
+      ?'<p>O teu carrinho está vazio.</p>'
+      :tratados.length
       ?'<p>Nada por comprar — o stock e as encomendas já cobrem a lista.</p>'
       :'<p>A lista de compras está vazia.</p>';
   }else{
     // A legenda usa as MESMAS caixas das linhas (e não ☐/▪, que o tipo de letra
     // desenha de outra maneira) — senão não se percebe que fala delas. A parte
     // de picar é `no-print`: no papel pica-se com uma caneta.
-    h+=`<div class="sl-leg"><i class="sl-box"></i> por apanhar · <i class="sl-box on"></i> já no carrinho de quem o leva · 🛒 quem trata<span class="no-print"><br><b class="sl-pick-hint">Toca numa linha para a picar</b> — fica riscada, e assim segue para o papel/PDF<span id="sl-clr-wrap" style="display:none"> · <span class="sl-clr" id="sl-clr">limpar picados</span></span></span></div>`;
+    h+=`<div class="sl-leg"><i class="sl-box"></i> por apanhar · <i class="sl-box on"></i> ${meu?'já apanhado (marcado na app)':'já no carrinho de quem o leva · 🛒 quem trata'}<span class="no-print"><br><b class="sl-pick-hint">Toca numa linha para a picar</b> — fica riscada, e assim segue para o papel/PDF<span id="sl-clr-wrap" style="display:none"> · <span class="sl-clr" id="sl-clr">limpar picados</span></span></span></div>`;
     h+=`<div class="sl-cols${dens}">${colsHtml}</div>`;
   }
   if(tratados.length){
     const g={},order=[];
     tratados.forEach(t=>{const k=shopArtKey(t.it.artigo);if(!g[k]){g[k]=t;order.push(k);}});
-    h+=`<div class="sl-done"><b>Não comprar — já tratado:</b> `
+    h+=`<div class="sl-done"><b>Não comprar — já tratado${meu?' (saiu do teu carrinho)':''}:</b> `
       +order.map(k=>`${escHtml(g[k].it.artigo)} <i>(${g[k].txt})</i>`).join(' · ')+'</div>';
   }
-  h+=`<div class="footer">Lista gerada em ${new Date().toLocaleString('pt-PT')} · ${evNome} ${ano}</div></div>`;
+  h+=`<div class="footer">${meu?'Carrinho gerado':'Lista gerada'} em ${new Date().toLocaleString('pt-PT')} · ${evNome} ${ano}</div></div>`;
   /* Picar os artigos na PRÉ-VISUALIZAÇÃO. Um PDF já gravado é papel digital —
      não há caixas para clicar lá dentro (fazer um PDF com formulário exigia uma
      biblioteca, e a app não tem build nem dependências). O que dá, e resolve o
