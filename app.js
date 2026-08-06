@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v218 · 2026-08-06 · A Shop List mostra UM artigo por linha: a loja é do artigo (o mesmo deixa de sair em dois grupos) e as refeições fecham-se em chips';
+const APP_BUILD = 'v219 · 2026-08-06 · Um artigo, uma decisão: as sub-linhas do grupo deixam de ter botões próprios e o 👤 entrega o artigo a alguém num toque';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -6335,6 +6335,14 @@ function shopItemCard(it,mineView,noBadge,grouped,noLoja){
     // Uma marca só: o chip. Qual a despesa fica no title — na lista o que
     // interessa é "não compres isto", não o nome do talho.
     right=`<span class="cmp-chip prov" title="${escHtml(enc.desc||'')} — despesa provisória, ainda por pagar">* encomendado</span>`;
+  }else if(grouped){
+    /* Sub-linha de um artigo agrupado: SEM ações próprias. Quem trata, carrinho
+       e apanhado são do ARTIGO — decididos no cabeçalho do grupo —, e ter os
+       mesmos botões repetidos por baixo era o convite a fazer duas vezes o que
+       é uma coisa só (ainda mais quando os pedidos nem quantidades têm para se
+       distinguirem). Fica o chip de quem trata, que é informação, e o toque na
+       linha, que abre o pedido para o EDITAR (quantidade, destino, loja). */
+    if(it.tratadoPor)right=`<span class="cmp-chip">🛒 ${escHtml(it.tratadoPor)}${mineView&&it.noCarrinho?' ✓':''}</span>`;
   }else if(mineView){
     // Checklist de compras: a bolinha marca "já está no carrinho físico".
     // Este estado é só para orientação de quem trata — os outros não o veem.
@@ -6350,6 +6358,11 @@ function shopItemCard(it,mineView,noBadge,grouped,noLoja){
     // e num ecrã estreito era o botão que lhe comia a largura.
     right=`<button class="cmp-mini cart write-action" title="Pôr no carrinho" aria-label="Pôr no carrinho" onclick="event.stopPropagation();claimItem(${it._id})"><i class="cmp-plus">＋</i>🛒</button>`;
   }
+  /* 👤 Entregar a alguém, num toque (admin). Estava só no detalhe do pedido, o
+     que obrigava a abrir um modal por pedido — dois, num artigo com dois.
+     Não aparece onde não há nada a entregar: coberto pelo stock, encomendado ou
+     removido da lista já estão tratados, e pôr lá quem trata era só ruído. */
+  if(!grouped&&!covered&&!enc&&!removed)right=qtBtn([it._id],it.artigo,it.tratadoPor)+right;
   if(removed)sub=`<div class="cmp-sub alert">⚠️ removido por ${escHtml(it.cfDesc||'?')}${mineView?' — abre para largar':''}</div>`;
   // Dica de stock: no coberto o chip "em stock" já o diz (não se repete); nos
   // outros, a dica normal — incl. o botão de um toque para alocar o livre.
@@ -6430,6 +6443,9 @@ function shopArtNestHtml(items,mineView,noLoja,scope){
   }else{
     right=`<button class="cmp-mini cart write-action" title="Pôr no carrinho" aria-label="Pôr no carrinho" onclick="event.stopPropagation();claimGrupo([${livres.map(x=>x._id)}])"><i class="cmp-plus">＋</i>🛒</button>`;
   }
+  // 👤 do ARTIGO: entrega os pedidos todos de uma vez (é a mesma pergunta para
+  // todos — "quem vai buscar isto?"), sem passar pelo detalhe de nenhum.
+  right=qtBtn(ids,it0.artigo,(items.find(x=>x.tratadoPor)||{}).tratadoPor)+right;
   const k=(scope||'')+'|'+shopArtKey(it0.artigo);
   const open=(k in SHOP_GRP_OPEN)?SHOP_GRP_OPEN[k]:items.some(x=>shopStockHint(x));
   const i=SHOP_GRP_KEYS.push(k)-1;
@@ -7436,6 +7452,68 @@ async function claimSameElsewhere(it,nome){
   others.forEach(o=>{if(got.has(o._id))o.tratadoPor=nome;});
   if(got.size<others.length)toast('Alguns já tinham ficado com outra pessoa','bad');
 }
+/* ── 👤 QUEM TRATA, num toque (só admin) ─────────────────────────────────
+   Entregar um artigo a alguém era só possível no detalhe de CADA pedido (o
+   select `shop-claim`): num artigo pedido por duas refeições eram dois modais
+   para responder uma vez à mesma pergunta. Passa a ser um botão na linha, que
+   abre a lista de nomes e grava para os pedidos todos daquele artigo.
+   Não é um `claim`: o admin escolhe QUEM, incluindo "ninguém" (largar). Por isso
+   não leva a guarda anti-corrida do ＋🛒 — aqui a decisão é dele e manda. */
+let _qtIds=[],_qtNome='';
+function qtBtn(ids,artigo,quem){
+  if(!isAdmin()||!ids||!ids.length)return '';
+  const t=quem?`Está com ${quem} — tocar para passar a outra pessoa`:'Entregar a alguém';
+  return `<button class="cmp-mini who write-action" title="${escHtml(t)}" aria-label="${escHtml(t)}" onclick="event.stopPropagation();qtOpen([${ids}],${JSON.stringify(String(artigo||'')).replace(/"/g,'&quot;')})">👤</button>`;
+}
+function qtOpen(ids,artigo){
+  if(!isAdmin())return;
+  _qtIds=(ids||[]).filter(x=>x!=null);_qtNome=artigo||'';
+  if(!_qtIds.length)return;
+  let bg=document.getElementById('qt-bg');
+  if(!bg){
+    bg=document.createElement('div');bg.id='qt-bg';bg.className='modal-bg';
+    bg.innerHTML='<div class="modal" id="qt-inner"></div>';
+    document.body.appendChild(bg);
+    bg.addEventListener('click',e=>{if(e.target===bg)qtClose();});
+  }
+  qtRender();
+  bg.classList.add('show');document.body.classList.add('no-scroll');
+}
+function qtClose(){
+  const bg=document.getElementById('qt-bg');
+  if(bg){bg.classList.remove('show');document.body.classList.remove('no-scroll');}
+}
+function qtRender(){
+  const box=document.getElementById('qt-inner');if(!box)return;
+  const its=shopArr().filter(x=>_qtIds.indexOf(x._id)>=0);
+  // Quem trata AGORA: só se for o mesmo em todos (senão não há opção "marcada")
+  const donos=[];its.forEach(x=>{if(donos.indexOf(x.tratadoPor||'')<0)donos.push(x.tratadoPor||'');});
+  const atual=donos.length===1?donos[0]:null;
+  const nomes=CALC?CALC.membros.map(m=>m.nome):[];
+  its.forEach(x=>{if(x.tratadoPor&&nomes.indexOf(x.tratadoPor)<0)nomes.push(x.tratadoPor);});
+  const eu=myOwnClaimName();
+  nomes.sort((a,b)=>((b===eu?1:0)-(a===eu?1:0))||a.localeCompare(b,'pt'));   // eu à cabeça
+  const op=(v,rot,sub)=>`<div class="slp-op${atual===v?' on':''}" onclick="qtSet(${JSON.stringify(v).replace(/"/g,'&quot;')})">
+    <div class="slp-op-t">${rot}${sub?`<i>${sub}</i>`:''}</div></div>`;
+  let h=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+    <h3 style="margin-bottom:0">👤 Quem trata?</h3>
+    <button onclick="qtClose()" style="background:var(--panel2);border:1px solid var(--line);color:var(--muted);border-radius:9px;width:32px;height:32px;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0">✕</button>
+  </div>`;
+  // Dizer a quantos pedidos isto se aplica: com dois destinos, mudar aqui mexe
+  // nos dois — e isso tem de estar escrito antes de se tocar, não depois.
+  h+=`<div class="note" style="margin-bottom:10px"><b>${escHtml(_qtNome)}</b>${its.length>1?` — ${its.length} pedidos deste artigo, todos de uma vez`:''}${donos.length>1?'<br>Agora está repartido por mais do que uma pessoa.':''}</div>`;
+  h+='<div class="slp-ops">'+op('','— ninguém —','volta a "Falta quem trate"')
+    +nomes.map(n=>op(n,'🛒 '+escHtml(n),n===eu?'eu':'')).join('')+'</div>';
+  box.innerHTML=h;
+}
+function qtSet(nome){
+  const ids=_qtIds.slice();qtClose();
+  if(!ids.length)return;
+  /* Trocar de dono limpa o "já apanhado": esse é do carrinho de quem tratava e
+     não passa com o artigo para a pessoa seguinte. */
+  _shopBulkUpdate(ids,{tratado_por:nome||null,no_carrinho:false},{tratadoPor:nome||null,noCarrinho:false});
+}
+
 /* ── Ações de um ARTIGO agrupado (a linha fechada da lista) ──────────────
    Valem para os pedidos todos daquele artigo de uma vez, que é como se compra:
    o vinho branco dos dois jantares traz-se numa ida. Não passam pelo

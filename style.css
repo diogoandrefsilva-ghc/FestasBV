@@ -992,6 +992,9 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .cmp-mini.cart{background:#FFFDF6;border:1.5px solid var(--barrete);color:var(--barrete);font-weight:700;padding:0 7px;height:26px;display:inline-flex;align-items:center;justify-content:center;gap:1px;font-size:12px;line-height:1}
 /* ＋ dentro do botão Carrinho: sinal discreto de "adicionar ao carrinho" */
 .cmp-mini.cart .cmp-plus{font-style:normal;font-weight:800;font-size:13px;line-height:1;margin-right:0;vertical-align:0}
+/* 👤 Entregar a alguém (admin): a MESMA altura do ＋🛒 ao lado, mas neutro —
+   é ação secundária e não pode disputar o olhar com a principal da linha. */
+.cmp-mini.who{background:var(--panel2);border:1.5px solid var(--line);padding:0 6px;height:26px;display:inline-flex;align-items:center;justify-content:center;font-size:13px;line-height:1}
 /* ✕ no cartão do Carrinho: largar o artigo (volta a "Em falta") */
 .cmp-x{flex:0 0 auto;width:24px;height:24px;border-radius:50%;border:1.5px solid var(--line);background:transparent;color:var(--faint);font-size:12px;font-weight:700;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0}
 .cmp-x:active{color:var(--red);border-color:var(--red)}
@@ -1868,7 +1871,7 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 #view-compras .cmp-badge,#view-compras .cmp-chip{background:#F3EAD2;border-radius:4px 9px 9px 4px;position:relative;padding-left:16px}
 #view-compras .cmp-badge::before,#view-compras .cmp-chip::before{content:"";position:absolute;left:5px;top:50%;width:4px;height:4px;margin-top:-2px;border-radius:50%;background:var(--sal);box-shadow:inset 0 0 0 1px rgba(110,75,25,.5)}
 #view-compras .cmp-badge.meal{background:rgba(30,122,77,.13)}
-#view-compras .cmp-mini.cart{border-radius:18px}
+#view-compras .cmp-mini.cart,#view-compras .cmp-mini.who{border-radius:18px}
 
 /* ── Estados vazios: recado pregado com pionés ── */
 #view-compras .cmp-empty{background:var(--sal);border:1px solid var(--line);border-radius:3px 16px 4px 15px;transform:rotate(-.6deg);box-shadow:0 8px 18px rgba(80,55,20,.16);position:relative;margin-top:16px}
