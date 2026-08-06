@@ -1996,3 +1996,19 @@ input.adm-ts-preco{flex:0 0 66px;width:66px;margin:0;padding:6px 8px;font-size:1
 .adm-ts-mv{width:22px;height:16px;padding:0;border:1px solid var(--line);background:var(--panel);color:var(--muted);border-radius:5px;font-size:8px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center}
 .adm-ts-mv:active{background:var(--barrete);border-color:var(--barrete);color:#fff}
 .adm-ts-mv:disabled{opacity:.3;cursor:default}
+
+/* ── Seletor do 🖨 da Shop List (shopPdfRender) ────────────────────────
+   Uma linha por opção, com a contagem à direita: escolhe-se a olhar para
+   quantos artigos é que cada folha leva. */
+.slp-ops{display:flex;flex-direction:column;gap:8px}
+.slp-op{display:flex;align-items:center;gap:10px;padding:11px 13px;border:1.5px solid var(--line);border-radius:12px;background:#FFFDF6;cursor:pointer;transition:.15s;user-select:none}
+.slp-op:active{transform:scale(.99)}
+.slp-op.on{border-color:var(--barrete);background:rgba(30,122,77,.1)}
+.slp-op-t{flex:1 1 auto;min-width:0;font-size:14px;font-weight:700;color:var(--ink)}
+.slp-op-t i{display:block;font-style:normal;font-size:11px;font-weight:400;color:var(--muted);margin-top:2px}
+.slp-op-n{flex:0 0 auto;font-size:13px;font-weight:700;color:var(--muted);background:var(--panel2);border-radius:20px;padding:3px 10px}
+.slp-op.on .slp-op-n{color:var(--barrete)}
+.slp-lojas{display:flex;flex-wrap:wrap;gap:7px;margin-top:2px}
+.slp-lojas .sd-chip{white-space:nowrap}
+.slp-lojas .sd-chip .slp-ln{font-style:normal;font-size:11px;color:var(--faint)}
+.slp-lojas .sd-chip.on .slp-ln{color:var(--barrete)}

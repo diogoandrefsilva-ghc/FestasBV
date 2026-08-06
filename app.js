@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v215 · 2026-08-06 · O 🖨 das Compras segue o sub-separador: no Carrinho a folha sai só com o meu carrinho, nos outros com a lista toda';
+const APP_BUILD = 'v216 · 2026-08-06 · O 🖨 das Compras pergunta primeiro o que levar: lista completa ou o carrinho de alguém, e de que lojas — com a contagem de artigos em cada opção';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -6723,13 +6723,7 @@ function renderCompras(){
     <div class="cmp-hdr-acts">
       ${isAdmin()?`<button class="btn write-action hdr-ico" id="shop-norm-btn" aria-label="Normalizar artigos" onclick="shopNormOpen()" title="Normalizar: juntar grafias do mesmo artigo (chouriço/chouriços…), pedidos repetidos e categorias">✨</button>`:''}
       ${SHOP_TAB!=='hist'?buscaBtn(SHOP_BUSCA,'toggleShopBusca'):''}
-      ${(()=>{
-        // A folha segue o sub-separador em que se está: no Carrinho leva só o
-        // meu carrinho (é essa a lista que a pessoa vai fazer), nos outros leva
-        // a lista toda. Em 📊 Relatórios (fora deste ecrã) é sempre a lista toda.
-        const meu=SHOP_TAB==='carrinho';
-        return `<button class="btn hdr-ico" aria-label="Exportar em PDF" title="${meu?'Exportar o meu carrinho em PDF — só os artigos que disse que trato, por categoria':'Exportar a lista em PDF — tudo o que falta comprar e o que já está em carrinhos, por categoria e numa folha só'}" onclick="generatePDF('shoplist'${meu?",'meu'":''})">🖨</button>`;
-      })()}
+      <button class="btn hdr-ico" aria-label="Exportar em PDF" title="Exportar em PDF — escolher o que levar (lista toda ou um carrinho) e de que lojas" onclick="shopPdfOpen(true)">🖨</button>
       <button class="btn write-action lfoto-btn hdr-ico" data-busy="⏳" aria-label="Adicionar artigos a partir de uma foto da lista" onclick="listaFotoPick()" title="Ler uma foto da lista (câmara ou galeria) e adicionar os artigos de uma vez" ${canW&&!fechadas?'':'disabled'}>📷</button>
       <button class="btn prim write-action hdr-ico" aria-label="Adicionar artigo" title="Adicionar artigo à lista" onclick="openShopItemModal()" ${canW?'':'disabled'}>＋</button>
     </div>
@@ -12200,10 +12194,10 @@ function openReports(){
       📄 Relatório Geral
     </button>
     <p style="font-size:11px;color:var(--faint);margin-top:-4px">Receitas, despesas, todos os cash-flows e o resumo de gastos por membro.</p>
-    <button class="btn prim" onclick="generatePDF('shoplist')" style="display:flex;align-items:center;justify-content:center;gap:8px">
+    <button class="btn prim" onclick="closeReports();shopPdfOpen()" style="display:flex;align-items:center;justify-content:center;gap:8px">
       🛒 Lista de Compras
     </button>
-    <p style="font-size:11px;color:var(--faint);margin-top:-4px">Tudo o que falta comprar e o que já está no carrinho de alguém, por categoria e condensado numa folha.</p>
+    <p style="font-size:11px;color:var(--faint);margin-top:-4px">Por categoria e condensado numa folha. Escolhe-se a seguir o que levar: a lista toda ou o carrinho de alguém, e de que lojas.</p>
 ${TSHIRTS_TABLE?`
     <button class="btn prim" onclick="generatePDF('tshirts')" style="display:flex;align-items:center;justify-content:center;gap:8px">
       👕 Encomenda de T-shirts
@@ -12364,6 +12358,128 @@ function generatePDF(type,escopo){
   ov.querySelector('#pdfPrint').onclick=()=>{frame.contentWindow.focus();frame.contentWindow.print();};
 }
 
+/* ── Escolher o que vai na folha (🖨 nas Compras) ─────────────────────────
+   Duas perguntas, e só estas: QUEM (a lista toda ou o carrinho de alguém) e
+   ONDE (que lojas). São as duas decisões que mudam a folha que se leva; o
+   resto — categorias, quantidades, dicas de stock — não é escolha de quem
+   imprime, é como a folha é.
+   - **Abre pré-escolhido pelo sub-separador** onde se está: no 🛒 Carrinho vem
+     com o meu carrinho marcado, nos outros com a lista completa. Quem só quer
+     o que já tinha antes carrega em Gerar e segue.
+   - **Os carrinhos dos outros também se imprimem** (é o mesmo que já se vê na
+     lista): quem está ao computador tira a folha de cada um.
+   - **Sem loja escolhida = todas**, que é o caso normal. As lojas são as que
+     existem NO que está escolhido, e a contagem de cada opção diz de antemão
+     quantos artigos é que a folha leva — para não se imprimir uma folha vazia. */
+let _slPdfQuem='',_slPdfLojas=[];
+/* Os artigos que a folha pode levar. É a mesma função que o relatório usa, para
+   a contagem do seletor e a folha nunca poderem discordar. `quem` = carrinho de
+   alguém (vazio = lista toda); `lojas` = chaves de loja (vazio = todas). */
+function shopPdfCands(quem,lojas){
+  return shopArr().filter(it=>shopIsPending(it)
+    &&(!quem||it.tratadoPor===quem)
+    &&(!lojas||!lojas.length||lojas.indexOf(shopLojaKey(shopLojaTxt(it)))>=0));
+}
+// Artigos distintos que a folha listaria (sem os cobertos/encomendados, que vão
+// para o rodapé) — é o número que o seletor mostra em cada opção.
+function shopPdfConta(quem,lojas){
+  const c=shopPdfCands(quem,lojas).filter(it=>!shopIsCovered(it)&&!shopEncomenda(it));
+  return new Set(c.map(it=>shopArtKey(it.artigo))).size;
+}
+// Quem tem carrinho: nomes com artigos por comprar reclamados
+function shopPdfCarrinhos(){
+  const n=[];
+  shopArr().forEach(it=>{
+    if(!shopIsPending(it)||!it.tratadoPor||shopIsCovered(it)||shopEncomenda(it))return;
+    if(n.indexOf(it.tratadoPor)<0)n.push(it.tratadoPor);
+  });
+  const eu=myOwnClaimName();
+  return n.sort((a,b)=>((b===eu?1:0)-(a===eu?1:0))||a.localeCompare(b,'pt'));   // o meu à cabeça
+}
+// Lojas presentes no que está escolhido: [{k,nome,n}] (k='' = sem loja indicada)
+function shopPdfLojas(quem){
+  const m={},order=[];
+  shopPdfCands(quem,null).forEach(it=>{
+    if(shopIsCovered(it)||shopEncomenda(it))return;
+    const nome=shopLojaTxt(it),k=shopLojaKey(nome);
+    if(!m[k]){m[k]={k,nome:nome||SHOP_SEM_LOJA,arts:new Set()};order.push(k);}
+    m[k].arts.add(shopArtKey(it.artigo));
+  });
+  return order.map(k=>({k:m[k].k,nome:m[k].nome,n:m[k].arts.size}))
+    .sort((a,b)=>((a.k?0:1)-(b.k?0:1))||a.nome.localeCompare(b.nome,'pt'));      // "sem loja" no fim
+}
+/* `doEcra=false` (📊 Relatórios) abre sempre na lista completa: ali não se veio
+   de sub-separador nenhum, e o que o SHOP_TAB tem é memória de outra visita. */
+function shopPdfOpen(doEcra){
+  const eu=myOwnClaimName();
+  _slPdfQuem=(doEcra&&SHOP_TAB==='carrinho'&&eu&&shopPdfCarrinhos().indexOf(eu)>=0)?eu:'';
+  _slPdfLojas=[];
+  let bg=document.getElementById('slpdf-bg');
+  if(!bg){
+    bg=document.createElement('div');bg.id='slpdf-bg';bg.className='modal-bg';
+    bg.innerHTML='<div class="modal" id="slpdf-inner"></div>';
+    document.body.appendChild(bg);
+    bg.addEventListener('click',e=>{if(e.target===bg)shopPdfClose();});
+  }
+  shopPdfRender();
+  bg.classList.add('show');document.body.classList.add('no-scroll');
+}
+function shopPdfClose(){
+  const bg=document.getElementById('slpdf-bg');
+  if(bg){bg.classList.remove('show');document.body.classList.remove('no-scroll');}
+}
+function shopPdfSetQuem(q){
+  _slPdfQuem=q;
+  // As lojas são as do que está escolhido: mudar de carrinho pode deixar uma
+  // loja escolhida sem artigos nenhuns, e aí ela deixa de existir na lista.
+  const validas=shopPdfLojas(q).map(l=>l.k);
+  _slPdfLojas=_slPdfLojas.filter(k=>validas.indexOf(k)>=0);
+  shopPdfRender();
+}
+function shopPdfToggleLoja(k){
+  const i=_slPdfLojas.indexOf(k);
+  if(i<0)_slPdfLojas.push(k);else _slPdfLojas.splice(i,1);
+  shopPdfRender();
+}
+function shopPdfTodasLojas(){_slPdfLojas=[];shopPdfRender();}
+function shopPdfGerar(){
+  const opt={quem:_slPdfQuem,lojas:_slPdfLojas.slice()};
+  shopPdfClose();
+  generatePDF('shoplist',opt);
+}
+function shopPdfRender(){
+  const box=document.getElementById('slpdf-inner');if(!box)return;
+  const eu=myOwnClaimName();
+  const carrinhos=shopPdfCarrinhos();
+  const lojas=SHOP_LOJA_COL?shopPdfLojas(_slPdfQuem):[];
+  const n=shopPdfConta(_slPdfQuem,_slPdfLojas);
+  const opcao=(q,rot,sub)=>{
+    const c=shopPdfConta(q,_slPdfLojas);
+    return `<div class="slp-op${_slPdfQuem===q?' on':''}" onclick="shopPdfSetQuem(${JSON.stringify(q).replace(/"/g,'&quot;')})">
+      <div class="slp-op-t">${rot}${sub?`<i>${sub}</i>`:''}</div>
+      <span class="slp-op-n">${c}</span>
+    </div>`;
+  };
+  let h=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+    <h3 style="margin-bottom:0">🖨 Folha das compras</h3>
+    <button onclick="shopPdfClose()" style="background:var(--panel2);border:1px solid var(--line);color:var(--muted);border-radius:9px;width:32px;height:32px;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0">✕</button>
+  </div>`;
+  h+=`<label>O que levar</label><div class="slp-ops">`;
+  h+=opcao('','🛒 Lista completa','tudo o que falta comprar, incluindo o que já está em carrinhos');
+  carrinhos.forEach(q=>{h+=opcao(q,`🛒 Carrinho de ${escHtml(q)}`,q===eu?'o meu carrinho':'');});
+  h+='</div>';
+  if(lojas.length){
+    h+=`<label>Lojas</label><div class="slp-lojas">
+      <span class="sd-chip${_slPdfLojas.length?'':' on'}" onclick="shopPdfTodasLojas()">Todas</span>
+      ${lojas.map(l=>`<span class="sd-chip${_slPdfLojas.indexOf(l.k)>=0?' on':''}" onclick="shopPdfToggleLoja(${JSON.stringify(l.k).replace(/"/g,'&quot;')})">${l.k?'🏬 ':''}${escHtml(l.nome)} <i class="slp-ln">${l.n}</i></span>`).join('')}
+    </div>
+    <p style="font-size:11px;color:var(--faint);margin:8px 0 0">Sem nenhuma escolhida, a folha leva todas.</p>`;
+  }
+  h+=`<button class="btn prim" style="width:100%;margin-top:16px" onclick="shopPdfGerar()" ${n?'':'disabled'}>🖨 Gerar folha — ${n} artigo${n===1?'':'s'}</button>`;
+  if(!n)h+=`<p style="font-size:11px;color:var(--faint);margin:8px 0 0;text-align:center">Nada para levar com esta escolha.</p>`;
+  box.innerHTML=h;
+}
+
 /* ── Resumo da Shop List numa folha (🖨 no cabeçalho das Compras) ─────────
    Para levar no bolso: ninguém percorre o supermercado com o telemóvel na mão a
    saltar entre sub-separadores. O que na app são três listas (em falta · já em
@@ -12382,19 +12498,26 @@ function generatePDF(type,escopo){
    - **Coberto pelo stock e encomendado ficam fora** da lista e vão para um
      rodapé pequeno: não há nada a comprar, mas convém saber porque é que o
      artigo não aparece. Mesma regra do ecrã.
-   - **`escopo='meu'` → só o MEU carrinho.** O 🖨 segue o sub-separador onde se
-     está: no Carrinho a folha é a lista que aquela pessoa vai fazer (e aí não
-     se repete "🛒 quem trata" linha a linha, que seria sempre ela); nos outros,
-     e em 📊 Relatórios, é a lista toda.
+   - **O que sai é escolhido no seletor** (`shopPdfOpen`, mesmo acima): `quem` =
+     o carrinho de alguém (vazio = lista toda) e `lojas` = as chaves de loja
+     escolhidas (vazio = todas). Num carrinho não se repete o "🛒 quem trata"
+     linha a linha — seria sempre a mesma pessoa; e com uma loja só, a loja sai
+     das linhas e vai para o subtítulo, pela mesma razão.
    Condensado a sério: 2 colunas, 3 quando a lista cresce, e corpo mais pequeno
    quando é mesmo grande — o objetivo é caber numa folha. */
-function buildShopReport(escopo){
-  const meu=escopo==='meu';
+function buildShopReport(sel){
+  sel=sel||{};
+  const quem=sel.quem||'';               // carrinho de alguém (vazio = lista toda)
+  const meu=!!quem;
+  const lojasSel=sel.lojas||[];          // chaves de loja (vazio = todas)
   const ano=DATA.evento.ano||'';
   const evNome=(DATA.evento.nome||'MEO').replace(/\s*\d{4}\s*/g,'').trim()||'MEO';
-  // No escopo "meu" a folha é o carrinho DESTA pessoa — o mesmo filtro do
-  // sub-separador 🛒 Carrinho (`shopMineOwn`: o meu, não o do cônjuge).
-  const pend=shopArr().filter(it=>shopIsPending(it)&&(!meu||shopMineOwn(it)));
+  const pend=shopPdfCands(quem,lojasSel);
+  // Com UMA loja escolhida, repetir o nome dela em todas as linhas é ruído: ela
+  // passa a ser o subtítulo da folha (e o mesmo vale para o "quem trata" de um
+  // carrinho). Com várias, cada linha tem de dizer a sua.
+  const umaLoja=lojasSel.length===1;
+  const mostrarLoja=!umaLoja;
   const tratados=[],comprar=[];
   pend.forEach(it=>{
     const cov=shopIsCovered(it);
@@ -12439,7 +12562,7 @@ function buildShopReport(escopo){
       });
       if(ds.length)meta.push(escHtml(ds.join(' · ')));
     }
-    if(opt.loja){
+    if(opt.loja&&mostrarLoja){
       const l=shopLojaTxt(items.find(x=>shopLojaTxt(x))||{});
       if(l)meta.push('🏬 '+escHtml(l));
     }
@@ -12538,9 +12661,12 @@ function buildShopReport(escopo){
   const colsHtml=colunas.map(c=>`<div class="sl-col">${c.join('')}</div>`).join('');
 
   // Título diz logo o que a folha é — a do carrinho de alguém não se confunde
-  // com a lista do grupo (podem andar as duas impressas no mesmo dia).
-  const quemEu=meu?(myPrimaryName()||myOwnClaimName()||''):'';
-  let h=`<div class="sl-doc"><h1>🛒 ${meu?`O meu carrinho${quemEu?` — ${escHtml(quemEu)}`:''}`:`Shop List — ${evNome} ${ano}`}</h1>`;
+  // com a lista do grupo (podem andar várias impressas no mesmo dia, e há uma
+  // por pessoa). "O meu carrinho" só quando é mesmo o de quem está a imprimir.
+  const titulo=meu
+    ?(quem===myOwnClaimName()?`O meu carrinho — ${escHtml(quem)}`:`Carrinho de ${escHtml(quem)}`)
+    :`Shop List — ${evNome} ${ano}`;
+  let h=`<div class="sl-doc"><h1>🛒 ${titulo}</h1>`;
   // Contam-se ARTIGOS distintos, não linhas: por refeição o mesmo artigo aparece
   // num bloco por refeição e o número do topo mudava com a ordenação escolhida.
   const nArt=new Set(comprar.map(it=>shopArtKey(it.artigo))).size;
@@ -12548,6 +12674,11 @@ function buildShopReport(escopo){
   const sub=[];
   if(meu)sub.push(`${evNome} ${ano}`);            // no carrinho o título é o dono, o evento vem aqui
   if(DATA.evento.datas)sub.push(escHtml(DATA.evento.datas));
+  // Filtro de lojas: diz-se logo no subtítulo qual é a volta que esta folha faz
+  if(lojasSel.length){
+    const nomes=shopPdfLojas(quem).filter(l=>lojasSel.indexOf(l.k)>=0).map(l=>l.nome);
+    if(nomes.length)sub.push('🏬 '+escHtml(nomes.join(' + ')));
+  }
   sub.push(`${nArt} artigo${nArt===1?'':'s'} ${meu?'para comprar':'por comprar'}`);
   if(!meu&&nCarr)sub.push(`${nCarr} em carrinhos`);
   if(tratados.length)sub.push(`${tratados.length} já tratado${tratados.length===1?'':'s'}`);
