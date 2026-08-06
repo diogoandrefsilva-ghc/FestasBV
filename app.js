@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v220 · 2026-08-06 · Um artigo tem UM dono: reclamar, largar e marcar apanhado valem para o artigo todo, e já não se consegue reparti-lo por dois carrinhos';
+const APP_BUILD = 'v221 · 2026-08-06 · O 👤 sai das linhas que já têm dono (é o chip do carrinho que passa o artigo a outra pessoa) e deixa de ser emoji azul — ícone desenhado, na cor da paleta';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -6351,18 +6351,19 @@ function shopItemCard(it,mineView,noBadge,grouped,noLoja){
     right=`<button class="cmp-x write-action" aria-label="Tirar do carrinho" onclick="event.stopPropagation();unclaimItem(${it._id})">✕</button>`;
   }else if(it.tratadoPor){
     // Para quem não trata, basta saber QUE está entregue e a QUEM (o estado
-    // do carrinho é detalhe de quem anda nas compras).
-    right=`<span class="cmp-chip">🛒 ${escHtml(it.tratadoPor)}</span>`;
+    // do carrinho é detalhe de quem anda nas compras). Para o admin, o chip é
+    // também o botão de passar o artigo a outra pessoa.
+    right=qtChip([it._id],it.artigo,`🛒 ${escHtml(it.tratadoPor)}`);
   }else{
     // Só ＋🛒 (sem a palavra "Carrinho"): o nome do artigo é o que interessa ler
     // e num ecrã estreito era o botão que lhe comia a largura.
     right=`<button class="cmp-mini cart write-action" title="Pôr no carrinho" aria-label="Pôr no carrinho" onclick="event.stopPropagation();claimItem(${it._id})"><i class="cmp-plus">＋</i>🛒</button>`;
   }
-  /* 👤 Entregar a alguém, num toque (admin). Estava só no detalhe do pedido, o
-     que obrigava a abrir um modal por pedido — dois, num artigo com dois.
-     Não aparece onde não há nada a entregar: coberto pelo stock, encomendado ou
-     removido da lista já estão tratados, e pôr lá quem trata era só ruído. */
-  if(!grouped&&!covered&&!enc&&!removed)right=qtBtn([it._id],it.artigo,it.tratadoPor)+right;
+  /* 👤 Entregar a alguém, num toque (admin) — só enquanto o artigo não tem dono.
+     Com dono, quem faz de botão é o chip do carrinho (acima). Não aparece onde
+     não há nada a entregar: coberto pelo stock, encomendado ou removido da lista
+     já estão tratados, e pôr lá quem trata era só ruído. */
+  if(!grouped&&!covered&&!enc&&!removed&&!it.tratadoPor)right=qtBtn([it._id],it.artigo)+right;
   if(removed)sub=`<div class="cmp-sub alert">⚠️ removido por ${escHtml(it.cfDesc||'?')}${mineView?' — abre para largar':''}</div>`;
   // Dica de stock: no coberto o chip "em stock" já o diz (não se repete); nos
   // outros, a dica normal — incl. o botão de um toque para alocar o livre.
@@ -6442,17 +6443,18 @@ function shopArtNestHtml(items,mineView,noLoja,scope){
     /* Repartido por várias pessoas é um ESTADO A CORRIGIR, não um estado normal:
        metade do vinho em cada carrinho é comprá-lo duas vezes. Desde a v220 já
        não se consegue chegar aqui pela app, mas os anos e as linhas de antes
-       podem estar assim — por isso o chip avisa em vez de o dar por bom, e o 👤
-       ao lado é o caminho para o resolver. */
+       podem estar assim — por isso o chip avisa em vez de o dar por bom.
+       Em qualquer dos casos é o CHIP que passa o artigo a outra pessoa. */
     right=quem.length>1
-      ?`<span class="cmp-chip alerta" title="Repartido por ${escHtml(quem.join(', '))} — arrisca comprar-se duas vezes. Entrega o artigo a uma pessoa no 👤.">⚠️ ${quem.length} pessoas</span>`
-      :`<span class="cmp-chip">🛒 ${escHtml(quem[0]||'')}</span>`;
+      ?qtChip(ids,it0.artigo,`⚠️ ${quem.length} pessoas`,'alerta')
+      :qtChip(ids,it0.artigo,`🛒 ${escHtml(quem[0]||'')}`);
   }else{
     right=`<button class="cmp-mini cart write-action" title="Pôr no carrinho" aria-label="Pôr no carrinho" onclick="event.stopPropagation();claimGrupo([${livres.map(x=>x._id)}])"><i class="cmp-plus">＋</i>🛒</button>`;
+    // 👤 do ARTIGO: entrega os pedidos todos de uma vez (é a mesma pergunta para
+    // todos — "quem vai buscar isto?"). Só enquanto não tem dono: a partir daí
+    // é o chip que o faz, sem gastar mais largura à linha.
+    right=qtBtn(ids,it0.artigo)+right;
   }
-  // 👤 do ARTIGO: entrega os pedidos todos de uma vez (é a mesma pergunta para
-  // todos — "quem vai buscar isto?"), sem passar pelo detalhe de nenhum.
-  right=qtBtn(ids,it0.artigo,(items.find(x=>x.tratadoPor)||{}).tratadoPor)+right;
   const k=(scope||'')+'|'+shopArtKey(it0.artigo);
   const open=(k in SHOP_GRP_OPEN)?SHOP_GRP_OPEN[k]:items.some(x=>shopStockHint(x));
   const i=SHOP_GRP_KEYS.push(k)-1;
@@ -7502,10 +7504,22 @@ async function claimItem(id){
    Não é um `claim`: o admin escolhe QUEM, incluindo "ninguém" (largar). Por isso
    não leva a guarda anti-corrida do ＋🛒 — aqui a decisão é dele e manda. */
 let _qtIds=[],_qtNome='';
-function qtBtn(ids,artigo,quem){
+/* O botão só existe enquanto NÃO há dono — aí a linha tem espaço (só o ＋🛒 ao
+   lado) e é a única altura em que não há outro sítio onde tocar. Assim que o
+   artigo fica com alguém, quem faz de botão é o próprio chip do carrinho
+   (`qtChip`): o nome já lá está e um botão a mais em cada linha comia a largura
+   ao nome do artigo, que é o que se lê no corredor do supermercado. */
+function qtBtn(ids,artigo){
   if(!isAdmin()||!ids||!ids.length)return '';
-  const t=quem?`Está com ${quem} — tocar para passar a outra pessoa`:'Entregar a alguém';
-  return `<button class="cmp-mini who write-action" title="${escHtml(t)}" aria-label="${escHtml(t)}" onclick="event.stopPropagation();qtOpen([${ids}],${JSON.stringify(String(artigo||'')).replace(/"/g,'&quot;')})">👤</button>`;
+  return `<button class="cmp-mini who write-action" title="Entregar a alguém" aria-label="Entregar a alguém" onclick="event.stopPropagation();qtOpen(${qtArgs(ids,artigo)})"><i class="cmp-ic-user"></i></button>`;
+}
+function qtArgs(ids,artigo){return `[${ids}],${JSON.stringify(String(artigo||'')).replace(/"/g,'&quot;')}`;}
+/* Chip de quem trata. Para o admin é tocável — é ali que se troca de pessoa, no
+   sítio onde o nome está escrito. Para os outros é só a constatação de sempre. */
+function qtChip(ids,artigo,txt,cls){
+  const c=`cmp-chip${cls?' '+cls:''}`;
+  if(!isAdmin())return `<span class="${c}">${txt}</span>`;
+  return `<button class="${c} qt-tap write-action" title="Tocar para passar a outra pessoa" onclick="event.stopPropagation();qtOpen(${qtArgs(ids,artigo)})">${txt}</button>`;
 }
 function qtOpen(ids,artigo){
   if(!isAdmin())return;
