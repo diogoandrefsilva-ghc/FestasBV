@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v222 · 2026-08-06 · Na folha das compras, a quantidade passa a ser o que FALTA comprar: com 1 já em stock de 6 pedidos lê-se "5", e o pedido fica na nota ao lado';
+const APP_BUILD = 'v223 · 2026-08-06 · Picar na folha das compras passa a marcar o carrinho na app (o que é meu), e o limpar mudou-se para a barra — dentro da folha fazia-a saltar ao primeiro pico';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -12556,11 +12556,10 @@ function generatePDF(type,escopo){
     .sl-meta{font-style:normal;font-size:.82em;color:#8a8a8a}
     .sl-q{flex:0 0 auto;font-weight:700;white-space:nowrap}
     .sl-leg{font-size:8.5px;color:#999;margin:0 0 9px}
-    /* Picar na pré-visualização (ver o <script> do buildShopReport) */
+    /* Picar na pré-visualização (ver o script no fim do buildShopReport) */
     .sl-row.picked .sl-nm,.sl-row.picked .sl-q{text-decoration:line-through;color:#b0b0b0}
     .sl-row.picked .sl-box{background:#1a1a2e;border-color:#1a1a2e}
     .sl-pick-hint{color:#2a9d6a;font-weight:700;cursor:pointer}
-    .sl-clr{color:#8a8a8a;cursor:pointer;text-decoration:underline}
     /* No telemóvel a folha é a mesma (uma coluna), só com as linhas um pouco
        mais folgadas e a caixa maior — ali pica-se com o dedo, não com caneta. */
     @media screen and (max-width:640px){
@@ -12596,6 +12595,7 @@ function generatePDF(type,escopo){
     <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:#1a1a2e;color:#fff;flex:0 0 auto">
       <span style="font-weight:700;font-size:14px">${nome} ${ano} — Relatório</span>
       <div style="display:flex;gap:8px">
+        ${type==='shoplist'?`<button id="pdfClr" title="Limpar os artigos picados" style="background:rgba(255,255,255,.15);border:none;color:#fff;font-size:14px;padding:8px 12px;border-radius:6px;cursor:pointer">🧹</button>`:''}
         <button id="pdfPrint" style="background:#50b96e;border:none;color:#1a1a2e;font-weight:700;font-size:14px;padding:8px 14px;border-radius:6px;cursor:pointer">🖨 Imprimir / Guardar PDF</button>
         <button id="pdfClose" style="background:rgba(255,255,255,.15);border:none;color:#fff;font-size:18px;padding:8px 14px;border-radius:6px;cursor:pointer">✕</button>
       </div>
@@ -12606,7 +12606,36 @@ function generatePDF(type,escopo){
   const frame=ov.querySelector('#pdfFrame');
   frame.srcdoc=docHtml;
   ov.querySelector('#pdfClose').onclick=()=>ov.remove();
+  /* Limpar os picados vive AQUI, na barra, e não dentro da folha: lá dentro
+     aparecia e desaparecia ao primeiro pico e fazia o documento saltar debaixo
+     do dedo de quem estava a picar. */
+  const clr=ov.querySelector('#pdfClr');
+  if(clr)clr.onclick=()=>{
+    const w=frame.contentWindow;
+    const n=w&&w.slLimpar?w.slLimpar():0;
+    if(n===0)toast('Não há nada picado');
+  };
   ov.querySelector('#pdfPrint').onclick=()=>{frame.contentWindow.focus();frame.contentWindow.print();};
+}
+
+/* O pico da folha aplicado ao carrinho. É chamado de dentro do iframe da
+   pré-visualização (mesmo origem, `srcdoc`) e trata o ARTIGO todo, como tudo o
+   resto na Shop List: passa pelos "irmãos" e grava pelo mesmo caminho da lista,
+   com as guardas e o re-render que ele já traz.
+   **Só mexe no que é meu** (`shopMine`: eu ou o cônjuge). O carrinho de outra
+   pessoa não se marca a partir de uma folha impressa — nem o do admin, que na
+   lista também só vê o ✓ no carrinho dele. Nesses casos devolve `false` e o
+   pico fica local, que é o que era antes para tudo.
+   Devolve uma Promise com `true` se o estado ficou mesmo como se pediu — é com
+   ela que a folha desfaz a linha quando a gravação falha (offline, permissões). */
+function slPicarSync(k,on){
+  const it=shopArr().find(x=>shopIsPending(x)&&!shopIsCovered(x)&&!shopEncomenda(x)&&shopArtKey(x.artigo)===k);
+  if(!it)return Promise.resolve(false);
+  const meus=shopIrmaos(it).filter(x=>shopMine(x));
+  if(!meus.length)return Promise.resolve(false);
+  if(meus.every(x=>!!x.noCarrinho)===!!on)return Promise.resolve(true);   // já estava assim
+  return Promise.resolve(_shopBulkUpdate(meus.map(x=>x._id),{no_carrinho:!!on},{noCarrinho:!!on}))
+    .then(()=>meus.every(x=>!!x.noCarrinho)===!!on);
 }
 
 /* ── Escolher o que vai na folha (🖨 nas Compras) ─────────────────────────
@@ -12884,12 +12913,15 @@ function buildShopReport(sel){
       const sh=shopStockHint(x);if(sh&&dicas.indexOf(sh.txt)<0)dicas.push(sh.txt);
     });
     if(dicas.length)meta.push(escHtml(dicas.join(' · ')));
-    // Caixa já ticada: quem leva o artigo marcou-o como apanhado. É informação
-    // de quem anda nas compras e é justamente para isso que a folha serve.
-    const feito=items.every(x=>x.tratadoPor&&x.noCarrinho);
+    /* Já apanhado. No MEU carrinho o pico da folha e o "✓ já apanhado" da app
+       são a mesma coisa (ver o script no fim): a linha nasce picada se já lá
+       estava marcada, e sincroniza nos dois sentidos. Nos artigos dos outros
+       a marca é só informação — caixa verde, como sempre — e o pico fica local. */
+    const meuArt=items.some(x=>shopMine(x));
+    const apanhado=items.every(x=>x.tratadoPor&&x.noCarrinho);
     // data-k: a chave do artigo, para o picar na pré-visualização (e para o
     // pico valer nas duas linhas quando o mesmo artigo aparece em dois blocos).
-    return `<div class="sl-row" data-k="${escHtml(shopArtKey(it.artigo))}"><i class="sl-box${feito?' on':''}"></i><span class="sl-nm">${escHtml(it.artigo)}${meta.length?` <i class="sl-meta">${meta.join(' · ')}</i>`:''}</span><span class="sl-q">${qtd?escHtml(qtd):''}</span></div>`;
+    return `<div class="sl-row${meuArt&&apanhado?' picked':''}" data-k="${escHtml(shopArtKey(it.artigo))}"${meuArt?' data-sync="1"':''}><i class="sl-box${!meuArt&&apanhado?' on':''}"></i><span class="sl-nm">${escHtml(it.artigo)}${meta.length?` <i class="sl-meta">${meta.join(' · ')}</i>`:''}</span><span class="sl-q">${qtd?escHtml(qtd):''}</span></div>`;
   };
   /* Um bloco: cabeçalho + as linhas dos artigos, por ordem alfabética. Cada
      pedaço sai com o seu PESO (linhas + o cabeçalho, que vale por quase duas,
@@ -12986,7 +13018,7 @@ function buildShopReport(sel){
     // A legenda usa as MESMAS caixas das linhas (e não ☐/▪, que o tipo de letra
     // desenha de outra maneira) — senão não se percebe que fala delas. A parte
     // de picar é `no-print`: no papel pica-se com uma caneta.
-    h+=`<div class="sl-leg"><i class="sl-box"></i> por apanhar · <i class="sl-box on"></i> ${meu?'já apanhado (marcado na app)':'já no carrinho de quem o leva · 🛒 quem trata'}<span class="no-print"><br><b class="sl-pick-hint">Toca numa linha para a picar</b> — fica riscada, e assim segue para o papel/PDF<span id="sl-clr-wrap" style="display:none"> · <span class="sl-clr" id="sl-clr">limpar picados</span></span></span></div>`;
+    h+=`<div class="sl-leg"><i class="sl-box"></i> por apanhar${meu?'':' · <i class="sl-box on"></i> já apanhado por quem o leva · 🛒 quem trata'}<span class="no-print"><br><b class="sl-pick-hint">Toca numa linha para a picar</b> — fica riscada e assim segue para o papel/PDF; o que for do teu carrinho fica logo marcado na app.</span></div>`;
     h+=`<div class="sl-cols">${colsHtml}</div>`;
   }
   if(tratados.length){
@@ -12996,44 +13028,76 @@ function buildShopReport(sel){
       +order.map(k=>`${escHtml(g[k].it.artigo)} <i>(${g[k].txt})</i>`).join(' · ')+'</div>';
   }
   h+=`<div class="footer">${meu?'Carrinho gerado':'Lista gerada'} em ${new Date().toLocaleString('pt-PT')} · ${evNome} ${ano}</div></div>`;
-  /* Picar os artigos na PRÉ-VISUALIZAÇÃO. Um PDF já gravado é papel digital —
-     não há caixas para clicar lá dentro (fazer um PDF com formulário exigia uma
-     biblioteca, e a app não tem build nem dependências). O que dá, e resolve o
-     mesmo, é picar aqui antes de imprimir/guardar: a linha fica riscada e assim
-     é que segue para o papel e para o PDF.
-     - Fica no `localStorage` DESTE aparelho (o iframe do srcdoc partilha a
-       origem da app), por ano. É uma marca pessoal de quem anda nas compras —
-       não mexe na lista nem no carrinho de ninguém, e por isso não vai à BD.
+  /* Picar os artigos na PRÉ-VISUALIZAÇÃO — e, no que é do meu carrinho, picar
+     também NA APP. Um PDF já gravado é papel digital: não há caixas para clicar
+     lá dentro (um PDF com formulário exigia uma biblioteca, e a app não tem
+     build nem dependências). O que dá é picar aqui antes de imprimir/guardar —
+     a linha fica riscada e assim segue para o papel — e é também aqui que se faz
+     a compra a partir do telemóvel, sem saltar entre ecrãs.
+     - **Artigo do meu carrinho** (`data-sync`): o pico É o "✓ já apanhado" da
+       app (`no_carrinho`), gravado pelo mesmo caminho da lista (`slPicarSync` →
+       `_shopBulkUpdate`, com as guardas e a atualização de ecrã que ele já
+       traz). Fechada a folha, o carrinho está marcado e a compra sai direita.
+       Falhando a gravação, a linha desfaz-se — não se finge que ficou.
+     - **Artigo de outra pessoa**: não se mexe no carrinho de ninguém. O pico é
+       marca pessoal deste aparelho (`localStorage`, por ano) — o mesmo que era
+       antes para tudo.
      - A chave é o artigo (`data-k`), não a linha: o mesmo artigo em dois blocos
-       pica-se de uma vez, e o pico sobrevive a gerar a folha outra vez. */
+       pica-se de uma vez, e o pico sobrevive a gerar a folha outra vez.
+     - Limpar em bloco vive na BARRA da pré-visualização (`#pdfClr`), fora do
+       documento: dentro dele, aparecer/desaparecer ao primeiro pico fazia a
+       folha saltar debaixo do dedo de quem estava a picar. */
   h+=`<script>
 (function(){
   var K=${JSON.stringify('festasbv_slpick_'+ano)};
   var st={};try{st=JSON.parse(localStorage.getItem(K)||'{}')||{};}catch(e){}
   var rows=[].slice.call(document.querySelectorAll('.sl-row'));
-  var wrap=document.getElementById('sl-clr-wrap'),clr=document.getElementById('sl-clr');
-  function sync(){
-    var n=0;rows.forEach(function(r){if(r.classList.contains('picked'))n++;});
-    if(wrap)wrap.style.display=n?'':'none';
-    try{localStorage.setItem(K,JSON.stringify(st));}catch(e){}
-  }
+  var sincro=function(k,on){
+    try{
+      var f=parent&&parent.slPicarSync;
+      return f?f.call(parent,k,on):null;
+    }catch(e){return null;}
+  };
+  function guardar(){try{localStorage.setItem(K,JSON.stringify(st));}catch(e){}}
   function pintar(k,on){
     rows.forEach(function(r){if(r.getAttribute('data-k')===k)r.classList.toggle('picked',on);});
   }
   rows.forEach(function(r){
-    var k=r.getAttribute('data-k');
-    if(st[k])r.classList.add('picked');
+    var k=r.getAttribute('data-k'),liga=r.hasAttribute('data-sync');
+    if(!liga&&st[k])r.classList.add('picked');   // o do carrinho já vem pintado do relatório
     r.addEventListener('click',function(){
-      var on=!st[k];
-      if(on)st[k]=1;else delete st[k];
-      pintar(k,on);sync();
+      var on=!r.classList.contains('picked');
+      pintar(k,on);                              // resposta imediata ao dedo
+      var p=liga?sincro(k,on):null;
+      if(p&&p.then){
+        p.then(function(ok){if(!ok)pintar(k,!on);});
+      }else{                                     // sem app do outro lado: marca local
+        if(on)st[k]=1;else delete st[k];
+        guardar();
+      }
     });
   });
-  if(clr)clr.addEventListener('click',function(){
-    rows.forEach(function(r){r.classList.remove('picked');});
-    st={};sync();
-  });
-  sync();
+  // Chamado pelo 🧹 da barra (fora do documento, para a folha não saltar)
+  window.slLimpar=function(){
+    var n=0,liga=0;
+    rows.forEach(function(r){
+      if(!r.classList.contains('picked'))return;
+      n++;if(r.hasAttribute('data-sync'))liga++;
+    });
+    if(!n)return 0;
+    // A mensagem não leva quebras de linha: este código sai de dentro de um
+    // template literal do app.js, onde a barra-n vira quebra a sério e parte a
+    // string do documento (foi o que aconteceu à primeira).
+    if(liga&&!confirm('Limpar '+n+' picado'+(n===1?'':'s')+'? '+liga+' '+(liga===1?'é do teu carrinho e volta':'são do teu carrinho e voltam')+' a "por apanhar" na app.'))return -1;
+    rows.forEach(function(r){
+      if(!r.classList.contains('picked'))return;
+      var k=r.getAttribute('data-k');
+      if(r.hasAttribute('data-sync'))sincro(k,false);else delete st[k];
+      pintar(k,false);
+    });
+    guardar();
+    return n;
+  };
 })();
 </script>`;
   return h;
