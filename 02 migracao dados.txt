@@ -1,5 +1,6 @@
 -- ============================================================
 -- FestasBV — Migração de dados (gerado a partir do JSON real)
+--
 -- Correr DEPOIS do 01_ddl_festasbv.sql
 ============================================================
 BEGIN;
