@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v216 · 2026-08-06 · O 🖨 das Compras pergunta primeiro o que levar: lista completa ou o carrinho de alguém, e de que lojas — com a contagem de artigos em cada opção';
+const APP_BUILD = 'v217 · 2026-08-06 · A folha das compras deixa de partir em colunas: um artigo por linha, à largura toda, no papel como no ecrã';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -12278,16 +12278,9 @@ function generatePDF(type,escopo){
     /* Shop List — folha condensada para levar às compras (ver buildShopReport) */
     .sl-doc h1{font-size:18px}
     .sl-doc .subtitle{font-size:11px;margin-bottom:4px}
-    /* As colunas são feitas à mão (uma sl-col por coluna, com os blocos já
-       repartidos no JS) e NÃO com column-count: o WebKit do iPhone
-       ignora o multicol ao paginar para impressão, e a folha saía numa coluna
-       só, esticada por duas páginas — justamente o contrário do que se quer. */
-    .sl-cols{display:flex;align-items:flex-start;gap:16px}
-    .sl-col{flex:1 1 0;min-width:0}
-    .sl-cols.sl-sm{font-size:9.5px;gap:12px}
-    .sl-cols.sl-xs{font-size:8px;gap:10px}
-    .sl-cols.sl-xs .sl-row{padding:.5px 0}
-    .sl-cols.sl-xs .sl-grp{margin-bottom:7px}
+    /* Uma coluna à largura toda — ver a nota no buildShopReport. Fica um <div>
+       (.sl-col) por dentro para o bloco de linhas ter dono próprio. */
+    .sl-cols,.sl-col{display:block;min-width:0}
     .sl-grp{break-inside:avoid;page-break-inside:avoid;margin:0 0 9px}
     .sl-grp-h .sl-cont{margin-left:auto;font-weight:400;text-transform:none;letter-spacing:0;color:#999}
     .sl-grp-h{display:flex;align-items:center;gap:5px;font-size:.85em;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#2a9d6a;border-bottom:1.5px solid #50b96e;padding-bottom:2px;margin-bottom:3px}
@@ -12304,18 +12297,12 @@ function generatePDF(type,escopo){
     .sl-row.picked .sl-box{background:#1a1a2e;border-color:#1a1a2e}
     .sl-pick-hint{color:#2a9d6a;font-weight:700;cursor:pointer}
     .sl-clr{color:#8a8a8a;cursor:pointer;text-decoration:underline}
-    /* No ECRÃ estreito (o telemóvel de quem abre a pré-visualização) a folha é
-       UMA coluna à largura toda, com o corpo a tamanho normal: em duas colunas
-       de 180px cada linha partia-se em três e ficava um emaranhado. As colunas
-       e o corpo pequeno são para o PAPEL, onde há 800px de largura. */
+    /* No telemóvel a folha é a mesma (uma coluna), só com as linhas um pouco
+       mais folgadas e a caixa maior — ali pica-se com o dedo, não com caneta. */
     @media screen and (max-width:640px){
-      .sl-cols,.sl-cols.sl-sm,.sl-cols.sl-xs{display:block;font-size:11px}
-      .sl-col+.sl-col{margin-top:9px}
-      .sl-cols.sl-xs .sl-row{padding:1.5px 0}
       .sl-row{padding:3px 0}
       .sl-box{width:11px;height:11px}
     }
-    .sl-done{margin-top:10px;padding-top:6px;border-top:1px solid #ddd;font-size:9px;color:#777;line-height:1.5}
     .section{margin-bottom:8px}
     .badge{display:inline-block;font-size:9px;font-weight:700;padding:1px 6px;border-radius:4px}
     .badge-green{background:#e8f9f1;color:#2a9d6a}.badge-red{background:#fff0f0;color:#e04545}.badge-blue{background:#eef5ff;color:#3a7dd6}
@@ -12503,8 +12490,8 @@ function shopPdfRender(){
      escolhidas (vazio = todas). Num carrinho não se repete o "🛒 quem trata"
      linha a linha — seria sempre a mesma pessoa; e com uma loja só, a loja sai
      das linhas e vai para o subtítulo, pela mesma razão.
-   Condensado a sério: 2 colunas, 3 quando a lista cresce, e corpo mais pequeno
-   quando é mesmo grande — o objetivo é caber numa folha. */
+   Uma coluna à largura toda, um artigo por linha — ver a nota das colunas mais
+   abaixo. */
 function buildShopReport(sel){
   sel=sel||{};
   const quem=sel.quem||'';               // carrinho de alguém (vazio = lista toda)
@@ -12588,28 +12575,29 @@ function buildShopReport(sel){
      com o traço e o espaço por baixo) — é com ele que as colunas se repartem
      equilibradas mais abaixo. */
   const blocos=[];
-  let nLinhas=0;
-  const MAX_BLOCO=18;   // artigos por bloco antes de o partir (ver abaixo)
+  /* Artigos por bloco antes de o partir em "(cont.)". Uma página A4 leva ~55
+     linhas, portanto um bloco de 20 cabe sempre inteiro numa — que é o que isto
+     tem de garantir. Não convém muito menor: cada pedaço traz mais um
+     cabeçalho, e aí gasta-se em cabeçalhos o que se poupa em espaço perdido no
+     fim das páginas (medido: com 15 ou 12 a folha volta a crescer). */
+  const MAX_BLOCO=20;
   const bloco=(label,items,opt)=>{
     const g={},order=[];
     items.forEach(it=>{const k=shopArtKey(it.artigo);if(!g[k]){g[k]=[];order.push(k);}g[k].push(it);});
     order.sort((a,b)=>g[a][0].artigo.localeCompare(g[b][0].artigo,'pt'));
-    nLinhas+=order.length;
     /* Uma categoria grande parte-se em pedaços com cabeçalho próprio ("…
-       (cont.)") em vez de se deixar cortar sozinha entre colunas: cortada,
-       metade dos artigos ficava no topo da coluna seguinte sem se saber de que
-       categoria eram — numa folha de compras isso é mandar a pessoa ao corredor
-       errado. Inteira, um bloco mais alto do que a coluna empurrava a folha toda
-       para a página seguinte. Os pedaços saem com o mesmo tamanho (nada de um
-       "(cont.)" com uma linha só) e cada um cabe à vontade numa coluna. */
+       (cont.)") em vez de se deixar cortar sozinha na mudança de página:
+       cortada, metade dos artigos ficava no topo da folha seguinte sem se saber
+       de que categoria eram — numa lista de compras isso é mandar a pessoa ao
+       corredor errado. Os pedaços saem com o mesmo tamanho (nada de um
+       "(cont.)" com uma linha só) e cada um cabe à vontade numa página. */
     const nPartes=Math.ceil(order.length/MAX_BLOCO);
     const porParte=Math.ceil(order.length/nPartes);
     for(let i=0;i<nPartes;i++){
       const parte=order.slice(i*porParte,(i+1)*porParte);
       if(!parte.length)continue;
       const cab=i===0?`${label}<span class="sl-n">${order.length}</span>`:`${label} <span class="sl-cont">(cont.)</span>`;
-      blocos.push({peso:parte.length+1.8,
-        html:`<div class="sl-grp"><div class="sl-grp-h">${cab}</div>${parte.map(k=>slRow(g[k],opt)).join('')}</div>`});
+      blocos.push({html:`<div class="sl-grp"><div class="sl-grp-h">${cab}</div>${parte.map(k=>slRow(g[k],opt)).join('')}</div>`});
     }
   };
 
@@ -12636,29 +12624,13 @@ function buildShopReport(sel){
     }
   }
 
-  /* Peso da folha → quantas colunas e que tamanho de corpo. Duas colunas
-     chegam para a lista de um evento; três só quando ela é mesmo grande, que é
-     quando vale a pena apertar o corpo para não passar à 2.ª folha. */
-  const peso=blocos.reduce((a,b)=>a+b.peso,0);
-  // Lista curta (um carrinho, tipicamente) fica numa coluna à largura toda: é
-  // como sai impressa e lê-se melhor do que duas meias-colunas de meia dúzia.
-  const nCols=peso<=14?1:peso>90?3:2;
-  const dens=peso>140?' sl-xs':peso>90?' sl-sm':'';
-  /* Repartir os blocos pelas colunas é connosco (ver a nota do CSS): enche-se
-     cada coluna até ao seu quinhão, pela ordem das categorias — assim a folha
-     lê-se de cima abaixo, coluna a coluna, e no telemóvel (onde é tudo uma
-     coluna) sai na mesma ordem. Um bloco vai para a coluna onde desequilibra
-     menos, e nunca se abre coluna que deixe outra vazia no fim. */
-  const alvo=peso/nCols;
-  const colunas=[[]];
-  let acc=0;
-  blocos.forEach((b,i)=>{
-    const faltamCols=nCols-colunas.length, faltamBlocos=blocos.length-i;
-    if(faltamCols>0&&acc>0&&acc+b.peso/2>alvo&&faltamBlocos>=faltamCols){colunas.push([]);acc=0;}
-    colunas[colunas.length-1].push(b.html);
-    acc+=b.peso;
-  });
-  const colsHtml=colunas.map(c=>`<div class="sl-col">${c.join('')}</div>`).join('');
+  /* UMA COLUNA, à largura toda, sempre — no papel e no ecrã. Já foram duas (e
+     três nas listas grandes) para a folha caber numa página; só que numa coluna
+     de 230px os nomes partem-se em duas e três linhas e a folha deixa de se ler
+     de relance no corredor do supermercado. Entre caber numa folha e ler-se
+     bem, manda ler-se bem: um artigo por linha, e que sejam as páginas que
+     forem. */
+  const colsHtml=`<div class="sl-col">${blocos.map(b=>b.html).join('')}</div>`;
 
   // Título diz logo o que a folha é — a do carrinho de alguém não se confunde
   // com a lista do grupo (podem andar várias impressas no mesmo dia, e há uma
@@ -12694,7 +12666,7 @@ function buildShopReport(sel){
     // desenha de outra maneira) — senão não se percebe que fala delas. A parte
     // de picar é `no-print`: no papel pica-se com uma caneta.
     h+=`<div class="sl-leg"><i class="sl-box"></i> por apanhar · <i class="sl-box on"></i> ${meu?'já apanhado (marcado na app)':'já no carrinho de quem o leva · 🛒 quem trata'}<span class="no-print"><br><b class="sl-pick-hint">Toca numa linha para a picar</b> — fica riscada, e assim segue para o papel/PDF<span id="sl-clr-wrap" style="display:none"> · <span class="sl-clr" id="sl-clr">limpar picados</span></span></span></div>`;
-    h+=`<div class="sl-cols${dens}">${colsHtml}</div>`;
+    h+=`<div class="sl-cols">${colsHtml}</div>`;
   }
   if(tratados.length){
     const g={},order=[];
