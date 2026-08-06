@@ -1353,6 +1353,10 @@ button.cmp-chip.qt-tap:active{filter:brightness(.93)}
 .lote-req-inline{display:flex;align-items:center;gap:6px;margin-top:8px;font-size:12.5px;color:var(--muted)}
 .lote-req-inline select{flex:1;min-width:0;height:36px;border:1px solid var(--line);border-radius:8px;background:#FFFDF6;color:var(--ink);padding:0 8px;font-size:13px}
 .lote-val{flex:0 0 auto;font-size:12px;font-weight:700;color:var(--muted);font-variant-numeric:tabular-nums;min-width:52px;text-align:right}
+/* "Só despesa — não entra em stock" (saco da caixa, taxas): só nos lotes livres */
+.lote-nostock{display:flex;align-items:center;gap:7px;margin-top:8px;font-size:12.5px;color:var(--muted);cursor:pointer}
+.lote-nostock input{flex:0 0 auto;width:17px;height:17px;margin:0;accent-color:var(--green)}
+.lote-nostock.on{color:var(--ink);font-weight:600}
 
 /* ── Itemização da fatura: cartão por artigo (registo da compra) ── */
 .lote-card{background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:9px 11px 10px;margin-bottom:7px;box-shadow:0 1px 3px rgba(80,55,20,.05)}

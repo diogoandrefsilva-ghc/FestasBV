@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v224 · 2026-08-06 · Registar uma compra que mistura artigos da lista com artigos de fora deixa de dar "All object keys must match"';
+const APP_BUILD = 'v225 · 2026-08-06 · Compra com artigos da lista e de fora deixa de rebentar a gravar; extras da fatura que não são artigos (saco da caixa, taxas) podem ficar só como despesa, fora do 🧺 Stock';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -8113,9 +8113,11 @@ function compraLoteHtml(l,i){
      por isso também não depende de STOCK_TABLE. */
   const prev=!!compraEdit.prov;
   const podeDest=prev||STOCK_TABLE;
-  const hasSplit=podeDest&&!!(l.splits&&l.splits.length);
+  // "Só despesa" não se reparte por vários destinos: não há quantidade de stock
+  // para dividir — é um valor, e vai inteiro para o destino escolhido.
+  const hasSplit=podeDest&&!l.noStock&&!!(l.splits&&l.splits.length);
   const destInline=(podeDest&&!hasSplit)
-    ?destBtnHtml(l.destino,`compraDestPick(${i})`)+`<button class="lote-split-btn" title="Dividir por vários destinos" onclick="compraLoteAddSplit(${i})">⇄</button>`
+    ?destBtnHtml(l.destino,`compraDestPick(${i})`)+(l.noStock?'':`<button class="lote-split-btn" title="Dividir por vários destinos" onclick="compraLoteAddSplit(${i})">⇄</button>`)
     :'';
   const fields=`<div class="lote-row">
       <input class="lote-qty" type="text" placeholder="Qtd" title="Quantidade" value="${escHtml(l.qtd||'')}" oninput="compraEdit.lotes[${i}].qtd=this.value" onblur="this.value=normalizeQty(this.value);compraEdit.lotes[${i}].qtd=this.value;compraSplitNoteUpd(${i})">
@@ -8146,7 +8148,14 @@ function compraLoteHtml(l,i){
      stock debaixo de "Batatas Fritas" mantendo a marca em `artigo`. Vale também
      na provisória — ela gera lotes como qualquer compra, e é aqui que se diz,
      artigo a artigo, a que pedido da lista é que ele responde. */
-  const reqInline=(STOCK_TABLE&&l.free)?(()=>{
+  /* "Só despesa — não entra em stock": só nos artigos livres/extras. O que veio
+     da lista é, por definição, uma necessidade da cozinha — logo é stock; o que
+     aparece do nada no talão é que pode não ser coisa nenhuma. Pôr a caixa nos
+     20 cartões de uma compra normal era ruído em todos para servir um. */
+  const nsInline=(STOCK_TABLE&&l.free)?`<label class="lote-nostock${l.noStock?' on':''}">
+      <input type="checkbox" ${l.noStock?'checked':''} onchange="compraLoteNoStock(${i},this.checked)">
+      <span>🧾 só despesa — não entra em 🧺 Stock</span></label>`:'';
+  const reqInline=(STOCK_TABLE&&l.free&&!l.noStock)?(()=>{
     const nomes=[...new Set(shopArr().filter(it=>!shopIsRemoved(it)).map(it=>it.artigo))].sort((a,b)=>a.localeCompare(b,'pt'));
     const cur=l._listArt||'';
     const known=nomes.some(n=>shopSameArtigo(n,cur));
@@ -8156,9 +8165,18 @@ function compraLoteHtml(l,i){
     return `<div class="lote-req-inline">🔗 pertence a <select onchange="compraLoteSetReq(${i},this.value)">${opts}</select></div>`;
   })():'';
   const cls='lote-card'+(l._fat==='miss'?' is-miss':l._fat==='warn'?' is-warn':(l._fat==='ok'||l._byBrand)?' is-ok':'');
-  return `<div class="${cls}">${head}${fields}${qtyHint}${destBlock}${reqInline}${fat}</div>`;
+  return `<div class="${cls}">${head}${fields}${qtyHint}${destBlock}${nsInline}${reqInline}${fat}</div>`;
 }
 function compraLoteSetReq(i,v){const l=(compraEdit.lotes||[])[i];if(!l)return;l._listArt=(v||'').trim()||null;}
+function compraLoteNoStock(i,on){
+  const l=(compraEdit.lotes||[])[i];if(!l)return;
+  l.noStock=!!on;
+  /* Sem lote não há quantidade a repartir nem pedido da lista para cobrir — o
+     que fica é uma linha de despesa. Sem destino escolhido vai a Gerais (a
+     bolsa comum): "por alocar" é um estado de stock e aqui não há stock. */
+  if(l.noStock){l.splits=null;l._listArt=null;if(!l.destino)l.destino='Gerais';}
+  compraRenderLotes();
+}
 function compraRenderLotes(){
   const cont=document.getElementById('shop-buy-lotes');if(!cont)return;
   const ls=compraEdit.lotes||[];
@@ -8758,6 +8776,19 @@ function faturaSubToggle(i,j){
   compraRenderLotes();
   if(multi&&STOCK_TABLE)toast('Fica em 🧺 Stock por alocar — depois de registares, aloca às refeições no separador Stock','ok');
 }
+/* Linhas da fatura que não são ARTIGOS: o saco da caixa, uma taxa, portes, o
+   vasilhame. Servem para pré-ligar o "só despesa" de um extra — nada mais.
+   NOME INTEIRO, não palavra contida: o cabeçalho tem de ser uma destas e tudo
+   o que vier atrás tem de ser enchimento conhecido, senão "saco de batatas"
+   (que é stock, e dos bons) vinha marcado como taxa da caixa. A app não decide
+   nada sozinha com isto: pré-marca um extra que já nasce por confirmar. */
+const NS_CABECA=['saco','sacos','sacola','sacolas','taxa','taxas','portes','vasilhame'];
+const NS_ENCHIMENTO=['de','da','do','dos','das','e','plastico','plastica','plasticos','papel','reutilizavel','reutilizaveis','compras','servico','servicos','entrega','caixa','tsr','un','unid','unidade'];
+function ehNaoStock(nome){
+  const t=String(nome||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').split(/[^a-z0-9]+/).filter(Boolean);
+  if(!t.length||!NS_CABECA.includes(t[0]))return false;
+  return t.slice(1).every(w=>NS_ENCHIMENTO.includes(w));
+}
 /* Extras da fatura (linhas que não estavam no carrinho): checkbox desmarcada
    por defeito; marcar converte em "artigo fora da lista" editável (o ✕ do
    lote serve de desfazer). Os que ficarem desmarcados não entram no registo. */
@@ -8774,7 +8805,11 @@ function faturaExtraToggle(i){
   const e=(compraEdit.faturaExtras||[])[i];if(!e)return;
   compraEdit.faturaExtras.splice(i,1);
   // Herda a ligação ao pedido genérico sugerida pela AI (Ruffles → Batatas Fritas)
-  (compraEdit.lotes=compraEdit.lotes||[]).push({free:true,artigo:e.artigo,qtd:e.qtd,valor:e.valor,destino:'Gerais',keys:[],_listArt:e.pedido||null});
+  // O saco da caixa (e afins) vem já com o "só despesa" ligado — continua à
+  // vista e desliga-se num toque, mas poupa o gesto no caso que se repete em
+  // todos os talões de supermercado.
+  const ns=ehNaoStock(e.artigo);
+  (compraEdit.lotes=compraEdit.lotes||[]).push({free:true,artigo:e.artigo,qtd:e.qtd,valor:e.valor,destino:'Gerais',keys:[],_listArt:ns?null:(e.pedido||null),noStock:ns});
   compraRenderLotes();
 }
 
@@ -8813,6 +8848,18 @@ async function saveCompra(){
       continue;
     }
     if(!artigo){toast('Indica o nome do artigo detalhado','bad');return;}
+    /* "Só despesa": não é coisa que se guarde — o saco da caixa, uma taxa,
+       portes. Paga-se na mesma (vai a uma linha de despesa do destino
+       escolhido, Gerais quando ninguém disse) mas não gera lote nenhum: um
+       saco não se aloca a refeição nenhuma nem se consome, e em 🧺 Stock ficava
+       a estorvar para sempre. É o mesmo caminho (`tipoRows`) por onde os itens
+       detalhados iam antes de existir tabela de stock. */
+    if(l.noStock){
+      const a=destinoAloc(l.destino,0);
+      const k=(a&&alocIsMeal(a))?(a.tipo+'|'+a.data+(a.bebida?'|'+DEST_BEB:'')):((a&&a.tipo)||'Gerais');
+      (tipoRows[k]=tipoRows[k]||[]).push({artigo,qtd:(l.qtd||'').trim(),valor:v});
+      continue;
+    }
     /* Provisória SEM tabela de stock: não há onde meter o artigo, por isso ele
        fica como despesa (uma por artigo), com o destino a dizer a que refeição
        pertence. Havendo stock, a provisória segue o caminho normal logo abaixo
@@ -8903,7 +8950,9 @@ async function saveCompra(){
   // Despesas diretas geradas do detalhe: uma linha por tipo (ou tipo+refeição)
   for(const k in tipoRows){
     const p=k.split('|');const its=tipoRows[k];
-    rows.push({tipo:p[0],data_valor:p[1]||null,valor:rnd(its.reduce((a,x)=>a+x.valor,0),2),obs:its.map(x=>x.artigo+(x.qtd?' ('+x.qtd+')':'')).join(', ')});
+    const row={tipo:p[0],data_valor:p[1]||null,valor:rnd(its.reduce((a,x)=>a+x.valor,0),2),obs:its.map(x=>x.artigo+(x.qtd?' ('+x.qtd+')':'')).join(', ')};
+    if(DESP_BEBIDA_COL&&p[2]===DEST_BEB)row.bebida=true;   // 🍻 bebida da refeição
+    rows.push(row);
   }
   // O valor dos lotes entra numa linha "🧺 Stock" (Gerais → bolsa comum); o
   // calcular() move depois o alocado para as refeições via stock_lotes
