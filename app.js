@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v226 · 2026-08-06 · Faturas de empresa: as linhas vêm sem IVA e a app acrescenta-o por taxa, fechando as contas contra o total impresso (e diz o total da fatura ao lado do total da compra)';
+const APP_BUILD = 'v227 · 2026-08-06 · No registo da compra, TODOS os artigos deixam editar o nome e a ligação ao pedido da lista — a app propõe, deixa de trancar';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -7997,7 +7997,11 @@ function compraRefreshLotes(){
     // Destino: itens de tipo (Bebidas/Gerais/…) → esse tipo; refeição fixa (sem
     // tabela) → 'Ref|data'; itens de refeição → proposta concreta (FIFO) já feita.
     const destino=d.tipoFix?(d.dataFix?d.tipoFix+'|'+d.dataFix:d.tipoFix):'';
-    const lote={artigo:d.artigo,qtd,valor:'',keys,tipoFix:d.tipoFix||null,dataFix:d.dataFix||null,destino,splits:null};
+    /* `_listArt` = o pedido da lista de onde este cartão nasceu, gravado à
+       cabeça e não só quando a fatura renomeia o artigo. É o que sobrevive a
+       mudar-se o nome à mão (senão encurtar "Batata Frita Lay's sem Sal 160g"
+       partia a ligação ao pedido) e é o que o seletor 🔗 mostra pré-preenchido. */
+    const lote={artigo:d.artigo,_listArt:d.artigo,qtd,valor:'',keys,tipoFix:d.tipoFix||null,dataFix:d.dataFix||null,destino,splits:null};
     if(!d.tipoFix)compraProporDestino(lote);   // propõe alocação concreta às refeições
     return lote;
   }).concat(prev.filter(l=>!used.has(l)&&l.free));   // artigos fora da lista mantêm-se
@@ -8098,11 +8102,18 @@ function compraLoteHtml(l,i){
     :l._fat==='ok'?`<span class="lote-tag ok">✓ na fatura</span>`
     :l._fat==='miss'?`<span class="lote-tag miss">⚠ não encontrado</span>`
     :l._fat==='warn'?`<span class="lote-tag warn">⚠ qtd difere</span>`:'';
-  // Se a fatura renomeou o artigo, o nome pedido na lista fica como nota
-  const sub=(!l.free&&l._listArt&&!shopSameArtigo(l._listArt,l.artigo))?`<small class="lote-list-art">na lista: ${escHtml(l._listArt)}</small>`:'';
-  const name=l.free
-    ?`<input class="lote-name-in" type="text" maxlength="60" placeholder="Nome do artigo" value="${escHtml(l.artigo||'')}" oninput="compraEdit.lotes[${i}].artigo=this.value">`
-    :`<span class="lote-name">${l.tipoFix?shopTipoIcon(l.tipoFix)+' ':''}${escHtml(l.artigo)}${sub}</span>`;
+  /* O NOME EDITA-SE EM TODOS OS ARTIGOS, venham do carrinho ou da fatura.
+     Estava trancado nos do carrinho, e é justamente neles que o nome costuma
+     ficar mau: quem manda no nome é o talão ("Batata Frita Lay's sem Sal 160g")
+     e é este nome que vai viver no cartão do 🧺 Stock o ano inteiro. Encurtá-lo
+     aqui é o único momento cómodo para o fazer.
+     A ligação ao pedido (🔗, abaixo) diz o que a app julga; a nota "na lista: X"
+     só se mantém onde esse seletor não aparece, senão diziam a mesma coisa
+     duas vezes. */
+  const temReq=STOCK_TABLE&&!l.noStock;
+  const sub=(!temReq&&!l.free&&l._listArt&&!shopSameArtigo(l._listArt,l.artigo))?`<small class="lote-list-art">na lista: ${escHtml(l._listArt)}</small>`:'';
+  const nameIn=`<input class="lote-name-in" type="text" maxlength="60" placeholder="Nome do artigo" value="${escHtml(l.artigo||'')}" oninput="compraEdit.lotes[${i}].artigo=this.value">`;
+  const name=sub?`<div class="lote-name-wrap">${nameIn}${sub}</div>`:nameIn;
   const head=`<div class="lote-head">${name}${tag}${l.free?`<button class="lote-x" title="Remover" onclick="compraDelLote(${i})">✕</button>`:''}</div>`;
   // Uma só linha: qtd + preço + destino (o destino desce para o bloco de split
   // quando o artigo está dividido por vários destinos)
@@ -8155,9 +8166,15 @@ function compraLoteHtml(l,i){
   const nsInline=(STOCK_TABLE&&l.free)?`<label class="lote-nostock${l.noStock?' on':''}">
       <input type="checkbox" ${l.noStock?'checked':''} onchange="compraLoteNoStock(${i},this.checked)">
       <span>🧾 só despesa — não entra em 🧺 Stock</span></label>`:'';
-  const reqInline=(STOCK_TABLE&&l.free&&!l.noStock)?(()=>{
+  /* A ligação ao pedido vale em TODOS os artigos, e sobretudo nos do carrinho:
+     ali ela vem de um PALPITE do casamento com a fatura (já casou "Batata Frita
+     Lay's sem Sal 160g" com "Salsa") e não havia como a desfazer — ficava um
+     cartão sem saída. Propor está certo; trancar é que não.
+     Vem pré-preenchida: nos do carrinho é o pedido de onde o cartão nasceu
+     (`_listArt`, ou o próprio nome enquanto a fatura não lhe mexeu). */
+  const reqInline=(temReq)?(()=>{
     const nomes=[...new Set(shopArr().filter(it=>!shopIsRemoved(it)).map(it=>it.artigo))].sort((a,b)=>a.localeCompare(b,'pt'));
-    const cur=l._listArt||'';
+    const cur=l._listArt||(l.free?'':l.artigo)||'';
     const known=nomes.some(n=>shopSameArtigo(n,cur));
     const opts=`<option value="">— não é da lista —</option>`+
       nomes.map(n=>`<option value="${escHtml(n)}"${shopSameArtigo(n,cur)?' selected':''}>${escHtml(n)}</option>`).join('')+
@@ -8167,7 +8184,17 @@ function compraLoteHtml(l,i){
   const cls='lote-card'+(l._fat==='miss'?' is-miss':l._fat==='warn'?' is-warn':(l._fat==='ok'||l._byBrand)?' is-ok':'');
   return `<div class="${cls}">${head}${fields}${qtyHint}${destBlock}${nsInline}${reqInline}${fat}</div>`;
 }
-function compraLoteSetReq(i,v){const l=(compraEdit.lotes||[])[i];if(!l)return;l._listArt=(v||'').trim()||null;}
+function compraLoteSetReq(i,v){
+  const l=(compraEdit.lotes||[])[i];if(!l)return;
+  const novo=(v||'').trim();
+  l._listArt=novo||null;
+  /* Desligar um artigo que veio do carrinho é dizer "esta linha do talão não é
+     o pedido que a app julgou". Passa a artigo avulso — ganha o ✕ e o "só
+     despesa", e deixa de contar como stock daquele pedido. Só aqui é que se
+     redesenha: mudar de pedido não muda o cartão, e um re-render a cada escolha
+     roubava o scroll a quem está a rever 20 artigos. */
+  if(!novo&&!l.free){l.free=true;compraRenderLotes();}
+}
 function compraLoteNoStock(i,on){
   const l=(compraEdit.lotes||[])[i];if(!l)return;
   l.noStock=!!on;
@@ -8674,9 +8701,13 @@ function faturaAplicar(d){
   // artigo→categoria é global e vale mesmo que a compra não chegue a registar-se)
   catAIMappings(linhas.filter(l=>l.categoria)).then(n=>{if(n&&TAB==='stock')renderStock();});
   const lotes=compraEdit.lotes||[];
-  // Reset (re-importação): volta ao nome da lista para refazer o matching do zero
-  // (só nos do carrinho — num lote livre o _listArt é a ligação manual, não se pisa)
-  lotes.forEach(l=>{delete l._fat;delete l._sug;delete l._subs;delete l._byBrand;delete l._impQtds;delete l._qtdPedida;if(!l.free&&l._listArt){l.artigo=l._listArt;delete l._listArt;}});
+  /* Reset (re-importação): volta ao nome da lista para refazer o matching do
+     zero (só nos do carrinho — num lote livre o _listArt é a ligação manual,
+     não se pisa). O `_listArt` MANTÉM-SE: é o pedido de onde o cartão nasceu,
+     não uma marca de "a fatura renomeou isto". Apagá-lo aqui deixava sem
+     ligação todos os artigos que a fatura não renomeou — e bastava encurtar-lhes
+     o nome à mão para o pedido se perder. */
+  lotes.forEach(l=>{delete l._fat;delete l._sug;delete l._subs;delete l._byBrand;delete l._impQtds;delete l._qtdPedida;if(!l.free&&l._listArt)l.artigo=l._listArt;});
   const pares=[];
   lotes.forEach((l,i)=>{if(l.free)return;l._qtdPedida=l.qtd||'';linhas.forEach((ln,j)=>{const s=faturaScore(l.artigo,ln.artigo);if(s>=0.5)pares.push({i,j,s});});});
   pares.sort((a,b)=>b.s-a.s);
