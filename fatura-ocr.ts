@@ -1,7 +1,9 @@
 // supabase/functions/fatura-ocr/index.ts
 // FestasBV — Lê uma fotografia de fatura/talão com o Gemini e devolve JSON
-// estruturado (loja, data, total, linhas artigo a artigo) para a app
-// pré-preencher o Registar Compra. Se a app mandar `categorias`, cada linha
+// estruturado (loja, data, total, sem_iva, linhas artigo a artigo com a taxa de
+// IVA de cada uma) para a app pré-preencher o Registar Compra. As linhas vão
+// SEMPRE com o valor impresso: numa fatura de grossista isso é o valor sem IVA
+// e é a app que faz as contas fecharem contra o total (ver `faturaIVA`). Se a app mandar `categorias`, cada linha
 // vem também com a categoria de produto sugerida; e há dois modos só-texto:
 // `artigos` (classifica artigos existentes em lote) e `normalizar` (agrupa
 // grafias do mesmo produto — com `categorias`, classifica-os na mesma resposta;
@@ -128,14 +130,31 @@ const promptFatura = (cats: Cat[], pedidos: string[]) => `Isto é um talão ou f
 PDF (pode ter várias páginas; considera todas).
 Extrai APENAS um objeto JSON com esta forma exata:
 {"loja": string|null, "data": "YYYY-MM-DD"|null, "total": number|null,
- "linhas": [{"artigo": string, "qtd": string|null, "preco": number${cats.length ? ', "categoria": string|null' : ""}${pedidos.length ? ', "pedido": string|null' : ""}}]}
+ "sem_iva": number|null,
+ "linhas": [{"artigo": string, "qtd": string|null, "preco": number, "iva": number|null${cats.length ? ', "categoria": string|null' : ""}${pedidos.length ? ', "pedido": string|null' : ""}}]}
 
 Regras:
-- "linhas": só produtos comprados. Ignora subtotais, IVA, troco, pontos de
-  cartão, sacos de caução devolvidos e linhas de desconto isoladas.
-- "preco" é o valor total pago por essa linha, JÁ COM o desconto dessa linha
-  aplicado se existir (se o desconto vier numa linha própria logo a seguir,
-  subtrai-o ao artigo respetivo).
+- "linhas": tudo o que SOMA ao total a pagar — produtos e também os encargos
+  cobrados à parte: taxa de serviço, portes, vasilhame, saco, "TAXA SDR" ou
+  outra taxa de embalagem. Ignora o que não é dinheiro a mais: subtotais,
+  quadros de IVA, troco, pontos de cartão, cauções DEVOLVIDAS (valor negativo)
+  e linhas de desconto isoladas.
+- "preco" é o valor da linha TAL COMO ESTÁ IMPRESSO na coluna do total dessa
+  linha — não lhe acrescentes nem tires IVA, e não o recalcules a partir do
+  preço unitário. Aplica-lhe apenas o desconto dessa linha, se existir (se o
+  desconto vier numa linha própria logo a seguir, subtrai-o ao artigo
+  respetivo).
+- Muitas faturas de grossista trazem os totais de linha SEM IVA, com o IVA a
+  aparecer só num quadro no fim, somado por taxa. Isso está certo assim: devolve
+  os números impressos e diz a taxa de cada linha em "iva".
+- "iva": a taxa de IVA dessa linha, em percentagem (0, 6, 13 ou 23). Pode vir
+  numa coluna própria ("IVA%", "Tx") ou por código/letra com legenda no fim
+  (ex.: A=6%, B=13%, C=23%; ou 1/2/3) — resolve o código pela legenda. Linhas
+  marcadas "não sujeito"/"isento" são 0. null se não se ler.
+- "total": o valor final efetivamente pago, COM IVA ("Total", "Total a pagar").
+- "sem_iva": o subtotal sem IVA, quando a fatura o mostra — "Ilíquido",
+  "Total s/IVA", "Mercadoria", ou a soma da coluna "Base IVA"/"Incidência" do
+  quadro de IVA. null se a fatura não mostrar nenhum.
 - "qtd": quantidade legível, ex. "2", "1,5 kg", "6 garrafas". null se não for claro.
 - "artigo": nome legível em português. Expande abreviaturas óbvias
   (ex. "LTE MG UHT" -> "Leite meio-gordo UHT") mas não inventes.

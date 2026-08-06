@@ -984,6 +984,9 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .cmp-qtd-row b{font-weight:700;color:var(--ink)}
 .cmp-badge{background:var(--panel2);border:1px solid var(--line);color:var(--muted);font-size:11px;font-weight:600;border-radius:8px;padding:3px 7px;white-space:nowrap;flex:0 0 auto}
 .cmp-badge.meal{background:rgba(30,122,77,.12);border-color:rgba(30,122,77,.35);color:var(--green)}
+/* Total da fatura lida, ao lado do total da compra (confronto com o papel) */
+.cmp-fat-tot{margin-left:8px;font-size:12px;font-weight:600;color:var(--muted)}
+.cmp-fat-tot.eq{color:var(--green)}
 .cmp-mini{background:var(--panel2);border:1px solid var(--line);color:var(--ink);font-size:11px;font-weight:600;border-radius:8px;padding:4px 8px;cursor:pointer;flex:0 0 auto;white-space:nowrap}
 .cmp-mini.prim{background:var(--barrete);color:#fff;border-color:var(--barrete)}
 /* Botão "＋🛒": fundo claro para o emoji (cinzento) se ver — o verde cheio

@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v225 · 2026-08-06 · Compra com artigos da lista e de fora deixa de rebentar a gravar; extras da fatura que não são artigos (saco da caixa, taxas) podem ficar só como despesa, fora do 🧺 Stock';
+const APP_BUILD = 'v226 · 2026-08-06 · Faturas de empresa: as linhas vêm sem IVA e a app acrescenta-o por taxa, fechando as contas contra o total impresso (e diz o total da fatura ao lado do total da compra)';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -7933,7 +7933,7 @@ function compraUpdateTotal(){
   // a vista — as duas partes existem e são ambas gravadas)
   if(!compraEdit.det||compraEdit.id)compraEdit.lines.forEach(ln=>{const v=parseFloat(ln.valor);if(!isNaN(v))tot+=v;});
   if(compraEdit.det||compraEdit.id)(compraEdit.lotes||[]).forEach(l=>{const v=parseFloat(l.valor);if(!isNaN(v))tot+=v;});
-  const el=document.getElementById('shop-buy-total');if(el)el.textContent=`Total: ${eur(rnd(tot,2))}`;
+  const el=document.getElementById('shop-buy-total');if(el)el.innerHTML=`Total: ${escHtml(eur(rnd(tot,2)))}${faturaTotHtml(rnd(tot,2))}`;
 }
 
 /* ── Detalhe por artigo no registo da compra (opt-in) ──
@@ -8665,7 +8665,11 @@ function faturaAplicar(d){
   //   2.ª linha a 1.0 no MESMO artigo (várias marcas, ex. Lays+Ruffles)
   //     → sub-artigo por confirmar, que herda o destino do genérico
   const linhas=d.linhas.filter(l=>l&&l.artigo&&typeof l.preco==='number'&&l.preco>=0)
-    .map(ln=>({artigo:String(ln.artigo).slice(0,60),qtd:ln.qtd?normalizeQty(String(ln.qtd)):'',valor:rnd(ln.preco,2),categoria:ln.categoria?String(ln.categoria).slice(0,40):null,pedido:ln.pedido?String(ln.pedido).slice(0,60):null}));
+    .map(ln=>({artigo:String(ln.artigo).slice(0,60),qtd:ln.qtd?normalizeQty(String(ln.qtd)):'',valor:rnd(ln.preco,2),iva:typeof ln.iva==='number'?ln.iva:null,categoria:ln.categoria?String(ln.categoria).slice(0,40):null,pedido:ln.pedido?String(ln.pedido).slice(0,60):null}));
+  // IVA: fatura "à la empresa" traz as linhas sem ele. Corre ANTES do matching
+  // para que lotes, sub-artigos e extras nasçam todos com o valor certo.
+  const iva=faturaIVA(linhas,d);
+  compraEdit.fatura={total:iva.total,modo:iva.modo};
   // Categorias sugeridas pela AI: gravam-se já (só onde não havia — a memória
   // artigo→categoria é global e vale mesmo que a compra não chegue a registar-se)
   catAIMappings(linhas.filter(l=>l.categoria)).then(n=>{if(n&&TAB==='stock')renderStock();});
@@ -8734,7 +8738,64 @@ function faturaAplicar(d){
   compraEdit.lotes=lotes;
   compraRenderLotes();
   const porConfirmar=sugestoes+subs+extras;
-  toast(`Fatura lida: ${preenchidos} preenchido(s) ✓${porConfirmar?`, ${porConfirmar} por confirmar ☐`:''}${semMatch?`, ${semMatch} sem correspondência ⚠️`:''}`,'ok');
+  const lido=`Fatura lida: ${preenchidos} preenchido(s) ✓${porConfirmar?`, ${porConfirmar} por confirmar ☐`:''}${semMatch?`, ${semMatch} sem correspondência ⚠️`:''}`;
+  // A nota do IVA vem à frente: mexe no dinheiro todo, e o toast é um só
+  toast(iva.nota?`${iva.nota} · ${lido}`:lido,iva.modo==='?'?'bad':'ok');
+}
+/* ── IVA nas faturas de empresa ──
+   Num talão de supermercado o preço da linha já traz o IVA e a soma das linhas
+   bate certo com o total. Numa fatura de grossista NÃO: as linhas vêm ao valor
+   líquido e o IVA aparece só num quadro no fim, somado por taxa. Importadas tal
+   e qual, a despesa ficava curta o IVA todo (num caso real: 95,64 € registados
+   para 115,89 € pagos — 20,25 € que ninguém dava por eles).
+   A conversão NÃO se faz por adivinhação: só quando as contas fecham contra o
+   TOTAL impresso na fatura. Se não fecharem, não se toca em nada e diz-se —
+   preços mexidos às escondidas eram pior do que o problema. */
+function faturaIVA(linhas,d){
+  const soma=rnd(linhas.reduce((s,l)=>s+l.valor,0),2);
+  const total=(typeof d.total==='number'&&d.total>0)?rnd(d.total,2):null;
+  if(!linhas.length||!total)return{modo:'?',soma,total:null,nota:''};
+  // Folga dos cêntimos: o vendedor calcula o IVA sobre a base de cada TAXA, não
+  // linha a linha, por isso arredondar cada linha desvia uns cêntimos.
+  const tol=Math.max(0.05,0.01*linhas.length);
+  if(Math.abs(soma-total)<=tol)return{modo:'ok',soma,total,nota:''};   // já com IVA
+  // 1) Taxa por linha → cada linha sobe a sua. É o caminho bom: mantém os
+  //    unitários certos (o azeite a 6% não pode subir 23% como o resto).
+  const tx=linhas.map(l=>(typeof l.iva==='number'&&l.iva>=0&&l.iva<=30)?l.iva:null);
+  if(tx.every(t=>t!==null)){
+    const v=linhas.map((l,i)=>rnd(l.valor*(1+tx[i]/100),2));
+    if(Math.abs(v.reduce((s,x)=>s+x,0)-total)<=tol){
+      faturaIVAAplicar(linhas,v,total);
+      return{modo:'iva',soma,total,nota:`IVA acrescentado por taxa (${eur(soma)} → ${eur(total)})`};
+    }
+  }
+  // 2) Sem taxas legíveis, só se for a PRÓPRIA fatura a dizer que a soma das
+  //    linhas é o valor sem IVA ("Ilíquido") é que se reparte a diferença.
+  const semIva=typeof d.sem_iva==='number'?rnd(d.sem_iva,2):null;
+  if(semIva&&Math.abs(soma-semIva)<=tol&&total>soma){
+    const f=total/soma;
+    faturaIVAAplicar(linhas,linhas.map(l=>rnd(l.valor*f,2)),total);
+    return{modo:'prop',soma,total,nota:`IVA repartido pelas linhas (${eur(soma)} → ${eur(total)})`};
+  }
+  return{modo:'?',soma,total,nota:`⚠️ As linhas somam ${eur(soma)} mas a fatura diz ${eur(total)} — confere os preços`};
+}
+// Substitui os valores e encosta a soma ao total impresso: o cêntimo que sobra
+// do arredondamento vai para a linha maior (onde pesa menos no unitário).
+function faturaIVAAplicar(linhas,vals,total){
+  linhas.forEach((l,i)=>{l.valor=vals[i];});
+  const dif=rnd(total-vals.reduce((s,v)=>s+v,0),2);
+  if(!dif)return;
+  let k=0;linhas.forEach((l,i)=>{if(l.valor>linhas[k].valor)k=i;});
+  linhas[k].valor=rnd(linhas[k].valor+dif,2);
+}
+// Confronto com o papel, ao lado do total da compra: é aqui que se vê se o que
+// se vai registar bate certo com a fatura. Os extras por marcar fazem a compra
+// ficar legitimamente abaixo do total, por isso é informação, não alarme.
+function faturaTotHtml(tot){
+  const f=compraEdit.fatura;
+  if(!f||!f.total)return '';
+  const eq=Math.abs(rnd(tot-f.total,2))<0.005;
+  return `<span class="cmp-fat-tot${eq?' eq':''}">· fatura ${escHtml(eur(f.total))}${eq?' ✓':''}</span>`;
 }
 // Aviso "quantidades não batem": compara o pedido da lista com a soma do que
 // veio da fatura para esse artigo (só quando ambos são numéricos, mesma unidade)
@@ -8783,11 +8844,13 @@ function faturaSubToggle(i,j){
    (que é stock, e dos bons) vinha marcado como taxa da caixa. A app não decide
    nada sozinha com isto: pré-marca um extra que já nasce por confirmar. */
 const NS_CABECA=['saco','sacos','sacola','sacolas','taxa','taxas','portes','vasilhame'];
-const NS_ENCHIMENTO=['de','da','do','dos','das','e','plastico','plastica','plasticos','papel','reutilizavel','reutilizaveis','compras','servico','servicos','entrega','caixa','tsr','un','unid','unidade'];
+const NS_ENCHIMENTO=['de','da','do','dos','das','e','plastico','plastica','plasticos','papel','reutilizavel','reutilizaveis','compras','servico','servicos','entrega','caixa','tsr','sdr','ambiental','un','unid','unidade'];
 function ehNaoStock(nome){
   const t=String(nome||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').split(/[^a-z0-9]+/).filter(Boolean);
   if(!t.length||!NS_CABECA.includes(t[0]))return false;
-  return t.slice(1).every(w=>NS_ENCHIMENTO.includes(w));
+  // C\u00f3digos internos (o "TAXA SDR (330765)" dos grossistas) n\u00e3o dizem nada do
+  // produto \u2014 s\u00f3 n\u00fameros, logo n\u00e3o podem transformar um artigo em taxa.
+  return t.slice(1).every(w=>NS_ENCHIMENTO.includes(w)||/^\d+$/.test(w));
 }
 /* Extras da fatura (linhas que não estavam no carrinho): checkbox desmarcada
    por defeito; marcar converte em "artigo fora da lista" editável (o ✕ do
