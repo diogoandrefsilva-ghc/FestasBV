@@ -1496,6 +1496,11 @@ button.cmp-chip.qt-tap:active{filter:brightness(.93)}
 .lote-miss-warn b{color:var(--gold)}
 .lote-miss-warn ul{margin:6px 0 0;padding-left:18px}
 .lote-miss-warn li{margin:2px 0}
+/* Um pedido que a fatura não cobre + o ＋ para o trazer para a compra */
+.miss-row{display:flex;align-items:center;gap:8px;margin-top:6px;padding-top:6px;border-top:1px solid rgba(168,123,20,.22)}
+.miss-row span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
+.miss-row i{color:var(--muted);font-style:normal;font-weight:400}
+.miss-row .cmp-mini{flex:0 0 auto}
 
 /* Separador Stock — cartões por artigo */
 .stk-card{background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:10px 12px;margin-bottom:8px;transition:background .12s}

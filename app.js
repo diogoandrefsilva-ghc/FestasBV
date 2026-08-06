@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v232 · 2026-08-06 · Nomes lidos da fatura deixam de vir em MAIÚSCULAS — passam pelo mesmo escrever-direito do ✨ Normalizar';
+const APP_BUILD = 'v233 · 2026-08-06 · A lista de artigos da compra é a da FATURA: os pedidos que ela não cobre descem para um bloco no fim, e o nome original do talão fica guardado';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -132,6 +132,11 @@ let COB_COL=false;
 // lista: "6 × 2,5 kg")? Sem a migração, STOCK_TAM_COL=false: o campo não
 // aparece e nunca se grava — a app funciona exatamente como antes.
 let STOCK_TAM_COL=false;
+// stock_lotes já tem a coluna 'artigo_fatura' (db/stock_artigo_fatura.sql)? É
+// o nome tal como a fatura o dizia, guardado à parte do `artigo` para o poder
+// renomear sem perder de onde ele veio. Sem a migração, STOCK_FAT_COL=false:
+// nunca se grava nem se mostra e a app comporta-se como antes.
+let STOCK_FAT_COL=false;
 // Switch das notificações de PRESENÇAS (config 'notif_presencas'). Lido em
 // carregar() por todos os utilizadores, porque é a app que marca as entradas
 // de presença como silenciosas quando está desligado (ver _flushPresLog).
@@ -2106,7 +2111,7 @@ async function carregar(){
     const sel='*,membros(*,presencas(*)),refeicoes_def(*),despesas(*),convidados(*),mealheiros(*),pagamentos(*)';
     // shoplist vai numa fetch SEPARADA e tolerante a falha: se a tabela ainda
     // não existir (migração por correr) o resto da app continua a funcionar.
-    const [res,uaRes,cjRes,vlRes,slRes,stRes,ctRes,acRes,npRes,flRes,fpRes,ccRes,sljRes,cobRes,cpRes,stmRes,ttRes,tsRes,tiRes,ppRes,dgRes,dbRes]=await Promise.all([
+    const [res,uaRes,cjRes,vlRes,slRes,stRes,ctRes,acRes,npRes,flRes,fpRes,ccRes,sljRes,cobRes,cpRes,stmRes,sfRes,ttRes,tsRes,tiRes,ppRes,dgRes,dbRes]=await Promise.all([
       sbFetch(`${SB_URL}/rest/v1/eventos?select=${encodeURIComponent(sel)}&order=ano.asc`,{headers:sbHeaders(),cache:'no-store'}),
       sbFetch(`${SB_URL}/rest/v1/user_amigos?select=email,amigo`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null),
       sbFetch(`${SB_URL}/rest/v1/conjuges?select=amigo_a,amigo_b`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null),
@@ -2135,6 +2140,8 @@ async function carregar(){
       sbFetch(`${SB_URL}/rest/v1/convidados?select=adultos,criancas&limit=1`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null),
       // sonda à coluna stock_lotes.tamanho (a embalagem do lote): 200 = já existe
       sbFetch(`${SB_URL}/rest/v1/stock_lotes?select=tamanho&limit=1`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null),
+      // sonda à coluna stock_lotes.artigo_fatura (o nome original do talão)
+      sbFetch(`${SB_URL}/rest/v1/stock_lotes?select=artigo_fatura&limit=1`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null),
       // t-shirts (db/tshirts.sql): tolerantes — sem a migração, TSHIRTS_TABLE=false
       // e o separador 👕 fica escondido
       sbFetch(`${SB_URL}/rest/v1/tshirt_tamanhos?select=*`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null),
@@ -2187,6 +2194,7 @@ async function carregar(){
     // Bebida alocada à refeição: sem a coluna, a despesa avulsa não se marca
     DESP_BEBIDA_COL=!!(dbRes&&dbRes.ok);
     STOCK_TAM_COL=STOCK_TABLE&&!!(stmRes&&stmRes.ok);
+    STOCK_FAT_COL=STOCK_TABLE&&!!(sfRes&&sfRes.ok);
     // Só gravamos os responsáveis se as colunas já existirem no Supabase
     // (senão o replace das refeições falhava todo — padrão dividas_publicas)
     REFDEF_RESP_COLS=rows.some(ev=>(ev.refeicoes_def||[]).some(r=>'resp_cozinha' in r));
@@ -2233,7 +2241,7 @@ async function carregar(){
       mealheiros:(ev.mealheiros||[]).map(m=>({quem:m.quem,data:m.data,valor:N(m.valor),subtipo:m.subtipo,desc:m.descricao})),
       pagamentos:(ev.pagamentos||[]).map(p=>({de:p.de,para:p.para,valor:N(p.valor),ref:p.ref,data:p.data,extra:N(p.extra)})),
       shoplist:(shopByEv[ev.id]||[]).map(s=>({_id:s.id,artigo:s.artigo,quantidade:s.quantidade||'',tamanho:s.tamanho||'',loja:s.loja||'',tipo:s.tipo,dataValor:s.data_valor,estado:s.estado||'pendente',tratadoPor:s.tratado_por||null,noCarrinho:!!s.no_carrinho,compraId:s.compra_id||null,cfDesc:s.cf_desc||null,cobertura:s.cobertura||'',valor:s.valor!=null?N(s.valor):null,criadoPor:s.criado_por||'',criadoEm:s.criado_em,compradoEm:s.comprado_em})),
-      stockLotes:(stockByEv[ev.id]||[]).map(l=>({_id:l.id,compraId:l.compra_id,artigo:l.artigo,qtd:N(l.qtd),unidade:l.unidade||'',tamanho:l.tamanho||'',valor:N(l.valor),alocacoes:Array.isArray(l.alocacoes)?l.alocacoes:[],_listArt:l.lista_artigo||null,criadoEm:l.criado_em})),
+      stockLotes:(stockByEv[ev.id]||[]).map(l=>({_id:l.id,compraId:l.compra_id,artigo:l.artigo,qtd:N(l.qtd),unidade:l.unidade||'',tamanho:l.tamanho||'',valor:N(l.valor),alocacoes:Array.isArray(l.alocacoes)?l.alocacoes:[],_listArt:l.lista_artigo||null,_fatNome:l.artigo_fatura||null,criadoEm:l.criado_em})),
       tshirts:(tsByEv[ev.id]||[]).map(t=>({_id:t.id,membro:t.membro,nome:t.nome,tipo:t.tipo,tamanho:t.tamanho,imputadoA:Array.isArray(t.imputado_a)?t.imputado_a.filter(Boolean):[],criadoPor:t.criado_por||'',criadoEm:t.criado_em}))
     }));
     ALL_YEARS.sort((a,b)=>(a.evento.ano||0)-(b.evento.ano||0));
@@ -7724,7 +7732,7 @@ function openCompra(compraId,opts){
       // Liga o lote ao artigo da lista: nome igual ou, se a fatura o renomeou
       // (o talão manda no nome), por semelhança — guarda-se em _listArt
       const link=linked.find(x=>shopSameArtigo(x.artigo,l.artigo))||linked.find(x=>faturaScore(x.artigo,l.artigo)>=0.5);
-      const base={_id:l._id,artigo:l.artigo,_listArt:link?link.artigo:null,qtd:fmtQty(l.qtd,l.unidade),valor:l.valor,keys:[],free:!link,destino:'',splits:null};
+      const base={_id:l._id,artigo:l.artigo,_listArt:link?link.artigo:null,_fatNome:l._fatNome||null,qtd:fmtQty(l.qtd,l.unidade),valor:l.valor,keys:[],free:!link,destino:'',splits:null};
       if(al.length>1)base.splits=al.map(a=>({destino:alocToDestino(a),qtd:a.qtd}));
       else if(al.length===1)base.destino=alocToDestino(al[0]);
       return base;
@@ -8133,6 +8141,12 @@ function compraLoteHtml(l,i){
      do lote em `compraEdit.lotes`, e filtrar dava-lhes o índice errado.
      O objeto fica onde estava — desfeita a ligação, o cartão volta sozinho. */
   if(!l.free&&!porConf&&loteCobertoPorOutro(l))return '';
+  /* Pedido que a fatura não cobre: sai da lista dos artigos (vai para o bloco
+     do fim). Só enquanto não tiver preço e não tiver sido trazido à mão — pôr
+     um preço é dizer que foi comprado, e aí volta a ser um artigo como os
+     outros. `_fat` só existe depois de se ler uma fatura, por isso uma compra
+     escrita à mão não é afetada: lá os cartões do carrinho são a compra. */
+  if(!l.free&&l._fat==='miss'&&!l._puxado&&!(rnd(parseFloat(l.valor),2)>0))return '';
   const tag=porConf?`<span class="lote-tag warn">☐ por confirmar</span>`
     :l._byBrand?`<span class="lote-tag ok">✓ por marcas</span>`
     :l._fat==='ok'?`<span class="lote-tag ok">✓ na fatura</span>`
@@ -8147,7 +8161,13 @@ function compraLoteHtml(l,i){
      só se mantém onde esse seletor não aparece, senão diziam a mesma coisa
      duas vezes. */
   const temReq=STOCK_TABLE&&!l.noStock;
-  const sub=(!temReq&&!l.free&&l._listArt&&!shopSameArtigo(l._listArt,l.artigo))?`<small class="lote-list-art">na lista: ${escHtml(l._listArt)}</small>`:'';
+  /* O nome da FATURA fica à vista assim que o de trabalho passa a ser outro.
+     Renomear é o esperado — "Qj Prato Pequeno Casteloes Un" não se procura na
+     despensa — mas quem confere a despesa meses depois precisa de ver o que o
+     talão dizia, e é isto (e a coluna `artigo_fatura`) que lho dá. Só aparece
+     quando os nomes divergem: repetir o mesmo nome duas vezes era ruído. */
+  const sub=((!temReq&&!l.free&&l._listArt&&!shopSameArtigo(l._listArt,l.artigo))?`<small class="lote-list-art">na lista: ${escHtml(l._listArt)}</small>`:'')
+    +((STOCK_FAT_COL&&l._fatNome&&!shopSameArtigo(l._fatNome,l.artigo))?`<small class="lote-list-art">🧾 na fatura: ${escHtml(l._fatNome)}</small>`:'');
   const nameIn=`<input class="lote-name-in" type="text" maxlength="60" placeholder="Nome do artigo" value="${escHtml(l.artigo||'')}" oninput="compraEdit.lotes[${i}].artigo=this.value">`;
   const name=sub?`<div class="lote-name-wrap">${nameIn}${sub}</div>`:nameIn;
   const head=`<div class="lote-head">${name}${tag}${l.free?`<button class="lote-x" title="Remover" onclick="compraDelLote(${i})">✕</button>`:''}</div>`;
@@ -8251,6 +8271,12 @@ function compraLoteSetReq(i,v){
      efeito visível era o que fazia parecer que ligar não servia de nada. */
   compraRenderLotes();
 }
+// Trazer para a compra um pedido que a fatura não cobriu (a leitura falhou, ou
+// comprou-se sem estar no talão): volta a ser um cartão, para levar preço.
+function compraPuxarMiss(i){
+  const l=(compraEdit.lotes||[])[i];if(!l)return;
+  l._puxado=true;compraRenderLotes();
+}
 function compraLoteNoStock(i,on){
   const l=(compraEdit.lotes||[])[i];if(!l)return;
   l.noStock=!!on;
@@ -8271,8 +8297,16 @@ function compraRenderLotes(){
   // preço ficar em branco). Fica visível na revisão, antes de registar.
   // Um pedido já coberto por outro artigo desta compra (🔗) não é "não apareceu
   // na fatura" — apareceu com outro nome, e é isso que a ligação diz.
-  const miss=ls.filter(l=>!l.free&&l._fat==='miss'&&!loteCobertoPorOutro(l,ls));
-  const missWarn=miss.length?`<div class="lote-miss-warn">⚠️ <b>${miss.length} artigo(s) do carrinho não apareceram na fatura.</b> Se deixares o preço em branco, ficam na lista <b>por tratar</b> (não são dados como comprados):<ul>${miss.map(l=>'<li>'+escHtml(l.artigo)+(l.qtd?' <i style="color:var(--muted);font-style:normal">('+escHtml(l.qtd)+')</i>':'')+'</li>').join('')}</ul></div>`:'';
+  /* A LISTA DE ARTIGOS É A DA FATURA. Um pedido do carrinho que a fatura não
+     cobre não é um artigo desta compra — é um pedido que ficou por comprar, e
+     estar no meio dos outros com 0,00 € era dar-lhe o aspeto de artigo. Desce
+     para aqui, em lista compacta, com um ＋ para o trazer de volta quando foi
+     mesmo comprado e a leitura é que falhou. Guarda-se o índice original: os
+     `onclick` levam a posição em `compraEdit.lotes`. */
+  const miss=ls.map((l,i)=>({l,i})).filter(x=>!x.l.free&&x.l._fat==='miss'&&!x.l._puxado
+    &&!(rnd(parseFloat(x.l.valor),2)>0)&&!loteCobertoPorOutro(x.l,ls));
+  const missWarn=miss.length?`<div class="lote-miss-warn">⚠️ <b>${miss.length} pedido(s) do carrinho que a fatura não cobre.</b> Ficam na lista <b>por tratar</b> — não são dados como comprados. Se algum foi mesmo comprado e a leitura falhou, traz-lo para a compra e mete-lhe o preço.
+      ${miss.map(({l,i})=>`<div class="miss-row"><span>${escHtml(l.artigo)}${l.qtd?' <i>('+escHtml(l.qtd)+')</i>':''}</span><button type="button" class="cmp-mini" onclick="compraPuxarMiss(${i})">＋ trazer</button></div>`).join('')}</div>`:'';
   const prev=!!compraEdit.prov;
   // Quem vem do cash-flow não vem da lista: o que está a fazer é meter artigos
   // em 🧺 Stock. Ligar a um pedido da lista é opcional (🔗 no artigo, ou o bloco
@@ -8794,6 +8828,7 @@ function faturaAplicar(d){
       // …e manda também no NOME do artigo (a lista é só guia); o nome pedido
       // fica em _listArt para o match com a procura da lista e como nota na UI
       if(ln.artigo&&!shopSameArtigo(l.artigo,ln.artigo)){l._listArt=l.artigo;l.artigo=ln.artigo;}
+      l._fatNome=ln.artigo;   // o que a fatura dizia, guardado antes de se lhe poder mexer no nome
       l._fat='ok';l._impQtds=[ln.qtd];
       faturaQtdRecheck(l);
       if(!l.tipoFix)compraProporDestino(l);   // re-propõe com a qtd real do talão
@@ -8915,6 +8950,7 @@ function faturaSugToggle(i){
   if(ln.qtd)l.qtd=ln.qtd;   // qtd real do talão (o pedido do carrinho é só guia)
   // O nome do talão também manda (a lista fica como nota em _listArt)
   if(ln.artigo&&!shopSameArtigo(l.artigo,ln.artigo)){l._listArt=l._listArt||l.artigo;l.artigo=ln.artigo;}
+  l._fatNome=ln.artigo;
   l._fat='ok';l._impQtds=[ln.qtd];
   faturaQtdRecheck(l);
   if(!l.tipoFix)compraProporDestino(l);
@@ -8959,7 +8995,7 @@ function faturaSubToggle(i,j){
   const destino=l.tipoFix?l.tipoFix:((l.keys||[]).length===1?l.keys[0]:(STOCK_TABLE?'':'Gerais'));
   // Herda a ligação ao pedido da lista (batatas fritas) e as refeições de
   // origem: é outra marca do MESMO pedido, logo cobre-o na mesma.
-  (compraEdit.lotes=compraEdit.lotes||[]).push({free:true,artigo:ln.artigo,qtd:ln.qtd,valor:ln.valor,destino,keys:(l.keys||[]).slice(),_listArt:l._listArt||l.artigo,_fat:'ok'});
+  (compraEdit.lotes=compraEdit.lotes||[]).push({free:true,artigo:ln.artigo,qtd:ln.qtd,valor:ln.valor,destino,keys:(l.keys||[]).slice(),_listArt:l._listArt||l.artigo,_fatNome:ln.artigo,_fat:'ok'});
   (l._impQtds=l._impQtds||[]).push(ln.qtd);
   faturaQtdRecheck(l);
   compraRenderLotes();
@@ -9000,7 +9036,7 @@ function faturaExtraToggle(i){
   // vista e desliga-se num toque, mas poupa o gesto no caso que se repete em
   // todos os talões de supermercado.
   const ns=ehNaoStock(e.artigo);
-  (compraEdit.lotes=compraEdit.lotes||[]).push({free:true,artigo:e.artigo,qtd:e.qtd,valor:e.valor,destino:'Gerais',keys:[],_listArt:ns?null:(e.pedido||null),noStock:ns});
+  (compraEdit.lotes=compraEdit.lotes||[]).push({free:true,artigo:e.artigo,qtd:e.qtd,valor:e.valor,destino:'Gerais',keys:[],_listArt:ns?null:(e.pedido||null),_fatNome:e.artigo,noStock:ns});
   compraRenderLotes();
 }
 
@@ -9084,7 +9120,7 @@ async function saveCompra(){
       const splits=(l.splits&&l.splits.length)?l.splits.filter(s=>s.destino&&(parseFloat(String(s.qtd).replace(',','.'))>0)):null;
       // Um lote livre ligado a um pedido (marca de "Batatas Fritas") mantém as
       // refeições herdadas — assim conta como necessidade de stock desse pedido.
-      lotes.push({artigo,qtd:q.n,unidade:q.u,valor:v,destino:(l.destino!=null?l.destino:''),splits:(splits&&splits.length?splits:null),keys:(l.free&&!l._listArt)?[]:(l.keys||[]),_listArt:l._listArt||null});
+      lotes.push({artigo,qtd:q.n,unidade:q.u,valor:v,destino:(l.destino!=null?l.destino:''),splits:(splits&&splits.length?splits:null),keys:(l.free&&!l._listArt)?[]:(l.keys||[]),_listArt:l._listArt||null,_fatNome:l._fatNome||null});
       continue;
     }
     // Sem tabela de stock: item detalhado → despesa direta do tipo/refeição
@@ -9194,14 +9230,14 @@ async function saveCompra(){
           // Resolve pelo destino/split escolhido; sem destino cai em FIFO (que
           // já vê os lotes anteriores empilhados nesta mesma gravação)
           l.alocacoes=resolveLoteAlocs(l);
-          stockArr().push({_id:null,compraId,artigo:l.artigo,qtd:l.qtd,unidade:l.unidade,valor:l.valor,alocacoes:l.alocacoes,_listArt:l._listArt||null,criadoEm:new Date().toISOString()});
+          stockArr().push({_id:null,compraId,artigo:l.artigo,qtd:l.qtd,unidade:l.unidade,valor:l.valor,alocacoes:l.alocacoes,_listArt:l._listArt||null,_fatNome:l._fatNome||null,criadoEm:new Date().toISOString()});
         }
         // `lista_artigo` vai SEMPRE (null quando o lote não responde a pedido
         // nenhum): num INSERT em bloco o PostgREST exige as mesmas chaves em
         // todas as linhas — só nas que tinham ligação, uma compra que misture
         // artigos da lista com artigos de fora rebentava com "All object keys
         // must match" e não gravava nada.
-        const lres=await queueWrite(()=>sbReq('POST','stock_lotes',lotes.map(l=>({evento_id:DATA._sbId,compra_id:compraId,artigo:l.artigo,qtd:l.qtd,unidade:l.unidade,valor:l.valor,alocacoes:l.alocacoes,lista_artigo:l._listArt||null})),{Prefer:'return=representation'}));
+        const lres=await queueWrite(()=>sbReq('POST','stock_lotes',lotes.map(l=>({evento_id:DATA._sbId,compra_id:compraId,artigo:l.artigo,qtd:l.qtd,unidade:l.unidade,valor:l.valor,alocacoes:l.alocacoes,lista_artigo:l._listArt||null,...(STOCK_FAT_COL?{artigo_fatura:l._fatNome||null}:{})})),{Prefer:'return=representation'}));
         if(Array.isArray(lres)){
           const added=stockArr().filter(l=>l.compraId===compraId&&l._id==null);
           added.forEach((l,i)=>{if(lres[i])l._id=lres[i].id;});
