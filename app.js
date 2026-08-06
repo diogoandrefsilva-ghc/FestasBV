@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v223 · 2026-08-06 · Picar na folha das compras passa a marcar o carrinho na app (o que é meu), e o limpar mudou-se para a barra — dentro da folha fazia-a saltar ao primeiro pico';
+const APP_BUILD = 'v224 · 2026-08-06 · Registar uma compra que mistura artigos da lista com artigos de fora deixa de dar "All object keys must match"';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -2265,8 +2265,24 @@ async function pushToGitHub(msg){
   return _writeChain;
 }
 
+/* INSERT em bloco: o PostgREST recusa o lote inteiro ("All object keys must
+   match") se as linhas não tiverem exatamente as mesmas chaves — e é fácil
+   acontecer, porque metade dos payloads da app monta colunas opcionais com um
+   `if` (o `lista_artigo` de um lote ligado a um pedido, o `tratado_por` de quem
+   trata). Uniformiza-se aqui: a união das chaves de todas as linhas, com null
+   no que faltar. Quando já batem certo (o caso normal) isto não muda nada; as
+   colunas que a migração não trouxe continuam de fora, que ninguém as mandou. */
+function sbRowsUniformes(rows){
+  const plain=o=>o&&typeof o==='object'&&!Array.isArray(o);
+  if(!Array.isArray(rows)||rows.length<2||!rows.every(plain))return rows;
+  const keys=[];rows.forEach(r=>Object.keys(r).forEach(k=>{if(!keys.includes(k))keys.push(k);}));
+  if(rows.every(r=>Object.keys(r).length===keys.length))return rows;
+  return rows.map(r=>{const o={};keys.forEach(k=>o[k]=r[k]!==undefined?r[k]:null);return o;});
+}
+
 async function sbReq(method,path,body,extra){
   const opt={method,headers:sbHeaders(extra||{})};
+  if(method==='POST')body=sbRowsUniformes(body);
   if(body!==undefined)opt.body=JSON.stringify(body);
   const r=await sbFetch(`${SB_URL}/rest/v1/${path}`,opt);
   if(!r.ok){let m='HTTP '+r.status;try{const j=await r.json();m=j.message||m;}catch(_){ }throw new Error(m);}
@@ -8935,7 +8951,12 @@ async function saveCompra(){
           l.alocacoes=resolveLoteAlocs(l);
           stockArr().push({_id:null,compraId,artigo:l.artigo,qtd:l.qtd,unidade:l.unidade,valor:l.valor,alocacoes:l.alocacoes,_listArt:l._listArt||null,criadoEm:new Date().toISOString()});
         }
-        const lres=await queueWrite(()=>sbReq('POST','stock_lotes',lotes.map(l=>{const o={evento_id:DATA._sbId,compra_id:compraId,artigo:l.artigo,qtd:l.qtd,unidade:l.unidade,valor:l.valor,alocacoes:l.alocacoes};if(l._listArt)o.lista_artigo=l._listArt;return o;}),{Prefer:'return=representation'}));
+        // `lista_artigo` vai SEMPRE (null quando o lote não responde a pedido
+        // nenhum): num INSERT em bloco o PostgREST exige as mesmas chaves em
+        // todas as linhas — só nas que tinham ligação, uma compra que misture
+        // artigos da lista com artigos de fora rebentava com "All object keys
+        // must match" e não gravava nada.
+        const lres=await queueWrite(()=>sbReq('POST','stock_lotes',lotes.map(l=>({evento_id:DATA._sbId,compra_id:compraId,artigo:l.artigo,qtd:l.qtd,unidade:l.unidade,valor:l.valor,alocacoes:l.alocacoes,lista_artigo:l._listArt||null})),{Prefer:'return=representation'}));
         if(Array.isArray(lres)){
           const added=stockArr().filter(l=>l.compraId===compraId&&l._id==null);
           added.forEach((l,i)=>{if(lres[i])l._id=lres[i].id;});
