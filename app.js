@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v238 · 2026-08-07 · O detalhe de uma compra reaberta avisa quando não soma o que a compra vale (e guardar deixa de poder apagar a diferença em silêncio)';
+const APP_BUILD = 'v239 · 2026-08-07 · O 🧺 Stock contava lotes e chamava-lhes “compras” — passa a dizer quantos artigos e, só havendo mais do que uma, quantas compras';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -9479,7 +9479,14 @@ function openLoteModal(id){
   // direita a dizer o mesmo por outras palavras.
   const demTot=rnd(needKeys.reduce((s,k)=>s+dem[k],0),3);
   const nL=lotes.length;
-  const cmpSum=nL?`${nL} ${anyOrg?(nL===1?'origem':'origens'):(nL===1?'compra':'compras')}`:'—';
+  /* Contava LOTES e chamava-lhes "compras": três marcas trazidas na mesma
+     compra diziam "3 compras", o que faz parecer que o artigo veio de três
+     idas às compras. São artigos; as compras são quantos compra_id distintos
+     há — e essa é a informação que interessa, porque um artigo espalhado por
+     várias compras é sinal de compras duplicadas por limpar. */
+  const nCmp=new Set(lotes.map(l=>l.compraId||'')).size;
+  const cmpSum=nL?(anyOrg?`${nL} ${nL===1?'origem':'origens'}`
+    :`${nL} ${nL===1?'artigo':'artigos'}${nCmp>1?` · ${nCmp} compras`:''}`):'—';
   document.getElementById('lote-info').innerHTML=
     `<div class="lote-sum">Em stock: <b>${escHtml(fmtQty(totQ,editingLote.u))}</b> · <b>${semCusto?'sem custo':eur(totV)}</b></div>`+
     `<div class="lote-acc">
