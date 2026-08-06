@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v221 · 2026-08-06 · O 👤 sai das linhas que já têm dono (é o chip do carrinho que passa o artigo a outra pessoa) e deixa de ser emoji azul — ícone desenhado, na cor da paleta';
+const APP_BUILD = 'v222 · 2026-08-06 · Na folha das compras, a quantidade passa a ser o que FALTA comprar: com 1 já em stock de 6 pedidos lê-se "5", e o pedido fica na nota ao lado';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -12800,6 +12800,56 @@ function buildShopReport(sel){
       if(qtd&&tams.length===1)qtd+=' × '+tams[0];
       else if(!qtd&&tams.length===1)qtd=tams[0];
     }
+    /* ── O NÚMERO GRANDE É O QUE HÁ A COMPRAR ──────────────────────────
+       Havendo 1 em stock de 6 pedidos, a coluna dizia "6 × 2,5 kg" e a nota
+       ao lado "1 já em stock — falta comprar 5": quem lê a folha de relance
+       no corredor leva 6. O que a linha tem de responder é "quanto meto no
+       carrinho", por isso a quantidade passa a ser a FALTA e o pedido desce
+       para a nota, ao lado do que já cá está. */
+    const pedidoTxt=qtd;
+    let notaStock='';
+    // Junta o total a comprar por unidade, com a mesma regra de "número seco
+    // sem embalagem = unidades" do shopSumQtys
+    const fmtAgg=m=>Object.keys(m).filter(u=>m[u]>0.0005).map(u=>{
+      const n=m[u];
+      return (!tams.length&&(!u||u==='un'))?fmtQty(n,n===1?'unidade':'unidades'):fmtQty(n,u);
+    }).join(' + ');
+    /* A cobertura é da REFEIÇÃO, não do pedido (`shopItemCoverage` já soma os
+       pedidos daquele artigo naquela refeição) — daí agrupar por refeição e
+       perguntar uma vez por grupo, senão o mesmo stock contava duas vezes. */
+    const grupos={};
+    items.forEach(x=>{const k=shopGroupKey(x);(grupos[k]=grupos[k]||[]).push(x);});
+    const falta={},jaCa={};
+    let comStock=false,tudoNum=true;
+    Object.keys(grupos).forEach(k=>{
+      const arr=grupos[k],c=shopItemCoverage(arr[0]);
+      if(c&&c.aloc>0.0005){
+        comStock=true;
+        const u=uKey(c.u);
+        jaCa[u]=rnd((jaCa[u]||0)+Math.min(c.aloc,c.need),3);
+        falta[u]=rnd((falta[u]||0)+c.falta,3);
+      }else{                                   // sem stock a contar: vale o pedido
+        arr.forEach(x=>{
+          const q=qtyParse(x.quantidade);
+          if(q){const u=uKey(q.u);falta[u]=rnd((falta[u]||0)+q.n,3);}
+          else tudoNum=false;
+        });
+      }
+    });
+    if(comStock&&tudoNum){
+      const f=fmtAgg(falta),j=fmtAgg(jaCa);
+      if(f&&j){
+        qtd=tams.length===1?`${f} × ${tams[0]}`:f;
+        notaStock=`🧺 ${j} já em stock · pedido ${pedidoTxt}`;
+      }
+    }
+    /* Cobertura dita à mão ("falta 1 kg"): o que a pessoa escreveu é
+       exatamente o que ainda falta, logo é ele o número a levar. */
+    const dec=items.length===1?shopCobDecl(items[0]):'';
+    if(dec&&dec!=='ok'){
+      qtd=dec;
+      notaStock=`🧺 falta dito à mão${pedidoTxt?` · pedido ${pedidoTxt}`:''}`;
+    }
     const meta=[];
     if(opt.dest){
       /* SÓ refeições. "🧾 Gerais" e "🥤 Bebidas" não dizem nada a quem está no
@@ -12824,11 +12874,15 @@ function buildShopReport(sel){
       const quem=[];items.forEach(x=>{if(x.tratadoPor&&quem.indexOf(x.tratadoPor)<0)quem.push(x.tratadoPor);});
       if(quem.length)meta.push('🛒 '+escHtml(quem.join(', ')));
     }
-    // A dica de stock é a MESMA frase do ecrã ("3 kg já em stock — falta comprar
-    // 2 kg"): é ela que impede comprar outra vez o que já está na garagem. Sem
-    // ela a folha mandava comprar o pedido inteiro.
+    /* Dicas de stock: as MESMAS frases do ecrã, que são o que impede comprar
+       outra vez o que já está na garagem. A da falta parcial ("1 já em stock —
+       falta comprar 5") não se repete — está dita na quantidade e na nota. */
+    if(notaStock)meta.push(escHtml(notaStock));
     const dicas=[];
-    items.forEach(x=>{const sh=shopStockHint(x);if(sh&&dicas.indexOf(sh.txt)<0)dicas.push(sh.txt);});
+    items.forEach(x=>{
+      if(notaStock&&/falta/.test(String((shopStockHint(x)||{}).txt||'')))return;
+      const sh=shopStockHint(x);if(sh&&dicas.indexOf(sh.txt)<0)dicas.push(sh.txt);
+    });
     if(dicas.length)meta.push(escHtml(dicas.join(' · ')));
     // Caixa já ticada: quem leva o artigo marcou-o como apanhado. É informação
     // de quem anda nas compras e é justamente para isso que a folha serve.
