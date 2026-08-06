@@ -1122,20 +1122,22 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 /* Label do cabeçalho num span próprio: nunca parte para 2 linhas — encolhe com
    reticências se não couber (o essencial — refeição + data — fica no início) */
 .cmp-grp-label{flex:0 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-/* Artigo agrupado (mesmo nome, várias refeições): continua a valer por UM artigo
-   da lista — o nome fica na mesma coluna e com o mesmo peso de um artigo de uma
-   só refeição (e com a quantidade total logo a seguir, tal e qual). A barra
-   verde deixa de envolver o conjunto: passa a ligar só as linhas-refeição, que
-   ficam recuadas por baixo. Assim conta-se os artigos pelos nomes a negrito. */
+/* Artigo agrupado (mesmo nome, várias refeições): é UMA linha da lista, igual à
+   de um artigo com um só pedido — o cabeçalho (.cmp-agh) é um cartão normal, com
+   o nome, a quantidade TOTAL, a loja e os destinos em chips. As linhas por
+   pedido ficam escondidas até se tocar; só então aparecem recuadas, ligadas pelo
+   fio verde. Assim a lista conta-se pelos nomes a negrito e lê-se no corredor do
+   supermercado, que é onde ela é usada. */
 .cmp-artgrp{position:relative}
-.cmp-artgrp-h{display:flex;align-items:baseline;gap:8px;padding:1px 2px 2px}
-.cmp-artgrp-name{font-size:14px;font-weight:700;color:var(--ink);line-height:1.25;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.cmp-artgrp-n{margin-left:auto;flex:0 0 auto;font-size:11px;color:var(--faint);white-space:nowrap}
+/* Os destinos numa linha de chips que quebra (e não numa parede que come o nome) */
+.cmp-agh-chips{display:flex;flex-wrap:wrap;gap:4px}
+/* O chevron roda a apontar para baixo quando o grupo está aberto */
+.cmp-agh-chev{transition:transform .15s ease}
+.cmp-artgrp.open>.cmp-agh .cmp-agh-chev{transform:rotate(90deg)}
 /* Corpo recuado com o fio verde a ligar as refeições do mesmo artigo */
-.cmp-artgrp-body{position:relative;padding-left:11px}
+.cmp-artgrp-body{display:none;position:relative;padding-left:11px}
+.cmp-artgrp.open>.cmp-artgrp-body{display:block}
 .cmp-artgrp-body::before{content:'';position:absolute;left:2px;top:3px;bottom:3px;width:2px;border-radius:2px;background:rgba(30,122,77,.35)}
-/* Total do grupo alinhado com o nome, logo por baixo dele */
-.cmp-artgrp-qtd{padding:0 2px 2px}
 /* Linha-refeição dentro do grupo: rótulo principal é a refeição, mais leve */
 .cmp-item.cmp-sub .cmp-artigo{font-size:13px;font-weight:600;color:var(--muted)}
 /* A refeição vai à cabeça da linha com o MESMO chip dos cartões normais (aqui
@@ -1834,10 +1836,15 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 #view-compras .cmp-list>.cmp-item:last-child{border-bottom:none}
 /* O artigo agrupado é UMA linha do talão: o tracejado só aparece no fim do
    grupo (entre artigos), nunca entre as refeições do mesmo artigo — assim os
-   tracejados contam-se e dão logo o número de artigos da lista. */
-#view-compras .cmp-artgrp{padding:10px 0 6px;border-bottom:1px dashed rgba(110,75,25,.28)}
+   tracejados contam-se e dão logo o número de artigos da lista. O cabeçalho
+   fechado leva o mesmo espaço de um artigo normal (é uma linha como as outras);
+   as linhas por pedido, essas, ficam apertadas por baixo. */
+#view-compras .cmp-artgrp{padding:0;border-bottom:1px dashed rgba(110,75,25,.28)}
 #view-compras .cmp-list>.cmp-artgrp:last-child{border-bottom:none}
 #view-compras .cmp-artgrp .cmp-item{border-bottom:none;padding:5px 2px}
+#view-compras .cmp-artgrp>.cmp-agh{padding:10px 2px}
+#view-compras .cmp-artgrp.open>.cmp-agh{padding-bottom:4px}
+#view-compras .cmp-artgrp.open>.cmp-artgrp-body{padding-bottom:8px}
 #view-compras .cmp-tap:active{background:rgba(110,75,25,.06)}
 #view-compras .cmp-item.incart{background:linear-gradient(90deg,rgba(30,122,77,.08),transparent 70%)}
 #view-compras .cmp-item.removed{border-bottom-color:rgba(179,64,47,.4);background:repeating-linear-gradient(-45deg,rgba(179,64,47,.05) 0 6px,transparent 6px 12px)}

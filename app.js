@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v217 · 2026-08-06 · A folha das compras deixa de partir em colunas: um artigo por linha, à largura toda, no papel como no ecrã';
+const APP_BUILD = 'v218 · 2026-08-06 · A Shop List mostra UM artigo por linha: a loja é do artigo (o mesmo deixa de sair em dois grupos) e as refeições fecham-se em chips';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -5730,9 +5730,36 @@ function shopLojaNomes(){
   ALL_YEARS.forEach(y=>(y.shoplist||[]).forEach(it=>{const l=shopLojaTxt(it);if(l&&!m[shopLojaKey(l)])m[shopLojaKey(l)]=l;}));
   return Object.values(m).sort((a,b)=>a.localeCompare(b,'pt'));
 }
+/* A loja é do ARTIGO, não do PEDIDO. "Loja não especificada" quer dizer
+   *ninguém disse*, não *noutro sítio* — logo nunca contradiz a loja que outro
+   pedido do MESMO artigo indicou. Sem isto, o azeite marcado "Azeiteiro" num
+   jantar e deixado em branco noutro saía DUAS VEZES na lista, em dois grupos,
+   a mandar comprar azeite duas vezes — que é o duplo-comprar que a app evita
+   em todo o lado (stock, coberto, encomendado).
+   Herda-se só quando o artigo tem UMA loja indicada: se dois pedidos disserem
+   lojas diferentes, foi de propósito e as duas ficam (informação verdadeira,
+   alguém a escreveu). Só mandam os pedidos ainda em jogo — a loja de um pedido
+   comprado ou removido não arrasta os que ficaram. */
+let SHOP_ART_LOJA={};
+function shopArtLojaCalc(){
+  const m={};
+  if(SHOP_LOJA_COL)shopArr().forEach(it=>{
+    if(!shopIsPending(it))return;
+    const l=shopLojaTxt(it),k=shopArtKey(it.artigo);
+    if(!l||!k)return;
+    if(!(k in m))m[k]=l;
+    else if(m[k]&&shopLojaKey(m[k])!==shopLojaKey(l))m[k]='';   // lojas diferentes → não se herda
+  });
+  SHOP_ART_LOJA=m;
+  return m;
+}
+/* Loja EFETIVA de um pedido: a dele; e, não tendo indicação, a que os irmãos do
+   mesmo artigo indicaram. É esta — e não a `loja` crua — que agrupa e ordena a
+   lista, o cartão da refeição e a folha das compras. */
+function shopLojaEfe(it){return shopLojaTxt(it)||SHOP_ART_LOJA[shopArtKey(it&&it.artigo)]||'';}
 // Ordenação por loja: com loja primeiro (alfabética), "sem loja" no fim
 function shopLojaCmp(a,b){
-  const la=shopLojaTxt(a),lb=shopLojaTxt(b);
+  const la=shopLojaEfe(a),lb=shopLojaEfe(b);
   return ((la?0:1)-(lb?0:1))||la.localeCompare(lb,'pt');
 }
 // Há alguma loja indicada nesta lista? (só então faz sentido ordenar por loja)
@@ -6295,8 +6322,9 @@ function shopItemCard(it,mineView,noBadge,grouped,noLoja){
   // A loja pedida tem LINHA PRÓPRIA, logo a seguir à quantidade: é indicação de
   // compra, lê-se com ela e não misturada no rodapé de quem pediu (que é o dado
   // menos importante do cartão, e por isso mais pequeno). Na vista agrupada por
-  // loja o cabeçalho já a diz → noLoja.
-  const lojaTxt=noLoja?'':shopLojaTxt(it);
+  // loja o cabeçalho já a diz → noLoja; num artigo agrupado di-la o cabeçalho do
+  // grupo (é do artigo, não de cada refeição) → grouped.
+  const lojaTxt=(noLoja||grouped)?'':shopLojaEfe(it);
   const lojaRow=lojaTxt?`<div class="cmp-loja-row"><span class="cmp-loja">${escHtml(lojaTxt)}</span></div>`:'';
   if(it.criadoPor)sub=`<div class="cmp-sub">pedido por ${escHtml(it.criadoPor)}</div>`;
   if(covered){
@@ -6337,19 +6365,82 @@ function shopItemCard(it,mineView,noBadge,grouped,noLoja){
   </div>`;
 }
 /* Um artigo agrupado: um só pedido → cartão normal; vários pedidos (mesmo nome,
-   refeições diferentes) → a MESMA linha de artigo (nome + quantidade total, na
-   mesma coluna e com o mesmo peso) e, recuadas por baixo, uma linha por
-   refeição ligadas pelo fio verde. O grupo conta como um artigo só: a lista
-   lê-se pelos nomes a negrito, não pelo número de linhas. */
-function shopArtNestHtml(items,mineView,noLoja){
+   refeições diferentes) → UMA LINHA SÓ, fechada — nome, quantidade total, loja e
+   as refeições em chips —, com as linhas por pedido a abrir num toque.
+
+   Antes o grupo mostrava sempre todas as linhas por baixo, cada uma com o seu
+   chip, o "pedido por" e o seu ＋🛒. É informação de PLANEAMENTO ("quem pediu
+   isto e para que jantar") despejada numa lista que se usa no CORREDOR do
+   supermercado, onde a pergunta é só "quanto vinho branco levo". A folha 🖨 já
+   dava uma linha por artigo; o ecrã é que tinha ficado atrás.
+   As refeições não se perdem — ficam nos chips, e o detalhe a um toque.
+
+   Abre-se sozinho quando algum pedido traz DICA DE STOCK: essa é por refeição
+   ("2 kg já em stock — falta 1 kg") e o cabeçalho não a sabe dizer por todos.
+   Nada de fechar por cima de informação que o resumo não substitui. */
+const SHOP_GRP_OPEN={};   // grupos abertos, por âmbito+artigo (sobrevive aos re-renders)
+const SHOP_GRP_KEYS=[];   // âmbitos desta renderização (o onclick leva o índice, não o nome)
+let SHOP_BLK='';          // bloco a ser desenhado (falta / carr / meu) — entra na chave
+function toggleArtGrp(i,el){
+  const k=SHOP_GRP_KEYS[i];if(!k)return;
+  const on=!SHOP_GRP_OPEN[k];SHOP_GRP_OPEN[k]=on;
+  // Alterna a classe no sítio em vez de refazer a lista: abrir um grupo não é
+  // mudar dados, e um re-render aqui custava o scroll de quem anda nas compras.
+  const box=el&&el.closest?el.closest('.cmp-artgrp'):null;
+  if(box)box.classList.toggle('open',on);
+}
+function shopArtNestHtml(items,mineView,noLoja,scope){
   if(items.length===1)return shopItemCard(items[0],mineView,false,false,noLoja);
-  const tot=shopSumQtys(items);
+  const it0=items[0];
+  const ids=items.map(x=>x._id).filter(x=>x!=null);
   // Total do grupo: mesma linha própria dos cartões (nome em cima, quantidade
   // por baixo) — é a resposta a "quanto preciso ao todo deste artigo".
-  const qtd=tot?`<div class="cmp-qtd-row cmp-artgrp-qtd">Quantidade: <b>${escHtml(tot)}</b></div>`:'';
-  let h=`<div class="cmp-artgrp"><div class="cmp-artgrp-h"><span class="cmp-artgrp-name">${escHtml(items[0].artigo)}</span><span class="cmp-artgrp-n">${items.length} refeições</span></div>${qtd}<div class="cmp-artgrp-body">`;
-  items.forEach(it=>{h+=shopItemCard(it,mineView,false,true,noLoja);});
-  return h+'</div></div>';
+  const tot=shopSumQtys(items);
+  const qtd=tot?`<div class="cmp-qtd-row">Quantidade: <b>${escHtml(tot)}</b></div>`:'';
+  const lojaTxt=noLoja?'':shopLojaEfe(it0);
+  const lojaRow=lojaTxt?`<div class="cmp-loja-row"><span class="cmp-loja">${escHtml(lojaTxt)}</span></div>`:'';
+  /* Os destinos em chips: é o que as linhas por pedido diziam, na largura de uma
+     linha. Acima de quatro conta-se o resto — a lista lê-se pelos artigos, e uma
+     parede de chips gasta o espaço que o nome precisa. */
+  const seen={},chips=[];
+  items.forEach(it=>{
+    const meal=shopIsMeal(it.tipo)&&it.dataValor;
+    const txt=meal?`${shopTipoIcon(it.tipo)} ${fmtDiaMes(it.dataValor)}`:`${shopTipoIcon(it.tipo)} ${escHtml(it.tipo)}`;
+    if(seen[txt])return;seen[txt]=1;
+    chips.push(`<span class="cmp-badge${meal?' meal':''}">${txt}</span>`);
+  });
+  const MAXC=4;
+  const chipsRow=`<div class="cmp-badge-row cmp-agh-chips">${chips.slice(0,MAXC).join('')}${chips.length>MAXC?`<span class="cmp-badge">+${chips.length-MAXC}</span>`:''}</div>`;
+  // Quem pediu: os nomes distintos do grupo (acima de dois, o número — o rodapé
+  // é o dado menos importante da linha e não pode empurrar o resto).
+  const pediu=[];items.forEach(x=>{if(x.criadoPor&&pediu.indexOf(x.criadoPor)<0)pediu.push(x.criadoPor);});
+  const sub=pediu.length?`<div class="cmp-sub">pedido por ${escHtml(pediu.length>2?pediu.length+' pessoas':pediu.join(' e '))}</div>`:'';
+  /* A ação é do GRUPO — reclamar/largar o artigo inteiro de uma vez, que é como
+     se compra (o vinho traz-se numa ida, não uma garrafa por jantar). O que cada
+     compra vai colmatar decide-se depois, ao registá-la. */
+  const livres=items.filter(x=>!x.tratadoPor&&x._id!=null);
+  const noCarrinho=items.every(x=>x.noCarrinho);
+  let check='',right='';
+  if(mineView){
+    check=`<button class="cmp-check write-action ${noCarrinho?'on':''}" onclick="event.stopPropagation();toggleCartGrupo([${ids}])" aria-label="Já no carrinho">✓</button>`;
+    right=`<button class="cmp-x write-action" aria-label="Tirar do carrinho" onclick="event.stopPropagation();unclaimGrupo([${ids}])">✕</button>`;
+  }else if(!livres.length){
+    const quem=[];items.forEach(x=>{if(x.tratadoPor&&quem.indexOf(x.tratadoPor)<0)quem.push(x.tratadoPor);});
+    right=`<span class="cmp-chip">🛒 ${escHtml(quem.length>1?quem.length+' pessoas':(quem[0]||''))}</span>`;
+  }else{
+    right=`<button class="cmp-mini cart write-action" title="Pôr no carrinho" aria-label="Pôr no carrinho" onclick="event.stopPropagation();claimGrupo([${livres.map(x=>x._id)}])"><i class="cmp-plus">＋</i>🛒</button>`;
+  }
+  const k=(scope||'')+'|'+shopArtKey(it0.artigo);
+  const open=(k in SHOP_GRP_OPEN)?SHOP_GRP_OPEN[k]:items.some(x=>shopStockHint(x));
+  const i=SHOP_GRP_KEYS.push(k)-1;
+  return `<div class="cmp-artgrp${open?' open':''}">
+    <div class="cmp-item cmp-line cmp-tap cmp-agh${mineView&&noCarrinho?' incart':''}" onclick="toggleArtGrp(${i},this)">
+      ${check}
+      <div class="cmp-main"><div class="cmp-artigo">${escHtml(it0.artigo)}</div>${qtd}${lojaRow}${chipsRow}${sub}</div>
+      ${right}<span class="cmp-chev-r cmp-agh-chev">›</span>
+    </div>
+    <div class="cmp-artgrp-body">${items.map(it=>shopItemCard(it,mineView,false,true,noLoja)).join('')}</div>
+  </div>`;
 }
 
 /* Lista agrupada por refeição/tipo: um cabeçalho por grupo (ex.: 🍳 Almoço 8/ago
@@ -6388,7 +6479,7 @@ function shopSumQtys(items){
 function shopArtGroupedList(list,mineView){
   const groups={},order=[];
   list.forEach(it=>{const k=shopArtKey(it.artigo);if(!groups[k]){groups[k]={items:[]};order.push(k);}groups[k].items.push(it);});
-  return '<div class="cmp-list">'+order.map(k=>shopArtNestHtml(groups[k].items,mineView)).join('')+'</div>';
+  return '<div class="cmp-list">'+order.map(k=>shopArtNestHtml(groups[k].items,mineView,false,SHOP_BLK+'|art')).join('')+'</div>';
 }
 
 /* Largar / marcar apanhado: só os pedidos que estão no carrinho da MESMA pessoa
@@ -6410,10 +6501,11 @@ function shopCatGroupedList(list,mineView){
     const items=cats[k].items;
     const c=k==='none'?null:artCat(items[0].artigo);
     const nome=c?c.nome:'Outros';
-    h+=`<div class="cmp-grp-hdr sf"><span class="cmp-grp-label">${catEmoji(nome)} ${escHtml(nome)}</span><span class="cmp-count">${items.length}</span></div>`;
+    // Conta ARTIGOS, não pedidos: é o que a lista mostra (uma linha por artigo).
     const byArt={},aOrder=[];
     items.forEach(it=>{const ak=shopArtKey(it.artigo);if(!byArt[ak]){byArt[ak]={items:[]};aOrder.push(ak);}byArt[ak].items.push(it);});
-    aOrder.forEach(ak=>{h+=shopArtNestHtml(byArt[ak].items,mineView);});
+    h+=`<div class="cmp-grp-hdr sf"><span class="cmp-grp-label">${catEmoji(nome)} ${escHtml(nome)}</span><span class="cmp-count">${aOrder.length}</span></div>`;
+    aOrder.forEach(ak=>{h+=shopArtNestHtml(byArt[ak].items,mineView,false,SHOP_BLK+'|cat:'+k);});
   });
   return '<div class="cmp-list">'+h+'</div>';
 }
@@ -6421,11 +6513,13 @@ function shopCatGroupedList(list,mineView){
 /* Lista agrupada por LOJA: "isto só há no X" / "prefiro comprar no Y". Um
    cabeçalho por loja e, no fim, os artigos sem indicação (compra-se onde
    calhar). Dentro de cada loja junta-se o mesmo artigo, como na vista por
-   categoria — a lista lê-se como uma ida às compras por sítio. */
+   categoria — a lista lê-se como uma ida às compras por sítio.
+   A loja é a EFETIVA (shopLojaEfe): um artigo com loja indicada num pedido e em
+   branco noutro é UM artigo daquela loja, não um artigo em dois grupos. */
 function shopLojaGroupedList(list,mineView){
   const lojas={},order=[];
   list.forEach(it=>{
-    const l=shopLojaTxt(it),k=l?shopLojaKey(l):'none';
+    const l=shopLojaEfe(it),k=l?shopLojaKey(l):'none';
     if(!lojas[k]){lojas[k]={items:[],nome:l};order.push(k);}
     lojas[k].items.push(it);
   });
@@ -6433,10 +6527,12 @@ function shopLojaGroupedList(list,mineView){
   let h='';
   order.forEach(k=>{
     const g=lojas[k];
-    h+=`<div class="cmp-grp-hdr sf"><span class="cmp-grp-label">${k==='none'?'🛒 '+SHOP_SEM_LOJA:'🏬 '+escHtml(g.nome)}</span><span class="cmp-count">${g.items.length}</span></div>`;
+    // A contagem do cabeçalho é de ARTIGOS, não de pedidos: é o que a lista
+    // mostra agora (uma linha por artigo) e o que quem compra vai buscar.
     const byArt={},aOrder=[];
     g.items.forEach(it=>{const ak=shopArtKey(it.artigo);if(!byArt[ak]){byArt[ak]={items:[]};aOrder.push(ak);}byArt[ak].items.push(it);});
-    aOrder.forEach(ak=>{h+=shopArtNestHtml(byArt[ak].items,mineView,true);});
+    h+=`<div class="cmp-grp-hdr sf"><span class="cmp-grp-label">${k==='none'?'🛒 '+SHOP_SEM_LOJA:'🏬 '+escHtml(g.nome)}</span><span class="cmp-count">${aOrder.length}</span></div>`;
+    aOrder.forEach(ak=>{h+=shopArtNestHtml(byArt[ak].items,mineView,true,SHOP_BLK+'|loja:'+k);});
   });
   return '<div class="cmp-list">'+h+'</div>';
 }
@@ -6518,9 +6614,10 @@ function mealShopSection(rd){
      especificada". Sem nenhuma loja indicada, é a lista simples de sempre. */
   const listaHtml=arr=>{
     if(!shopHasLojas(arr))return arr.map(it=>lineOf(it,past)).join('');
+    shopArtLojaCalc();
     const g={},order=[];
     arr.forEach(it=>{
-      const l=shopLojaTxt(it),k=l?shopLojaKey(l):'none';
+      const l=shopLojaEfe(it),k=l?shopLojaKey(l):'none';
       if(!g[k]){g[k]={nome:l,items:[]};order.push(k);}
       g[k].items.push(it);
     });
@@ -6658,6 +6755,8 @@ function setShopTab(t){SHOP_TAB=t;try{localStorage.setItem('festasbv_shop_tab',t
 
 function renderCompras(){
   const el=document.getElementById('view-compras');if(!el||!DATA)return;
+  shopArtLojaCalc();                                      // loja efetiva de cada artigo (agrupa e ordena a lista)
+  SHOP_GRP_KEYS.length=0;                                 // âmbitos dos grupos desta renderização
   const items=shopArr();
   const act=items.filter(it=>!shopIsBought(it));          // tudo o que não está comprado (pedidos de stock são pendentes por design)
   const canW=shopCanWrite();
@@ -6688,10 +6787,20 @@ function renderCompras(){
     :byCat?shopCatGroupedList(arr,mineView)
     :byArt?shopArtGroupedList(arr,mineView)
     :shopGroupedList(arr,mineView);
-  const nVisiveis=arr=>arr.length;
-  // Um bloco de estado (em falta / em carrinhos / o meu carrinho)
-  const blocoOf=(arr,mineView,cls)=>{
+  /* A contagem é do que a lista MOSTRA. Nas vistas que juntam o mesmo artigo
+     (loja/categoria/artigo) uma linha é um ARTIGO — dizer "7" por cima de cinco
+     linhas fazia a lista parecer que escondia coisas. Por refeição, onde cada
+     pedido é uma linha, continuam a ser pedidos. */
+  const juntaArt=byLoja||byCat||byArt;
+  const nVisiveis=arr=>juntaArt
+    ?new Set(arr.map(it=>(byLoja?shopLojaKey(shopLojaEfe(it))+'|':'')+shopArtKey(it.artigo))).size
+    :arr.length;
+  /* Um bloco de estado (em falta / em carrinhos / o meu carrinho). O nome do
+     bloco entra na chave dos grupos abertos: o mesmo artigo pode aparecer em
+     "Em falta" e em "Já em carrinhos", e abrir um não é abrir o outro. */
+  const blocoOf=(arr,mineView,cls,blk)=>{
     if(!arr.length)return '';
+    SHOP_BLK=blk||'';
     const inner=listOf(arr,mineView);
     return cls?`<div class="${cls}">${inner}</div>`:inner;
   };
@@ -6705,7 +6814,9 @@ function renderCompras(){
      VÊ: não mexe em nada do que se regista (ver a nota no sub-separador do
      carrinho). O Histórico não tem pesquisa — lá manda a data. */
   const buscando=SHOP_BUSCA&&!!SHOP_Q.trim()&&SHOP_TAB!=='hist';
-  const qOk=it=>!buscando||buscaMatch(SHOP_Q,it.artigo,shopLojaTxt(it));
+  // Loja efetiva também na pesquisa: procurar "azeiteiro" tem de dar o azeite
+  // todo — encontrar meio artigo é pior do que não encontrar nenhum.
+  const qOk=it=>!buscando||buscaMatch(SHOP_Q,it.artigo,shopLojaEfe(it));
   /* Encomendado numa provisória sai destas listas pela mesma razão que o coberto
      pelo stock: não há nada a comprar. Deixá-lo em "Em falta" era o convite a
      comprá-lo outra vez — que é justamente o que a encomenda evita. Continua
@@ -6778,12 +6889,12 @@ function renderCompras(){
       // Cabeçalho de estado + wrapper .cmp-free: distingue à vista o que ainda
       // não tem dono (fita campino) do que já está entregue (bloco verde abaixo)
       h+=`<div class="cmp-sec-hdr sf cmp-sec-falta">📣 Falta quem trate <span class="cmp-count">${nVisiveis(falta)}</span></div>`;
-      h+=blocoOf(falta,false,'cmp-free');
+      h+=blocoOf(falta,false,'cmp-free','falta');
     }
     // ── Já em carrinhos (de qualquer pessoa — todos veem quem leva o quê) ──
     if(carrinhos.length){
       h+=`<div class="cmp-sec-hdr sf cmp-sec-claim" style="margin-top:22px">🛒 Já em carrinhos <span class="cmp-count">${nVisiveis(carrinhos)}</span></div>`;
-      h+=blocoOf(carrinhos,false,'cmp-claimed');
+      h+=blocoOf(carrinhos,false,'cmp-claimed','carr');
     }
     // Pedidos cobertos pelo stock NÃO entram na shop list — não há nada a
     // comprar. Vêem-se no cartão da refeição (bloco "Comprado") e no Stock.
@@ -6794,7 +6905,7 @@ function renderCompras(){
         ?`<div class="cmp-empty sf"><span class="cmp-empty-ico">🔎</span>Nada no teu carrinho com <b>${escHtml(SHOP_Q.trim())}</b>.</div>`
         :'<div class="cmp-empty sf"><span class="cmp-empty-ico">🛒</span>O teu carrinho está vazio.<br>Passa por <b>📝 Em falta</b> e toca no <b>＋🛒</b> dos artigos que fores buscar.</div>';
     }else{
-      h+=blocoOf(mine,true,'');
+      h+=blocoOf(mine,true,'','meu');
     }
     // A pesquisa é só de leitura: registar a compra leva SEMPRE o carrinho
     // inteiro. Dizê-lo por escrito enquanto há artigos escondidos pelo filtro.
@@ -7324,6 +7435,42 @@ async function claimSameElsewhere(it,nome){
   const got=new Set((res||[]).map(r=>r.id));
   others.forEach(o=>{if(got.has(o._id))o.tratadoPor=nome;});
   if(got.size<others.length)toast('Alguns já tinham ficado com outra pessoa','bad');
+}
+/* ── Ações de um ARTIGO agrupado (a linha fechada da lista) ──────────────
+   Valem para os pedidos todos daquele artigo de uma vez, que é como se compra:
+   o vinho branco dos dois jantares traz-se numa ida. Não passam pelo
+   `claimSameElsewhere` — este pergunta "levas também?" e aqui a resposta já foi
+   dada no toque, no botão de um artigo que a lista mostra como um só.
+   O que cada compra vai colmatar decide-se depois, ao registá-la (o picker dos
+   pedidos e o 🔗 de cada artigo). */
+async function claimGrupo(ids){
+  ids=(ids||[]).filter(x=>x!=null);if(!ids.length)return;
+  if(ids.length===1)return claimItem(ids[0]);
+  const nome=myPrimaryName()||(isAdmin()?'Admin':'');
+  setSync('load','a guardar…');
+  try{
+    // Mesma guarda anti-corrida do claim simples: só leva os que ainda estão livres
+    const res=await queueWrite(()=>sbReq('PATCH',`shoplist?id=in.(${ids.join(',')})&tratado_por=is.null`,{tratado_por:nome},{Prefer:'return=representation'}));
+    const got=new Set((res||[]).map(r=>r.id));
+    shopArr().forEach(x=>{if(got.has(x._id))x.tratadoPor=nome;});
+    if(got.size<ids.length)toast(got.size?'Alguns já tinham ficado com outra pessoa':'Entretanto ficaram com outra pessoa','bad');
+    syncMirror();marcaGuardado();renderShopViews();
+  }catch(e){setSync('err','erro ao guardar');toast(permErrorMsg(e),'bad');}
+}
+function unclaimGrupo(ids){
+  ids=(ids||[]).filter(x=>x!=null);if(!ids.length)return;
+  const meus=shopArr().filter(x=>ids.indexOf(x._id)>=0&&(shopMine(x)||isAdmin()));
+  if(!meus.length){toast('Só quem está a tratar pode largar o artigo','bad');return;}
+  _shopBulkUpdate(meus.map(x=>x._id),{tratado_por:null,no_carrinho:false},{tratadoPor:null,noCarrinho:false});
+}
+function toggleCartGrupo(ids){
+  ids=(ids||[]).filter(x=>x!=null);if(!ids.length)return;
+  const meus=shopArr().filter(x=>ids.indexOf(x._id)>=0&&(shopMine(x)||isAdmin()));
+  if(!meus.length)return;                        // o carrinho é pessoal de quem trata
+  // Meio apanhado conta como por apanhar: o toque marca tudo (e só desmarca
+  // quando já estava tudo marcado) — é o que a caixa da linha mostra.
+  const v=!meus.every(x=>x.noCarrinho);
+  _shopBulkUpdate(meus.map(x=>x._id),{no_carrinho:v},{noCarrinho:v});
 }
 function unclaimItem(id){
   const it=shopArr().find(x=>x._id===id);if(!it)return;
@@ -12363,9 +12510,10 @@ let _slPdfQuem='',_slPdfLojas=[];
    a contagem do seletor e a folha nunca poderem discordar. `quem` = carrinho de
    alguém (vazio = lista toda); `lojas` = chaves de loja (vazio = todas). */
 function shopPdfCands(quem,lojas){
+  shopArtLojaCalc();     // a loja é do artigo — escolher "Azeiteiro" leva o azeite todo, não só o pedido que a escreveu
   return shopArr().filter(it=>shopIsPending(it)
     &&(!quem||it.tratadoPor===quem)
-    &&(!lojas||!lojas.length||lojas.indexOf(shopLojaKey(shopLojaTxt(it)))>=0));
+    &&(!lojas||!lojas.length||lojas.indexOf(shopLojaKey(shopLojaEfe(it)))>=0));
 }
 // Artigos distintos que a folha listaria (sem os cobertos/encomendados, que vão
 // para o rodapé) — é o número que o seletor mostra em cada opção.
@@ -12388,7 +12536,7 @@ function shopPdfLojas(quem){
   const m={},order=[];
   shopPdfCands(quem,null).forEach(it=>{
     if(shopIsCovered(it)||shopEncomenda(it))return;
-    const nome=shopLojaTxt(it),k=shopLojaKey(nome);
+    const nome=shopLojaEfe(it),k=shopLojaKey(nome);
     if(!m[k]){m[k]={k,nome:nome||SHOP_SEM_LOJA,arts:new Set()};order.push(k);}
     m[k].arts.add(shopArtKey(it.artigo));
   });
@@ -12550,8 +12698,10 @@ function buildShopReport(sel){
       if(ds.length)meta.push(escHtml(ds.join(' · ')));
     }
     if(opt.loja&&mostrarLoja){
-      const l=shopLojaTxt(items.find(x=>shopLojaTxt(x))||{});
-      if(l)meta.push('🏬 '+escHtml(l));
+      // Loja efetiva (é do artigo, não do pedido). No caso raro de dois pedidos
+      // pedirem lojas diferentes saem as duas — foi escrito de propósito.
+      const ls=[];items.forEach(x=>{const l=shopLojaEfe(x);if(l&&ls.indexOf(l)<0)ls.push(l);});
+      if(ls.length)meta.push('🏬 '+escHtml(ls.join(' / ')));
     }
     if(!meu){
       const quem=[];items.forEach(x=>{if(x.tratadoPor&&quem.indexOf(x.tratadoPor)<0)quem.push(x.tratadoPor);});
@@ -12611,7 +12761,7 @@ function buildShopReport(sel){
       order.forEach(k=>{bloco(`${catEmoji(cats[k].nome)} ${escHtml(cats[k].nome)}`,cats[k].items,{dest:true,loja:true});});
     }else if(byLoja){
       const lojas={},order=[];
-      comprar.forEach(it=>{const l=shopLojaTxt(it),k=l?shopLojaKey(l):'\uffff';if(!lojas[k]){lojas[k]={nome:l,items:[]};order.push(k);}lojas[k].items.push(it);});
+      comprar.forEach(it=>{const l=shopLojaEfe(it),k=l?shopLojaKey(l):'\uffff';if(!lojas[k]){lojas[k]={nome:l,items:[]};order.push(k);}lojas[k].items.push(it);});
       order.sort((a,b)=>((a==='\uffff'?1:0)-(b==='\uffff'?1:0))||lojas[a].nome.localeCompare(lojas[b].nome,'pt'));
       order.forEach(k=>{bloco(k==='\uffff'?'🛒 '+SHOP_SEM_LOJA:'🏬 '+escHtml(lojas[k].nome),lojas[k].items,{dest:true});});
     }else if(byArt){
