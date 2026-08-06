@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v231 · 2026-08-06 · Pedido já coberto por outro artigo sai da lista, e agora dá-se ✕ a um palpite errado da leitura (a linha vai para os extras, não se perde)';
+const APP_BUILD = 'v232 · 2026-08-06 · Nomes lidos da fatura deixam de vir em MAIÚSCULAS — passam pelo mesmo escrever-direito do ✨ Normalizar';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -4915,8 +4915,18 @@ const NB_MINOR=new Set(['de','do','da','dos','das','e','com','sem','em','no','na
 const NB_UNID=new Set(['kg','g','gr','grs','mg','l','lt','lts','ml','cl','dl',
   'un','uni','und','unid','unids','uns','cx','pct','emb','pack','packs']);
 function nbPalavra(w,primeira,sepAntes){
+  /* Quantidade colada à unidade ("125G", "50ML", "1,5L") → só a unidade desce.
+     A regra de não tocar em tokens com dígitos existe para não estragar "1,5"
+     nem "7up"; escrita ASSIM vinha do talão em maiúsculas e ficava "125G" no
+     meio de um nome já em minúsculas. Só desce o que é mesmo dígitos-e-depois-
+     letras: "R103" (código interno) não é unidade nenhuma e fica como está. */
+  if(/^[\d.,]+[A-Za-z]+$/.test(w))return w.toLowerCase();
   if(/\d/.test(w))return w;                       // "1,5", "500g", "7up" — não se toca
-  if(/['’]$/.test(sepAntes)&&!primeira)return w;  // "Lay's" — o que vem depois da plica fica
+  /* Depois de plica fica como está — é o que impede "Lay's" de virar "Lay'S".
+     Só que num talão em maiúsculas ("LAY'S") era exatamente isso que dava, por
+     o "S" já vir grande. Uma letra só depois da plica é o possessivo e desce
+     sempre; mais do que uma é nome próprio ("D'Aucy") e não se toca. */
+  if(/['’]$/.test(sepAntes)&&!primeira)return w.length===1?w.toLowerCase():w;
   const low=w.toLowerCase();
   if(!primeira&&NB_UNID.has(low))return w;
   if(!primeira&&NB_MINOR.has(nbKey(w)))return low;
@@ -8731,7 +8741,9 @@ function faturaAplicar(d){
   if(!compraEdit.det)compraSetMode(true);
   // Cabeçalho: só preenche o que está vazio (não pisa o que o utilizador escreveu)
   const desc=document.getElementById('shop-buy-desc');
-  if(desc&&!desc.value.trim()&&d.loja){desc.value=String(d.loja).slice(0,30);shopBuyDescCount();}
+  // A loja vem do mesmo talão em maiúsculas ("NOVA CHINA") e é o descritivo da
+  // despesa, que depois se lê nos cash-flows e nos relatórios
+  if(desc&&!desc.value.trim()&&d.loja){desc.value=shopNomeBonito(String(d.loja)).slice(0,30);shopBuyDescCount();}
   const date=document.getElementById('shop-buy-date');
   if(date&&typeof d.data==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(d.data))date.value=d.data;
   // Matching por níveis de confiança:
@@ -8740,7 +8752,16 @@ function faturaAplicar(d){
   //   2.ª linha a 1.0 no MESMO artigo (várias marcas, ex. Lays+Ruffles)
   //     → sub-artigo por confirmar, que herda o destino do genérico
   const linhas=d.linhas.filter(l=>l&&l.artigo&&typeof l.preco==='number'&&l.preco>=0)
-    .map(ln=>({artigo:String(ln.artigo).slice(0,60),qtd:ln.qtd?normalizeQty(String(ln.qtd)):'',valor:rnd(ln.preco,2),iva:typeof ln.iva==='number'?ln.iva:null,categoria:ln.categoria?String(ln.categoria).slice(0,40):null,pedido:ln.pedido?String(ln.pedido).slice(0,60):null}));
+    /* O NOME DO TALÃO PASSA PELO "ESCREVER DIREITO". As caixas registadoras
+       imprimem tudo em maiúsculas ("MANTEIGA C/SAL MIMOSA 125G") e o nome do
+       talão é o que manda no artigo — ia para o cartão, para o 🧺 Stock e para
+       os relatórios a gritar, ao lado dos nomes da lista, esses bem escritos.
+       É o mesmo `shopNomeBonito` do ✨ Normalizar, com a mesma regra de ouro:
+       só maiúsculas, acentos e grafia — nenhuma palavra se tira, acrescenta ou
+       troca, que é o que garante que o nome continua a ser o do talão. Não mexe
+       no casamento com a lista (`faturaTokens` já compara sem acentos nem
+       maiúsculas) e um nome já bem escrito volta igual. */
+    .map(ln=>({artigo:shopNomeBonito(String(ln.artigo)).slice(0,60),qtd:ln.qtd?normalizeQty(String(ln.qtd)):'',valor:rnd(ln.preco,2),iva:typeof ln.iva==='number'?ln.iva:null,categoria:ln.categoria?String(ln.categoria).slice(0,40):null,pedido:ln.pedido?String(ln.pedido).slice(0,60):null}));
   // IVA: fatura "à la empresa" traz as linhas sem ele. Corre ANTES do matching
   // para que lotes, sub-artigos e extras nasçam todos com o valor certo.
   const iva=faturaIVA(linhas,d);
