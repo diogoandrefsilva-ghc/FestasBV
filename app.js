@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v235 · 2026-08-06 · Compra que falha a meio já não fica meio lançada (era a origem dos movimentos duplicados) e “Salsa” deixa de dar match em tudo o que tenha “sal”';
+const APP_BUILD = 'v236 · 2026-08-06 · Linha da fatura por marcar deixa de sair da compra em silêncio, e a abreviatura do talão volta a casar (BAT FRIT → Batatas Fritas) sem a Salsa roubar linhas';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -8757,16 +8757,26 @@ function faturaTokens(s){return shopArtKey(s).replace(/[^a-z0-9\s]/g,' ').split(
    uma às batatas. Com a terminação explícita, "batatas"/"batata" continua a
    casar (é o que isto existe para apanhar) e "salsa"/"sal" já não. */
 const FT_PLURAIS=['s','es','as','os','is'];
-function faturaMesmoToken(a,b){
-  if(a===b)return true;
-  const [c,l]=a.length<b.length?[a,b]:[b,a];
-  return l.startsWith(c)&&FT_PLURAIS.includes(l.slice(c.length));
+/* Quanto vale o encontro de duas palavras: 1 se são a mesma (iguais ou plural
+   uma da outra), 0,5 se uma é ABREVIATURA da outra, 0 se nada.
+   O meio-termo é o que resolve a saga das batatas fritas sem perder os talões,
+   que abreviam tudo ("BAT FRIT", "QJ", "RC", "PH"). Valendo o mesmo que uma
+   palavra inteira, `'salsa'.startsWith('sal')` dava ao pedido "Salsa" nota
+   máxima em todas as linhas com "sal" — as três de batatas fritas — e, como o
+   casamento é ganancioso por ordem de nota, a Salsa roubava-lhes uma. Valendo
+   metade, a nota máxima fica para "SALSA CNT 50 G", que é a linha certa, e as
+   batatas ficam com a delas. */
+function faturaTokScore(t,x){
+  if(t===x)return 1;
+  const [c,l]=t.length<x.length?[t,x]:[x,t];
+  if(!l.startsWith(c))return 0;
+  return FT_PLURAIS.includes(l.slice(c.length))?1:0.5;
 }
 function faturaScore(artLista,artTalao){
   const a=faturaTokens(artLista),b=faturaTokens(artTalao);
   if(!a.length||!b.length)return 0;
   let hit=0;
-  a.forEach(t=>{if(b.some(x=>faturaMesmoToken(t,x)))hit++;});
+  a.forEach(t=>{hit+=Math.max(0,...b.map(x=>faturaTokScore(t,x)));});
   return hit/a.length;
 }
 function faturaAplicar(d){
@@ -8853,7 +8863,11 @@ function faturaAplicar(d){
      custava dinheiro: não responder deixava a linha fora da compra. */
   linhas.forEach((ln,j)=>{
     if(linhaUsada.has(j))return;
-    let i=lotes.findIndex(l=>!l.free&&l._fat==='ok'&&faturaScore(l._listArt||l.artigo,ln.artigo)===1);
+    /* 0,75 e não 1: com a abreviatura a valer meia palavra, uma segunda marca
+       escrita à maneira do talão ("BAT FRIT ONDULADA" para o pedido "Batatas
+       Fritas") dá 0,75 — uma palavra inteira e uma abreviada. Exigir 1 mandava-a
+       para os extras, onde ficava por marcar e saía da compra. */
+    let i=lotes.findIndex(l=>!l.free&&l._fat==='ok'&&faturaScore(l._listArt||l.artigo,ln.artigo)>=0.75);
     if(i<0&&ln.pedido)i=lotes.findIndex(l=>!l.free&&shopSameArtigo(l._listArt||l.artigo,ln.pedido));
     if(i<0)return;
     linhaUsada.add(j);loteUsado.add(i);   // o pedido fica servido por este artigo
@@ -9182,6 +9196,21 @@ async function saveCompra(){
   if(naoDetetados.length){
     const lst=naoDetetados.map(n=>'• '+n.artigo+(n.qtd?' ('+n.qtd+')':'')).join('\n');
     if(!confirm(`⚠️ Estes artigos do carrinho não foram detetados na fatura e vão ficar na lista POR TRATAR (não são dados como comprados):\n\n${lst}\n\nRegistar a compra assim mesmo?`))return;
+  }
+  /* LINHAS DA FATURA POR MARCAR. Um extra que fica por marcar é dinheiro que
+     sai da compra sem ninguém dar por isso — foi o que deixou uma compra em
+     58,77 € com um talão de 68,41 €, e é preciso descer o ecrã todo até aos
+     extras para reparar. Não se marcam sozinhos de propósito (podem ser
+     compras pessoais no mesmo talão), mas silêncio é que não pode haver: diz-se
+     quanto fica de fora e mostra-se a conta contra o total impresso. */
+  const fora=(compraEdit.faturaExtras||[]);
+  if(fora.length&&det&&!isEdit){
+    const somaFora=rnd(fora.reduce((a,x)=>a+(+x.valor||0),0),2);
+    const somaCompra=rnd(rows.reduce((a,r)=>a+r.valor,0),2);
+    const totFat=compraEdit.fatura&&compraEdit.fatura.total;
+    const lst=fora.map(n=>'• '+n.artigo+(n.qtd?' ('+n.qtd+')':'')+' — '+eur(n.valor)).join('\n');
+    const conta=totFat?`\n\nCompra: ${eur(somaCompra)} · fatura: ${eur(totFat)}`:'';
+    if(!confirm(`⚠️ Estas linhas da fatura ficam DE FORA da compra (${eur(somaFora)}):\n\n${lst}${conta}\n\nSe alguma é das Festas, cancela e marca-a em "🧾 Extras da fatura".\n\nRegistar assim mesmo?`))return;
   }
   const compraId=compraEdit.id||('c'+Date.now());
   const compradoEm=new Date().toISOString();
