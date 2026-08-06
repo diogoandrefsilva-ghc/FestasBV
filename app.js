@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v228 · 2026-08-06 · Cartões dos artigos da compra 23% mais baixos (uma compra de 30 artigos deixa de ser uma maratona de scroll)';
+const APP_BUILD = 'v229 · 2026-08-06 · Pedido coberto só por marcas deixa de se dar por resolvido antes de a marca ser confirmada — etiqueta, contorno e pergunta certos';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -8097,8 +8097,14 @@ function compraSplitNote(l){
   return 'Repartido a 100%.';
 }
 function compraLoteHtml(l,i){
-  // Estado do matching com a fatura (só nos artigos do carrinho)
-  const tag=l._byBrand?`<span class="lote-tag ok">✓ por marcas</span>`
+  /* Estado do matching com a fatura (só nos artigos do carrinho).
+     Um pedido coberto SÓ por marcas (_byBrand) ainda não está coberto por nada
+     enquanto a marca não for confirmada: dizer-lhe "✓ por marcas" a verde, com
+     0,00 € ao lado e a caixa por picar por baixo, era o cartão a dar por
+     resolvido o que ainda está a perguntar — e quem lê um ✓ verde não pica. */
+  const porConf=!l.free&&l._byBrand&&!!(l._subs&&l._subs.length);
+  const tag=porConf?`<span class="lote-tag warn">☐ por confirmar</span>`
+    :l._byBrand?`<span class="lote-tag ok">✓ por marcas</span>`
     :l._fat==='ok'?`<span class="lote-tag ok">✓ na fatura</span>`
     :l._fat==='miss'?`<span class="lote-tag miss">⚠ não encontrado</span>`
     :l._fat==='warn'?`<span class="lote-tag warn">⚠ qtd difere</span>`:'';
@@ -8146,12 +8152,22 @@ function compraLoteHtml(l,i){
       <button class="cmp-mini split-add" onclick="compraLoteAddSplit(${i})">＋ destino</button>
       <div class="split-note" id="split-note-${i}">${compraSplitNote(l)}</div></div>`;
   }
+  /* Duas perguntas diferentes, e o texto tem de as separar:
+     · o artigo TEM linha própria na fatura e apareceu outra marca do mesmo
+       genérico (Ruffles ao lado de Lay's) → "＋ Outra marca do mesmo?", que se
+       ACRESCENTA ao que já lá está;
+     · o artigo NÃO tem linha própria (_byBrand) e o que a fatura traz é esta,
+       ligada pelo pedido que a leitura devolveu e não pelo nome. Aqui não há
+       "outra": é a única que há, e chamar-lhe "outra marca" ao lado de um
+       0,00 € era o cartão a fazer uma pergunta que não é a que está a fazer. */
+  const subTit=l._byBrand?'É esta a linha da fatura para este pedido?':'＋ Outra marca do mesmo?';
   const fat=(!l.free&&l._sug?`<label class="lote-sug"><input type="checkbox" onchange="faturaSugToggle(${i})">
         <div class="sug-txt"><b>Corresponde a esta linha da fatura?</b><span>${escHtml(l._sug.artigo)}${l._sug.qtd?' · '+escHtml(l._sug.qtd):''}</span></div>
         <span class="sug-price">${eur(l._sug.valor)}</span></label>`:'')+
     (!l.free&&l._subs?l._subs.map((s,j)=>`<label class="lote-sug alt"><input type="checkbox" onchange="faturaSubToggle(${i},${j})">
-        <div class="sug-txt"><b>＋ Outra marca do mesmo?</b><span>${escHtml(s.artigo)}${s.qtd?' · '+escHtml(s.qtd):''}</span></div>
-        <span class="sug-price">${eur(s.valor)}</span></label>`).join(''):'');
+        <div class="sug-txt"><b>${subTit}</b><span>${escHtml(s.artigo)}${s.qtd?' · '+escHtml(s.qtd):''}</span></div>
+        <span class="sug-price">${eur(s.valor)}</span></label>`).join(''):'')+
+    (porConf?`<div class="lote-hint">🔗 A fatura não tem nenhuma linha com este nome — foi a leitura que ligou a de cima a este pedido. <b>Pica-a</b>, senão o pedido fica por tratar e o valor dela não entra na compra.</div>`:'');
   // Pediste X no carrinho mas o talão traz Y → o talão manda no stock
   const qtyHint=(!l.free&&l._fat==='warn'&&l._qtdPedida)
     ?`<div class="lote-hint">📝 Pediste <b>${escHtml(String(l._qtdPedida))}</b> no carrinho; o talão tem <b>${escHtml(l.qtd||'—')}</b> — é esta que entra em stock.</div>`:'';
@@ -8181,7 +8197,7 @@ function compraLoteHtml(l,i){
       (cur&&!known?`<option value="${escHtml(cur)}" selected>${escHtml(cur)}</option>`:'');
     return `<div class="lote-req-inline">🔗 pertence a <select onchange="compraLoteSetReq(${i},this.value)">${opts}</select></div>`;
   })():'';
-  const cls='lote-card'+(l._fat==='miss'?' is-miss':l._fat==='warn'?' is-warn':(l._fat==='ok'||l._byBrand)?' is-ok':'');
+  const cls='lote-card'+(porConf?' is-warn':l._fat==='miss'?' is-miss':l._fat==='warn'?' is-warn':(l._fat==='ok'||l._byBrand)?' is-ok':'');
   return `<div class="${cls}">${head}${fields}${qtyHint}${destBlock}${nsInline}${reqInline}${fat}</div>`;
 }
 function compraLoteSetReq(i,v){
