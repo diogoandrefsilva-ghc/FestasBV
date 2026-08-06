@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v237 · 2026-08-06 · Cada linha da fatura é um artigo e nenhuma disputa cartões com outra — o total da compra nasce igual ao do talão';
+const APP_BUILD = 'v238 · 2026-08-07 · O detalhe de uma compra reaberta avisa quando não soma o que a compra vale (e guardar deixa de poder apagar a diferença em silêncio)';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -7958,7 +7958,20 @@ function compraUpdateTotal(){
   // a vista — as duas partes existem e são ambas gravadas)
   if(!compraEdit.det||compraEdit.id)compraEdit.lines.forEach(ln=>{const v=parseFloat(ln.valor);if(!isNaN(v))tot+=v;});
   if(compraEdit.det||compraEdit.id)(compraEdit.lotes||[]).forEach(l=>{const v=parseFloat(l.valor);if(!isNaN(v))tot+=v;});
-  const el=document.getElementById('shop-buy-total');if(el)el.innerHTML=`Total: ${escHtml(eur(rnd(tot,2)))}${faturaTotHtml(rnd(tot,2))}`;
+  const el=document.getElementById('shop-buy-total');if(el)el.innerHTML=`Total: ${escHtml(eur(rnd(tot,2)))}${faturaTotHtml(rnd(tot,2))}${compraDescasaHtml(rnd(tot,2))}`;
+}
+/* A EDITAR: o detalhe tem de somar o que a compra vale nos cash-flows. Se não
+   somar, alguma coisa se perdeu entre gravar e reabrir — e o perigo é calado:
+   carregar em Guardar grava o detalhe curto POR CIMA da compra boa, e aí a
+   diferença deixa de ser recuperável. Mais vale dizê-lo antes de se tocar no
+   botão do que descobri-lo depois nas contas. */
+function compraDescasaHtml(tot){
+  if(!compraEdit.id)return '';
+  const reg=rnd((DATA.despesas||[]).filter(d=>d.compraId===compraEdit.id).reduce((a,d)=>a+(+d.valor||0),0),2);
+  const dif=rnd(reg-tot,2);
+  if(Math.abs(dif)<0.005)return '';
+  return `<div class="cmp-descasa">⚠️ Esta compra vale <b>${escHtml(eur(reg))}</b> nos cash-flows, mas o detalhe aqui só soma <b>${escHtml(eur(tot))}</b> — faltam ${escHtml(eur(Math.abs(dif)))}.
+    <b>Não guardes</b> sem perceber porquê: guardar reescreve a compra por este detalhe e a diferença perde-se. Cancela e avisa.</div>`;
 }
 
 /* ── Detalhe por artigo no registo da compra (opt-in) ──
@@ -9245,10 +9258,15 @@ async function saveCompra(){
         // artigos da lista com artigos de fora rebentava com "All object keys
         // must match" e não gravava nada.
         const lres=await queueWrite(()=>sbReq('POST','stock_lotes',lotes.map(l=>({evento_id:DATA._sbId,compra_id:compraId,artigo:l.artigo,qtd:l.qtd,unidade:l.unidade,valor:l.valor,alocacoes:l.alocacoes,lista_artigo:l._listArt||null,...(STOCK_FAT_COL?{artigo_fatura:l._fatNome||null}:{})})),{Prefer:'return=representation'}));
-        if(Array.isArray(lres)){
-          const added=stockArr().filter(l=>l.compraId===compraId&&l._id==null);
-          added.forEach((l,i)=>{if(lres[i])l._id=lres[i].id;});
-        }
+        /* Gravou tantos artigos quantos foram enviados? Um INSERT que devolva
+           menos linhas do que recebeu é a compra a ficar com menos artigos do
+           que o dinheiro que lançou — e sem esta conta ninguém dava por isso
+           senão ao reabrir a compra, dias depois. Rebenta de propósito: o catch
+           desfaz a compra toda, que é melhor do que meia. */
+        if(!Array.isArray(lres)||lres.length!==lotes.length)
+          throw new Error(`o stock não gravou tudo (${(lres&&lres.length)||0} de ${lotes.length} artigos)`);
+        const added=stockArr().filter(l=>l.compraId===compraId&&l._id==null);
+        added.forEach((l,i)=>{if(lres[i])l._id=lres[i].id;});
       }
     }
     // Artigos: os marcados que foram para stock ficam PENDENTES (necessidade

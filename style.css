@@ -1496,6 +1496,10 @@ button.cmp-chip.qt-tap:active{filter:brightness(.93)}
 .lote-miss-warn b{color:var(--gold)}
 .lote-miss-warn ul{margin:6px 0 0;padding-left:18px}
 .lote-miss-warn li{margin:2px 0}
+/* O detalhe reaberto não bate certo com o valor gravado da compra */
+.cmp-descasa{margin-top:8px;padding:9px 11px;border-radius:10px;font-weight:400;line-height:1.45;
+  font-size:12px;color:var(--ink);background:rgba(179,64,47,.09);border:1px solid rgba(179,64,47,.45)}
+.cmp-descasa b{color:var(--red)}
 /* Um pedido que a fatura não cobre + o ＋ para o trazer para a compra */
 .miss-row{display:flex;align-items:center;gap:8px;margin-top:6px;padding-top:6px;border-top:1px solid rgba(168,123,20,.22)}
 .miss-row span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
