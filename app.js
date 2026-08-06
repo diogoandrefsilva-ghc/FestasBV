@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v234 · 2026-08-06 · Cada linha da fatura é um artigo — acabaram as propostas “outra marca do mesmo” aninhadas e por confirmar';
+const APP_BUILD = 'v235 · 2026-08-06 · Compra que falha a meio já não fica meio lançada (era a origem dos movimentos duplicados) e “Salsa” deixa de dar match em tudo o que tenha “sal”';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -7729,9 +7729,16 @@ function openCompra(compraId,opts){
     // (1 alocação → destino simples; várias → split; nenhuma → por alocar).
     compraEdit.lotes=stockArr().filter(l=>l.compraId===compraId).map(l=>{
       const al=(l.alocacoes||[]).filter(a=>+a.qtd>0);
-      // Liga o lote ao artigo da lista: nome igual ou, se a fatura o renomeou
-      // (o talão manda no nome), por semelhança — guarda-se em _listArt
-      const link=linked.find(x=>shopSameArtigo(x.artigo,l.artigo))||linked.find(x=>faturaScore(x.artigo,l.artigo)>=0.5);
+      /* A ligação GRAVADA manda. Reabrir a compra deitava-a fora e adivinhava
+         outra por semelhança de nomes — e como o `artigo` do lote é o nome do
+         talão, a adivinhação errava: um lote gravado com lista_artigo="Batatas
+         Fritas" reabria ligado a "Salsa" só porque os nomes se pareciam. Pior,
+         era destrutivo: gravava-se por cima com a ligação errada.
+         A semelhança fica como recurso para os lotes antigos, gravados antes
+         de a coluna existir — esses não têm nada guardado. */
+    const link=(l._listArt&&linked.find(x=>shopSameArtigo(x.artigo,l._listArt)))
+        ||(l._listArt?{artigo:l._listArt}:null)
+        ||linked.find(x=>shopSameArtigo(x.artigo,l.artigo))||linked.find(x=>faturaScore(x.artigo,l.artigo)>=0.5);
       const base={_id:l._id,artigo:l.artigo,_listArt:link?link.artigo:null,_fatNome:l._fatNome||null,qtd:fmtQty(l.qtd,l.unidade),valor:l.valor,keys:[],free:!link,destino:'',splits:null};
       if(al.length>1)base.splits=al.map(a=>({destino:alocToDestino(a),qtd:a.qtd}));
       else if(al.length===1)base.destino=alocToDestino(al[0]);
@@ -8742,11 +8749,24 @@ function faturaComprime(file){
 function faturaTokens(s){return shopArtKey(s).replace(/[^a-z0-9\s]/g,' ').split(/\s+/).filter(t=>t.length>=3);}
 // Score 0..1 — fração dos tokens do artigo da lista presentes na linha do talão
 // (match por prefixo nos dois sentidos: "batata" encontra "batatas" e vice-versa)
+/* Dois tokens são a mesma palavra? Iguais, ou um é o outro mais uma terminação
+   de plural/flexão. O prefixo à solta ("um começa pelo outro") era demasiado
+   largo e foi a causa da saga das batatas fritas: `'salsa'.startsWith('sal')`
+   dá verdade, logo o pedido "Salsa" batia a 100% em TODAS as linhas com "sal"
+   — as três de batatas fritas — e, como cada linha só serve um pedido, roubava
+   uma às batatas. Com a terminação explícita, "batatas"/"batata" continua a
+   casar (é o que isto existe para apanhar) e "salsa"/"sal" já não. */
+const FT_PLURAIS=['s','es','as','os','is'];
+function faturaMesmoToken(a,b){
+  if(a===b)return true;
+  const [c,l]=a.length<b.length?[a,b]:[b,a];
+  return l.startsWith(c)&&FT_PLURAIS.includes(l.slice(c.length));
+}
 function faturaScore(artLista,artTalao){
   const a=faturaTokens(artLista),b=faturaTokens(artTalao);
   if(!a.length||!b.length)return 0;
   let hit=0;
-  a.forEach(t=>{if(b.some(x=>x.startsWith(t)||t.startsWith(x)))hit++;});
+  a.forEach(t=>{if(b.some(x=>faturaMesmoToken(t,x)))hit++;});
   return hit/a.length;
 }
 function faturaAplicar(d){
@@ -9167,6 +9187,7 @@ async function saveCompra(){
   const compradoEm=new Date().toISOString();
   const btn=document.getElementById('shop-buy-save');btn.disabled=true;
   setSync('load','a guardar…');
+  let escritoParcial=false;
   try{
     // Edição: apaga as despesas antigas desta compra (BD + local)
     if(isEdit){
@@ -9180,6 +9201,13 @@ async function saveCompra(){
       return row;
     });
     const ins=await queueWrite(()=>sbReq('POST','despesas',payload,{Prefer:'return=representation'}));
+    /* A partir daqui há dinheiro escrito na BD. Se o resto falhar (foi o que
+       aconteceu com o INSERT dos lotes a rebentar) as despesas ficavam lá — e
+       cada nova tentativa criava OUTRO compra_id, o que dava a mesma compra
+       lançada duas e três vezes, uma delas sem lotes nenhuns (tudo em Gerais,
+       porque é a alocação dos lotes que leva o valor às refeições).
+       Marca-se aqui; o catch desfaz. */
+    escritoParcial=true;
     payload.forEach((r,i)=>DATA.despesas.push({_id:ins&&ins[i]?ins[i].id:null,quem:r.quem,dataDesp:r.data_desp,dataValor:r.data_valor,desc:r.descricao,tipo:r.tipo,valor:r.valor,obs:r.observacoes||'',compraId:compraId,bebida:!!r.bebida}));
     // Lotes de stock: substitui os da compra e aloca por FIFO (cada lote já vê
     // as alocações dos anteriores e dos lotes de outras compras)
@@ -9244,7 +9272,24 @@ async function saveCompra(){
     btn.disabled=false;closeShopBuyModal();
     CALC=calcular(JSON.parse(JSON.stringify(DATA)));renderAll();
     toast(isEdit?'Compra atualizada ✓':(prov?'Compra provisória registada ✓ — falta pagar':'Compra registada ✓'),'ok');
-  }catch(e){setSync('err','erro ao guardar');btn.disabled=false;toast(permErrorMsg(e),'bad');}
+  }catch(e){
+    /* Desfaz o que ficou escrito a meio: sem isto, voltar a carregar em
+       "Registar compra" lançava a compra outra vez, com outro compra_id, em
+       cima da anterior. Corre em bloco e cala os erros do próprio rollback — se
+       ele também falhar, o que interessa é ver o erro original e não um segundo
+       por cima. */
+    if(escritoParcial){
+      try{
+        await queueWrite(()=>sbReq('DELETE',`despesas?compra_id=eq.${enc(compraId)}`));
+        if(STOCK_TABLE)await queueWrite(()=>sbReq('DELETE',`stock_lotes?compra_id=eq.${enc(compraId)}`));
+      }catch(_){}
+      DATA.despesas=(DATA.despesas||[]).filter(d=>d.compraId!==compraId);
+      if(STOCK_TABLE)DATA.stockLotes=stockArr().filter(l=>l.compraId!==compraId);
+      syncMirror();
+    }
+    setSync('err','erro ao guardar');btn.disabled=false;
+    toast('A compra NÃO ficou registada (desfiz o que tinha sido escrito): '+permErrorMsg(e),'bad');
+  }
 }
 
 /* ── Detalhe / alocação de um ARTIGO em stock (menu de ajustes do admin) ──
