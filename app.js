@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v219 · 2026-08-06 · Um artigo, uma decisão: as sub-linhas do grupo deixam de ter botões próprios e o 👤 entrega o artigo a alguém num toque';
+const APP_BUILD = 'v220 · 2026-08-06 · Um artigo tem UM dono: reclamar, largar e marcar apanhado valem para o artigo todo, e já não se consegue reparti-lo por dois carrinhos';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -6439,7 +6439,14 @@ function shopArtNestHtml(items,mineView,noLoja,scope){
     right=`<button class="cmp-x write-action" aria-label="Tirar do carrinho" onclick="event.stopPropagation();unclaimGrupo([${ids}])">✕</button>`;
   }else if(!livres.length){
     const quem=[];items.forEach(x=>{if(x.tratadoPor&&quem.indexOf(x.tratadoPor)<0)quem.push(x.tratadoPor);});
-    right=`<span class="cmp-chip">🛒 ${escHtml(quem.length>1?quem.length+' pessoas':(quem[0]||''))}</span>`;
+    /* Repartido por várias pessoas é um ESTADO A CORRIGIR, não um estado normal:
+       metade do vinho em cada carrinho é comprá-lo duas vezes. Desde a v220 já
+       não se consegue chegar aqui pela app, mas os anos e as linhas de antes
+       podem estar assim — por isso o chip avisa em vez de o dar por bom, e o 👤
+       ao lado é o caminho para o resolver. */
+    right=quem.length>1
+      ?`<span class="cmp-chip alerta" title="Repartido por ${escHtml(quem.join(', '))} — arrisca comprar-se duas vezes. Entrega o artigo a uma pessoa no 👤.">⚠️ ${quem.length} pessoas</span>`
+      :`<span class="cmp-chip">🛒 ${escHtml(quem[0]||'')}</span>`;
   }else{
     right=`<button class="cmp-mini cart write-action" title="Pôr no carrinho" aria-label="Pôr no carrinho" onclick="event.stopPropagation();claimGrupo([${livres.map(x=>x._id)}])"><i class="cmp-plus">＋</i>🛒</button>`;
   }
@@ -7356,13 +7363,28 @@ async function saveShopItem(){
       if(SHOP_LOJA_COL){patch.loja=loja||null;local.loja=loja;}
       // A cobertura NÃO se grava aqui: é escrita do lado do stock (loteCobSet),
       // que é quem sabe o que está cá. Editar o pedido não lhe toca.
-      // Admin pode reatribuir quem trata (puxar/largar por outrem)
+      /* Admin pode reatribuir quem trata (puxar/largar por outrem). Vale para o
+         ARTIGO, como o 👤 da lista: mudar aqui só este pedido deixava o artigo
+         repartido por dois carrinhos, que é o estado que a app evita. Os irmãos
+         levam um PATCH à parte — este só grava a linha que se está a editar. */
+      let claimIrmaos=[];
       if(it&&isAdmin()&&document.getElementById('shop-claim-wrap').style.display!=='none'){
         const nv=document.getElementById('shop-claim').value||null;
-        if(nv!==(it.tratadoPor||null)){patch.tratado_por=nv;patch.no_carrinho=false;local.tratadoPor=nv;local.noCarrinho=false;}
+        if(nv!==(it.tratadoPor||null)){
+          patch.tratado_por=nv;patch.no_carrinho=false;local.tratadoPor=nv;local.noCarrinho=false;
+          // Só quando o nome não muda na mesma gravação: a renomear, os "irmãos"
+          // ainda são os do nome velho e não é a eles que a escolha se referia.
+          if(shopSameArtigo(artigo,it.artigo))
+            claimIrmaos=shopIrmaos(it).filter(x=>x._id!==editingItemId&&(x.tratadoPor||null)!==nv);
+        }
       }
       await queueWrite(()=>sbReq('PATCH',`shoplist?id=eq.${editingItemId}`,patch));
       if(it)Object.assign(it,local);
+      if(claimIrmaos.length){
+        const ids=claimIrmaos.map(x=>x._id);
+        await queueWrite(()=>sbReq('PATCH',`shoplist?id=in.(${ids.join(',')})`,{tratado_por:patch.tratado_por,no_carrinho:false}));
+        claimIrmaos.forEach(x=>{x.tratadoPor=patch.tratado_por;x.noCarrinho=false;});
+      }
       toast('Artigo atualizado ✓','ok');
     }else{
       const criadoPor=myPrimaryName()||(isAdmin()?'Admin':'');
@@ -7416,41 +7438,61 @@ async function _shopUpdate(id,patch,local){
     Object.assign(it,local);syncMirror();marcaGuardado();renderShopViews();
   }catch(e){setSync('err','erro ao guardar');toast(permErrorMsg(e),'bad');}
 }
+function shopArtKey(s){return (s||'').trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');}
+function shopSameArtigo(a,b){return shopArtKey(a)===shopArtKey(b);}
+/* Os pedidos do MESMO artigo que ainda estão EM JOGO (por comprar, não cobertos
+   pelo stock, não encomendados, não removidos). É este o conjunto sobre o qual
+   as ações de posse trabalham — o artigo é a unidade, não o pedido. Inclui o
+   próprio, e não olha à loja nem à refeição: é o mesmo produto e vai na mesma
+   ida às compras. */
+function shopIrmaos(it){
+  if(!it)return [];
+  return shopArr().filter(x=>x._id!=null&&shopIsPending(x)&&!shopIsRemoved(x)
+    &&!shopIsCovered(x)&&!shopEncomenda(x)&&shopSameArtigo(x.artigo,it.artigo));
+}
+/* "Eu trato" é do ARTIGO — e é esta a trava contra o vinho branco ficar metade
+   no carrinho do Diogo e metade no do João Mestre, que é como se compra o mesmo
+   produto duas vezes. Era possível por três caminhos: o ＋🛒 do cartão de CADA
+   refeição, a vista por Refeição (onde cada pedido é uma linha) e o "levas
+   também?" a que se podia dizer que não.
+   Antes isto era uma SUGESTÃO (`claimSameElsewhere`, um confirm recusável).
+   Deixou de haver pergunta: um artigo tem um dono. Se parte dele já está com
+   outra pessoa, NÃO se leva o resto — diz-se com quem está. Quem desempata é o
+   admin, pelo 👤 (que grava para o artigo todo). */
 async function claimItem(id){
   const it=shopArr().find(x=>x._id===id);if(!it)return;
-  if(it.tratadoPor&&!shopMine(it)){toast(`Já está a ser tratado por ${it.tratadoPor}`,'bad');return;}
+  const irmaos=shopIrmaos(it);
+  const alheio=irmaos.find(x=>x.tratadoPor&&!shopMine(x));
+  if(alheio){
+    toast(alheio._id!==id
+      ?`"${it.artigo}" já está com ${alheio.tratadoPor} (pedido noutra refeição)`
+      :`Já está a ser tratado por ${alheio.tratadoPor}`,'bad');
+    return;
+  }
+  const ids=irmaos.filter(x=>!x.tratadoPor).map(x=>x._id);
+  if(!ids.length)return;                      // já é todo meu
   const nome=myPrimaryName()||(isAdmin()?'Admin':'');
   setSync('load','a guardar…');
   try{
-    // Anti-corrida: só reclama se no servidor ainda estiver livre — ninguém
-    // "rouba" um artigo que outro reclamou entretanto (só o próprio larga).
-    const res=await queueWrite(()=>sbReq('PATCH',`shoplist?id=eq.${id}&tratado_por=is.null`,{tratado_por:nome},{Prefer:'return=representation'}));
-    if(res&&res.length){Object.assign(it,{tratadoPor:nome});await claimSameElsewhere(it,nome);}
-    else{
-      const rows=await sbReq('GET',`shoplist?id=eq.${id}&select=tratado_por,no_carrinho,estado`);
-      if(rows&&rows[0])Object.assign(it,{tratadoPor:rows[0].tratado_por||null,noCarrinho:!!rows[0].no_carrinho,estado:rows[0].estado||it.estado});
-      toast(it.tratadoPor?`Entretanto ficou ${it.tratadoPor} a tratar`:'Não foi possível reclamar o artigo','bad');
+    // Anti-corrida: só reclama os que no servidor ainda estiverem livres —
+    // ninguém "rouba" o que outro reclamou entretanto (só o próprio larga).
+    const res=await queueWrite(()=>sbReq('PATCH',`shoplist?id=in.(${ids.join(',')})&tratado_por=is.null`,{tratado_por:nome},{Prefer:'return=representation'}));
+    const got=new Set((res||[]).map(r=>r.id));
+    shopArr().forEach(x=>{if(got.has(x._id))x.tratadoPor=nome;});
+    if(!got.size){
+      // Ninguém apanhou nada: relê-se para dizer com quem é que ficou
+      const rows=await sbReq('GET',`shoplist?id=in.(${ids.join(',')})&select=id,tratado_por,no_carrinho,estado`);
+      (rows||[]).forEach(r=>{const x=shopArr().find(y=>y._id===r.id);
+        if(x)Object.assign(x,{tratadoPor:r.tratado_por||null,noCarrinho:!!r.no_carrinho,estado:r.estado||x.estado});});
+      const dono=(rows||[]).map(r=>r.tratado_por).find(Boolean);
+      toast(dono?`Entretanto ficou ${dono} a tratar`:'Não foi possível reclamar o artigo','bad');
+    }else if(got.size<ids.length){
+      // Repartiu-se numa corrida entre dois telemóveis: é justamente o estado
+      // que isto evita, por isso diz-se em vez de ficar calado.
+      toast('Parte deste artigo ficou com outra pessoa — o admin resolve no 👤','bad');
     }
     syncMirror();marcaGuardado();renderShopViews();
   }catch(e){setSync('err','erro ao guardar');toast(permErrorMsg(e),'bad');}
-}
-/* "Eu trato" em bloco: se o mesmo artigo (nome igual, sem acentos/maiúsculas)
-   estiver livre noutras refeições/tipos, propõe levar tudo na mesma ida — o
-   caso típico "trago logo as batatas de hoje e de amanhã". Quem quiser manter
-   compradores separados ignora a sugestão; cada registo continua independente. */
-function shopArtKey(s){return (s||'').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');}
-function shopSameArtigo(a,b){return shopArtKey(a)===shopArtKey(b);}
-async function claimSameElsewhere(it,nome){
-  const others=shopArr().filter(x=>x._id!==it._id&&x._id!=null&&!x.tratadoPor&&shopIsPending(x)&&!shopIsCovered(x)&&shopGroupKey(x)!==shopGroupKey(it)&&shopSameArtigo(x.artigo,it.artigo));
-  if(!others.length)return;
-  const lst=others.map(o=>{const q=shopQtyLabel(o);return `• ${shopGroupLabel(o.tipo,o.dataValor)}${q?' — '+q:''}`;}).join('\n');
-  if(!confirm(`"${it.artigo}" também está em falta em:\n\n${lst}\n\nLevas também?`))return;
-  // Mesma guarda anti-corrida do claim simples: só leva os que ainda estão livres
-  const ids=others.map(o=>o._id);
-  const res=await queueWrite(()=>sbReq('PATCH',`shoplist?id=in.(${ids.join(',')})&tratado_por=is.null`,{tratado_por:nome},{Prefer:'return=representation'}));
-  const got=new Set((res||[]).map(r=>r.id));
-  others.forEach(o=>{if(got.has(o._id))o.tratadoPor=nome;});
-  if(got.size<others.length)toast('Alguns já tinham ficado com outra pessoa','bad');
 }
 /* ── 👤 QUEM TRATA, num toque (só admin) ─────────────────────────────────
    Entregar um artigo a alguém era só possível no detalhe de CADA pedido (o
@@ -7514,51 +7556,34 @@ function qtSet(nome){
   _shopBulkUpdate(ids,{tratado_por:nome||null,no_carrinho:false},{tratadoPor:nome||null,noCarrinho:false});
 }
 
-/* ── Ações de um ARTIGO agrupado (a linha fechada da lista) ──────────────
-   Valem para os pedidos todos daquele artigo de uma vez, que é como se compra:
-   o vinho branco dos dois jantares traz-se numa ida. Não passam pelo
-   `claimSameElsewhere` — este pergunta "levas também?" e aqui a resposta já foi
-   dada no toque, no botão de um artigo que a lista mostra como um só.
+/* ── Ações de posse: são todas do ARTIGO ─────────────────────────────────
+   Reclamar, largar e marcar apanhado valem para os pedidos todos do artigo, que
+   é como se compra: o vinho branco dos dois jantares traz-se numa ida. As três
+   passam pelo `shopIrmaos`, seja qual for o botão de onde vieram — o cabeçalho
+   do grupo, o cartão de uma refeição ou a vista por Refeição. É o que impede o
+   artigo de ficar repartido por dois carrinhos.
    O que cada compra vai colmatar decide-se depois, ao registá-la (o picker dos
    pedidos e o 🔗 de cada artigo). */
-async function claimGrupo(ids){
-  ids=(ids||[]).filter(x=>x!=null);if(!ids.length)return;
-  if(ids.length===1)return claimItem(ids[0]);
-  const nome=myPrimaryName()||(isAdmin()?'Admin':'');
-  setSync('load','a guardar…');
-  try{
-    // Mesma guarda anti-corrida do claim simples: só leva os que ainda estão livres
-    const res=await queueWrite(()=>sbReq('PATCH',`shoplist?id=in.(${ids.join(',')})&tratado_por=is.null`,{tratado_por:nome},{Prefer:'return=representation'}));
-    const got=new Set((res||[]).map(r=>r.id));
-    shopArr().forEach(x=>{if(got.has(x._id))x.tratadoPor=nome;});
-    if(got.size<ids.length)toast(got.size?'Alguns já tinham ficado com outra pessoa':'Entretanto ficaram com outra pessoa','bad');
-    syncMirror();marcaGuardado();renderShopViews();
-  }catch(e){setSync('err','erro ao guardar');toast(permErrorMsg(e),'bad');}
-}
-function unclaimGrupo(ids){
-  ids=(ids||[]).filter(x=>x!=null);if(!ids.length)return;
-  const meus=shopArr().filter(x=>ids.indexOf(x._id)>=0&&(shopMine(x)||isAdmin()));
+function claimGrupo(ids){const id=(ids||[]).filter(x=>x!=null)[0];if(id!=null)claimItem(id);}
+function unclaimGrupo(ids){const id=(ids||[]).filter(x=>x!=null)[0];if(id!=null)unclaimItem(id);}
+function toggleCartGrupo(ids){const id=(ids||[]).filter(x=>x!=null)[0];if(id!=null)toggleCart(id);}
+/* Largar = largar o artigo. Largar só um pedido devolvia-o a "Falta quem trate"
+   e deixava o resto no meu carrinho — o mesmo estado repartido, pela porta do
+   lado. Só se largam os que são meus (o admin larga os de qualquer um). */
+function unclaimItem(id){
+  const it=shopArr().find(x=>x._id===id);if(!it)return;
+  const meus=shopIrmaos(it).filter(x=>x.tratadoPor&&(shopMine(x)||isAdmin()));
   if(!meus.length){toast('Só quem está a tratar pode largar o artigo','bad');return;}
   _shopBulkUpdate(meus.map(x=>x._id),{tratado_por:null,no_carrinho:false},{tratadoPor:null,noCarrinho:false});
 }
-function toggleCartGrupo(ids){
-  ids=(ids||[]).filter(x=>x!=null);if(!ids.length)return;
-  const meus=shopArr().filter(x=>ids.indexOf(x._id)>=0&&(shopMine(x)||isAdmin()));
+function toggleCart(id){
+  const it=shopArr().find(x=>x._id===id);if(!it)return;
+  const meus=shopIrmaos(it).filter(x=>shopMine(x)||isAdmin());
   if(!meus.length)return;                        // o carrinho é pessoal de quem trata
   // Meio apanhado conta como por apanhar: o toque marca tudo (e só desmarca
   // quando já estava tudo marcado) — é o que a caixa da linha mostra.
   const v=!meus.every(x=>x.noCarrinho);
   _shopBulkUpdate(meus.map(x=>x._id),{no_carrinho:v},{noCarrinho:v});
-}
-function unclaimItem(id){
-  const it=shopArr().find(x=>x._id===id);if(!it)return;
-  if(!shopMine(it)&&!isAdmin()){toast('Só quem está a tratar pode largar o artigo','bad');return;}
-  _shopUpdate(id,{tratado_por:null,no_carrinho:false},{tratadoPor:null,noCarrinho:false});
-}
-function toggleCart(id){
-  const it=shopArr().find(x=>x._id===id);if(!it)return;
-  if(!shopMine(it)&&!isAdmin())return;   // o carrinho é pessoal de quem trata
-  const v=!it.noCarrinho;_shopUpdate(id,{no_carrinho:v},{noCarrinho:v});
 }
 async function deleteShopItem(id){
   const it=shopArr().find(x=>x._id===id);if(!it)return;
