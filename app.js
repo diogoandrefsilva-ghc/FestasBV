@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v229 · 2026-08-06 · Pedido coberto só por marcas deixa de se dar por resolvido antes de a marca ser confirmada — etiqueta, contorno e pergunta certos';
+const APP_BUILD = 'v230 · 2026-08-06 · Ligar um artigo da fatura a um pedido passa a tirar-lhe o ⚠ não encontrado — a ligação feita à mão contava para nada';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -8096,6 +8096,19 @@ function compraSplitNote(l){
   if(livre<-0.0005)return `⚠️ Repartiste ${fmtQty(rnd(tot,3),u)} — mais do que ${fmtQty(q.n,u)}.`;
   return 'Repartido a 100%.';
 }
+/* Um pedido do carrinho sem preço próprio fica COBERTO se outro artigo desta
+   compra ficou ligado a ele (🔗) e tem valor: foi comprado com outro nome. Sem
+   isto, ligar "Bloco 3 Tom Bas" ao pedido "Extensão 2m" não tirava ao pedido o
+   ⚠ "não encontrado" nem o aviso do topo — a ligação ficava sem efeito visível
+   e não havia mais nada a fazer para a app perceber. */
+function loteCobertoPorOutro(l,ls){
+  if(!l||l.free)return false;
+  const v=rnd(parseFloat(l.valor),2);
+  if(v>0)return false;                       // tem linha própria, não precisa
+  const pedido=l._listArt||l.artigo;
+  return (ls||compraEdit.lotes||[]).some(o=>o!==l&&o.free&&!o.noStock
+    &&o._listArt&&shopSameArtigo(o._listArt,pedido)&&rnd(parseFloat(o.valor),2)>0);
+}
 function compraLoteHtml(l,i){
   /* Estado do matching com a fatura (só nos artigos do carrinho).
      Um pedido coberto SÓ por marcas (_byBrand) ainda não está coberto por nada
@@ -8103,9 +8116,11 @@ function compraLoteHtml(l,i){
      0,00 € ao lado e a caixa por picar por baixo, era o cartão a dar por
      resolvido o que ainda está a perguntar — e quem lê um ✓ verde não pica. */
   const porConf=!l.free&&l._byBrand&&!!(l._subs&&l._subs.length);
+  const cobOutro=!porConf&&loteCobertoPorOutro(l);
   const tag=porConf?`<span class="lote-tag warn">☐ por confirmar</span>`
     :l._byBrand?`<span class="lote-tag ok">✓ por marcas</span>`
     :l._fat==='ok'?`<span class="lote-tag ok">✓ na fatura</span>`
+    :cobOutro?`<span class="lote-tag ok">✓ por outro artigo</span>`
     :l._fat==='miss'?`<span class="lote-tag miss">⚠ não encontrado</span>`
     :l._fat==='warn'?`<span class="lote-tag warn">⚠ qtd difere</span>`:'';
   /* O NOME EDITA-SE EM TODOS OS ARTIGOS, venham do carrinho ou da fatura.
@@ -8197,7 +8212,7 @@ function compraLoteHtml(l,i){
       (cur&&!known?`<option value="${escHtml(cur)}" selected>${escHtml(cur)}</option>`:'');
     return `<div class="lote-req-inline">🔗 pertence a <select onchange="compraLoteSetReq(${i},this.value)">${opts}</select></div>`;
   })():'';
-  const cls='lote-card'+(porConf?' is-warn':l._fat==='miss'?' is-miss':l._fat==='warn'?' is-warn':(l._fat==='ok'||l._byBrand)?' is-ok':'');
+  const cls='lote-card'+(porConf?' is-warn':(l._fat==='ok'||l._byBrand||cobOutro)?' is-ok':l._fat==='miss'?' is-miss':l._fat==='warn'?' is-warn':'');
   return `<div class="${cls}">${head}${fields}${qtyHint}${destBlock}${nsInline}${reqInline}${fat}</div>`;
 }
 function compraLoteSetReq(i,v){
@@ -8205,11 +8220,13 @@ function compraLoteSetReq(i,v){
   const novo=(v||'').trim();
   l._listArt=novo||null;
   /* Desligar um artigo que veio do carrinho é dizer "esta linha do talão não é
-     o pedido que a app julgou". Passa a artigo avulso — ganha o ✕ e o "só
-     despesa", e deixa de contar como stock daquele pedido. Só aqui é que se
-     redesenha: mudar de pedido não muda o cartão, e um re-render a cada escolha
-     roubava o scroll a quem está a rever 20 artigos. */
-  if(!novo&&!l.free){l.free=true;compraRenderLotes();}
+     o pedido que a app julgou": passa a artigo avulso — ganha o ✕ e o "só
+     despesa", e deixa de contar como stock daquele pedido. */
+  if(!novo&&!l.free)l.free=true;
+  /* Redesenha sempre: a ligação não muda só este cartão. É ela que tira ao
+     PEDIDO do outro lado o ⚠ "não encontrado" e o aviso do topo — deixá-la sem
+     efeito visível era o que fazia parecer que ligar não servia de nada. */
+  compraRenderLotes();
 }
 function compraLoteNoStock(i,on){
   const l=(compraEdit.lotes||[])[i];if(!l)return;
@@ -8229,7 +8246,9 @@ function compraRenderLotes(){
   if(!det){cont.innerHTML='';compraUpdateTotal();return;}
   // Aviso: artigos do carrinho que a fatura não detetou (ficam por tratar se o
   // preço ficar em branco). Fica visível na revisão, antes de registar.
-  const miss=ls.filter(l=>!l.free&&l._fat==='miss');
+  // Um pedido já coberto por outro artigo desta compra (🔗) não é "não apareceu
+  // na fatura" — apareceu com outro nome, e é isso que a ligação diz.
+  const miss=ls.filter(l=>!l.free&&l._fat==='miss'&&!loteCobertoPorOutro(l,ls));
   const missWarn=miss.length?`<div class="lote-miss-warn">⚠️ <b>${miss.length} artigo(s) do carrinho não apareceram na fatura.</b> Se deixares o preço em branco, ficam na lista <b>por tratar</b> (não são dados como comprados):<ul>${miss.map(l=>'<li>'+escHtml(l.artigo)+(l.qtd?' <i style="color:var(--muted);font-style:normal">('+escHtml(l.qtd)+')</i>':'')+'</li>').join('')}</ul></div>`:'';
   const prev=!!compraEdit.prov;
   // Quem vem do cash-flow não vem da lista: o que está a fazer é meter artigos
@@ -8939,7 +8958,7 @@ async function saveCompra(){
   const det=!!compraEdit.det;
   const lotes=[];const tipoRows={};const naoDetetados=[];   // tipoRows: 'Tipo'|'Tipo|data' → artigos; naoDetetados: artigos do carrinho sem preço
   const provItens=[];   // provisória: artigos que ficam só como detalhe da despesa
-  const byBrandParents=[];   // pedidos cobertos por marcas (só ficam "comprados" se alguma marca for confirmada)
+  const semLinha=[];   // pedidos do carrinho sem preço próprio — cobertos ou não, decide-se no fim
   // "Só totais" numa compra nova: o detalhe está escondido → não entra no registo
   for(const l of ((det||isEdit)?(compraEdit.lotes||[]):[])){
     const artigo=(l.artigo||'').trim();
@@ -8951,10 +8970,14 @@ async function saveCompra(){
       // estar cobertos pelas linhas de repartição).
       // Vale na provisória como em qualquer compra: sem preço não há artigo —
       // o que falta numa provisória é o pagamento, não saber o que se trouxe.
-      if(det&&!isEdit&&artigo&&!l.free){
-        if(l._byBrand)byBrandParents.push({artigo,qtd:l.qtd||''});
-        else naoDetetados.push({artigo,qtd:l.qtd||''});
-      }
+      /* Sem preço próprio ainda não quer dizer sem compra: outro artigo desta
+         compra pode estar ligado a este pedido (🔗) — é o que acontece quando o
+         talão lhe chama outra coisa ("Bloco 3 Tom Bas" para o pedido "Extensão
+         2m"). Guarda-se agora e decide-se no fim, quando os lotes todos já são
+         conhecidos. A regra existia só para as marcas que a leitura ligava
+         sozinha; ligada à mão, o pedido continuava a ser dado como não
+         encontrado mesmo com o artigo ali ao lado, ligado e com preço. */
+      if(det&&!isEdit&&artigo&&!l.free)semLinha.push({artigo,qtd:l.qtd||'',pedido:l._listArt||artigo});
       continue;
     }
     if(!artigo){toast('Indica o nome do artigo detalhado','bad');return;}
@@ -9013,9 +9036,10 @@ async function saveCompra(){
     if(!q||!(q.n>0)){toast(`Indica a quantidade de "${artigo}" (ex: 10 pacotes)`,'bad');return;}
     lotes.push({artigo,qtd:q.n,unidade:q.u,valor:v,keys:l.free?(l.destino?[l.destino]:[]):(l.keys||[])});
   }
-  // Pedido coberto por marcas mas SEM nenhuma marca confirmada (sem lote ligado a
-  // ele) → volta a "por tratar", em vez de ficar comprado sem nada por baixo.
-  byBrandParents.forEach(p=>{if(!lotes.some(L=>L._listArt&&shopSameArtigo(L._listArt,p.artigo)))naoDetetados.push(p);});
+  /* Pedido sem preço próprio: só é "não encontrado" se NENHUM artigo desta
+     compra ficou ligado a ele. Com um ligado — a marca que a leitura apanhou ou
+     a ligação que se fez à mão — o pedido foi comprado, com outro nome. */
+  semLinha.forEach(p=>{if(!lotes.some(L=>L._listArt&&shopSameArtigo(L._listArt,p.pedido)))naoDetetados.push({artigo:p.artigo,qtd:p.qtd});});
   const rows=[];
   // Modo por totais: validar linhas (totalmente vazias são ignoradas se houver
   // mais alguma coisa). Na edição as linhas entram SEMPRE — o tabulador ativo
