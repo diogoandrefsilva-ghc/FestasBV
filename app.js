@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v236 · 2026-08-06 · Linha da fatura por marcar deixa de sair da compra em silêncio, e a abreviatura do talão volta a casar (BAT FRIT → Batatas Fritas) sem a Salsa roubar linhas';
+const APP_BUILD = 'v237 · 2026-08-06 · Cada linha da fatura é um artigo e nenhuma disputa cartões com outra — o total da compra nasce igual ao do talão';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -8821,70 +8821,54 @@ function faturaAplicar(d){
      ligação todos os artigos que a fatura não renomeou — e bastava encurtar-lhes
      o nome à mão para o pedido se perder. */
   lotes.forEach(l=>{delete l._fat;delete l._sug;delete l._impQtds;delete l._qtdPedida;if(!l.free&&l._listArt)l.artigo=l._listArt;});
-  const pares=[];
-  lotes.forEach((l,i)=>{if(l.free)return;l._qtdPedida=l.qtd||'';linhas.forEach((ln,j)=>{const s=faturaScore(l.artigo,ln.artigo);if(s>=0.5)pares.push({i,j,s});});});
-  pares.sort((a,b)=>b.s-a.s);
-  const loteUsado=new Set(),linhaUsada=new Set();
-  let preenchidos=0,sugestoes=0;
-  pares.forEach(p=>{
-    if(loteUsado.has(p.i)||linhaUsada.has(p.j))return;
-    const l=lotes[p.i],ln=linhas[p.j];
-    if(p.s===1){                              // certeza → entra por defeito
-      loteUsado.add(p.i);linhaUsada.add(p.j);
-      if(l.valor===''||l.valor==null)l.valor=ln.valor;
-      // O talão manda na quantidade real (o pedido do carrinho é só guia): se a
-      // fatura traz qtd, é essa que entra em stock — não o que se pediu.
-      if(ln.qtd)l.qtd=ln.qtd;
-      // …e manda também no NOME do artigo (a lista é só guia); o nome pedido
-      // fica em _listArt para o match com a procura da lista e como nota na UI
-      if(ln.artigo&&!shopSameArtigo(l.artigo,ln.artigo)){l._listArt=l.artigo;l.artigo=ln.artigo;}
-      l._fatNome=ln.artigo;   // o que a fatura dizia, guardado antes de se lhe poder mexer no nome
-      l._fat='ok';l._impQtds=[ln.qtd];
-      faturaQtdRecheck(l);
-      if(!l.tipoFix)compraProporDestino(l);   // re-propõe com a qtd real do talão
-      preenchidos++;
-    }else{                                    // parcial → só com o teu OK
-      loteUsado.add(p.i);linhaUsada.add(p.j);
-      l._sug=ln;
-      sugestoes++;
-    }
-  });
-  /* 2.ª passagem: linha que bate a 100% num pedido JÁ servido por outra linha
-     (o genérico "Batatas Fritas" com duas marcas no mesmo talão).
-     3.ª passagem: linha cujo `pedido` — o palpite da leitura — nomeia um artigo
-     do carrinho, mesmo sem bater por texto (Ruffles → Batatas Fritas).
+  /* CADA LINHA DA FATURA É UM ARTIGO — nenhuma disputa cartões com outra.
+     A nota de semelhança decide apenas a LIGAÇÃO ao pedido a que a linha
+     responde; não decide quem fica com a linha.
 
-     Nos dois casos a linha vira CARTÃO PRÓPRIO, já ligada ao pedido. Era uma
-     proposta aninhada dentro do cartão do pedido, por confirmar — o que só fazia
-     sentido enquanto os cartões eram os pedidos e uma segunda linha da fatura
-     não tinha onde viver. Com a fatura a conduzir, cada linha É um artigo: não
-     há nada a perguntar sobre a EXISTÊNCIA dela, só sobre a que pedido responde
-     — e isso resolve-se no 🔗, que se pode mudar. A pergunta aninhada ainda
-     custava dinheiro: não responder deixava a linha fora da compra. */
-  linhas.forEach((ln,j)=>{
-    if(linhaUsada.has(j))return;
-    /* 0,75 e não 1: com a abreviatura a valer meia palavra, uma segunda marca
-       escrita à maneira do talão ("BAT FRIT ONDULADA" para o pedido "Batatas
-       Fritas") dá 0,75 — uma palavra inteira e uma abreviada. Exigir 1 mandava-a
-       para os extras, onde ficava por marcar e saía da compra. */
-    let i=lotes.findIndex(l=>!l.free&&l._fat==='ok'&&faturaScore(l._listArt||l.artigo,ln.artigo)>=0.75);
-    if(i<0&&ln.pedido)i=lotes.findIndex(l=>!l.free&&shopSameArtigo(l._listArt||l.artigo,ln.pedido));
-    if(i<0)return;
-    linhaUsada.add(j);loteUsado.add(i);   // o pedido fica servido por este artigo
-    faturaLinhaComoArtigo(lotes,lotes[i],ln);
+     Era esse o modelo antigo, e era ele que produzia os disparates: as linhas
+     concorriam aos cartões dos pedidos, UMA para cada, quem ganhava "tomava" o
+     cartão e quem perdia caía nos extras — de onde, por marcar, saía da compra.
+     Daí a "Salsa" arrancar uma linha às batatas fritas (as três dizem "SAL"),
+     as batatas ficarem a 0,00 € e 9,64 € desaparecerem sem aviso.
+
+     Sem disputa não há nada disso: 2 Lay's, 4 Onduladas e 2 Ruffles são três
+     artigos, os três ligados ao mesmo pedido "Batatas Fritas" — que é o que
+     eles são. E o total da compra nasce igual ao da fatura, porque nenhuma
+     linha fica pelo caminho. O que não for das Festas tira-se com o ✕. */
+  const pedidos=lotes.filter(l=>!l.free);
+  pedidos.forEach(l=>{l._qtdPedida=l.qtd||'';});
+  const servidos=new Set();
+  let preenchidos=0;
+  linhas.forEach(ln=>{
+    let melhor=null,nota=0;
+    pedidos.forEach(l=>{
+      // O `pedido` que a leitura devolve vale por si: nomeia o pedido de que a
+      // linha é marca, mesmo quando os nomes não têm nada em comum.
+      const s=(ln.pedido&&shopSameArtigo(l._listArt||l.artigo,ln.pedido))
+        ?1:faturaScore(l._listArt||l.artigo,ln.artigo);
+      if(s>nota){nota=s;melhor=l;}
+    });
+    /* Acima de meia palavra, não meia palavra. Um pedido de UMA palavra atinge
+       0,5 só por uma abreviatura ("Salsa" contra o "SAL" de "SNACK BAT OND
+       C/SAL FORNO") e ficava ligado ao produto errado — e uma ligação errada dá
+       por servido um pedido que ninguém comprou. Sem ligação o artigo entra na
+       mesma, à vista, e o 🔗 resolve-se num toque: é o erro barato dos dois. */
+    const alvo=nota>0.5?melhor:null;
+    if(alvo)servidos.add(alvo);
+    faturaLinhaComoArtigo(lotes,alvo,ln);
     preenchidos++;
   });
-  // Pedidos do carrinho SEM nada na fatura → ⚠️ (ficam sem preço). Os que outra
-  // linha veio servir estão em loteUsado e não entram aqui.
+  // Pedidos do carrinho que nenhuma linha veio servir → descem para o bloco do
+  // fim ("a fatura não cobre"), de onde se podem trazer de volta à mão.
   let semMatch=0;
-  lotes.forEach((l,i)=>{if(!l.free&&!loteUsado.has(i)&&l._fat!=='ok'){l._fat='miss';semMatch++;}});
-  // Linhas da fatura sem correspondência → EXTRAS, desmarcados por defeito
-  compraEdit.faturaExtras=linhas.filter((ln,j)=>!linhaUsada.has(j));
-  const extras=compraEdit.faturaExtras.length;
+  pedidos.forEach(l=>{if(!servidos.has(l)){l._fat='miss';semMatch++;}});
+  /* Já não há "extras": uma linha da fatura sem pedido correspondente é na
+     mesma um artigo comprado e pago, por isso entra como cartão sem ligação.
+     Ficar de fora à espera de ser marcada era como o dinheiro desaparecia. */
+  compraEdit.faturaExtras=[];
   compraEdit.lotes=lotes;
   compraRenderLotes();
-  const porConfirmar=sugestoes+extras;
-  const lido=`Fatura lida: ${preenchidos} preenchido(s) ✓${porConfirmar?`, ${porConfirmar} por confirmar ☐`:''}${semMatch?`, ${semMatch} sem correspondência ⚠️`:''}`;
+  const lido=`Fatura lida: ${preenchidos} artigo(s) ✓${semMatch?`, ${semMatch} pedido(s) que ela não cobre ⚠️`:''}`;
   // A nota do IVA vem à frente: mexe no dinheiro todo, e o toast é um só
   toast(iva.nota?`${iva.nota} · ${lido}`:lido,iva.modo==='?'?'bad':'ok');
 }
@@ -8992,11 +8976,14 @@ function faturaSugReject(i){
    entra como artigo à parte, herdando a ligação ao pedido e as refeições de
    origem — é outra marca do MESMO pedido, logo cobre-o na mesma. */
 function faturaLinhaComoArtigo(lotes,l,ln){
-  const destino=l.tipoFix?l.tipoFix:((l.keys||[]).length===1?l.keys[0]:(STOCK_TABLE?'':'Gerais'));
-  lotes.push({free:true,artigo:ln.artigo,qtd:ln.qtd,valor:ln.valor,destino,keys:(l.keys||[]).slice(),
-    _listArt:l._listArt||l.artigo,_fatNome:ln.artigo,_fat:'ok'});
-  (l._impQtds=l._impQtds||[]).push(ln.qtd);
-  faturaQtdRecheck(l);
+  // Sem pedido correspondente (`l` nulo) o artigo entra na mesma, sem ligação e
+  // na bolsa comum — é o antigo "extra", mas dentro da compra em vez de à porta.
+  const destino=l?(l.tipoFix?l.tipoFix:((l.keys||[]).length===1?l.keys[0]:(STOCK_TABLE?'':'Gerais'))):'Gerais';
+  lotes.push({free:true,artigo:ln.artigo,qtd:ln.qtd,valor:ln.valor,destino,
+    keys:l?(l.keys||[]).slice():[],
+    _listArt:l?(l._listArt||l.artigo):null,_fatNome:ln.artigo,_fat:'ok',
+    noStock:ehNaoStock(ln.artigo)});   // saco da caixa, taxas: entram como só-despesa
+  if(l){(l._impQtds=l._impQtds||[]).push(ln.qtd);faturaQtdRecheck(l);}
 }
 /* Linhas da fatura que não são ARTIGOS: o saco da caixa, uma taxa, portes, o
    vasilhame. Servem para pré-ligar o "só despesa" de um extra — nada mais.
