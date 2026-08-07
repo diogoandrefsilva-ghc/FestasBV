@@ -1695,6 +1695,52 @@ button.cmp-chip.qt-tap:active{filter:brightness(.93)}
 .cft-prov{border-left-style:dashed;background:repeating-linear-gradient(135deg,rgba(168,123,20,.04) 0 9px,transparent 9px 18px)}
 .cft-prov .cft-kind{color:var(--gold)}
 
+/* ── Ficha de consulta de um cash-flow (o modal antes do ✏️ Editar) ──
+   Mesma linguagem dos cartões da lista (cor do tipo à esquerda, rótulo pequeno
+   em maiúsculas, valor a peso) mas com espaço para respirar: primeiro o quanto,
+   depois o quê, e o resto em linhas chave/valor que se leem de cima a baixo. */
+.cfv-back{background:var(--panel2);border:1px solid var(--line);color:var(--muted);border-radius:9px;
+  width:32px;height:32px;font-size:22px;line-height:1;cursor:pointer;display:flex;align-items:center;
+  justify-content:center;flex-shrink:0;padding:0 2px 3px 0;font-family:inherit}
+.cfv-back:active{transform:scale(.92);background:var(--line)}
+.cfv-hero{border:1px solid var(--line);border-left:4px solid var(--line);border-radius:15px;
+  background:linear-gradient(158deg,var(--panel2),var(--panel) 65%);padding:14px 16px 15px;
+  box-shadow:0 1px 5px rgba(80,55,20,.08)}
+.cfv-hero.b-despesa{border-left-color:var(--red)}
+.cfv-hero.b-mealheiro{border-left-color:var(--green)}
+.cfv-hero.b-reembolso{border-left-color:var(--blue)}
+.cfv-hero.b-saldar{border-left-color:var(--gold)}
+.cfv-hero.cfv-prov{border-left-color:var(--gold);border-left-style:dashed;
+  background:repeating-linear-gradient(135deg,rgba(168,123,20,.05) 0 9px,transparent 9px 18px),linear-gradient(158deg,var(--panel2),var(--panel) 65%)}
+.cfv-kind{font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;line-height:1.3}
+.cfv-prov .cfv-kind{color:var(--gold)}
+.cfv-val{font-size:31px;font-weight:800;letter-spacing:-.7px;font-variant-numeric:tabular-nums;line-height:1.1;margin-top:4px}
+.cfv-val.neg{color:var(--red)}.cfv-val.pos{color:var(--green)}.cfv-val.mov{color:var(--blue)}.cfv-val.set{color:var(--gold)}
+.cfv-title{font-size:15.5px;font-weight:600;color:var(--ink);line-height:1.35;margin-top:5px;overflow-wrap:anywhere}
+.cfv-when{font-size:12px;color:var(--muted);margin-top:7px;line-height:1.4}
+/* Linhas chave/valor. Sem fundos por linha: a caixa é uma só e os separadores
+   são um traço leve — a informação é pouca e não precisa de grelha. */
+.cfv-rows{margin-top:10px;border:1px solid var(--line);border-radius:13px;background:var(--panel);overflow:hidden}
+.cfv-row{display:flex;align-items:baseline;justify-content:space-between;gap:14px;padding:10px 14px;border-top:1px solid rgba(216,200,163,.55)}
+.cfv-row:first-child{border-top:none}
+.cfv-k{flex:0 0 auto;font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--faint);padding-top:2px}
+.cfv-v{min-width:0;font-size:13.5px;font-weight:600;color:var(--ink);text-align:right;line-height:1.35;overflow-wrap:anywhere}
+.cfv-v small{display:block;font-size:11px;font-weight:500;color:var(--faint);margin-top:2px;line-height:1.35}
+.cfv-flow{display:flex;align-items:center;gap:10px;margin-top:10px;padding:12px 14px;
+  border:1px solid var(--line);border-radius:13px;background:var(--panel)}
+.cfv-flow-p{flex:1 1 0;min-width:0}
+.cfv-flow-p.to{text-align:right}
+.cfv-flow-p small{display:block;font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.09em;color:var(--faint)}
+.cfv-flow-p b{display:block;font-size:14.5px;font-weight:700;color:var(--ink);margin-top:2px;line-height:1.3;overflow-wrap:anywhere}
+.cfv-flow-a{flex:0 0 auto;font-size:17px;font-weight:800;color:var(--gold)}
+.cfv-blk{margin-top:10px;padding:11px 14px 13px;border:1px solid var(--line);border-radius:13px;background:var(--panel)}
+.cfv-blk-h{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.09em;color:var(--faint)}
+.cfv-blk-b{font-size:13px;color:var(--ink);line-height:1.5;margin-top:6px;white-space:pre-wrap;overflow-wrap:anywhere}
+.cfv-line{display:flex;align-items:baseline;justify-content:space-between;gap:12px;font-size:13px;color:var(--muted);padding:4px 0 0}
+.cfv-line span+span{flex:0 0 auto;font-variant-numeric:tabular-nums;font-weight:700;color:var(--ink)}
+.cfv-note{font-size:11.5px;color:var(--faint);line-height:1.5;margin:10px 2px 0}
+.cfv-note.gold{color:var(--gold)}
+
 /* ── Categorias de artigos (agrupadores: Sumos, Talho, …) ── */
 /* Stock: um container colapsável por categoria; "Outros" (sem categoria) no fim */
 .stk-cat{border:1px solid var(--line);border-radius:13px;background:var(--panel);margin-bottom:7px;overflow:hidden;box-shadow:0 1px 5px rgba(80,55,20,.06)}

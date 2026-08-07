@@ -172,19 +172,30 @@ setTimeout(function(){ if (window.fbvEsconderSplash) window.fbvEsconderSplash();
   </div>
 </div>
 
-<!-- Edit Cash Flow modal — reuses same layout as creation -->
+<!-- Detalhe de um cash-flow: abre em CONSULTA (ficha de leitura) e só com o ✏️
+     é que se troca pelo formulário de edição — que é o mesmo de sempre. -->
 <div class="modal-bg" id="edit-cf-bg">
   <div class="modal" id="edit-cf-modal">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-      <h3 style="margin-bottom:0" id="edit-cf-title">Editar Cash Flow</h3>
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px">
+      <button class="cfv-back" id="cf-view-back" onclick="cfVoltarView()" title="Voltar ao detalhe" aria-label="Voltar ao detalhe" style="display:none">‹</button>
+      <h3 style="margin-bottom:0;flex:1;min-width:0" id="edit-cf-title">Detalhe do movimento</h3>
       <button onclick="closeEditCf()" style="background:var(--panel2);border:1px solid var(--line);color:var(--muted);border-radius:9px;width:32px;height:32px;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0">✕</button>
     </div>
-    <!-- Same wheel as creation, but for type display -->
-    <div class="cf-wheel" id="ecf-wheel"></div>
-    <div id="edit-cf-form"></div>
-    <div class="mbtns admin-only write-action">
-      <button class="btn danger" id="edit-cf-del" onclick="deleteCfFromDetail()">Apagar</button>
-      <button class="btn prim" id="edit-cf-save" onclick="saveEditCf()">Guardar</button>
+    <!-- Consulta -->
+    <div id="cf-view"></div>
+    <div class="mbtns" id="cf-view-btns">
+      <button class="btn ghost" onclick="closeEditCf()">Fechar</button>
+      <button class="btn prim write-action" id="cf-view-edit" onclick="cfUnlockEdit()">✏️ Editar</button>
+    </div>
+    <div class="note" id="cf-view-nota" style="display:none"></div>
+    <!-- Edição (desbloqueada pelo ✏️) — mesmo layout da criação -->
+    <div id="cf-edit-wrap" style="display:none">
+      <div class="cf-wheel" id="ecf-wheel"></div>
+      <div id="edit-cf-form"></div>
+      <div class="mbtns admin-only write-action">
+        <button class="btn danger" id="edit-cf-del" onclick="deleteCfFromDetail()">Apagar</button>
+        <button class="btn prim" id="edit-cf-save" onclick="saveEditCf()">Guardar</button>
+      </div>
     </div>
   </div>
 </div>
