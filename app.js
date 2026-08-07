@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v242 · 2026-08-07 · Stock: um cartão por artigo E unidade — o bacalhau ao kg deixa de se somar com o às postas';
+const APP_BUILD = 'v244 · 2026-08-07 · Stock: um cartão por artigo E unidade — o bacalhau ao kg deixa de se somar com o às postas';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -5798,14 +5798,53 @@ function shopLojaCmp(a,b){
 }
 // Há alguma loja indicada nesta lista? (só então faz sentido ordenar por loja)
 function shopHasLojas(list){return SHOP_LOJA_COL&&list.some(it=>shopLojaTxt(it));}
+/* ── Admin a agir por outro membro na lista de compras ──
+   Quem regista as compras é muitas vezes o admin, com o talão de outra pessoa
+   na mão. `SHOP_COMO` põe a lista de compras a olhar para o carrinho dessa
+   pessoa: o sub-separador 🛒, o reclamar, o ✓ apanhado e o "quem pagou" da
+   compra passam a ser dela.
+   Redireciona-se AQUI e só aqui — nas duas funções que definem "eu" na lista,
+   com dez chamadas ao todo. O `myPrimaryName()` fica intocado de propósito: é
+   ele que manda nos saldos, nas presenças e nas permissões, e uma mentira
+   global nesses sítios estragava contas em vez de facilitar registos.
+   NÃO se guarda entre sessões: é um modo temporário, e reabrir a app no
+   carrinho de outra pessoa sem se dar por isso era o erro caro. */
+let SHOP_COMO=null;
+function shopComo(){return (isAdmin()&&SHOP_COMO)||null;}
+function shopComoSet(nome){SHOP_COMO=(nome||'').trim()||null;shopComoClose();renderCompras();}
+function shopComoClose(){const bg=document.getElementById('scomo-bg');if(bg){bg.classList.remove('show');document.body.classList.remove('no-scroll');}}
+function shopComoOpen(){
+  if(!isAdmin())return;
+  let bg=document.getElementById('scomo-bg');
+  if(!bg){
+    bg=document.createElement('div');bg.id='scomo-bg';bg.className='modal-bg';
+    bg.innerHTML='<div class="modal" id="scomo-inner"></div>';
+    document.body.appendChild(bg);
+    bg.addEventListener('click',e=>{if(e.target===bg)shopComoClose();});
+  }
+  const eu=myPrimaryName()||'Admin';
+  const cur=shopComo()||'';
+  const nomes=(CALC?CALC.membros.map(m=>m.nome):[]).filter(n=>n!==eu).sort((a,b)=>a.localeCompare(b,'pt'));
+  const op=(v,rot,sub)=>`<div class="slp-op${cur===v?' on':''}" onclick="shopComoSet(${JSON.stringify(v).replace(/"/g,'&quot;')})">
+    <div class="slp-op-t">${rot}${sub?`<i>${sub}</i>`:''}</div></div>`;
+  document.getElementById('scomo-inner').innerHTML=
+    `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+      <h3 style="margin-bottom:0">👤 Agir por quem?</h3>
+      <button onclick="shopComoClose()" style="background:var(--panel2);border:1px solid var(--line);color:var(--muted);border-radius:9px;width:32px;height:32px;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0">✕</button>
+    </div>`+
+    `<div class="note" style="margin-bottom:10px">Passas a ver o <b>carrinho dessa pessoa</b> e tudo o que fizeres na lista fica em nome dela — reclamar, marcar apanhado e registar a compra. Não muda nada nos saldos nem nas presenças.</div>`+
+    '<div class="slp-ops">'+op('','🙋 Eu ('+escHtml(eu)+')','o normal')+
+      nomes.map(n=>op(n,'🛒 '+escHtml(n),'')).join('')+'</div>';
+  bg.classList.add('show');document.body.classList.add('no-scroll');
+}
 // Nomes com que reclamo artigos (próprio + cônjuge; admin sem membro → 'Admin')
-function myClaimNames(){const s=new Set(MY_NAMES);const p=myPrimaryName()||(isAdmin()?'Admin':'');if(p)s.add(p);return s;}
+function myClaimNames(){const c=shopComo();if(c)return new Set([c]);const s=new Set(MY_NAMES);const p=myPrimaryName()||(isAdmin()?'Admin':'');if(p)s.add(p);return s;}
 function shopMine(it){return !!it.tratadoPor&&myClaimNames().has(it.tratadoPor);}
 // "Meu carrinho" é PESSOAL: só conta o que reclamei em meu próprio nome (não o
 // do cônjuge). O agregado continua a co-gerir (largar/marcar), mas a checklist
 // da aba Carrinho mostra só os meus — o que o cônjuge leva vê-se em "Já em
 // carrinhos", com o nome dele.
-function myOwnClaimName(){return myPrimaryName()||(isAdmin()?'Admin':'');}
+function myOwnClaimName(){return shopComo()||myPrimaryName()||(isAdmin()?'Admin':'');}
 function shopMineOwn(it){const n=myOwnClaimName();return !!n&&it.tratadoPor===n;}
 function shopCanEditItem(it){return isAdmin()||(it.criadoPor&&myClaimNames().has(it.criadoPor));}
 
@@ -6902,6 +6941,22 @@ function renderCompras(){
     </div>
   </div>`;
 
+  /* Faixa de "estou a agir por outra pessoa". Persistente e a ocupar a largura
+     toda de propósito: o modo muda o dono de tudo o que se toca na lista, e um
+     chip discreto ao lado dos outros era esquecível — voltar a esta página meia
+     hora depois e reclamar artigos em nome de outra pessoa sem dar por isso é
+     exatamente o que isto tem de impedir. Só admin. */
+  const como=shopComo();
+  if(isAdmin()){
+    // Ícone desenhado (--ic-user), não emoji: o 👤 sai azul do sistema e muda de
+    // aparelho para aparelho — a mesma razão do chip do carrinho.
+    const icU='<i class="cmp-ic-user" aria-hidden="true"></i>';
+    h+=como
+      ?`<div class="cmp-como on">${icU}<span class="cmp-como-t">A agir por <b>${escHtml(como)}</b> — o carrinho e as compras ficam em nome dele</span>
+          <button class="cmp-como-x" onclick="shopComoSet('')" title="Voltar a mim">✕</button></div>`
+      :`<button class="cmp-como" onclick="shopComoOpen()">${icU}<span class="cmp-como-t">Agir por outro membro</span><span class="cmp-como-chev">›</span></button>`;
+  }
+
   // ── Sub-separadores: Em falta · O Meu Carrinho · Histórico ──
   const nCompras=new Set((DATA.despesas||[]).filter(d=>d.compraId).map(d=>d.compraId)).size;
   const nHist=nCompras+removidos.length;
@@ -7777,7 +7832,11 @@ function openCompra(compraId,opts){
   document.getElementById('shop-buy-save').textContent=isEdit?'Guardar':(o.detalhe?'Registar despesa':'Registar compra');
   document.getElementById('shop-buy-del').style.display=(isEdit&&isAdmin())?'':'none';
   document.getElementById('shop-buy-save').style.display=ro?'none':'';
-  const who0=isEdit?((DATA.despesas.find(d=>d.compraId===compraId)||{}).quem||myPrimaryName()):myPrimaryName();
+  /* Numa compra NOVA o "quem pagou" segue por quem se está a agir: se o admin
+     está no carrinho do João a registar a fatura dele, o defeito tem de ser o
+     João — pôr o admin lá era o engano que este modo existe para evitar. Numa
+     compra já gravada manda quem lá está, sempre. */
+  const who0=isEdit?((DATA.despesas.find(d=>d.compraId===compraId)||{}).quem||myPrimaryName()):(shopComo()||myPrimaryName());
   document.getElementById('shop-buy-who').innerHTML=isAdmin()?memberOptions(who0):myMemberOptions(who0);
   const date0=isEdit?((DATA.despesas.find(d=>d.compraId===compraId)||{}).dataDesp||new Date().toISOString().slice(0,10)):new Date().toISOString().slice(0,10);
   document.getElementById('shop-buy-date').value=compraEdit.prov?'':date0;
@@ -8852,7 +8911,16 @@ function faturaAplicar(d){
   // Categorias sugeridas pela AI: gravam-se já (só onde não havia — a memória
   // artigo→categoria é global e vale mesmo que a compra não chegue a registar-se)
   catAIMappings(linhas.filter(l=>l.categoria)).then(n=>{if(n&&TAB==='stock')renderStock();});
-  const lotes=compraEdit.lotes||[];
+  /* A LINHA EM BRANCO NÃO É UM ARTIGO. O "🧾 Detalhar por artigo" abre com uma
+     linha vazia (e o ＋ Artigo acrescenta outras); lendo a fatura por cima
+     dela, ficava um cartão vazio à cabeça da lista — sem nome, sem preço e sem
+     nada que se lhe faça a não ser apagá-lo à mão. Só sai o que está mesmo por
+     escrever: nome, quantidade e valor vazios. O que a pessoa já tinha
+     escrito fica onde está, que a fatura não veio apagar trabalho ninguém. */
+  const lotes=(compraEdit.lotes||[]).filter(l=>!(l.free
+    &&!String(l.artigo||'').trim()
+    &&!String(l.qtd||'').trim()
+    &&(l.valor===''||l.valor==null)));
   /* Reset (re-importação): volta ao nome da lista para refazer o matching do
      zero (só nos do carrinho — num lote livre o _listArt é a ligação manual,
      não se pisa). O `_listArt` MANTÉM-SE: é o pedido de onde o cartão nasceu,

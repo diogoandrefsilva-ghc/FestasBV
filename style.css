@@ -1505,6 +1505,21 @@ button.cmp-chip.qt-tap:active{filter:brightness(.93)}
 .lote-miss-warn b{color:var(--gold)}
 .lote-miss-warn ul{margin:6px 0 0;padding-left:18px}
 .lote-miss-warn li{margin:2px 0}
+/* "Agir por outro membro" (só admin) — botão quando desligado, faixa quando
+   ligado. Ligado é dourado e ocupa a linha toda: enquanto está ativo, tudo o
+   que se toca na lista fica em nome de outra pessoa. */
+.cmp-como{display:flex;align-items:center;gap:8px;width:100%;margin-top:10px;padding:8px 11px;
+  border:1px dashed var(--line);border-radius:10px;background:transparent;color:var(--muted);
+  font-size:12px;font-family:inherit;text-align:left;cursor:pointer}
+.cmp-como-t{flex:1;min-width:0}
+.cmp-como .cmp-ic-user{flex:0 0 auto;width:14px;height:14px}
+.cmp-como-chev{flex:0 0 auto;color:var(--faint);font-size:15px}
+.cmp-como.on{border-style:solid;border-color:rgba(168,123,20,.55);background:rgba(168,123,20,.12);
+  color:var(--ink);font-weight:500;cursor:default}
+.cmp-como.on b{color:var(--gold)}
+.cmp-como-x{flex:0 0 auto;background:transparent;border:none;color:var(--gold);font-size:15px;
+  line-height:1;cursor:pointer;padding:4px 2px 4px 8px;border-radius:6px}
+.cmp-como-x:active{background:rgba(168,123,20,.2)}
 /* O detalhe reaberto não bate certo com o valor gravado da compra */
 .cmp-descasa{margin-top:8px;padding:9px 11px;border-radius:10px;font-weight:400;line-height:1.45;
   font-size:12px;color:var(--ink);background:rgba(179,64,47,.09);border:1px solid rgba(179,64,47,.45)}
