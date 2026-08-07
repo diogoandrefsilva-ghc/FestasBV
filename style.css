@@ -2212,9 +2212,11 @@ input.adm-ts-preco{flex:0 0 66px;width:66px;margin:0;padding:6px 8px;font-size:1
 .adm-ts-mv:active{background:var(--barrete);border-color:var(--barrete);color:#fff}
 .adm-ts-mv:disabled{opacity:.3;cursor:default}
 
-/* ── Seletor do 🖨 da Shop List (shopPdfRender) ────────────────────────
+/* ── Seletor do 🖨 (shopPdfRender e stockPdfRender) ─────────────────────
    Uma linha por opção, com a contagem à direita: escolhe-se a olhar para
-   quantos artigos é que cada folha leva. */
+   quantos artigos é que cada folha leva. Serve as duas folhas — a das compras
+   (o que levar · que lojas) e a do stock (o que sai · que categorias) —, que
+   fazem a mesma pergunta com outras palavras. */
 .slp-ops{display:flex;flex-direction:column;gap:8px}
 .slp-op{display:flex;align-items:center;gap:10px;padding:11px 13px;border:1.5px solid var(--line);border-radius:12px;background:#FFFDF6;cursor:pointer;transition:.15s;user-select:none}
 .slp-op:active{transform:scale(.99)}

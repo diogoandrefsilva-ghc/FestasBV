@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v249 · 2026-08-07 · Stock com dois eixos: alocação (custo) e consumo (o que já se gastou) + artigos de despensa';
+const APP_BUILD = 'v250 · 2026-08-07 · Folha do stock em PDF (🖨 no separador Stock): inventário, o que falta gastar, o que está por alocar ou o de uma refeição';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -7677,18 +7677,23 @@ function stockAggAlocs(lotes,u0){
 }
 // Dia da semana abreviado a 3 letras (Sáb, Dom, Sex, …) para rótulos compactos
 function diaAbrev(ds){const s=diaCurto(ds);return s?s.slice(0,3):'';}
-function stockDestChip(k,qtd,u,desp){
-  const a=destinoAloc(k,qtd);if(!a)return '';
-  const meal=alocIsMeal(a);
+/* Ícone + rótulo curto de um destino, já em HTML ("☀️ Sáb 08/08", "Bebidas").
+   Sai daqui e não de cada sítio que o desenha: o chip do cartão e a folha do
+   🖨 têm de chamar a mesma coisa ao mesmo destino. */
+function stockDestTxt(k){
+  const a=destinoAloc(k,0);if(!a)return '';
   // Bebida: ícone composto (🍻 + o da refeição) — o 🍻 sozinho não dizia se era
   // do almoço ou do jantar, e pode haver os dois no mesmo dia
   const ic=alocIsBebida(a)?DEST_BEB_ICON+shopTipoIcon(a.tipo):shopTipoIcon(a.tipo);
-  const lbl=meal?`${diaAbrev(a.data)} ${fmtDiaMes(a.data)}`:a.tipo;
+  return `${ic} ${escHtml(alocIsMeal(a)?`${diaAbrev(a.data)} ${fmtDiaMes(a.data)}`:a.tipo)}`;
+}
+function stockDestChip(k,qtd,u,desp){
+  const a=destinoAloc(k,qtd);if(!a)return '';
   // Num artigo de DESPENSA a refeição ter passado não gasta nada — o frasco de
   // pimenta continua na prateleira. Pintá-lo de "usado" era a mesma mentira que
   // a derivação do consumo, dita a outra cor.
   const cls=(!desp&&stockDestEstado(k)==='consumido')?' usado':'';
-  return `<span class="stk-chip${cls}">${ic} ${escHtml(lbl)} · ${escHtml(fmtQty(qtd,u))}</span>`;
+  return `<span class="stk-chip${cls}">${stockDestTxt(k)} · ${escHtml(fmtQty(qtd,u))}</span>`;
 }
 // Cartão minimal: nome + chips (refeições por ordem do calendário, com a qtd
 // à frente; a sobra ganha o badge "disponível"). As compras de origem e o total
@@ -7784,9 +7789,12 @@ function stockEstadoVal(ag,st,c){
   if(!(c.tot>0))return 0;
   return rnd(ag.totV*((st==='consumido'?c.cons:c.resta)/c.tot),2);
 }
-function renderStock(){
-  const el=document.getElementById('view-stock');if(!el||!DATA)return;
-  if(!STOCK_TABLE){el.innerHTML='<div class="empty sf">Stock indisponível.</div>';return;}
+/* Os cartões do separador, já prontos: um por ARTIGO + UNIDADE (o
+   guarda-chuva), com o consumo, os estados, as marcas e a sugestão de despensa
+   calculados uma vez. Vive fora do renderStock porque a folha do 🖨 tem de
+   listar EXATAMENTE os mesmos cartões — recontá-los ali era o convite a o ecrã
+   e o papel discordarem. */
+function stockGrupos(){
   const lots=stockArr().filter(stockBacked);
   const groups={};
   // Agrupa pelo PEDIDO genérico (loteReqArtigo): Ruffles+Lays ligados a "Batatas
@@ -7802,7 +7810,7 @@ function renderStock(){
   // Nomes que existem em mais do que uma unidade — é a esses que o cartão diz
   // em que unidade é que ele é (senão ficavam dois "Bacalhau" sem explicação)
   const nUnid={};Object.values(groups).forEach(g=>{const nk=shopArtKey(g.artigo);nUnid[nk]=(nUnid[nk]||0)+1;});
-  const arrTodos=Object.values(groups).sort((a,b)=>a.artigo.localeCompare(b.artigo,'pt')||uKey(a.u).localeCompare(uKey(b.u)))
+  return Object.values(groups).sort((a,b)=>a.artigo.localeCompare(b.artigo,'pt')||uKey(a.u).localeCompare(uKey(b.u)))
     .map(g=>{
       // O consumo calcula-se UMA vez por cartão e viaja no grupo: os chips de
       // filtro, o € dos containers e o rodapé do cartão têm de dizer todos o
@@ -7812,6 +7820,11 @@ function renderStock(){
       return Object.assign(g,{cons,estados:stockGroupEstados(ag,cons),despSug:despensaSugerida(g.artigo),
         multiU:nUnid[shopArtKey(g.artigo)]>1,marcas:[...new Set(g.lotes.map(l=>l.artigo))].filter(m=>!shopSameArtigo(m,g.artigo))});
     });
+}
+function renderStock(){
+  const el=document.getElementById('view-stock');if(!el||!DATA)return;
+  if(!STOCK_TABLE){el.innerHTML='<div class="empty sf">Stock indisponível.</div>';return;}
+  const arrTodos=stockGrupos();
   /* Pesquisa: nome do artigo, marcas debaixo do guarda-chuva (Ruffles · Lays) e
      categoria — procurar "talho" traz o corredor todo. Filtra ANTES dos chips
      de estado, para as contagens deles falarem do que está à vista. */
@@ -7828,7 +7841,10 @@ function renderStock(){
   const addBtn=canEdit?`<button class="btn ghost write-action stk-add hdr-ico" id="stk-add-btn" aria-label="Adicionar stock" onclick="stkAddOpen()" title="Adicionar stock que não veio de compras (ofertas, sobras do ano anterior)">＋</button>`:'';
   // 🔎 só quando há stock: numa lista vazia não há nada para procurar
   const buscaB=arrTodos.length?buscaBtn(STOCK_BUSCA,'toggleStockBusca'):'';
-  let h=`<div class="cmp-hdr"><div class="cmp-hdr-title sf">🧺 Stock</div><div class="cmp-hdr-acts">${buscaB}${addBtn}${aiBtn}</div></div>`;
+  // 🖨 pela mesma razão — e é livre a toda a gente, como o da Shop List: a folha
+  // só diz o que a lista já mostra
+  const pdfB=arrTodos.length?`<button class="btn hdr-ico" aria-label="Exportar em PDF" title="Exportar o stock em PDF — escolher o que sai (tudo, o que falta gastar, o que está por alocar, ou o de um destino) e de que categorias" onclick="stockPdfOpen()">🖨</button>`:'';
+  let h=`<div class="cmp-hdr"><div class="cmp-hdr-title sf">🧺 Stock</div><div class="cmp-hdr-acts">${buscaB}${pdfB}${addBtn}${aiBtn}</div></div>`;
   h+=`<div class="note" style="margin-top:2px;margin-bottom:8px">${canEdit?'Toca num artigo para o alocar às refeições e categorias — as contas recalculam sozinhas.':'Toca num artigo para ver como está alocado às refeições e categorias.'}</div>`;
   if(!arrTodos.length){el.innerHTML=h+`<div class="empty sf">Ainda não há stock. Regista uma compra itemizada, importa uma fatura${canEdit?' ou usa <b>＋ Stock</b> para o que não foi comprado (ofertas, sobras do ano anterior)':''}.</div>`;return;}
   if(STOCK_BUSCA)h+=buscaCaixa('stk-busca',STOCK_Q,'Procurar artigo, marca ou categoria…','setStockQ');
@@ -13793,6 +13809,11 @@ function openReports(){
       🛒 Lista de Compras
     </button>
     <p style="font-size:11px;color:var(--faint);margin-top:-4px">Por categoria e condensado numa folha. Escolhe-se a seguir o que levar: a lista toda ou o carrinho de alguém, e de que lojas.</p>
+${STOCK_TABLE?`
+    <button class="btn prim" onclick="closeReports();stockPdfOpen()" style="display:flex;align-items:center;justify-content:center;gap:8px">
+      🧺 Stock
+    </button>
+    <p style="font-size:11px;color:var(--faint);margin-top:-4px">O que há em stock, por categoria, com destinos e o que falta gastar. Escolhe-se a seguir o que sai: tudo, o que falta gastar, o que está por alocar, ou o de uma refeição.</p>`:''}
 ${TSHIRTS_TABLE?`
     <button class="btn prim" onclick="generatePDF('tshirts')" style="display:flex;align-items:center;justify-content:center;gap:8px">
       👕 Encomenda de T-shirts
@@ -13880,6 +13901,8 @@ function generatePDF(type,escopo){
     .sl-grp-h .sl-cont{margin-left:auto;font-weight:400;text-transform:none;letter-spacing:0;color:#999}
     .sl-grp-h{display:flex;align-items:center;gap:5px;font-size:.85em;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#2a9d6a;border-bottom:1.5px solid #50b96e;padding-bottom:2px;margin-bottom:3px}
     .sl-grp-h .sl-n{margin-left:auto;color:#999}
+    /* Folha do stock: o € do bloco (no separador é o mesmo, por container) */
+    .sl-grp-h .sl-eur{color:#8a8a8a;font-weight:400;text-transform:none;letter-spacing:0}
     .sl-row{display:flex;align-items:baseline;gap:5px;padding:1.5px 0;border-bottom:1px dotted #e8e8e8;break-inside:avoid;page-break-inside:avoid}
     .sl-box{flex:0 0 auto;display:inline-block;width:8px;height:8px;border:1px solid #999;border-radius:2px;vertical-align:baseline}
     .sl-box.on{background:#50b96e;border-color:#3d9a58}
@@ -13911,6 +13934,8 @@ function generatePDF(type,escopo){
     body=buildTshirtsReport();
   } else if(type==='shoplist'){
     body=buildShopReport(escopo);
+  } else if(type==='stock'){
+    body=buildStockReport(escopo);
   } else {
     body=buildPersonReport(pessoa);
   }
@@ -13926,7 +13951,7 @@ function generatePDF(type,escopo){
     <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:#1a1a2e;color:#fff;flex:0 0 auto">
       <span style="font-weight:700;font-size:14px">${nome} ${ano} — Relatório</span>
       <div style="display:flex;gap:8px">
-        ${type==='shoplist'?`<button id="pdfClr" title="Limpar os artigos picados" style="background:rgba(255,255,255,.15);border:none;color:#fff;font-size:14px;padding:8px 12px;border-radius:6px;cursor:pointer">🧹</button>`:''}
+        ${(type==='shoplist'||type==='stock')?`<button id="pdfClr" title="Limpar os artigos picados" style="background:rgba(255,255,255,.15);border:none;color:#fff;font-size:14px;padding:8px 12px;border-radius:6px;cursor:pointer">🧹</button>`:''}
         <button id="pdfPrint" style="background:#50b96e;border:none;color:#1a1a2e;font-weight:700;font-size:14px;padding:8px 14px;border-radius:6px;cursor:pointer">🖨 Imprimir / Guardar PDF</button>
         <button id="pdfClose" style="background:rgba(255,255,255,.15);border:none;color:#fff;font-size:18px;padding:8px 14px;border-radius:6px;cursor:pointer">✕</button>
       </div>
@@ -13967,6 +13992,112 @@ function slPicarSync(k,on){
   if(meus.every(x=>!!x.noCarrinho)===!!on)return Promise.resolve(true);   // já estava assim
   return Promise.resolve(_shopBulkUpdate(meus.map(x=>x._id),{no_carrinho:!!on},{noCarrinho:!!on}))
     .then(()=>meus.every(x=>!!x.noCarrinho)===!!on);
+}
+
+/* ── Peças partilhadas pelas folhas (Shop List e Stock) ───────────────────
+   As duas folhas são a mesma folha com conteúdo diferente: blocos com
+   cabeçalho, linhas com caixa, e picar na pré-visualização. Ter isto num sítio
+   só é o que impede uma delas mudar e a outra ficar para trás. */
+/* Artigos por bloco antes de o partir em "(cont.)". Uma página A4 leva ~55
+   linhas, portanto um bloco de 20 cabe sempre inteiro numa — que é o que isto
+   tem de garantir. Não convém muito menor: cada pedaço traz mais um cabeçalho,
+   e aí gasta-se em cabeçalhos o que se poupa em espaço perdido no fim das
+   páginas (medido: com 15 ou 12 a folha volta a crescer). */
+const FOLHA_MAX_BLOCO=20;
+/* Um bloco (categoria, loja, refeição…): cabeçalho + as linhas já em HTML.
+   Um bloco grande parte-se em pedaços com cabeçalho próprio ("… (cont.)") em
+   vez de se deixar cortar sozinho na mudança de página: cortado, metade dos
+   artigos ficava no topo da folha seguinte sem se saber de que bloco eram — numa
+   lista de compras isso é mandar a pessoa ao corredor errado, e num inventário
+   é contar a prateleira errada. Os pedaços saem com o mesmo tamanho (nada de um
+   "(cont.)" com uma linha só) e cada um cabe à vontade numa página.
+   `extra` = HTML a fechar o cabeçalho depois da contagem (o € do stock). */
+function folhaBloco(label,linhas,extra){
+  const nPartes=Math.ceil(linhas.length/FOLHA_MAX_BLOCO)||1;
+  const porParte=Math.ceil(linhas.length/nPartes);
+  let out='';
+  for(let i=0;i<nPartes;i++){
+    const parte=linhas.slice(i*porParte,(i+1)*porParte);
+    if(!parte.length)continue;
+    const cab=i===0?`${label}<span class="sl-n">${linhas.length}</span>${extra||''}`:`${label} <span class="sl-cont">(cont.)</span>`;
+    out+=`<div class="sl-grp"><div class="sl-grp-h">${cab}</div>${parte.join('')}</div>`;
+  }
+  return out;
+}
+/* Picar os artigos na PRÉ-VISUALIZAÇÃO. Um PDF já gravado é papel digital: não
+   há caixas para clicar lá dentro (um PDF com formulário exigia uma biblioteca,
+   e a app não tem build nem dependências). O que dá é picar aqui antes de
+   imprimir/guardar — a linha fica riscada e assim segue para o papel — e é
+   também aqui que se faz a compra/conferência a partir do telemóvel, sem saltar
+   entre ecrãs.
+   - **Linha com `data-sync`** (só a Shop List a põe, e só no MEU carrinho): o
+     pico É o "✓ já apanhado" da app, gravado pelo mesmo caminho da lista
+     (`slPicarSync` → `_shopBulkUpdate`, com as guardas e a atualização de ecrã
+     que ele já traz). Falhando a gravação, a linha desfaz-se — não se finge que
+     ficou.
+   - **Sem `data-sync`** (artigos de outra pessoa, e a folha do stock inteira):
+     não se mexe em dados de ninguém. O pico é marca pessoal deste aparelho
+     (`localStorage`, por ano e por folha).
+   - A chave é o ARTIGO (`data-k`), não a linha: o mesmo artigo em dois blocos
+     pica-se de uma vez, e o pico sobrevive a gerar a folha outra vez.
+   - Limpar em bloco vive na BARRA da pré-visualização (`#pdfClr`), fora do
+     documento: dentro dele, aparecer/desaparecer ao primeiro pico fazia a folha
+     saltar debaixo do dedo de quem estava a picar.
+   **Cuidado**: isto sai de dentro de um template literal, onde uma barra-n vira
+   quebra de linha a sério e parte a string do documento (já aconteceu). Nada de
+   `\n` no que for escrito lá dentro. */
+function folhaPicarScript(chave){
+  return `<script>
+(function(){
+  var K=${JSON.stringify(chave)};
+  var st={};try{st=JSON.parse(localStorage.getItem(K)||'{}')||{};}catch(e){}
+  var rows=[].slice.call(document.querySelectorAll('.sl-row'));
+  var sincro=function(k,on){
+    try{
+      var f=parent&&parent.slPicarSync;
+      return f?f.call(parent,k,on):null;
+    }catch(e){return null;}
+  };
+  function guardar(){try{localStorage.setItem(K,JSON.stringify(st));}catch(e){}}
+  function pintar(k,on){
+    rows.forEach(function(r){if(r.getAttribute('data-k')===k)r.classList.toggle('picked',on);});
+  }
+  rows.forEach(function(r){
+    var k=r.getAttribute('data-k'),liga=r.hasAttribute('data-sync');
+    if(!liga&&st[k])r.classList.add('picked');   // o do carrinho já vem pintado do relatório
+    r.addEventListener('click',function(){
+      var on=!r.classList.contains('picked');
+      pintar(k,on);                              // resposta imediata ao dedo
+      var p=liga?sincro(k,on):null;
+      if(p&&p.then){
+        p.then(function(ok){if(!ok)pintar(k,!on);});
+      }else{                                     // sem app do outro lado: marca local
+        if(on)st[k]=1;else delete st[k];
+        guardar();
+      }
+    });
+  });
+  // Chamado pelo 🧹 da barra (fora do documento, para a folha não saltar)
+  window.slLimpar=function(){
+    var n=0,liga=0;
+    rows.forEach(function(r){
+      if(!r.classList.contains('picked'))return;
+      n++;if(r.hasAttribute('data-sync'))liga++;
+    });
+    if(!n)return 0;
+    // A mensagem não leva quebras de linha: ver a nota acima.
+    if(liga&&!confirm('Limpar '+n+' picado'+(n===1?'':'s')+'? '+liga+' '+(liga===1?'é do teu carrinho e volta':'são do teu carrinho e voltam')+' a "por apanhar" na app.'))return -1;
+    rows.forEach(function(r){
+      if(!r.classList.contains('picked'))return;
+      var k=r.getAttribute('data-k');
+      if(r.hasAttribute('data-sync'))sincro(k,false);else delete st[k];
+      pintar(k,false);
+    });
+    guardar();
+    return n;
+  };
+})();
+</script>`;
 }
 
 /* ── Escolher o que vai na folha (🖨 nas Compras) ─────────────────────────
@@ -14259,30 +14390,11 @@ function buildShopReport(sel){
      com o traço e o espaço por baixo) — é com ele que as colunas se repartem
      equilibradas mais abaixo. */
   const blocos=[];
-  /* Artigos por bloco antes de o partir em "(cont.)". Uma página A4 leva ~55
-     linhas, portanto um bloco de 20 cabe sempre inteiro numa — que é o que isto
-     tem de garantir. Não convém muito menor: cada pedaço traz mais um
-     cabeçalho, e aí gasta-se em cabeçalhos o que se poupa em espaço perdido no
-     fim das páginas (medido: com 15 ou 12 a folha volta a crescer). */
-  const MAX_BLOCO=20;
   const bloco=(label,items,opt)=>{
     const g={},order=[];
     items.forEach(it=>{const k=shopArtKey(it.artigo);if(!g[k]){g[k]=[];order.push(k);}g[k].push(it);});
     order.sort((a,b)=>g[a][0].artigo.localeCompare(g[b][0].artigo,'pt'));
-    /* Uma categoria grande parte-se em pedaços com cabeçalho próprio ("…
-       (cont.)") em vez de se deixar cortar sozinha na mudança de página:
-       cortada, metade dos artigos ficava no topo da folha seguinte sem se saber
-       de que categoria eram — numa lista de compras isso é mandar a pessoa ao
-       corredor errado. Os pedaços saem com o mesmo tamanho (nada de um
-       "(cont.)" com uma linha só) e cada um cabe à vontade numa página. */
-    const nPartes=Math.ceil(order.length/MAX_BLOCO);
-    const porParte=Math.ceil(order.length/nPartes);
-    for(let i=0;i<nPartes;i++){
-      const parte=order.slice(i*porParte,(i+1)*porParte);
-      if(!parte.length)continue;
-      const cab=i===0?`${label}<span class="sl-n">${order.length}</span>`:`${label} <span class="sl-cont">(cont.)</span>`;
-      blocos.push({html:`<div class="sl-grp"><div class="sl-grp-h">${cab}</div>${parte.map(k=>slRow(g[k],opt)).join('')}</div>`});
-    }
+    blocos.push({html:folhaBloco(label,order.map(k=>slRow(g[k],opt)))});
   };
 
   if(comprar.length){
@@ -14359,78 +14471,242 @@ function buildShopReport(sel){
       +order.map(k=>`${escHtml(g[k].it.artigo)} <i>(${g[k].txt})</i>`).join(' · ')+'</div>';
   }
   h+=`<div class="footer">${meu?'Carrinho gerado':'Lista gerada'} em ${new Date().toLocaleString('pt-PT')} · ${evNome} ${ano}</div></div>`;
-  /* Picar os artigos na PRÉ-VISUALIZAÇÃO — e, no que é do meu carrinho, picar
-     também NA APP. Um PDF já gravado é papel digital: não há caixas para clicar
-     lá dentro (um PDF com formulário exigia uma biblioteca, e a app não tem
-     build nem dependências). O que dá é picar aqui antes de imprimir/guardar —
-     a linha fica riscada e assim segue para o papel — e é também aqui que se faz
-     a compra a partir do telemóvel, sem saltar entre ecrãs.
-     - **Artigo do meu carrinho** (`data-sync`): o pico É o "✓ já apanhado" da
-       app (`no_carrinho`), gravado pelo mesmo caminho da lista (`slPicarSync` →
-       `_shopBulkUpdate`, com as guardas e a atualização de ecrã que ele já
-       traz). Fechada a folha, o carrinho está marcado e a compra sai direita.
-       Falhando a gravação, a linha desfaz-se — não se finge que ficou.
-     - **Artigo de outra pessoa**: não se mexe no carrinho de ninguém. O pico é
-       marca pessoal deste aparelho (`localStorage`, por ano) — o mesmo que era
-       antes para tudo.
-     - A chave é o artigo (`data-k`), não a linha: o mesmo artigo em dois blocos
-       pica-se de uma vez, e o pico sobrevive a gerar a folha outra vez.
-     - Limpar em bloco vive na BARRA da pré-visualização (`#pdfClr`), fora do
-       documento: dentro dele, aparecer/desaparecer ao primeiro pico fazia a
-       folha saltar debaixo do dedo de quem estava a picar. */
-  h+=`<script>
-(function(){
-  var K=${JSON.stringify('festasbv_slpick_'+ano)};
-  var st={};try{st=JSON.parse(localStorage.getItem(K)||'{}')||{};}catch(e){}
-  var rows=[].slice.call(document.querySelectorAll('.sl-row'));
-  var sincro=function(k,on){
-    try{
-      var f=parent&&parent.slPicarSync;
-      return f?f.call(parent,k,on):null;
-    }catch(e){return null;}
-  };
-  function guardar(){try{localStorage.setItem(K,JSON.stringify(st));}catch(e){}}
-  function pintar(k,on){
-    rows.forEach(function(r){if(r.getAttribute('data-k')===k)r.classList.toggle('picked',on);});
-  }
-  rows.forEach(function(r){
-    var k=r.getAttribute('data-k'),liga=r.hasAttribute('data-sync');
-    if(!liga&&st[k])r.classList.add('picked');   // o do carrinho já vem pintado do relatório
-    r.addEventListener('click',function(){
-      var on=!r.classList.contains('picked');
-      pintar(k,on);                              // resposta imediata ao dedo
-      var p=liga?sincro(k,on):null;
-      if(p&&p.then){
-        p.then(function(ok){if(!ok)pintar(k,!on);});
-      }else{                                     // sem app do outro lado: marca local
-        if(on)st[k]=1;else delete st[k];
-        guardar();
-      }
-    });
+  h+=folhaPicarScript('festasbv_slpick_'+ano);
+  return h;
+}
+
+/* ── Escolher o que vai na folha do STOCK (🖨 no separador Stock) ─────────
+   A mesma ideia do 🖨 da Shop List, com as perguntas que o stock faz. Duas, e
+   só estas:
+   - **O QUE SAI**: o inventário todo, ou um dos recortes que o separador já
+     tem nos chips — o que falta gastar (a pergunta da cozinha) e o que está por
+     alocar (a pergunta do custo) — ou o stock de UM destino, que é a folha de
+     quem carrega a carrinha para uma refeição.
+     Não há opção "consumido": uma folha do que já se gastou não se leva a lado
+     nenhum. Os chips do ecrã têm-na porque ali é leitura, não é uma folha.
+   - **QUE CATEGORIAS**: o mesmo papel que as lojas fazem na folha das compras —
+     imprime-se só o corredor que interessa (as bebidas, o talho).
+   O resto — agrupar por categoria, os destinos na linha, o € do bloco — não é
+   escolha de quem imprime, é como a folha é.
+   Os grupos calculam-se UMA vez por abertura (`_stkPdfBase`): as contagens de
+   todas as opções saem da mesma lista que a folha vai levar, e assim não podem
+   discordar (a mesma regra do `shopPdfCands`). */
+let _stkPdfEsc='',_stkPdfCats=[],_stkPdfBase=null;
+// Escopo "d:<destino>" → a chave do destino ('' quando o escopo é outro)
+function stkPdfDest(esc){const s=String(esc||'');return s.slice(0,2)==='d:'?s.slice(2):'';}
+// A chave de categoria de um artigo — a mesma dos containers do separador
+function stkCatKey(artigo){const c=artCat(artigo);return c?'c'+c.id:'none';}
+/* Os cartões que a folha leva. `esc` = '' (tudo) | 'porgastar' | 'poralocar' |
+   'd:<destino>'; `cats` = chaves de categoria (vazio = todas). */
+function stockPdfGrupos(esc,cats,base){
+  const dest=stkPdfDest(esc);
+  return (base||_stkPdfBase||stockGrupos()).filter(g=>{
+    if(cats&&cats.length&&cats.indexOf(stkCatKey(g.artigo))<0)return false;
+    if(dest){const d=stockAggAlocs(g.lotes,g.u).dest[dest];return !!d&&d.qtd>0.0005;}
+    if(esc)return g.estados.has(esc);
+    return true;
   });
-  // Chamado pelo 🧹 da barra (fora do documento, para a folha não saltar)
-  window.slLimpar=function(){
-    var n=0,liga=0;
-    rows.forEach(function(r){
-      if(!r.classList.contains('picked'))return;
-      n++;if(r.hasAttribute('data-sync'))liga++;
-    });
-    if(!n)return 0;
-    // A mensagem não leva quebras de linha: este código sai de dentro de um
-    // template literal do app.js, onde a barra-n vira quebra a sério e parte a
-    // string do documento (foi o que aconteceu à primeira).
-    if(liga&&!confirm('Limpar '+n+' picado'+(n===1?'':'s')+'? '+liga+' '+(liga===1?'é do teu carrinho e volta':'são do teu carrinho e voltam')+' a "por apanhar" na app.'))return -1;
-    rows.forEach(function(r){
-      if(!r.classList.contains('picked'))return;
-      var k=r.getAttribute('data-k');
-      if(r.hasAttribute('data-sync'))sincro(k,false);else delete st[k];
-      pintar(k,false);
-    });
-    guardar();
-    return n;
+}
+// Destinos com stock alocado: [{k,n}] (n = artigos), por ordem do calendário
+function stockPdfDestinos(base){
+  const m={};
+  (base||_stkPdfBase||stockGrupos()).forEach(g=>{
+    const ag=stockAggAlocs(g.lotes,g.u);
+    Object.keys(ag.dest).forEach(k=>{if(ag.dest[k].qtd>0.0005)m[k]=(m[k]||0)+1;});
+  });
+  return Object.keys(m).sort(destKeyCmp).map(k=>({k,n:m[k]}));
+}
+// Categorias presentes no que está escolhido: [{k,nome,n}] ("Outros" no fim)
+function stockPdfCats(esc,base){
+  const m={},order=[];
+  stockPdfGrupos(esc,null,base).forEach(g=>{
+    const c=artCat(g.artigo),k=c?'c'+c.id:'none';
+    if(!m[k]){m[k]={k,nome:c?c.nome:'Outros',n:0};order.push(k);}
+    m[k].n++;
+  });
+  return order.map(k=>m[k]).sort((a,b)=>((a.k==='none'?1:0)-(b.k==='none'?1:0))||a.nome.localeCompare(b.nome,'pt'));
+}
+function stockPdfOpen(){
+  _stkPdfEsc='';_stkPdfCats=[];_stkPdfBase=stockGrupos();
+  let bg=document.getElementById('stkpdf-bg');
+  if(!bg){
+    bg=document.createElement('div');bg.id='stkpdf-bg';bg.className='modal-bg';
+    bg.innerHTML='<div class="modal" id="stkpdf-inner"></div>';
+    document.body.appendChild(bg);
+    bg.addEventListener('click',e=>{if(e.target===bg)stockPdfClose();});
+  }
+  stockPdfRender();
+  bg.classList.add('show');lockScroll();
+}
+function stockPdfClose(){
+  const bg=document.getElementById('stkpdf-bg');
+  if(bg){bg.classList.remove('show');unlockScroll();}
+}
+function stockPdfSetEsc(e){
+  _stkPdfEsc=e;
+  // As categorias são as do que está escolhido: mudar de recorte pode deixar
+  // uma categoria escolhida sem artigos nenhuns, e aí ela deixa de existir
+  const validas=stockPdfCats(e).map(c=>c.k);
+  _stkPdfCats=_stkPdfCats.filter(k=>validas.indexOf(k)>=0);
+  stockPdfRender();
+}
+function stockPdfToggleCat(k){
+  const i=_stkPdfCats.indexOf(k);
+  if(i<0)_stkPdfCats.push(k);else _stkPdfCats.splice(i,1);
+  stockPdfRender();
+}
+function stockPdfTodasCats(){_stkPdfCats=[];stockPdfRender();}
+function stockPdfGerar(){
+  const opt={esc:_stkPdfEsc,cats:_stkPdfCats.slice()};
+  stockPdfClose();
+  generatePDF('stock',opt);
+}
+function stockPdfRender(){
+  const box=document.getElementById('stkpdf-inner');if(!box)return;
+  const n=stockPdfGrupos(_stkPdfEsc,_stkPdfCats).length;
+  const cats=CATS_TABLE?stockPdfCats(_stkPdfEsc):[];
+  const opcao=(e,rot,sub)=>{
+    const c=stockPdfGrupos(e,_stkPdfCats).length;
+    return `<div class="slp-op${_stkPdfEsc===e?' on':''}" onclick="stockPdfSetEsc(${JSON.stringify(e).replace(/"/g,'&quot;')})">
+      <div class="slp-op-t">${rot}${sub?`<i>${sub}</i>`:''}</div>
+      <span class="slp-op-n">${c}</span>
+    </div>`;
   };
-})();
-</script>`;
+  let h=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+    <h3 style="margin-bottom:0">🖨 Folha do stock</h3>
+    <button onclick="stockPdfClose()" style="background:var(--panel2);border:1px solid var(--line);color:var(--muted);border-radius:9px;width:32px;height:32px;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0">✕</button>
+  </div>`;
+  h+=`<label>O que sai na folha</label><div class="slp-ops">`;
+  h+=opcao('','🧺 Todo o stock','o que há, alocado ou não');
+  h+=opcao('porgastar','🍽️ Só o que falta gastar','o que ainda dá para cozinhar');
+  h+=opcao('poralocar','🗓️ Só o que está por alocar','o que falta arrumar no custo');
+  h+='</div>';
+  const dests=stockPdfDestinos();
+  if(dests.length){
+    // A folha de quem carrega a carrinha para uma refeição: só o que está
+    // entregue àquele destino, e a quantidade da linha é a que vai para lá.
+    h+=`<label>Ou só o de um destino</label><div class="slp-ops">`;
+    dests.forEach(d=>{const l=destLabel(d.k);h+=opcao('d:'+d.k,`${l.icon} ${escHtml(l.label)}`,'');});
+    h+='</div>';
+  }
+  if(cats.length){
+    h+=`<label>Categorias</label><div class="slp-lojas">
+      <span class="sd-chip${_stkPdfCats.length?'':' on'}" onclick="stockPdfTodasCats()">Todas</span>
+      ${cats.map(c=>`<span class="sd-chip${_stkPdfCats.indexOf(c.k)>=0?' on':''}" onclick="stockPdfToggleCat(${JSON.stringify(c.k).replace(/"/g,'&quot;')})">${catEmoji(c.nome)} ${escHtml(c.nome)} <i class="slp-ln">${c.n}</i></span>`).join('')}
+    </div>
+    <p style="font-size:11px;color:var(--faint);margin:8px 0 0">Sem nenhuma escolhida, a folha leva todas.</p>`;
+  }
+  h+=`<button class="btn prim" style="width:100%;margin-top:16px" onclick="stockPdfGerar()" ${n?'':'disabled'}>🖨 Gerar folha — ${n} artigo${n===1?'':'s'}</button>`;
+  if(!n)h+=`<p style="font-size:11px;color:var(--faint);margin:8px 0 0;text-align:center">Nada para levar com esta escolha.</p>`;
+  box.innerHTML=h;
+}
+
+/* ── O stock numa folha (🖨 no separador Stock) ───────────────────────────
+   O papel que se leva à garagem: conferir o que lá está, ou saber o que sai
+   para uma refeição. É a folha das compras com o outro conteúdo — as mesmas
+   caixas para picar, os mesmos blocos por categoria, a mesma regra de partir um
+   bloco grande em "(cont.)" em vez de o deixar cortar-se na mudança de página.
+   - **Uma linha por CARTÃO do separador** (artigo + unidade): é o guarda-chuva,
+     e é ele que o modal abre. Dois "Bacalhau" em unidades diferentes são duas
+     linhas — kg e postas não se somam, no ecrã como no papel.
+   - **O número grande é o que a folha foi pedida para dizer**: o que há
+     (inventário), o que falta gastar, o que está por alocar, ou o que vai para
+     aquele destino. Uma folha, uma pergunta.
+   - **O € não vai na linha, vai no cabeçalho do bloco** — igual ao separador,
+     que também só o mostra por categoria. Quem confere a prateleira conta
+     artigos; o dinheiro é conversa do relatório geral.
+   - **Picar é conferir** e fica só neste aparelho: aqui não há nada do lado da
+     app para marcar (o consumo diz-se no modal do artigo, com as suas regras) —
+     e uma folha não é sítio para dar baixa de stock sem se ver o que se faz. */
+function buildStockReport(sel){
+  sel=sel||{};
+  const esc=sel.esc||'',catsSel=sel.cats||[];
+  const dest=stkPdfDest(esc);
+  const ano=DATA.evento.ano||'';
+  const evNome=(DATA.evento.nome||'MEO').replace(/\s*\d{4}\s*/g,'').trim()||'MEO';
+  const base=stockGrupos();
+  const grupos=stockPdfGrupos(esc,catsSel,base);
+  // Quanto é que a linha mostra — e quanto vale. A resposta muda com o que se
+  // pediu à folha: num inventário é o que há; numa folha de destino, o que vai
+  // para lá. Sai daqui uma vez para a linha e para o total do bloco não se
+  // poderem contradizer.
+  const qtdDe=(g,ag)=>dest?ag.dest[dest].qtd:esc==='poralocar'?ag.freeQ:esc==='porgastar'?g.cons.resta:ag.totQ;
+  const valDe=(g,ag)=>dest?ag.dest[dest].val:stockEstadoVal(ag,esc||'all',g.cons);
+
+  const stkRow=g=>{
+    const ag=stockAggAlocs(g.lotes,g.u),c=g.cons;
+    const meta=[];
+    // O mesmo nome em duas unidades dá dois cartões: cada um diz qual é o seu
+    if(g.multiU)meta.push(escHtml('em '+uLabel(g.u)));
+    // Marcas debaixo do guarda-chuva (Ruffles · Lays) — no corredor da garagem
+    // é por elas que se reconhece a caixa
+    if(g.marcas&&g.marcas.length)meta.push(escHtml(g.marcas.join(' · ')));
+    const selos=[...new Set(g.lotes.map(loteOrigem).filter(Boolean))].map(o=>`${STOCK_ORIGENS[o].ic} ${STOCK_ORIGENS[o].lbl}`);
+    if(g.lotes.some(loteProvisorio))selos.push('📌 por pagar');   // está cá; o € é que não é final
+    if(selos.length)meta.push(escHtml(selos.join(' · ')));
+    /* Onde está arrumado (eixo do custo). Numa folha de um destino não se
+       repete — o título já o diz — e no "por alocar" não vem ao caso: ali o que
+       interessa é precisamente a parte que ainda não tem destino. */
+    if(!dest&&esc!=='poralocar'){
+      const ds=Object.keys(ag.dest).sort(destKeyCmp).map(k=>`${stockDestTxt(k)} ${escHtml(fmtQty(ag.dest[k].qtd,ag.u))}`);
+      if(ag.freeQ>0.0005)ds.push(`🧺 por alocar ${escHtml(fmtQty(ag.freeQ,ag.u))}`);
+      if(ds.length)meta.push(ds.join(' · '));
+    }
+    /* Consumo (o outro eixo). Na despensa não há meio termo — ainda há ou
+       acabou; no resto diz-se o que já se gastou, e só quando já se gastou
+       alguma coisa: "0 gasto" é repetir a quantidade que está ao lado. */
+    const mao=c.manual?' ✍️':'';
+    if(c.desp)meta.push(`🫙 despensa · <b>${c.resta>0.0005?'ainda há':'acabou'}</b>${mao}`);
+    else if(c.cons>0.0005)meta.push(escHtml(esc==='porgastar'
+      ?`🍽️ ${fmtQty(c.cons,ag.u)} já gasto de ${fmtQty(c.tot,ag.u)}`
+      :`🍽️ gasto ${fmtQty(c.cons,ag.u)} · por gastar ${fmtQty(c.resta,ag.u)}`)+mao);
+    // data-k = a chave do cartão (artigo+unidade), para o picar na
+    // pré-visualização — e para o pico valer nas duas se o artigo aparecer duas vezes
+    return `<div class="sl-row" data-k="${escHtml(shopArtKey(g.artigo)+'|'+uKey(g.u))}"><i class="sl-box"></i><span class="sl-nm">${escHtml(g.artigo)}${meta.length?` <i class="sl-meta">${meta.join(' · ')}</i>`:''}</span><span class="sl-q">${escHtml(fmtQty(qtdDe(g,ag),ag.u))}</span></div>`;
+  };
+
+  let blocos='';
+  const fazBloco=(label,gs)=>{
+    const tot=rnd(gs.reduce((a,g)=>a+valDe(g,stockAggAlocs(g.lotes,g.u)),0),2);
+    blocos+=folhaBloco(label,gs.map(g=>stkRow(g)),tot>0.005?`<span class="sl-eur">${eur(tot)}</span>`:'');
+  };
+  if(CATS_TABLE){
+    // Por CATEGORIA, como os containers do separador — é por prateleira que se
+    // confere. Sem categoria cai em "Outros", sempre no fim.
+    const secs={},order=[];
+    grupos.forEach(g=>{const k=stkCatKey(g.artigo);if(!secs[k]){const c=artCat(g.artigo);secs[k]={nome:c?c.nome:'Outros',gs:[]};order.push(k);}secs[k].gs.push(g);});
+    order.sort((a,b)=>((a==='none'?1:0)-(b==='none'?1:0))||secs[a].nome.localeCompare(secs[b].nome,'pt'));
+    order.forEach(k=>fazBloco(`${catEmoji(secs[k].nome)} ${escHtml(secs[k].nome)}`,secs[k].gs));
+  }else fazBloco('🧺 Artigos',grupos);
+
+  const dl=dest?destLabel(dest):null;
+  const titulo=dest?`Stock · ${escHtml(dl.label)}`
+    :esc==='porgastar'?`Stock por gastar`
+    :esc==='poralocar'?`Stock por alocar`
+    :`Stock — ${evNome} ${ano}`;
+  let h=`<div class="sl-doc stk-doc"><h1>${dest?dl.icon:'🧺'} ${titulo}</h1>`;
+  const sub=[];
+  if(dest||esc)sub.push(`${evNome} ${ano}`);      // no recorte o título é o recorte; o evento vem aqui
+  if(DATA.evento.datas)sub.push(escHtml(DATA.evento.datas));
+  if(catsSel.length){
+    const nomes=stockPdfCats(esc,base).filter(c=>catsSel.indexOf(c.k)>=0).map(c=>c.nome);
+    if(nomes.length)sub.push(escHtml(nomes.join(' + ')));
+  }
+  sub.push(`${grupos.length} artigo${grupos.length===1?'':'s'}`);
+  const totV=rnd(grupos.reduce((a,g)=>a+valDe(g,stockAggAlocs(g.lotes,g.u)),0),2);
+  if(totV>0.005)sub.push(`${eur(totV)} em stock`);
+  h+=`<div class="subtitle">${sub.join(' · ')}</div>`;
+  if(!grupos.length){
+    h+='<p>Não há stock com esta escolha.</p>';
+  }else{
+    // A legenda usa a MESMA caixa das linhas (e não ☐, que o tipo de letra
+    // desenha de outra maneira). A parte de picar é `no-print`: no papel
+    // pica-se com uma caneta.
+    h+=`<div class="sl-leg"><i class="sl-box"></i> por conferir<span class="no-print"><br><b class="sl-pick-hint">Toca numa linha para a picar</b> — fica riscada e assim segue para o papel/PDF. A marca é só deste aparelho: não mexe no stock nem nas contas.</span></div>`;
+    h+=`<div class="sl-cols"><div class="sl-col">${blocos}</div></div>`;
+  }
+  h+=`<div class="footer">Stock em ${new Date().toLocaleString('pt-PT')} · ${evNome} ${ano}</div></div>`;
+  h+=folhaPicarScript('festasbv_stkpick_'+ano);
   return h;
 }
 
