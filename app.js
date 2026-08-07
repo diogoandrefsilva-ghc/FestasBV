@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v252 · 2026-08-07 · Folha do stock sem subtotal € por categoria (colava-se à coluna das quantidades)';
+const APP_BUILD = 'v253 · 2026-08-07 · Aviso de compra descasada só quando ela JÁ abre descasada (editar valores deixou de o disparar) + confirmação a guardar';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -8572,6 +8572,12 @@ function openCompra(compraId,opts){
   if(o.detalhe&&!compraEdit.lotes.length)compraEdit.lotes.push({free:true,artigo:'',qtd:'',valor:'',destino:compraDestPad(),keys:[]});
   compraRefreshLotes();
   compraApplyMode();
+  /* Baseline do aviso de descasamento (ver compraDescasaHtml): o total do
+     detalhe TAL COMO ABRIU, já com os lotes e as linhas montados. Guarda-se
+     aqui e não se toca mais — é contra ele que se compara, para editar valores
+     não disparar um aviso que só faz sentido sobre o que veio da BD.
+     `_totIni` é campo de trabalho do modal: nunca chega à BD. */
+  if(isEdit){compraEdit._totIni=compraTotal();compraUpdateTotal();}
 
   // Modo leitura (membro a ver uma compra já registada): desativa todos os campos
   const modal=document.getElementById('shop-buy-modal');
@@ -8678,27 +8684,41 @@ function compraLineField(i,field,value){if(!compraEdit.lines[i])return;compraEdi
 function compraLineTipo(i,tipo){if(!compraEdit.lines[i])return;compraEdit.lines[i].tipo=tipo;if(!shopIsMeal(tipo))compraEdit.lines[i].dataValor=null;compraRenderLines();}
 function compraAddLine(){compraEdit.lines.push({tipo:'Gerais',dataValor:null,valor:'',obs:''});compraRenderLines();}
 function compraRemoveLine(i){compraEdit.lines.splice(i,1);if(!compraEdit.lines.length)compraEdit.lines.push({tipo:'Gerais',dataValor:null,valor:'',obs:''});compraRenderLines();}
-function compraUpdateTotal(){
+function compraTotal(){
   let tot=0;
   // Modo "preço por artigo" numa compra NOVA: as linhas de repartição estão
   // escondidas e não contam; na EDIÇÃO contam sempre (os tabuladores só mudam
   // a vista — as duas partes existem e são ambas gravadas)
   if(!compraEdit.det||compraEdit.id)compraEdit.lines.forEach(ln=>{const v=parseFloat(ln.valor);if(!isNaN(v))tot+=v;});
   if(compraEdit.det||compraEdit.id)(compraEdit.lotes||[]).forEach(l=>{const v=parseFloat(l.valor);if(!isNaN(v))tot+=v;});
-  const el=document.getElementById('shop-buy-total');if(el)el.innerHTML=`Total: ${escHtml(eur(rnd(tot,2)))}${faturaTotHtml(rnd(tot,2))}${compraDescasaHtml(rnd(tot,2))}`;
+  return rnd(tot,2);
 }
-/* A EDITAR: o detalhe tem de somar o que a compra vale nos cash-flows. Se não
-   somar, alguma coisa se perdeu entre gravar e reabrir — e o perigo é calado:
-   carregar em Guardar grava o detalhe curto POR CIMA da compra boa, e aí a
-   diferença deixa de ser recuperável. Mais vale dizê-lo antes de se tocar no
-   botão do que descobri-lo depois nas contas. */
-function compraDescasaHtml(tot){
-  if(!compraEdit.id)return '';
-  const reg=rnd((DATA.despesas||[]).filter(d=>d.compraId===compraEdit.id).reduce((a,d)=>a+(+d.valor||0),0),2);
-  const dif=rnd(reg-tot,2);
+function compraUpdateTotal(){
+  const tot=compraTotal();
+  const el=document.getElementById('shop-buy-total');if(el)el.innerHTML=`Total: ${escHtml(eur(tot))}${faturaTotHtml(tot)}${compraDescasaHtml()}`;
+}
+// O que a compra vale HOJE nos cash-flows (as despesas dela, somadas)
+function compraRegistado(){
+  if(!compraEdit.id)return 0;
+  return rnd((DATA.despesas||[]).filter(d=>d.compraId===compraEdit.id).reduce((a,d)=>a+(+d.valor||0),0),2);
+}
+/* A EDITAR: o detalhe TAL COMO ABRIU tem de somar o que a compra vale nos
+   cash-flows. Se não somar, alguma coisa se perdeu entre gravar e reabrir — e o
+   perigo é calado: guardar apaga as despesas todas desta compra e reescreve-as
+   por este detalhe, e aí a diferença deixa de ser recuperável.
+   COMPARA-SE CONTRA O QUE ABRIU (`_totIni`), NUNCA contra o total ao vivo.
+   Contra o vivo, acrescentar um artigo de 28 € — que é exatamente o que se vem
+   cá fazer — dava o aviso a quem estava a fazer tudo bem, e ainda ao contrário
+   ("o detalhe só soma 306" com 306 > 278, porque a frase só servia o outro
+   sentido). Mexer nos valores é o trabalho normal do editor; o que é sinal de
+   avaria é a compra JÁ VIR descasada. */
+function compraDescasaHtml(){
+  if(!compraEdit.id||compraEdit._totIni==null)return '';
+  const reg=compraRegistado();
+  const dif=rnd(reg-compraEdit._totIni,2);
   if(Math.abs(dif)<0.005)return '';
-  return `<div class="cmp-descasa">⚠️ Esta compra vale <b>${escHtml(eur(reg))}</b> nos cash-flows, mas o detalhe aqui só soma <b>${escHtml(eur(tot))}</b> — faltam ${escHtml(eur(Math.abs(dif)))}.
-    <b>Não guardes</b> sem perceber porquê: guardar reescreve a compra por este detalhe e a diferença perde-se. Cancela e avisa.</div>`;
+  return `<div class="cmp-descasa">⚠️ Ao abrir, esta compra valia <b>${escHtml(eur(reg))}</b> nos cash-flows mas o detalhe só somava <b>${escHtml(eur(compraEdit._totIni))}</b> — ${dif>0?'faltam':'são mais'} ${escHtml(eur(Math.abs(dif)))}, e a diferença já lá estava antes de mexeres.
+    Guardar apaga as despesas desta compra e reescreve-as por este detalhe: a diferença <b>perde-se</b>. Percebe porquê primeiro — a app volta a perguntar antes de gravar.</div>`;
 }
 
 /* ── Detalhe por artigo no registo da compra (opt-in) ──
@@ -9956,6 +9976,19 @@ async function saveCompra(){
     const lst=fora.map(n=>'• '+n.artigo+(n.qtd?' ('+n.qtd+')':'')+' — '+eur(n.valor)).join('\n');
     const conta=totFat?`\n\nCompra: ${eur(somaCompra)} · fatura: ${eur(totFat)}`:'';
     if(!confirm(`⚠️ Estas linhas da fatura ficam DE FORA da compra (${eur(somaFora)}):\n\n${lst}${conta}\n\nSe alguma é das Festas, cancela e marca-a em "🧾 Extras da fatura".\n\nRegistar assim mesmo?`))return;
+  }
+  /* Compra que JÁ VEIO descasada dos cash-flows (ver compraDescasaHtml): guardar
+     apaga as despesas todas dela e reescreve-as por este detalhe, portanto a
+     diferença que estava a mais desaparece das contas sem deixar rasto. Não se
+     trava — às vezes é mesmo isto que se quer, e trancar o editor deixava a
+     compra sem maneira nenhuma de se corrigir —, mas pergunta-se, com os três
+     números à frente: o que lá está, o que abriu, e com o que fica. */
+  if(isEdit&&compraEdit._totIni!=null){
+    const reg=compraRegistado();
+    if(Math.abs(rnd(reg-compraEdit._totIni,2))>=0.005){
+      const novo=rnd(rows.reduce((a,r)=>a+r.valor,0),2);
+      if(!confirm(`⚠️ Esta compra vale ${eur(reg)} nos cash-flows, mas o detalhe abriu a somar ${eur(compraEdit._totIni)} — uma diferença de ${eur(Math.abs(rnd(reg-compraEdit._totIni,2)))} que já lá estava.\n\nGuardar reescreve a compra por este detalhe: passa a valer ${eur(novo)}.\n\nGuardar assim mesmo?`))return;
+    }
   }
   const compraId=compraEdit.id||('c'+Date.now());
   const compradoEm=new Date().toISOString();
