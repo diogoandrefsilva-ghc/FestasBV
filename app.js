@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v250 · 2026-08-07 · Folha do stock em PDF (🖨 no separador Stock): inventário, o que falta gastar, o que está por alocar ou o de uma refeição';
+const APP_BUILD = 'v251 · 2026-08-07 · Folha do stock: linha mais limpa (sem 📌/🫙 e sem repetir a quantidade do destino único)';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -14641,22 +14641,36 @@ function buildStockReport(sel){
     // Marcas debaixo do guarda-chuva (Ruffles · Lays) — no corredor da garagem
     // é por elas que se reconhece a caixa
     if(g.marcas&&g.marcas.length)meta.push(escHtml(g.marcas.join(' · ')));
+    /* De onde veio, quando não foi comprado. O 📌 "por pagar" NÃO entra aqui:
+       é marca de dinheiro, e esta folha não fala de dinheiro por linha — quem
+       confere a prateleira quer saber se a caixa lá está, não se a fatura já
+       chegou. Vive no cartão do separador, que é onde se trata dela. */
     const selos=[...new Set(g.lotes.map(loteOrigem).filter(Boolean))].map(o=>`${STOCK_ORIGENS[o].ic} ${STOCK_ORIGENS[o].lbl}`);
-    if(g.lotes.some(loteProvisorio))selos.push('📌 por pagar');   // está cá; o € é que não é final
     if(selos.length)meta.push(escHtml(selos.join(' · ')));
     /* Onde está arrumado (eixo do custo). Numa folha de um destino não se
        repete — o título já o diz — e no "por alocar" não vem ao caso: ali o que
        interessa é precisamente a parte que ainda não tem destino. */
     if(!dest&&esc!=='poralocar'){
-      const ds=Object.keys(ag.dest).sort(destKeyCmp).map(k=>`${stockDestTxt(k)} ${escHtml(fmtQty(ag.dest[k].qtd,ag.u))}`);
-      if(ag.freeQ>0.0005)ds.push(`🧺 por alocar ${escHtml(fmtQty(ag.freeQ,ag.u))}`);
-      if(ds.length)meta.push(ds.join(' · '));
+      const qMost=qtdDe(g,ag);
+      const ent=Object.keys(ag.dest).sort(destKeyCmp).map(k=>({t:stockDestTxt(k),q:ag.dest[k].qtd}));
+      /* Num artigo de DESPENSA o "por alocar" não diz nada a quem confere a
+         prateleira: o frasco está cá e não se gasta por alocação — é conversa
+         do custo, e essa tem folha própria (🗓️ Só o que está por alocar). */
+      if(ag.freeQ>0.0005&&!c.desp)ent.push({t:'🧺 por alocar',q:ag.freeQ});
+      /* Um destino só, a levar tudo, não repete o número que está ao lado
+         ("🧾 Gerais 6 · · · 6"): fica só o destino, que é o que a linha ainda
+         não disse. Com mais do que um — ou quando o número da direita é outro,
+         como na folha do que falta gastar — cada um diz o seu. */
+      const soUm=ent.length===1&&Math.abs(ent[0].q-qMost)<0.0005;
+      if(ent.length)meta.push(ent.map(e=>soUm?e.t:`${e.t} ${escHtml(fmtQty(e.q,ag.u))}`).join(' · '));
     }
-    /* Consumo (o outro eixo). Na despensa não há meio termo — ainda há ou
-       acabou; no resto diz-se o que já se gastou, e só quando já se gastou
-       alguma coisa: "0 gasto" é repetir a quantidade que está ao lado. */
+    /* Consumo (o outro eixo). Só se diz o que foge ao normal: na despensa, que
+       ACABOU — "despensa · ainda há" era uma etiqueta em cada frasco para não
+       acrescentar nada (o artigo está na folha, logo está cá); no resto, o que
+       já se gastou, e só depois de se ter gasto alguma coisa ("0 gasto" é
+       repetir a quantidade do lado). */
     const mao=c.manual?' ✍️':'';
-    if(c.desp)meta.push(`🫙 despensa · <b>${c.resta>0.0005?'ainda há':'acabou'}</b>${mao}`);
+    if(c.desp){if(!(c.resta>0.0005))meta.push(`🫙 <b>acabou</b>${mao}`);}
     else if(c.cons>0.0005)meta.push(escHtml(esc==='porgastar'
       ?`🍽️ ${fmtQty(c.cons,ag.u)} já gasto de ${fmtQty(c.tot,ag.u)}`
       :`🍽️ gasto ${fmtQty(c.cons,ag.u)} · por gastar ${fmtQty(c.resta,ag.u)}`)+mao);
