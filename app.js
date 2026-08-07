@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v245 · 2026-08-07 · Cash-flow: o detalhe abre em ficha de consulta e só se edita depois do ✏️';
+const APP_BUILD = 'v246 · 2026-08-07 · Ficha de consulta também nas compras da lista — artigos, quantidades e preços sem abrir o editor';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -1719,7 +1719,7 @@ function renderCashFlows(){
       // Com um destino filtrado, a linha que fez a compra entrar na lista fica
       // marcada — é a resposta a "o que é que esta compra tem a ver com isto?"
       const lines=subs.map(l=>`<div class="cft-sub${cfFilterDest!=='all'&&l.key===cfFilterDest?' on':''}"><span>${l.ic||shopTipoIcon(l.sub)} ${l.sub}${l.dia?' · '+l.dia:''}${l.obs?' · <i>'+escHtml(l.obs)+'</i>':''}</span>${one?'':`<span>−${eur(l.valor)}</span>`}</div>`).join('');
-      return `<div class="card cft-card b-despesa${cf.prov?' cft-prov':''}" onclick="openCompra('${cf.compraId}')">
+      return `<div class="card cft-card b-despesa${cf.prov?' cft-prov':''}" onclick="openCfDetail('compra','${cf.compraId}')">
         <div class="cft-kind k-despesa sf">${cf.prov?'📌 Provisória · detalhada':'🛒 Compra · lista'}</div>
         <div class="cft-l1"><div class="cft-title">${escHtml(cf.line1)}</div><span class="cft-v neg">−${eur(cf.valor)}</span></div>
         ${(cf.line2||provData)?`<div class="cft-meta">${[provData,cf.line2?truncRef(cf.line2):''].filter(Boolean).join(' · ')}</div>`:''}
@@ -3647,11 +3647,14 @@ let editingCf=null;
    (editCfEntry/saveEditCf), intacto por baixo. */
 let cfView=null;   // {source,idx,editType} do movimento aberto em consulta
 
+/* source: 'despesas' | 'mealheiros' | 'pagamentos' (idx = índice) ou 'compra'
+   (idx = compra_id). A compra é o movimento com detalhe artigo a artigo — e era
+   precisamente o que continuava a cair direito no formulário. */
 function openCfDetail(source,idx){
-  // Cash-flow que veio de uma compra da lista → abre o editor da compra (não o de despesa avulsa)
+  // Uma despesa de uma compra da lista é a compra: a ficha é a dela, inteira.
   if(source==='despesas'){
-    const d=DATA.despesas[idx];
-    if(d&&d.compraId){openCompra(d.compraId);return;}
+    const d=(DATA.despesas||[])[idx];
+    if(d&&d.compraId)return openCfDetail('compra',d.compraId);
   }
   // HTML velho ainda em cache: o app.js e o index.html são os dois network-first,
   // mas são dois pedidos — quem apanhe o deploy a meio fica com o novo app.js e o
@@ -3669,6 +3672,7 @@ function openCfDetail(source,idx){
 /* Caminho antigo (só para o caso acima): formulário direto, trancado a quem não
    pode gravar. Não é por aqui que se entra num detalhe — é pelo openCfDetail. */
 function cfEditorDireto(source,idx){
+  if(source==='compra'){openCompra(idx);return;}
   editCfEntry(source,idx);
   const t=editingCf&&editingCf.editType;
   const btns=document.querySelector('#edit-cf-modal .mbtns');
@@ -3682,6 +3686,7 @@ function cfEditorDireto(source,idx){
 
 /* Tipo do movimento a partir da origem (a mesma classificação que a lista usa). */
 function cfViewTipoOf(source,idx){
+  if(source==='compra')return'compra';
   if(source==='despesas')return'despesa';
   if(source==='mealheiros')return'mealheiro';
   const p=(DATA.pagamentos||[])[idx];
@@ -3689,9 +3694,13 @@ function cfViewTipoOf(source,idx){
 }
 /* Editar continua a ser do admin — e, com as contas fechadas, despesas e
    mealheiros (as entradas do apuramento) deixam de se mexer. Os pagamentos
-   continuam editáveis depois do fecho, como sempre. */
+   continuam editáveis depois do fecho, como sempre.
+   A compra fica de fora do fecho de propósito: quem manda nela é o `openCompra`,
+   que sempre a deixou editar depois de fechadas as contas — a ficha não é sítio
+   para mudar essa regra às escondidas. */
 function cfPodeEditar(t){
   if(!isAdmin())return false;
+  if(t==='compra')return true;
   return !(contasFechadas()&&(t==='despesa'||t==='mealheiro'));
 }
 /* Troca a ficha pelo formulário e vice-versa (o modal é o mesmo). */
@@ -3712,6 +3721,9 @@ function cfUnlockEdit(){
   const{source,idx}=cfView;
   // A UI já esconde o botão; a guarda é para o esconder não ser a única proteção
   if(!cfPodeEditar(cfViewTipoOf(source,idx)))return;
+  // A compra tem editor próprio (é onde se mexe nos artigos e nos lotes) — o ✏️
+  // leva lá, em vez de trazer para aqui um formulário que não é deste modal.
+  if(source==='compra'){closeEditCf();openCompra(idx);return;}
   editCfEntry(source,idx);
   cfSetMode('edit');
 }
@@ -3766,7 +3778,8 @@ function cfViewRender(){
   cfView.editType=t;
   const box=document.getElementById('cf-view');
   if(!box)return;
-  box.innerHTML=t==='despesa'?cfvDespesaHtml((DATA.despesas||[])[idx])
+  box.innerHTML=t==='compra'?cfvCompraHtml(idx)
+    :t==='despesa'?cfvDespesaHtml((DATA.despesas||[])[idx])
     :t==='mealheiro'?cfvMealheiroHtml((DATA.mealheiros||[])[idx])
     :t==='reembolso'?cfvReembolsoHtml((DATA.pagamentos||[])[idx])
     :t==='saldar'?cfvSaldarHtml((DATA.pagamentos||[])[idx]):'';
@@ -3826,6 +3839,101 @@ function cfvDespesaHtml(d){
   if(String(d.obs||'').trim())h+=cfvBlk('Observações',`<div class="cfv-blk-b">${escHtml(d.obs)}</div>`);
   if(prov)h+='<div class="cfv-note gold">📌 Provisória: já conta nas contas e no custo da refeição — o que falta é o pagamento, e o valor ainda pode ser acertado.</div>';
   return h;
+}
+
+/* ── Ficha de uma compra da lista ──
+   O que a distingue dos outros movimentos é ter **detalhe artigo a artigo** — e
+   era exatamente aqui que ver o que se comprou obrigava a abrir o editor da
+   compra, com o picker de pedidos, os tabuladores e as caixas todas. A ficha
+   responde por ordem: quanto, quem, quando · o que se comprou · onde entrou o
+   dinheiro. Mexer nos artigos continua a ser lá dentro, pelo ✏️. */
+function cfvCompraHtml(compraId){
+  const ds=(DATA.despesas||[]).filter(d=>d.compraId===compraId);
+  if(!ds.length)return'<div class="cfv-note">Esta compra já não existe.</div>';
+  const d0=ds.find(d=>d.desc&&d.desc!=='Compras')||ds[0];
+  const prov=ds.every(despProvisoria);
+  const total=rnd(ds.reduce((a,x)=>a+(+x.valor||0),0),2);
+  let h=cfvHero({type:'despesa',prov,valor:total,sign:'neg',sgn:'−',
+    kind:prov?'📌 Provisória · detalhada':'🛒 Compra · lista',
+    title:escHtml(d0.desc||'Compra da lista'),
+    when:prov?'📌 Ainda por pagar':(d0.dataDesp?`📅 ${fmtDataLonga(d0.dataDesp)}`:'')});
+  h+=`<div class="cfv-rows">${cfvRow(prov?'Quem paga':'Quem pagou',escHtml(d0.quem||'—'))}</div>`;
+  const arts=cfvCompraArtigos(compraId,ds);
+  if(arts.length)h+=cfvBlk(`🧺 Artigos · ${arts.length}`,arts.map(a=>`<div class="cfv-item">
+    <span class="cfv-item-n">${escHtml(a.nome||'(sem nome)')}${a.sub?`<small>${a.sub}</small>`:''}</span>
+    <span class="cfv-item-q">${a.qtd?escHtml(a.qtd):''}</span>
+    <span class="cfv-item-v">${a.valor==null?'':eur(a.valor)}</span>
+  </div>`).join(''));
+  const dest=cfvCompraDestinos(compraId,ds);
+  if(dest.length)h+=cfvBlk('Onde entra',dest.map(x=>{
+    const dl=destLabel(x.k);
+    return `<div class="cfv-line"><span>${dl.icon} ${escHtml(dl.label)}${x.obs?' · <i>'+escHtml(x.obs)+'</i>':''}</span><span>−${eur(x.valor)}</span></div>`;
+  }).join(''));
+  if(!arts.length)h+='<div class="cfv-note">Esta compra foi registada só por totais — não tem artigos detalhados.</div>';
+  // Só se promete stock onde ele existe: a provisória do formato antigo não tem
+  // lotes (só se converte ao voltar a gravar), e dizer-lhe "já entraram em stock"
+  // era mandar quem cozinha procurar o que não está lá.
+  if(prov)h+=`<div class="cfv-note gold">📌 Provisória: ${stockArr().some(l=>l.compraId===compraId)
+    ?'os artigos já entraram em stock e já contam nas contas'
+    :'já conta nas contas'} — o que falta é o pagamento, e o valor ainda pode ser acertado.</div>`;
+  return h;
+}
+/* Artigos da compra. Formato normal = um lote de stock por artigo; formato
+   antigo (provisória escrita só no cash-flow) = os artigos vivem nas observações
+   da despesa, e o preço é o da linha. Ver provArtigos. */
+function cfvCompraArtigos(compraId,ds){
+  const lotes=stockArr().filter(l=>l.compraId===compraId);
+  if(lotes.length)return lotes.map(l=>{
+    const al=(l.alocacoes||[]).filter(a=>+a.qtd>0);
+    const sub=[
+      // Um artigo repartido por duas refeições diz QUAIS — é isso que se vem cá
+      // ver. Só acima de duas é que a contagem passa a ser mais legível.
+      al.length?(al.length<=2?al.map(a=>cfvDestCurto(alocToDestino(a))).join(' · ')
+                             :`${al.length} destinos`)
+               :'por alocar',
+      // O nome do talão nem sempre é o nome do pedido ("Folhas de Louro" ↔ "Louro"):
+      // quando diferem, diz-se a que pedido da lista é que o artigo responde.
+      (l._listArt&&!shopSameArtigo(l._listArt,l.artigo))?`🔗 ${escHtml(l._listArt)}`:''
+    ].filter(Boolean).join(' · ');
+    return{nome:l.artigo,qtd:loteQtdLabel(l),valor:+l.valor||0,sub};
+  });
+  const out=[];
+  ds.forEach(d=>{
+    const a=provArtigos(d);
+    if(!a.length)return;
+    // Uma despesa por artigo (o normal) → o € é o do artigo. Nas antigas, com
+    // tudo numa linha só, não há preço por artigo para mostrar.
+    const um=a.length===1;
+    const sub=cfvDestCurto(alocToDestino({tipo:d.tipo,data:d.dataValor,bebida:d.bebida}));
+    a.forEach(x=>out.push({nome:x.artigo,qtd:x.qtd,valor:um?(+d.valor||0):null,sub}));
+  });
+  return out;
+}
+function cfvDestCurto(v){return v?`${destLabel(v).icon} ${escHtml(destLabel(v).short)}`:'';}
+/* "Onde entra" — o dinheiro por destino. A linha "🧺 Stock" é técnica (entra por
+   Gerais e só depois se reparte pelas alocações), por isso troca-se pela
+   repartição real, como no cartão da lista. Ao contrário do cartão, aqui NÃO se
+   detalha artigo a artigo: os artigos já têm bloco próprio e repeti-los era ler
+   a mesma compra duas vezes. */
+function cfvCompraDestinos(compraId,ds){
+  const by={};
+  const add=(k,v,obs)=>{
+    const key=k+'\n'+(obs||'');
+    if(!by[key])by[key]={k,obs:obs||'',valor:0};
+    by[key].valor=rnd(by[key].valor+v,2);
+  };
+  ds.forEach(d=>{
+    if((d.obs||'')===STOCK_OBS&&d.tipo==='Gerais'){
+      const m=cfStockDestMap(compraId,+d.valor||0);
+      const ks=Object.keys(m);
+      if(ks.length){ks.forEach(k=>add(k,m[k],''));return;}
+    }
+    // No formato antigo as observações SÃO os artigos (com a nota à mão colada
+    // à frente) — e esses já têm bloco próprio. Aqui fica só a nota.
+    const obs=(d.obs||'')===STOCK_OBS?'':(provArtigos(d).length?provNotaTxt(d):(d.obs||''));
+    add(cfDespDests(d)[0]||'Gerais',+d.valor||0,obs);
+  });
+  return Object.keys(by).map(k=>by[k]).sort((a,b)=>destKeyCmp(a.k,b.k));
 }
 
 function cfvMealheiroHtml(m){
@@ -6982,7 +7090,7 @@ function mealShopSection(rd){
      não há artigos nenhuns e fica a própria despesa, que é tudo o que existe. */
   let nProvArts=0;
   const provLines=provs.map(({d,i})=>{
-    const abre=d.compraId?`openCompra('${d.compraId}')`:`openCfDetail('despesas',${i})`;
+    const abre=d.compraId?`openCfDetail('compra','${d.compraId}')`:`openCfDetail('despesas',${i})`;
     const arts=provArtigos(d);
     nProvArts+=arts.length||1;
     if(!arts.length)return `<div class="msl-it prov" onclick="${abre}" title="Provisório">
