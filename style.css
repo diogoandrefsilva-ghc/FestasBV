@@ -1355,6 +1355,9 @@ button.cmp-chip.qt-tap:active{filter:brightness(.93)}
 /* ✏️ do lote sem compra (corrigir quantidade/unidade/origem) — ao lado do ✕ */
 .cmp-ln-ed{background:transparent;border:none;font-size:13px;cursor:pointer;padding:2px 2px 2px 4px;line-height:1;border-radius:6px;flex:0 0 auto;opacity:.75}
 .cmp-ln-ed:hover{opacity:1;background:rgba(30,122,77,.1)}
+/* Unidade do cartão de stock — só aparece quando o mesmo artigo existe em mais
+   do que uma (3 postas de bacalhau num cartão, 2,092 kg noutro) */
+.stk-un{flex:0 0 auto;font-size:10px;font-weight:700;letter-spacing:.03em;color:var(--faint);background:var(--panel2);border:1px solid var(--line);border-radius:7px;padding:2px 6px;white-space:nowrap}
 /* Marcas listadas no cartão de stock (Ruffles · Lays) */
 .stk-marcas{font-size:11.5px;color:var(--muted);margin:1px 0 5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 /* Ligação "pertence a" no registo da compra (em todos os artigos) */
@@ -1545,6 +1548,12 @@ button.cmp-chip.qt-tap:active{filter:brightness(.93)}
 /* Detalhe do lote: resumo + compras (esquerda) ↔ pedidos da lista (direita) */
 .lote-sum{font-size:13px;color:var(--muted);line-height:1.4}
 .lote-sum b{font-size:15px;font-weight:700;color:var(--ink)}
+/* O resto do artigo, noutra unidade — um toque abre o outro guarda-chuva */
+.lote-outras{margin-top:7px;display:flex;flex-wrap:wrap;align-items:center;gap:5px}
+.lote-outras .lo-lbl{font-size:11.5px;color:var(--muted)}
+.lote-outras .lo-btn{font-family:inherit;font-size:11.5px;font-weight:700;color:var(--ink);background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:3px 8px;cursor:pointer;white-space:nowrap}
+.lote-outras .lo-btn:active{background:var(--line)}
+.lote-outras i{flex:1 0 100%;font-size:10.5px;font-style:normal;color:var(--faint);line-height:1.35}
 /* Compras e Pedidos empilhados: fechados mostram só o resumo (à direita), e
    abrem um de cada vez com a largura toda — os nomes de fatura e as linhas das
    refeições deixam de se espremer em meia coluna.

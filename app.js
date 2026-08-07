@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v241 · 2026-08-07 · O visto do “só despesa” aparece mesmo marcado (o modal apagava-lhe o visto do sistema)';
+const APP_BUILD = 'v242 · 2026-08-07 · Stock: um cartão por artigo E unidade — o bacalhau ao kg deixa de se somar com o às postas';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -5882,6 +5882,9 @@ function fmtQty(n,u){
    lotes antigos ('un') e os novos ('') passam a casar na mesma. */
 function uKey(u){const s=(u||'').trim();return s==='un'?'':s;}
 function sameUnit(a,b){return uKey(a)===uKey(b);}
+/* A unidade sozinha, para se falar dela sem número à frente ("em kg", "em
+   unidades"). Sai do próprio fmtQty para os plurais serem os mesmos. */
+function uLabel(u){return fmtQty(2,uKey(u)).replace(/^2\s*/,'')||'unidades';}
 /* Quantidade de UM lote como a lista a escreve: "6 × 2,5 kg". O `tamanho` é a
    embalagem e vive à parte da quantidade — nos pedidos (shopQtyLabel) e agora
    também nos lotes, para os dois lados se lerem da mesma maneira. Como na
@@ -7014,9 +7017,11 @@ function renderRemovidos(removidos,open){
 // Em contas fechadas o stock não se gere — o separador desaparece
 function updateStockTabVis(){const t=document.getElementById('tab-stock');if(t)t.style.display=(STOCK_TABLE&&!contasFechadas())?'':'none';}
 
-// Agrega as alocações de um conjunto de lotes por destino + o livre (por alocar)
-function stockAggAlocs(lotes){
-  const dest={};let freeQ=0,freeV=0,totQ=0,totV=0,u='';
+/* Agrega as alocações de um conjunto de lotes por destino + o livre (por alocar).
+   Os lotes têm de ser TODOS da mesma unidade — somar quantidades só se faz
+   dentro dela. A unidade vem de fora (`u0`) quando quem chama a sabe. */
+function stockAggAlocs(lotes,u0){
+  const dest={};let freeQ=0,freeV=0,totQ=0,totV=0,u=u0||'';
   lotes.forEach(l=>{
     u=u||l.unidade;const unit=l.qtd>0?l.valor/l.qtd:0;
     totQ=rnd(totQ+l.qtd,3);totV=rnd(totV+(+l.valor||0),2);
@@ -7042,7 +7047,7 @@ function stockDestChip(k,qtd,u){
 // à frente; a sobra ganha o badge "disponível"). As compras de origem e o total
 // em € vivem no detalhe — toca-se no cartão para o abrir.
 function stockArticleCard(g){
-  const ag=stockAggAlocs(g.lotes);
+  const ag=stockAggAlocs(g.lotes,g.u);
   // Com um estado escolhido nos chips de filtro, o cartão mostra só a parte do
   // artigo que está nesse estado (o resto vê-se em "Tudo")
   const st=STOCK_FILTER;
@@ -7057,9 +7062,11 @@ function stockArticleCard(g){
     // Por pagar: o artigo está cá, o € é que ainda não é final
     +(g.lotes.some(loteProvisorio)?'<span class="stk-org" title="Ainda por pagar — o valor é provisório">📌</span>':'');
   // Com filtro de estado abre o lote que tem essa parte (não o primeiro do grupo)
-  const tgt=(st==='all'?null:g.lotes.find(l=>stockGroupEstados(stockAggAlocs([l])).has(st)))||g.lotes[0];
+  const tgt=(st==='all'?null:g.lotes.find(l=>stockGroupEstados(stockAggAlocs([l],g.u)).has(st)))||g.lotes[0];
+  // O mesmo nome comprado em duas unidades dá dois cartões: cada um diz qual é
+  const unTag=g.multiU?`<span class="stk-un">em ${escHtml(uLabel(g.u))}</span>`:'';
   return `<div class="stk-card stk-tap" onclick="openLoteModal(${tgt._id})">
-    <div class="stk-card-top"><b>${escHtml(g.artigo)}</b>${orgTag}<span class="stk-chev">›</span></div>
+    <div class="stk-card-top"><b>${escHtml(g.artigo)}</b>${unTag}${orgTag}<span class="stk-chev">›</span></div>
     ${marcas}
     <div class="stk-chips">${chips}</div>
   </div>`;
@@ -7103,9 +7110,19 @@ function renderStock(){
   const groups={};
   // Agrupa pelo PEDIDO genérico (loteReqArtigo): Ruffles+Lays ligados a "Batatas
   // Fritas" caem num só cartão; as marcas ficam listadas lá dentro.
-  lots.forEach(l=>{const rn=loteReqArtigo(l);const k=shopArtKey(rn);(groups[k]=groups[k]||{artigo:rn,lotes:[]}).lotes.push(l);});
-  const arrTodos=Object.values(groups).sort((a,b)=>a.artigo.localeCompare(b.artigo,'pt'))
-    .map(g=>Object.assign(g,{estados:stockGroupEstados(stockAggAlocs(g.lotes)),marcas:[...new Set(g.lotes.map(l=>l.artigo))].filter(m=>!shopSameArtigo(m,g.artigo))}));
+  /* …e pela UNIDADE, que é o que faz de um cartão exatamente um guarda-chuva —
+     o mesmo conjunto de lotes que o modal abre (umbrellaLotes) e a mesma chave
+     por que se aloca, se procura e se cobre. Agrupado só pelo nome, o cartão do
+     bacalhau somava 3 postas com 2,092 kg e chamava "5,092 kg" ao resultado,
+     mostrava o € de tudo e abria o modal de um deles — o que fazia a metade que
+     ficava de fora parecer desaparecida, e trocar de metade conforme o lote que
+     calhava ser o alvo. kg e unidades não se somam: são dois cartões. */
+  lots.forEach(l=>{const rn=loteReqArtigo(l);const k=shopArtKey(rn)+'|'+uKey(l.unidade);(groups[k]=groups[k]||{artigo:rn,u:l.unidade,lotes:[]}).lotes.push(l);});
+  // Nomes que existem em mais do que uma unidade — é a esses que o cartão diz
+  // em que unidade é que ele é (senão ficavam dois "Bacalhau" sem explicação)
+  const nUnid={};Object.values(groups).forEach(g=>{const nk=shopArtKey(g.artigo);nUnid[nk]=(nUnid[nk]||0)+1;});
+  const arrTodos=Object.values(groups).sort((a,b)=>a.artigo.localeCompare(b.artigo,'pt')||uKey(a.u).localeCompare(uKey(b.u)))
+    .map(g=>Object.assign(g,{estados:stockGroupEstados(stockAggAlocs(g.lotes,g.u)),multiU:nUnid[shopArtKey(g.artigo)]>1,marcas:[...new Set(g.lotes.map(l=>l.artigo))].filter(m=>!shopSameArtigo(m,g.artigo))}));
   /* Pesquisa: nome do artigo, marcas debaixo do guarda-chuva (Ruffles · Lays) e
      categoria — procurar "talho" traz o corredor todo. Filtra ANTES dos chips
      de estado, para as contagens deles falarem do que está à vista. */
@@ -7160,7 +7177,7 @@ function renderStock(){
       const s=secs[k];
       const nome=s.cat?s.cat.nome:'Outros';
       // € do container: com filtro de estado, só a parte que está nesse estado
-      const totV=rnd(s.groups.reduce((a,g)=>a+stockEstadoVal(stockAggAlocs(g.lotes),STOCK_FILTER),0),2);
+      const totV=rnd(s.groups.reduce((a,g)=>a+stockEstadoVal(stockAggAlocs(g.lotes,g.u),STOCK_FILTER),0),2);
       // Aberto por defeito; o fecho é da sessão. A pesquisar, abrem-se todos —
       // um container fechado escondia precisamente o artigo que se procura.
       const open=stkBuscando||STOCK_CAT_OPEN[k]!==false;
@@ -9378,6 +9395,21 @@ function umbrellaLotes(reqName,u){
   return stockArr().filter(l=>stockBacked(l)&&shopSameArtigo(loteReqArtigo(l),reqName)&&sameUnit(l.unidade,u))
     .sort((a,b)=>loteCompraDate(a).localeCompare(loteCompraDate(b))||(a.criadoEm||'').localeCompare(b.criadoEm||'')||((a._id||0)-(b._id||0)));
 }
+/* O MESMO artigo comprado noutra unidade (3 postas de bacalhau + 2,092 kg dele)
+   é outro guarda-chuva: kg e unidades não se somam, e alocar, cobrir e comparar
+   com os pedidos passa sempre pela mesma unidade. Calado, o modal parecia ter
+   perdido metade do stock — daqui sai a linha que diz que ele existe e leva lá.
+   Uma entrada por unidade, com um lote qualquer dela para abrir (o modal
+   recalcula o guarda-chuva a partir dele). */
+function stockOutrasUnidades(reqName,u){
+  const out={};
+  stockArr().forEach(l=>{
+    if(!stockBacked(l)||!shopSameArtigo(loteReqArtigo(l),reqName)||sameUnit(l.unidade,u))return;
+    const k=uKey(l.unidade),o=(out[k]=out[k]||{u:l.unidade,qtd:0,val:0,id:l._id});
+    o.qtd=rnd(o.qtd+(+l.qtd||0),3);o.val=rnd(o.val+(+l.valor||0),2);
+  });
+  return Object.values(out).sort((a,b)=>uKey(a.u).localeCompare(uKey(b.u)));
+}
 /* ── Compras / Pedidos: duas secções empilhadas e fechadas ───────────────
    O estado (aberto/fechado) de cada uma fica guardado no aparelho: quem anda a
    alocar artigo atrás de artigo abre a secção uma vez e não a volta a abrir em
@@ -9496,8 +9528,16 @@ function openLoteModal(id){
   const nCmp=new Set(lotes.map(l=>l.compraId||'')).size;
   const cmpSum=nL?(anyOrg?`${nL} ${nL===1?'origem':'origens'}`
     :`${nL} ${nL===1?'artigo':'artigos'}${nCmp>1?` · ${nCmp} compras`:''}`):'—';
+  // O resto deste artigo, comprado noutra unidade: um toque leva lá
+  const outras=stockOutrasUnidades(reqName,u);
+  const outrasHtml=outras.length?`<div class="lote-outras">
+    <span class="lo-lbl">Também há deste artigo:</span>
+    ${outras.map(o=>`<button type="button" class="lo-btn" onclick="openLoteModal(${o.id})">${escHtml(fmtQty(o.qtd,o.u))} · ${eur(o.val)} ›</button>`).join('')}
+    <i>Unidades diferentes não se somam — está noutro cartão do stock.</i>
+  </div>`:'';
   document.getElementById('lote-info').innerHTML=
     `<div class="lote-sum">Em stock: <b>${escHtml(fmtQty(totQ,editingLote.u))}</b> · <b>${semCusto?'sem custo':eur(totV)}</b></div>`+
+    outrasHtml+
     `<div class="lote-acc">
       ${loteAccSec('cmp',anyOrg?'📦':'🛒',anyOrg?'Origem':'Compras',totQ,cmpSum,comprasRows)}
       ${loteAccSec('need','📋','Pedidos na lista',
