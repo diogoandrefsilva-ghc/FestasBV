@@ -335,6 +335,17 @@ setTimeout(function(){ if (window.fbvEsconderSplash) window.fbvEsconderSplash();
         <label>Categoria 🏷️</label>
         <select id="lote-cat" onchange="loteCatChanged(this.value)"></select>
       </div>
+      <!-- Artigo de despensa (db/despensa.sql): o que NÃO se esgota por alocação
+           — o sal, a pimenta, o louro. É marca global por nome, como a categoria,
+           e muda a leitura do consumo deste artigo em todos os anos. -->
+      <div id="lote-desp-wrap" style="display:none">
+        <label>🫙 Artigo de despensa</label>
+        <div class="lote-desp-row">
+          <button type="button" class="lote-desp-sw" id="lote-desp-sw" onclick="loteDespToggle()" aria-pressed="false"><i></i></button>
+          <span class="lote-desp-txt" id="lote-desp-txt"></span>
+        </div>
+        <div class="note" id="lote-desp-note" style="margin-top:2px"></div>
+      </div>
       <div id="lote-req-wrap" style="display:none">
         <label>🔗 Cobre o pedido de</label>
         <input id="lote-req" list="lote-req-list" placeholder="ex.: batatas fritas" onchange="loteReqChanged(this.value)">
@@ -344,10 +355,17 @@ setTimeout(function(){ if (window.fbvEsconderSplash) window.fbvEsconderSplash();
     </div>
     <!-- O (quantidade) é escrito pelo loteRenderAlocs() e acompanha o que se
          está a alocar — fecha a leitura de cima: comprado · pedido · alocado -->
-    <label id="lote-aloc-lbl">🍽️ Alocação</label>
+    <label id="lote-aloc-lbl">💶 Alocação</label>
     <div id="lote-alocs"></div>
     <button class="btn ghost write-action" id="lote-addline" style="width:100%;margin-top:10px" onclick="loteAddAloc()">＋ Alocar a refeição</button>
     <div class="note" id="lote-resto" style="margin-top:10px"></div>
+    <!-- 2.º eixo do stock: o que já se GASTOU, à parte de para onde vai o custo
+         (db/stock_consumo.sql). Nos artigos de despensa é só ainda há / acabou.
+         Escrito pelo loteConsFill() — nada disto entra nas contas. -->
+    <div id="lote-cons-wrap" style="display:none">
+      <label id="lote-cons-lbl">🍽️ Consumo</label>
+      <div id="lote-cons-body"></div>
+    </div>
     <!-- Que pedidos da lista é que este stock trata (db/cobertura.sql). Parte-se
          daqui — do que está cá — para o pedido, que é o sentido natural. -->
     <div id="lote-cob-wrap" class="shop-cob-wrap" style="display:none">

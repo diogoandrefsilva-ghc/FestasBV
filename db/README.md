@@ -50,10 +50,20 @@ Numa BD limpa, correr por esta ordem (há dependências entre eles):
     paga por várias pessoas. Continua a ser uma linha por pagador (é o que as
     contas leem); o token diz que são a mesma despesa, para aparecerem num
     cartão só e se editarem/apagarem juntas
+16. `stock_consumo.sql` — `stock_lotes.consumido`: o 2.º eixo do stock. A
+    *alocação* diz para onde vai o custo, o *consumo* diz o que já se gastou.
+    `NULL` = derivar das refeições que já passaram (o comportamento de sempre);
+    número = dito à mão. **Não entra em conta nenhuma** — é leitura de despensa
+17. `despensa.sql` — `artigos_despensa`: os artigos que **não se esgotam** por
+    alocação (sal, pimenta, louro). Uma embalagem serve o evento todo, por isso
+    neles a derivação do consumo desliga-se e vale um interruptor: ainda há /
+    acabou. Marca global por nome normalizado, como as categorias
 
-Os passos 4–15 são migrações add-on idempotentes: correr uma vez cada. A app é
+Os passos 4–17 são migrações add-on idempotentes: correr uma vez cada. A app é
 tolerante a qualquer uma delas faltar — sonda a coluna/tabela e esconde o que
-ainda não existe.
+ainda não existe. (Há mais add-ons no diretório que nunca entraram nesta lista —
+`cobertura.sql`, `bebida_refeicao.sql`, `stock_artigo_fatura.sql`,
+`admin_pass_temp.sql` — e valem a mesma regra: idempotentes e opcionais.)
 
 ## Conteúdo
 

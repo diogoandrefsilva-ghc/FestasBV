@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v248 · 2026-08-07 · Sacos, taxas e vasilhame saem do cartão da compra e ganham bloco próprio na ficha';
+const APP_BUILD = 'v249 · 2026-08-07 · Stock com dois eixos: alocação (custo) e consumo (o que já se gastou) + artigos de despensa';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -162,6 +162,19 @@ let STOCK_TAM_COL=false;
 // renomear sem perder de onde ele veio. Sem a migração, STOCK_FAT_COL=false:
 // nunca se grava nem se mostra e a app comporta-se como antes.
 let STOCK_FAT_COL=false;
+/* stock_lotes já tem a coluna 'consumido' (db/stock_consumo.sql)? É o segundo
+   eixo do stock: a ALOCAÇÃO diz para onde vai o custo, o CONSUMO diz o que já
+   se gastou. Sem a migração, STOCK_CONS_COL=false — o consumo volta a ser só o
+   derivado das alocações (o comportamento de sempre) e não se escreve nada. */
+let STOCK_CONS_COL=false;
+/* Artigos de DESPENSA (db/despensa.sql): os que NÃO SE ESGOTAM por alocação —
+   o sal, a pimenta, o louro. Um frasco serve o evento todo e ainda sobra para o
+   ano seguinte, por isso neles o consumo não se deriva (seria mentira) e vale
+   um interruptor: ainda há / acabou. É uma marca GLOBAL por nome normalizado
+   (shopArtKey), como as categorias. Sem a migração, DESP_TABLE=false e tudo o
+   que é despensa fica escondido. */
+let DESP_TABLE=false;
+let ART_DESP={};   // {artigoKey: {origem}} — os artigos marcados como despensa
 // Switch das notificações de PRESENÇAS (config 'notif_presencas'). Lido em
 // carregar() por todos os utilizadores, porque é a app que marca as entradas
 // de presença como silenciosas quando está desligado (ver _flushPresLog).
@@ -2149,7 +2162,7 @@ async function carregar(){
     const sel='*,membros(*,presencas(*)),refeicoes_def(*),despesas(*),convidados(*),mealheiros(*),pagamentos(*)';
     // shoplist vai numa fetch SEPARADA e tolerante a falha: se a tabela ainda
     // não existir (migração por correr) o resto da app continua a funcionar.
-    const [res,uaRes,cjRes,vlRes,slRes,stRes,ctRes,acRes,npRes,flRes,fpRes,ccRes,sljRes,cobRes,cpRes,stmRes,sfRes,ttRes,tsRes,tiRes,ppRes,dgRes,dbRes]=await Promise.all([
+    const [res,uaRes,cjRes,vlRes,slRes,stRes,ctRes,acRes,npRes,flRes,fpRes,ccRes,sljRes,cobRes,cpRes,stmRes,sfRes,ttRes,tsRes,tiRes,ppRes,dgRes,dbRes,scRes,adRes]=await Promise.all([
       sbFetch(`${SB_URL}/rest/v1/eventos?select=${encodeURIComponent(sel)}&order=ano.asc`,{headers:sbHeaders(),cache:'no-store'}),
       sbFetch(`${SB_URL}/rest/v1/user_amigos?select=email,amigo`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null),
       sbFetch(`${SB_URL}/rest/v1/conjuges?select=amigo_a,amigo_b`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null),
@@ -2193,7 +2206,13 @@ async function carregar(){
       // sonda à coluna despesas.grupo_pag (db/despesas_pagadores.sql): 200 = já existe
       sbFetch(`${SB_URL}/rest/v1/despesas?select=grupo_pag&limit=1`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null),
       // sonda à coluna despesas.bebida (db/bebida_refeicao.sql)
-      sbFetch(`${SB_URL}/rest/v1/despesas?select=bebida&limit=1`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null)
+      sbFetch(`${SB_URL}/rest/v1/despesas?select=bebida&limit=1`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null),
+      // sonda à coluna stock_lotes.consumido (db/stock_consumo.sql): o eixo do
+      // consumo, à parte da alocação. Sem ela o consumo é só o derivado.
+      sbFetch(`${SB_URL}/rest/v1/stock_lotes?select=consumido&limit=1`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null),
+      // artigos de despensa (db/despensa.sql): os que não se esgotam por
+      // alocação. Tolerante — sem a migração, DESP_TABLE=false
+      sbFetch(`${SB_URL}/rest/v1/artigos_despensa?select=*`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null)
     ]);
     if(!res.ok)throw new Error('HTTP '+res.status);
     const rows=await res.json();
@@ -2233,6 +2252,12 @@ async function carregar(){
     DESP_BEBIDA_COL=!!(dbRes&&dbRes.ok);
     STOCK_TAM_COL=STOCK_TABLE&&!!(stmRes&&stmRes.ok);
     STOCK_FAT_COL=STOCK_TABLE&&!!(sfRes&&sfRes.ok);
+    // Consumo dito à mão: sem a coluna, o consumo é só o que se deriva das
+    // alocações — e um artigo de despensa não tem onde guardar o "acabou"
+    STOCK_CONS_COL=STOCK_TABLE&&!!(scRes&&scRes.ok);
+    DESP_TABLE=!!(adRes&&adRes.ok);
+    ART_DESP={};
+    if(DESP_TABLE)(await adRes.json()).forEach(r=>{ART_DESP[r.artigo_key]={origem:r.origem||'manual'};});
     // Só gravamos os responsáveis se as colunas já existirem no Supabase
     // (senão o replace das refeições falhava todo — padrão dividas_publicas)
     REFDEF_RESP_COLS=rows.some(ev=>(ev.refeicoes_def||[]).some(r=>'resp_cozinha' in r));
@@ -2279,7 +2304,9 @@ async function carregar(){
       mealheiros:(ev.mealheiros||[]).map(m=>({quem:m.quem,data:m.data,valor:N(m.valor),subtipo:m.subtipo,desc:m.descricao})),
       pagamentos:(ev.pagamentos||[]).map(p=>({de:p.de,para:p.para,valor:N(p.valor),ref:p.ref,data:p.data,extra:N(p.extra)})),
       shoplist:(shopByEv[ev.id]||[]).map(s=>({_id:s.id,artigo:s.artigo,quantidade:s.quantidade||'',tamanho:s.tamanho||'',loja:s.loja||'',tipo:s.tipo,dataValor:s.data_valor,estado:s.estado||'pendente',tratadoPor:s.tratado_por||null,noCarrinho:!!s.no_carrinho,compraId:s.compra_id||null,cfDesc:s.cf_desc||null,cobertura:s.cobertura||'',valor:s.valor!=null?N(s.valor):null,criadoPor:s.criado_por||'',criadoEm:s.criado_em,compradoEm:s.comprado_em})),
-      stockLotes:(stockByEv[ev.id]||[]).map(l=>({_id:l.id,compraId:l.compra_id,artigo:l.artigo,qtd:N(l.qtd),unidade:l.unidade||'',tamanho:l.tamanho||'',valor:N(l.valor),alocacoes:Array.isArray(l.alocacoes)?l.alocacoes:[],_listArt:l.lista_artigo||null,_fatNome:l.artigo_fatura||null,criadoEm:l.criado_em})),
+      // `_cons` (stock_lotes.consumido) é NULL de propósito quando ninguém o
+      // escreveu: null = derivar das alocações, número = foi dito à mão
+      stockLotes:(stockByEv[ev.id]||[]).map(l=>({_id:l.id,compraId:l.compra_id,artigo:l.artigo,qtd:N(l.qtd),unidade:l.unidade||'',tamanho:l.tamanho||'',valor:N(l.valor),alocacoes:Array.isArray(l.alocacoes)?l.alocacoes:[],_listArt:l.lista_artigo||null,_fatNome:l.artigo_fatura||null,_cons:l.consumido==null?null:Number(l.consumido),criadoEm:l.criado_em})),
       tshirts:(tsByEv[ev.id]||[]).map(t=>({_id:t.id,membro:t.membro,nome:t.nome,tipo:t.tipo,tamanho:t.tamanho,imputadoA:Array.isArray(t.imputado_a)?t.imputado_a.filter(Boolean):[],criadoPor:t.criado_por||'',criadoEm:t.criado_em}))
     }));
     ALL_YEARS.sort((a,b)=>(a.evento.ano||0)-(b.evento.ano||0));
@@ -6306,6 +6333,153 @@ function loteProvisorio(l){
 function stockBacked(l){return loteSemCompra(l)||(DATA.despesas||[]).some(d=>d.compraId===l.compraId);}
 function hojeISO(){return new Date().toISOString().slice(0,10);}
 
+/* ═══ CONSUMO DO STOCK (2.º eixo) e ARTIGOS DE DESPENSA ═══════════════
+   O stock responde a DUAS perguntas e durante muito tempo teve um campo só
+   para as duas — a alocação —, o que deixava buracos por onde escapavam
+   precisamente os artigos que dão trabalho:
+
+     ALOCAÇÃO   para onde vai o CUSTO (que refeição paga, ou que bolsa comum).
+     CONSUMO    o que já se GASTOU — o que ainda está cá para cozinhar.
+
+   Nas batatas fritas as duas andam juntas e ninguém dá pela diferença: aloco 3
+   pacotes ao almoço de sábado, sábado passa, foram-se 3. Fora daí:
+
+   · 100 cervejas em "Bebidas" (tipo puro, sem data) ficavam ALOCADAS para
+     sempre. Nunca consumidas — não têm data que passe — e também não contadas
+     como stock que ainda cá está. Eram um buraco: nem cá, nem gastas.
+   · um frasco de pimenta serve os jantares todos e ainda sobra para o ano
+     seguinte. Alocá-lo a uma refeição não o gasta, mas a app dava-o por gasto
+     mal essa refeição passasse.
+
+   Daí os dois conceitos abaixo, e a regra que os liga:
+
+     `_cons` (stock_lotes.consumido)  null = DERIVAR das alocações passadas (o
+       comportamento de sempre, e o caso normal — não obriga a escrever nada);
+       número = foi DITO À MÃO, e a partir daí a app não adivinha mais.
+
+     DESPENSA (db/despensa.sql)  o artigo NÃO SE ESGOTA por alocação. Nesses a
+       derivação está DESLIGADA e o consumo é um interruptor: ainda há / acabou.
+
+   NADA DISTO ENTRA NAS CONTAS. O consumo é leitura de despensa e de cozinha:
+   não mexe em quotas, saldos, rateios nem no custo das refeições, e o
+   calcular() nem sabe que existe. Se mexeres no motor, o consumo não tem de
+   aparecer lá — quem manda no dinheiro continua a ser só `alocacoes`. */
+function ehDespensa(artigo){return DESP_TABLE&&!!ART_DESP[shopArtKey(artigo||'')];}
+function loteDespensa(l){return ehDespensa(loteReqArtigo(l));}
+/* O consumo que a app deduz sozinha: o que está alocado a refeições cujo dia
+   JÁ PASSOU. É a regra de sempre ("no dia seguinte à refeição passa a
+   consumido") — o que mudou é ter nome e poder ser contrariada. Um tipo puro
+   (Bebidas/Gerais) não tem data, logo nunca se deriva dele: é um depósito, e
+   quem diz que se gastou é a alocação a refeições ou o "dar baixa". */
+function loteConsDerivado(l){
+  const hoje=hojeISO();let q=0;
+  ((l&&l.alocacoes)||[]).forEach(a=>{if(alocIsMeal(a)&&a.data<hoje)q=rnd(q+(+a.qtd||0),3);});
+  return q;
+}
+// O consumo foi escrito à mão neste lote? (com a coluna por migrar, nunca)
+function loteConsManual(l){return STOCK_CONS_COL&&!!l&&l._cons!=null;}
+/* Quanto deste lote já se gastou. Um valor à mão manda sempre; sem ele, num
+   artigo de despensa é 0 (derivar seria mentira) e no resto deriva-se. */
+function loteConsumido(l){
+  if(!l)return 0;
+  if(loteConsManual(l))return Math.max(0,Math.min(+l._cons||0,+l.qtd||0));
+  return loteDespensa(l)?0:Math.min(loteConsDerivado(l),+l.qtd||0);
+}
+/* Leitura de consumo de um guarda-chuva (artigo+unidade, o que o cartão é).
+   `resta` é o que a cozinha pode contar — o que o separador chama "por gastar".
+   Nos artigos de despensa não há meio termo: ou ainda há, ou acabou. */
+function umbConsumo(lotes,artigo){
+  let tot=0,cons=0,pool=0,manual=false;
+  (lotes||[]).forEach(l=>{
+    tot=rnd(tot+(+l.qtd||0),3);
+    cons=rnd(cons+loteConsumido(l),3);
+    if(loteConsManual(l))manual=true;
+    // `pool` = o que está parado num TIPO PURO (Bebidas/Gerais/Cerveja). É o
+    // depósito: custo já arrumado, consumo por dizer — e o único caso em que
+    // nem os chips nem a passagem dos dias sabem responder se aquilo ainda
+    // está na garagem. Sai daqui para quem o quiser assinalar.
+    (l.alocacoes||[]).forEach(a=>{if(!alocIsMeal(a))pool=rnd(pool+(+a.qtd||0),3);});
+  });
+  cons=rnd(Math.max(0,Math.min(cons,tot)),3);
+  const desp=ehDespensa(artigo||((lotes||[])[0]?loteReqArtigo(lotes[0]):''));
+  return {tot,cons,resta:rnd(Math.max(0,tot-cons),3),pool,manual,desp};
+}
+/* Reparte um consumo dito à mão pelos lotes, do mais antigo para o mais novo
+   (a mesma ordem FIFO por que se alocam) — gasta-se primeiro o que entrou
+   primeiro. Devolve {idLote:qtd}; `null` limpa e devolve o guarda-chuva ao
+   consumo derivado. Escrevem-se TODOS os lotes, mesmo os que ficam a zero:
+   deixar metade em automático e metade à mão dava um total que ninguém
+   conseguia explicar. */
+function consumoPlan(lotesFifo,total){
+  const out={};
+  if(total==null){(lotesFifo||[]).forEach(l=>{out[l._id]=null;});return out;}
+  let resto=rnd(Math.max(0,total),3);
+  (lotesFifo||[]).forEach(l=>{
+    const take=rnd(Math.max(0,Math.min(+l.qtd||0,resto)),3);
+    out[l._id]=take;resto=rnd(resto-take,3);
+  });
+  return out;
+}
+/* Grava o consumo de um guarda-chuva. `total` em quantidade, ou null para
+   voltar ao automático. Devolve false (com aviso) se a coluna não existir. */
+async function umbConsSet(lotes,total){
+  if(!STOCK_CONS_COL){toast('Falta correr db/stock_consumo.sql','bad');return false;}
+  const fifo=(lotes||[]).map(l=>({_id:l._id,qtd:+l.qtd||0}));
+  const plan=consumoPlan(fifo,total);
+  try{
+    for(const id in plan){
+      const v=plan[id];
+      await queueWrite(()=>sbReq('PATCH',`stock_lotes?id=eq.${id}`,{consumido:v}));
+      const l=stockArr().find(x=>String(x._id)===String(id));if(l)l._cons=v;
+    }
+    syncMirror();marcaGuardado();
+    return true;
+  }catch(e){toast(permErrorMsg(e),'bad');return false;}
+}
+/* ── A marca de despensa ────────────────────────────────────────────
+   Global por nome normalizado, como as categorias: a pimenta é despensa em
+   todos os anos e para toda a gente. Só o admin decide. */
+async function despSetMark(artigo,on,origem){
+  if(!DESP_TABLE){toast('Falta correr db/despensa.sql','bad');return false;}
+  if(!isAdmin()){toast('Só o admin marca artigos de despensa','bad');return false;}
+  const key=shopArtKey(artigo);if(!key)return false;
+  try{
+    if(on){
+      await queueWrite(()=>sbReq('POST','artigos_despensa?on_conflict=artigo_key',
+        [{artigo_key:key,origem:origem||'manual',atualizado_em:new Date().toISOString()}],
+        {Prefer:'resolution=merge-duplicates'}));
+      ART_DESP[key]={origem:origem||'manual'};
+    }else{
+      await queueWrite(()=>sbReq('DELETE',`artigos_despensa?artigo_key=eq.${enc(key)}`));
+      delete ART_DESP[key];
+    }
+    marcaGuardado();
+    return true;
+  }catch(e){toast(permErrorMsg(e),'bad');return false;}
+}
+/* A app SUGERE, nunca marca sozinha: o padrão do sal e do louro é ser pedido
+   em duas ou mais refeições e nenhuma delas escrever quantidade — quem pede
+   sal não diz quanto. É bom sinal mas não é prova (a salsa e os coentros fazem
+   o mesmo e são fresco, compram-se por refeição), por isso fica um convite no
+   modal do artigo e é o admin que responde. Recusar guarda-se no aparelho,
+   senão a mesma pergunta voltava em cada abertura do modal. */
+let _DESP_NAO=(function(){try{return JSON.parse(localStorage.getItem('festasbv_desp_nao'))||{};}catch(e){return{};}})();
+function despensaSugerida(artigo){
+  if(!DESP_TABLE||!artigo||ehDespensa(artigo))return false;
+  if(_DESP_NAO[shopArtKey(artigo)])return false;
+  const refs=new Set();let temQtd=false;
+  shopArr().forEach(it=>{
+    if(shopIsRemoved(it)||!shopSameArtigo(it.artigo,artigo))return;
+    if(qtyParse(it.quantidade))temQtd=true;
+    if(shopIsMeal(it.tipo)&&it.dataValor)refs.add(it.tipo+'|'+it.dataValor);
+  });
+  return !temQtd&&refs.size>=2;
+}
+function despensaRecusar(artigo){
+  _DESP_NAO[shopArtKey(artigo)]=true;
+  try{localStorage.setItem('festasbv_desp_nao',JSON.stringify(_DESP_NAO));}catch(e){}
+}
+
 // Interpreta quantidade em texto ("5 pacotes", "2,5 kg") → {n,u} com unidade
 // canónica (g→kg, ml→L; desconhecida fica o texto). null se não houver número.
 function qtyParse(raw){
@@ -7503,14 +7677,17 @@ function stockAggAlocs(lotes,u0){
 }
 // Dia da semana abreviado a 3 letras (Sáb, Dom, Sex, …) para rótulos compactos
 function diaAbrev(ds){const s=diaCurto(ds);return s?s.slice(0,3):'';}
-function stockDestChip(k,qtd,u){
+function stockDestChip(k,qtd,u,desp){
   const a=destinoAloc(k,qtd);if(!a)return '';
   const meal=alocIsMeal(a);
   // Bebida: ícone composto (🍻 + o da refeição) — o 🍻 sozinho não dizia se era
   // do almoço ou do jantar, e pode haver os dois no mesmo dia
   const ic=alocIsBebida(a)?DEST_BEB_ICON+shopTipoIcon(a.tipo):shopTipoIcon(a.tipo);
   const lbl=meal?`${diaAbrev(a.data)} ${fmtDiaMes(a.data)}`:a.tipo;
-  const cls=stockDestEstado(k)==='consumido'?' usado':'';
+  // Num artigo de DESPENSA a refeição ter passado não gasta nada — o frasco de
+  // pimenta continua na prateleira. Pintá-lo de "usado" era a mesma mentira que
+  // a derivação do consumo, dita a outra cor.
+  const cls=(!desp&&stockDestEstado(k)==='consumido')?' usado':'';
   return `<span class="stk-chip${cls}">${ic} ${escHtml(lbl)} · ${escHtml(fmtQty(qtd,u))}</span>`;
 }
 // Cartão minimal: nome + chips (refeições por ordem do calendário, com a qtd
@@ -7518,60 +7695,94 @@ function stockDestChip(k,qtd,u){
 // em € vivem no detalhe — toca-se no cartão para o abrir.
 function stockArticleCard(g){
   const ag=stockAggAlocs(g.lotes,g.u);
-  // Com um estado escolhido nos chips de filtro, o cartão mostra só a parte do
-  // artigo que está nesse estado (o resto vê-se em "Tudo")
+  const c=g.cons||umbConsumo(g.lotes,g.artigo);
   const st=STOCK_FILTER;
-  const dests=Object.keys(ag.dest).filter(k=>st==='all'||stockDestEstado(k)===st).sort(destKeyCmp);
-  const chips=dests.map(k=>stockDestChip(k,ag.dest[k].qtd,ag.u)).join('')
-    +((ag.freeQ>0&&(st==='all'||st==='disponivel'))?`<span class="stk-chip livre">🧺 disponível · ${escHtml(fmtQty(ag.freeQ,ag.u))}</span>`:'');
+  /* Os chips são o eixo do CUSTO (onde é que este artigo está arrumado). O
+     filtro "por alocar" é o único que os corta — aí só interessa a parte sem
+     destino; nos outros dois (consumido / por gastar) o corte não se faz nos
+     destinos, porque consumo e alocação deixaram de ser a mesma coisa: quem os
+     escolhe está a perguntar QUANTO, e isso responde-se no rodapé. */
+  const soLivre=st==='poralocar';
+  const dests=soLivre?[]:Object.keys(ag.dest).sort(destKeyCmp);
+  const chips=dests.map(k=>stockDestChip(k,ag.dest[k].qtd,ag.u,c.desp)).join('')
+    +((ag.freeQ>0.0005&&(st==='all'||st==='poralocar'))?`<span class="stk-chip livre">🧺 por alocar · ${escHtml(fmtQty(ag.freeQ,ag.u))}</span>`:'');
   // Marcas debaixo do guarda-chuva (Ruffles · Lays) — só quando diferem do nome
   const marcas=(g.marcas&&g.marcas.length)?`<div class="stk-marcas">${g.marcas.map(m=>escHtml(m)).join(' · ')}</div>`:'';
   // Selo de origem: parte (ou tudo) deste artigo não veio de uma compra
   const origs=[...new Set(g.lotes.map(loteOrigem).filter(Boolean))];
   const orgTag=(origs.length?`<span class="stk-org" title="${escHtml(origs.map(o=>STOCK_ORIGENS[o].lbl).join(' · '))}">${origs.map(o=>STOCK_ORIGENS[o].ic).join('')}</span>`:'')
     // Por pagar: o artigo está cá, o € é que ainda não é final
-    +(g.lotes.some(loteProvisorio)?'<span class="stk-org" title="Ainda por pagar — o valor é provisório">📌</span>':'');
-  // Com filtro de estado abre o lote que tem essa parte (não o primeiro do grupo)
-  const tgt=(st==='all'?null:g.lotes.find(l=>stockGroupEstados(stockAggAlocs([l],g.u)).has(st)))||g.lotes[0];
+    +(g.lotes.some(loteProvisorio)?'<span class="stk-org" title="Ainda por pagar — o valor é provisório">📌</span>':'')
+    // Despensa: não se esgota por alocação. E, quando ainda não está marcado
+    // mas tem o feitio (pedido em várias refeições, ninguém diz quanto), fica o
+    // convite — só o selo; a pergunta com Sim/Não é lá dentro, no modal, que é
+    // onde se decide. Uma caixa de decisão em cada cartão da lista era um ecrã
+    // de perguntas em vez de um separador de stock.
+    +(c.desp?'<span class="stk-org" title="Artigo de despensa — uma embalagem serve o evento todo">🫙</span>'
+      :(g.despSug?'<span class="stk-org sug" title="Parece artigo de despensa — abre para confirmar">💡</span>':''));
   // O mesmo nome comprado em duas unidades dá dois cartões: cada um diz qual é
   const unTag=g.multiU?`<span class="stk-un">em ${escHtml(uLabel(g.u))}</span>`:'';
-  return `<div class="stk-card stk-tap" onclick="openLoteModal(${tgt._id})">
+  return `<div class="stk-card stk-tap" onclick="openLoteModal(${g.lotes[0]._id})">
     <div class="stk-card-top"><b>${escHtml(g.artigo)}</b>${unTag}${orgTag}<span class="stk-chev">›</span></div>
     ${marcas}
     <div class="stk-chips">${chips}</div>
+    ${stockConsLinha(c,ag.u)}
   </div>`;
 }
-// Filtro do separador Stock por ESTADO ('all' | 'disponivel' | 'alocado' |
-// 'consumido'). Só vive na sessão — ao reabrir a app volta a "Tudo".
+/* Rodapé do cartão: o eixo do CONSUMO, numa linha.
+   Não aparece sempre de propósito. Num artigo por alocar ou entregue a uma
+   refeição futura, "0 consumidos · 10 por gastar" é repetir o que os chips
+   acabaram de dizer — e a regra da app é não dizer a mesma coisa duas vezes.
+   Aparece quando acrescenta alguma coisa: já se gastou parte, é despensa (onde
+   a leitura é outra), ou está parado num tipo puro — o depósito de Bebidas/
+   Gerais, que é precisamente o caso em que os chips não sabem dizer se aquilo
+   ainda está na garagem ou já se bebeu. */
+function stockConsLinha(c,u){
+  if(c.desp){const ha=c.resta>0.0005;return `<div class="stk-cons desp${ha?'':' fim'}">🫙 despensa · <b>${ha?'ainda há':'acabou'}</b></div>`;}
+  if(!(c.cons>0.0005)&&!c.pool)return '';
+  const mao=c.manual?'<i class="stk-cons-mao" title="Consumo dito à mão — a app não o está a deduzir">✍️</i>':'';
+  // "Gasto:" e não "3 pacotes gastos": a quantidade sai do fmtQty e não há
+  // maneira de a fazer concordar com o adjetivo ("1 pacote gastos")
+  return `<div class="stk-cons">Gasto: <b>${escHtml(fmtQty(c.cons,u))}</b> · Por gastar: <b>${escHtml(fmtQty(c.resta,u))}</b>${mao}</div>`;
+}
+/* Filtro do separador Stock ('all' | 'consumido' | 'porgastar' | 'poralocar').
+   Só vive na sessão — ao reabrir a app volta a "Tudo".
+   Os três respondem a três perguntas diferentes, e é por isso que são estes:
+     🍽️ Consumido   o que já se gastou            (eixo do consumo)
+     🧺 Por gastar   o que ainda dá para cozinhar  (eixo do consumo)
+     🗓️ Por alocar   custo por arrumar             (eixo da alocação)
+   Havia aqui um "Alocado" que era o complemento exato do "Por alocar" — a
+   mesma informação lida ao contrário — e faltava a única pergunta que a
+   cozinha faz: quanto é que ainda há. Trocou-se uma pela outra. */
 let STOCK_FILTER='all';
 // Containers de categoria abertos/fechados (só na sessão; abertos por defeito)
 const STOCK_CAT_OPEN={};
 function setStockFilter(f){STOCK_FILTER=f;renderStock();}
-/* Estado de um destino de alocação — derivado, nunca gravado (o admin pode
-   sempre reabrir o lote e mudar a alocação, e o estado acompanha):
-   · 'disponivel' — sem destino, ainda por alocar a qualquer refeição;
-   · 'alocado'    — refeição de hoje ou de um dia futuro (ou tipo puro
-                    Bebidas/Cerveja/Gerais, que não tem data);
-   · 'consumido'  — refeição de um dia já passado. */
+/* Um DESTINO de alocação já passou? Serve só para pintar o chip do que ficou
+   para trás. É eixo do custo — não confundir com o consumo (umbConsumo), que
+   é o que responde a "isto ainda cá está". */
 function stockDestEstado(k){
   const a=destinoAloc(k,0);
-  if(!a)return 'disponivel';
-  if(!alocIsMeal(a))return 'alocado';
-  return a.data<hojeISO()?'consumido':'alocado';
+  if(!a)return 'livre';
+  if(!alocIsMeal(a))return 'pool';
+  return a.data<hojeISO()?'consumido':'futuro';
 }
-// Estados em que um artigo toca: destinos das alocações + o que está por alocar
-function stockGroupEstados(ag){
+// Estados em que um artigo toca — dois do consumo, um da alocação
+function stockGroupEstados(ag,c){
   const s=new Set();
-  Object.keys(ag.dest).forEach(k=>{if(ag.dest[k].qtd>0)s.add(stockDestEstado(k));});
-  if(ag.freeQ>0)s.add('disponivel');
+  if(c.cons>0.0005)s.add('consumido');
+  if(c.resta>0.0005)s.add('porgastar');
+  if(ag.freeQ>0.0005)s.add('poralocar');
   return s;
 }
-// € do artigo dentro de um estado (para os totais dos containers de categoria)
-function stockEstadoVal(ag,st){
+/* € do artigo dentro de um estado (para os totais dos containers de categoria).
+   No eixo do consumo não há € por destino que sirva — o que se gastou pode
+   estar espalhado por vários —, por isso vale a proporção do total. */
+function stockEstadoVal(ag,st,c){
   if(st==='all')return ag.totV;
-  let v=st==='disponivel'?ag.freeV:0;
-  Object.keys(ag.dest).forEach(k=>{if(stockDestEstado(k)===st)v=rnd(v+ag.dest[k].val,2);});
-  return rnd(v,2);
+  if(st==='poralocar')return ag.freeV;
+  if(!(c.tot>0))return 0;
+  return rnd(ag.totV*((st==='consumido'?c.cons:c.resta)/c.tot),2);
 }
 function renderStock(){
   const el=document.getElementById('view-stock');if(!el||!DATA)return;
@@ -7592,7 +7803,15 @@ function renderStock(){
   // em que unidade é que ele é (senão ficavam dois "Bacalhau" sem explicação)
   const nUnid={};Object.values(groups).forEach(g=>{const nk=shopArtKey(g.artigo);nUnid[nk]=(nUnid[nk]||0)+1;});
   const arrTodos=Object.values(groups).sort((a,b)=>a.artigo.localeCompare(b.artigo,'pt')||uKey(a.u).localeCompare(uKey(b.u)))
-    .map(g=>Object.assign(g,{estados:stockGroupEstados(stockAggAlocs(g.lotes,g.u)),multiU:nUnid[shopArtKey(g.artigo)]>1,marcas:[...new Set(g.lotes.map(l=>l.artigo))].filter(m=>!shopSameArtigo(m,g.artigo))}));
+    .map(g=>{
+      // O consumo calcula-se UMA vez por cartão e viaja no grupo: os chips de
+      // filtro, o € dos containers e o rodapé do cartão têm de dizer todos o
+      // mesmo número, e recontá-lo em cada sítio era o convite a divergirem.
+      const ag=stockAggAlocs(g.lotes,g.u);
+      const cons=umbConsumo(g.lotes,g.artigo);
+      return Object.assign(g,{cons,estados:stockGroupEstados(ag,cons),despSug:despensaSugerida(g.artigo),
+        multiU:nUnid[shopArtKey(g.artigo)]>1,marcas:[...new Set(g.lotes.map(l=>l.artigo))].filter(m=>!shopSameArtigo(m,g.artigo))});
+    });
   /* Pesquisa: nome do artigo, marcas debaixo do guarda-chuva (Ruffles · Lays) e
      categoria — procurar "talho" traz o corredor todo. Filtra ANTES dos chips
      de estado, para as contagens deles falarem do que está à vista. */
@@ -7616,15 +7835,16 @@ function renderStock(){
   // Chips de filtro por estado: os três aparecem SEMPRE (com a contagem de
   // artigos), mesmo a zero — são a chave de leitura do separador, não podem
   // sumir só porque o stock está todo no mesmo estado
-  // Ordem: do que já foi gasto para o que ainda está por gastar
-  const FILTROS=[['consumido','🍽️','Consumido'],['alocado','🗓️','Alocado'],['disponivel','🧺','Disponível']]
+  // Ordem: do que já foi gasto para o que ainda está por gastar, e no fim o que
+  // falta arrumar no custo — que é trabalho de outra natureza
+  const FILTROS=[['consumido','🍽️','Consumido'],['porgastar','🧺','Por gastar'],['poralocar','🗓️','Por alocar']]
     .map(f=>f.concat(arr.filter(g=>g.estados.has(f[0])).length));
   h+=`<div class="cmp-sort stk-filter">
     <span class="sd-chip txt${STOCK_FILTER==='all'?' on':''}" onclick="setStockFilter('all')">Tudo</span>
     ${FILTROS.map(([s,ic,lbl,n])=>`<span class="sd-chip${STOCK_FILTER===s?' on':''}${n?'':' vazio'}" onclick="setStockFilter('${s}')"><i>${ic}</i><small>${lbl}</small><b class="stk-n">${n}</b></span>`).join('')}
   </div>`;
   const vis=STOCK_FILTER==='all'?arr:arr.filter(g=>g.estados.has(STOCK_FILTER));
-  if(!vis.length)h+=`<div class="empty sf">${stkBuscando?`Nenhum artigo com <b>${escHtml(STOCK_Q.trim())}</b>${STOCK_FILTER==='all'?'':' neste estado'}.`:STOCK_FILTER==='disponivel'?'Não há stock por alocar — está tudo entregue a refeições.':STOCK_FILTER==='consumido'?'Ainda não há stock consumido.':'Nada alocado a refeições de hoje ou dos próximos dias.'}</div>`;
+  if(!vis.length)h+=`<div class="empty sf">${stkBuscando?`Nenhum artigo com <b>${escHtml(STOCK_Q.trim())}</b>${STOCK_FILTER==='all'?'':' neste estado'}.`:STOCK_FILTER==='poralocar'?'Não há stock por alocar — está tudo com destino.':STOCK_FILTER==='consumido'?'Ainda não se gastou nada.':'Não há stock por gastar — foi tudo consumido.'}</div>`;
   else if(!CATS_TABLE)h+=vis.map(g=>stockArticleCard(g)).join('');
   else{
     // Containers por categoria de produto (Sumos, Talho, …), colapsáveis; os
@@ -7647,7 +7867,7 @@ function renderStock(){
       const s=secs[k];
       const nome=s.cat?s.cat.nome:'Outros';
       // € do container: com filtro de estado, só a parte que está nesse estado
-      const totV=rnd(s.groups.reduce((a,g)=>a+stockEstadoVal(stockAggAlocs(g.lotes,g.u),STOCK_FILTER),0),2);
+      const totV=rnd(s.groups.reduce((a,g)=>a+stockEstadoVal(stockAggAlocs(g.lotes,g.u),STOCK_FILTER,g.cons),0),2);
       // Aberto por defeito; o fecho é da sessão. A pesquisar, abrem-se todos —
       // um container fechado escondia precisamente o artigo que se procura.
       const open=stkBuscando||STOCK_CAT_OPEN[k]!==false;
@@ -10034,12 +10254,14 @@ function openLoteModal(id){
   // mesmo campo, só muda de sítio, para o membro poder preencher a categoria que
   // falta e o modo consulta ver a ligação já feita.
   const pai=document.getElementById(canEdit?'lote-ren-fields':'lote-body-fields');
-  if(pai)['lote-cat-wrap','lote-req-wrap'].forEach(id=>{const el=document.getElementById(id);if(el&&el.parentNode!==pai)pai.appendChild(el);});
+  if(pai)['lote-cat-wrap','lote-desp-wrap','lote-req-wrap'].forEach(id=>{const el=document.getElementById(id);if(el&&el.parentNode!==pai)pai.appendChild(el);});
   loteEditCancel();   // o painel de edição abre sempre fechado…
   ['lote-save','lote-addline','lote-ren-btn'].forEach(i=>{document.getElementById(i).style.display=canEdit?'':'none';});   // …e só depois se decide quem vê o quê
   loteCatFill();
+  loteDespFill();
   loteReqFill();
   loteRenderAlocs();
+  loteConsFill();
   loteCobFill();
   document.getElementById('lote-bg').classList.add('show');
   lockScroll();
@@ -10114,8 +10336,8 @@ function loteEditOpen(){
   if(nota)nota.textContent=mostrarDets
     ?'O nome genérico muda em todo o lado (lotes e pedidos da lista). Os de baixo são o nome de cada lote no stock — os pedidos ficam como estão.'
     :'Muda o nome em todo o lado: nos lotes de stock e nos pedidos da lista de compras.';
-  _loteEdit={};          // a partir daqui a categoria e a ligação só se guardam no fim
-  loteCatFill();loteReqFill();
+  _loteEdit={};          // a partir daqui a categoria, a despensa e a ligação só se guardam no fim
+  loteCatFill();loteDespFill();loteReqFill();
   wrap.style.display='';
   loteBodyShow(false);   // o resto do modal colapsa: é o mesmo pop-up, outro assunto
   // Sem focar nada: focar abria o teclado por cima do painel mal se tocava no ✏️,
@@ -10132,7 +10354,7 @@ function loteEditCancel(){
   loteBodyShow(true);
   const aberto=!!_loteEdit;
   _loteRen=[];_loteEdit=null;
-  if(aberto&&editingLote){loteCatFill();loteReqFill();}   // deita fora o que se escreveu
+  if(aberto&&editingLote){loteCatFill();loteDespFill();loteReqFill();}   // deita fora o que se escreveu
 }
 // Nome já usado por algum artigo (stock ou lista)? — base do aviso de fusão
 function artigoNomeEmUso(nk){
@@ -10153,7 +10375,7 @@ async function loteEditSave(){
   if(vazio){toast('Os nomes não podem ficar em branco','bad');return;}
   const alvos=dets.concat(umb);
   const ed=_loteEdit||{};
-  const extra=ed.cat!==undefined||ed.req!==undefined;
+  const extra=ed.cat!==undefined||ed.req!==undefined||ed.desp!==undefined;
   if(!alvos.length&&!extra){loteEditCancel();return;}
   // Fusão só se põe ao nível do guarda-chuva: é esse nome que faz dois artigos
   // passarem a ser um só. Um nome de lote fica preso ao pedido deste artigo, logo
@@ -10185,6 +10407,12 @@ async function loteEditSave(){
     if(ed.cat!==undefined){
       const nome=umb.length?umb[0].novo:editingLote.artigo;
       if(await catUserSetMapping(nome,ed.cat))n++;
+    }
+    // A despensa é marca por NOME, como a categoria — logo vai pelo nome novo,
+    // depois de o rename já ter mudado a chave
+    if(ed.desp!==undefined){
+      const nome=umb.length?umb[0].novo:editingLote.artigo;
+      if(!!ed.desp!==ehDespensa(nome)&&await despSetMark(nome,!!ed.desp,'manual'))n++;
     }
     if(ed.req!==undefined){
       const prod=(dets.find(d=>shopSameArtigo(d.antigo,editingLote.product))||{}).novo||editingLote.product;
@@ -10339,6 +10567,156 @@ async function loteReqChanged(v){
     toast(novo?`Ligado a "${novo}" ✓`:'Ligação removida ✓','ok');
   }catch(e){setSync('err','erro ao guardar');toast(permErrorMsg(e),'bad');loteReqFill();}
 }
+/* ── 🍽️ Consumo — o 2.º eixo, dentro do modal ────────────────────────
+   A alocação (em cima) diz para onde vai o CUSTO; isto diz o que já se GASTOU.
+   São perguntas diferentes e a app respondia às duas com o mesmo campo, o que
+   deixava de fora precisamente os artigos que dão trabalho: um depósito de
+   cerveja em "Bebidas" nunca passava a consumido (não tem data que passe) e um
+   frasco de pimenta era dado por gasto assim que a refeição passasse.
+   Nada do que se escreve aqui entra nas contas — é leitura de despensa. */
+function loteUmbAtual(){
+  if(!editingLote)return [];
+  const ids=new Set(editingLote.allIds||[]);
+  return stockArr().filter(l=>l._id!=null&&ids.has(l._id));
+}
+function loteConsFill(){
+  const wrap=document.getElementById('lote-cons-wrap');if(!wrap)return;
+  if(!editingLote||!STOCK_TABLE){wrap.style.display='none';return;}
+  const nome=editingLote.reqName||editingLote.artigo;
+  const lotes=loteUmbAtual();
+  const c=umbConsumo(lotes,nome);
+  const u=editingLote.u,canEdit=isAdmin()&&!contasFechadas();
+  const uLbl=fmtQty(0,u).split(' ')[1]||'';
+  const podeEscrever=canEdit&&STOCK_CONS_COL;
+  let h='';
+  /* O convite da despensa vive aqui, e não no cartão da lista: é a resposta a
+     esta pergunta que decide como todo este bloco se lê. No cartão fica só o
+     selo 💡 — uma caixa de Sim/Não em cada linha da lista fazia do separador
+     um questionário. */
+  if(canEdit&&DESP_TABLE&&despensaSugerida(nome))h+=`<div class="lote-cons-sug">
+    <div class="lcs-txt">💡 <b>${escHtml(nome)}</b> é pedido em várias refeições e ninguém escreve quantidade — é o feitio de um artigo de despensa (uma embalagem serve tudo). É?</div>
+    <div class="lcs-btns"><button type="button" class="btn ghost" onclick="loteDespSug(false)">Não</button><button type="button" class="btn prim" onclick="loteDespSug(true)">Sim, é despensa</button></div>
+  </div>`;
+  if(c.desp){
+    // Despensa: não há contas a fazer. Alocar não gasta, e "25%" de um frasco
+    // de pimenta é um número que ninguém sabe medir — a única pergunta com
+    // resposta é se ainda há.
+    const acabou=!(c.resta>0.0005);
+    h+=`<div class="lote-cons-est">
+      <button type="button" class="lce-opt${acabou?'':' on'}" ${podeEscrever?'':'disabled'} onclick="loteConsDesp(false)">🫙 ainda há</button>
+      <button type="button" class="lce-opt fim${acabou?' on':''}" ${podeEscrever?'':'disabled'} onclick="loteConsDesp(true)">🚫 acabou</button>
+    </div>
+    <div class="note" style="margin-top:6px">Uma embalagem serve o evento todo — alocá-la a uma refeição não a gasta. Por isso aqui não se contam quantidades: ou ainda há, ou acabou.</div>`;
+  }else{
+    h+=`<div class="lote-cons-num">Gasto: <b>${escHtml(fmtQty(c.cons,u))}</b> · Por gastar: <b>${escHtml(fmtQty(c.resta,u))}</b></div>`;
+    h+=`<div class="note" style="margin-top:2px">${c.manual
+      ?'Dito à mão — a app deixou de o deduzir das refeições.'
+      :'Contado sozinho: o que está alocado a refeições cujo dia já passou.'}</div>`;
+    /* O depósito é o caso que nem a alocação nem a data conseguem esclarecer:
+       100 cervejas em "Bebidas" podem estar todas na garagem ou já bebidas, e
+       a app não tem por onde saber. Daí a nota — e as duas saídas. */
+    if(c.pool&&!c.manual)h+=`<div class="note lote-cons-pool">🍻 Há stock parado numa bolsa comum (Bebidas/Gerais), que não tem dia para passar. Ou o vais dando às refeições com o ⇄ da linha, ou dizes aqui quanto já se gastou.</div>`;
+    if(podeEscrever)h+=`<div class="lote-cons-acts">
+      <span class="lca-lbl">Já se gastou</span>
+      <div class="lote-qty-w${uLbl?'':' nou'}"><input type="number" step="any" min="0" inputmode="decimal" id="lote-cons-in" value="${c.cons||''}" placeholder="0">${uLbl?`<i>${escHtml(uLbl)}</i>`:''}</div>
+      <button type="button" class="btn ghost" onclick="loteConsDarBaixa()">Dar baixa</button>
+      ${c.manual?'<button type="button" class="btn ghost lca-auto" onclick="loteConsAuto()">↺ automático</button>':''}
+    </div>`;
+  }
+  if(canEdit&&!STOCK_CONS_COL)h+=`<div class="note" style="margin-top:6px">Para escrever consumo à mão falta correr <b>db/stock_consumo.sql</b>.</div>`;
+  document.getElementById('lote-cons-body').innerHTML=h;
+  wrap.style.display='';
+}
+/* Depois de gravar consumo: só o bloco e o cartão do separador. A lista de
+   compras não se toca de propósito — a cobertura de um pedido continua a ser
+   derivada da ALOCAÇÃO, e dizer que se bebeu a cerveja não é dizer que ela
+   deixou de estar entregue àquela refeição. Misturar os dois eixos aqui era
+   desfazer a separação que este ecrã veio fazer. */
+function loteConsRefresh(){
+  loteConsFill();
+  if(STOCK_TABLE&&TAB==='stock')renderStock();
+}
+async function loteConsDarBaixa(){
+  if(!editingLote)return;
+  const el=document.getElementById('lote-cons-in');if(!el)return;
+  const v=parseFloat(String(el.value).replace(',','.'))||0;
+  const lotes=loteUmbAtual();
+  const tot=rnd(lotes.reduce((s,l)=>s+(+l.qtd||0),0),3);
+  if(v<0){toast('O consumo não pode ser negativo','bad');return;}
+  if(v-tot>0.0005){toast(`Só há ${fmtQty(tot,editingLote.u)} — não se pode gastar mais`,'bad');return;}
+  setSync('load','a guardar…');
+  if(await umbConsSet(lotes,rnd(v,3))){loteConsRefresh();toast('Consumo atualizado ✓','ok');}
+  else setSync('err','erro ao guardar');
+}
+// Volta ao automático: a app torna a deduzir o consumo das refeições passadas
+async function loteConsAuto(){
+  if(!editingLote)return;
+  setSync('load','a guardar…');
+  if(await umbConsSet(loteUmbAtual(),null)){loteConsRefresh();toast('Consumo outra vez automático ✓','ok');}
+  else setSync('err','erro ao guardar');
+}
+/* Despensa: "acabou" grava a quantidade toda, "ainda há" limpa. É a mesma
+   coluna do consumo — num artigo que não se esgota ela só tem dois valores
+   possíveis, e assim comprar um frasco novo volta sozinho a "ainda há" (passa
+   a haver stock por gastar) sem ninguém ter de se lembrar de o desmarcar. */
+async function loteConsDesp(acabou){
+  if(!editingLote)return;
+  const lotes=loteUmbAtual();
+  const tot=rnd(lotes.reduce((s,l)=>s+(+l.qtd||0),0),3);
+  setSync('load','a guardar…');
+  if(await umbConsSet(lotes,acabou?tot:null)){loteConsRefresh();toast(acabou?'Marcado como acabado ✓':'Marcado como disponível ✓','ok');}
+  else setSync('err','erro ao guardar');
+}
+/* ── 🫙 A marca de despensa ──────────────────────────────────────────
+   Vive no painel ✏️ com o resto do que o artigo É (nome, categoria, que pedido
+   cobre) e guarda-se com ele; quem não tem o painel vê-a no corpo, em leitura.
+   O convite do 💡 é o atalho: responde à mesma pergunta num toque, e por isso
+   grava logo — não passa pelo _loteEdit. */
+function loteDespFill(){
+  const wrap=document.getElementById('lote-desp-wrap');if(!wrap)return;
+  if(!DESP_TABLE||!editingLote){wrap.style.display='none';return;}
+  const nome=editingLote.reqName||editingLote.artigo;
+  const on=_loteEdit&&_loteEdit.desp!==undefined?!!_loteEdit.desp:ehDespensa(nome);
+  // A quem não edita só se mostra quando diz alguma coisa: um interruptor
+  // desligado e trancado é uma caixa a ocupar espaço para não dizer nada
+  if(!isAdmin()&&!on){wrap.style.display='none';return;}
+  const sw=document.getElementById('lote-desp-sw');
+  sw.classList.toggle('on',on);
+  sw.setAttribute('aria-pressed',on?'true':'false');
+  sw.disabled=!isAdmin();
+  document.getElementById('lote-desp-txt').textContent=on?'Sim — não se esgota':'Não — gasta-se';
+  document.getElementById('lote-desp-note').textContent=on
+    ?'Uma embalagem serve o evento todo (sal, pimenta, louro). Alocá-la a uma refeição não a gasta, e o consumo passa a ser só "ainda há / acabou".'
+    :'Marca os artigos que uma embalagem chega para tudo — sal, pimenta, louro. Neles a app deixa de dar o artigo por gasto quando a refeição passa.';
+  wrap.style.display='';
+}
+function loteDespToggle(){
+  if(!editingLote||!isAdmin())return;
+  const nome=editingLote.reqName||editingLote.artigo;
+  const atual=_loteEdit&&_loteEdit.desp!==undefined?!!_loteEdit.desp:ehDespensa(nome);
+  if(_loteEdit){_loteEdit.desp=!atual;loteDespFill();return;}   // painel aberto: só ao Guardar
+  loteDespGrava(!atual,'manual');
+}
+// Resposta ao 💡: um toque, grava já (é a resposta a uma pergunta, não um campo
+// de formulário). "Não" só se guarda no aparelho — não é um facto sobre o
+// artigo, é este utilizador a dizer que não quer voltar a ser perguntado.
+function loteDespSug(sim){
+  if(!editingLote)return;
+  const nome=editingLote.reqName||editingLote.artigo;
+  if(!sim){despensaRecusar(nome);loteConsFill();if(STOCK_TABLE&&TAB==='stock')renderStock();return;}
+  loteDespGrava(true,'heur');
+}
+async function loteDespGrava(on,origem){
+  const nome=editingLote.reqName||editingLote.artigo;
+  setSync('load','a guardar…');
+  if(await despSetMark(nome,on,origem)){
+    // O ⇄ e os chips não mudam, mas a leitura do consumo muda toda: num artigo
+    // de despensa a derivação desliga-se e o bloco passa a ser há/acabou
+    loteDespFill();loteConsFill();
+    if(STOCK_TABLE&&TAB==='stock')renderStock();
+    toast(on?'🫙 Marcado como artigo de despensa ✓':'Deixou de ser artigo de despensa ✓','ok');
+  }else setSync('err','erro ao guardar');
+}
 function loteMeals(){return (DATA.refeicoesDef||[]).filter(r=>shopIsMeal(r.ref));}
 /* ── "Que pedidos é que isto trata?" (db/cobertura.sql) ───────────────
    O sentido é o natural: parte-se do que está CÁ — o stock — para os pedidos
@@ -10451,10 +10829,17 @@ function loteRenderAlocs(){
   const solo=!editingLote.multi;
   // Peças da linha, iguais nos dois modos
   const qtyCell=(i,a)=>`<div class="lote-qty-w${uLbl?'':' nou'}">
-      <input type="number" step="any" min="0" inputmode="decimal" ${canEdit?'':'disabled'} value="${a.qtd||''}" placeholder="qtd" onchange="loteAlocField(${i},'qtd',this.value)">
+      <input type="number" step="any" min="0" inputmode="decimal" id="lote-q-${i}" ${canEdit?'':'disabled'} value="${a.qtd||''}" placeholder="qtd" onchange="loteAlocField(${i},'qtd',this.value)">
       ${uLbl?`<i>${escHtml(uLbl)}</i>`:''}
     </div>`;
-  const endCells=(i,a)=>qtyCell(i,a)+`<span class="lote-val">${eur(lv(i))}</span>`+
+  /* ⇄ só nas linhas de TIPO PURO com quantidade — o depósito (Bebidas, Gerais),
+     de onde se vai tirando para as refeições à medida que os dias passam. Era
+     um par de edições com a subtração feita de cabeça (baixar o depósito, criar
+     a linha da refeição), e quem falhasse uma delas ficava com o total fora do
+     que há em stock. */
+  const daBtn=(i,a)=>(canEdit&&!alocIsMeal(a)&&(+a.qtd||0)>0.0005)
+    ?`<button class="lote-da" title="Dar parte deste depósito a uma refeição" onclick="loteDepositoDar(${i})">⇄</button>`:'';
+  const endCells=(i,a)=>qtyCell(i,a)+`<span class="lote-val">${eur(lv(i))}</span>`+daBtn(i,a)+
     (canEdit?`<button class="cmp-ln-del" title="Remover" onclick="loteDelAloc(${i})">✕</button>`:'');
   // Botão-texto que abre um bottom-sheet (o mesmo padrão do destino): ao
   // contrário de um <select>, corta com "…" e cabe na linha.
@@ -10493,7 +10878,10 @@ function loteRenderAlocs(){
   const livre=rnd(editingLote.totQ-tot,3);
   // O total alocado sobe para o rótulo, na mesma forma dos cabeçalhos de cima
   const lbl=document.getElementById('lote-aloc-lbl');
-  if(lbl)lbl.innerHTML=`🍽️ Alocação <span class="lote-acc-q">(${escHtml(fmtQty(rnd(tot,3),editingLote.u))})</span>`;
+  // 💶 e não 🍽️: este bloco é o eixo do CUSTO. O 🍽️ passou para o bloco do
+  // Consumo, logo abaixo — ter o prato nos dois era a confusão que os dois
+  // eixos vieram desfazer.
+  if(lbl)lbl.innerHTML=`💶 Alocação <span class="lote-acc-q">(${escHtml(fmtQty(rnd(tot,3),editingLote.u))})</span>`;
   // O que sobra na bolsa comum é o que o alocado não levou (0 € se o que sobra
   // for stock oferecido / do ano anterior)
   const restoVal=Math.max(0,rnd(editingLote.totV-lineVal.reduce((s,v)=>s+(+v||0),0),2));
@@ -10522,10 +10910,51 @@ function loteMarcaPicker(i){
 function loteAlocField(i,f,v){
   const a=editingLote&&editingLote.alocs[i];if(!a)return;
   if(f==='marca'){a.marca=v||'';loteRenderAlocs();return;}
-  if(f==='qtd')a.qtd=parseFloat(String(v).replace(',','.'))||0;
+  if(f==='qtd'){
+    const novo=parseFloat(String(v).replace(',','.'))||0;
+    /* Linha tirada de um depósito com o ⇄: o que ela leva sai de lá. Sem isto,
+       corrigir a quantidade aqui punha o total acima do que há em stock e
+       obrigava a ir baixar o depósito à mão — que é o par de contas que o ⇄
+       veio poupar. */
+    if(a._from){
+      const pool=editingLote.alocs.find(x=>x!==a&&alocToDestino(x)===a._from);
+      if(pool)pool.qtd=rnd(Math.max(0,(+pool.qtd||0)-rnd(novo-(+a.qtd||0),3)),3);
+    }
+    a.qtd=novo;
+  }
   else{const d=destinoAloc(v,0);a.tipo=d?d.tipo:v;a.data=d?d.data:null;
     if(d&&d.bebida)a.bebida=true;else delete a.bebida;}
   loteRenderAlocs();
+}
+/* Passa parte de um depósito (tipo puro) para uma refeição, num gesto só.
+   A linha nova fica AMARRADA ao depósito (`_from`, a chave de destino dele):
+   mexer na quantidade dela move a do depósito em sentido contrário, e apagá-la
+   devolve-lhe o que levava. `_from` é só de trabalho — o saveLote reconstrói as
+   alocações a partir do destino e da marca, por isso nunca chega à BD. */
+function loteDepositoDar(i){
+  if(!isAdmin()||contasFechadas()||!editingLote)return;
+  const pool=editingLote.alocs[i];if(!pool||alocIsMeal(pool))return;
+  const fromK=alocToDestino(pool);
+  openDestPicker('',v=>{
+    const d=destinoAloc(v,0);if(!d)return;
+    const destK=alocToDestino(d);if(destK===fromK)return;
+    /* Proposta: havendo pedido na lista para essa refeição, é ele — é a
+       quantidade que alguém já disse que faz falta ali. Sem pedido não há
+       melhor palpite do que o depósito inteiro, e por isso o campo fica logo
+       focado e selecionado: o número é um ponto de partida para corrigir, não
+       uma afirmação. */
+    const dem=stockDemandFor(editingLote.reqName||editingLote.artigo,editingLote.u);
+    const pedido=dem[destK]||0,disp=+pool.qtd||0;
+    const q=rnd(Math.min(disp,pedido>0.0005?pedido:disp),3);
+    // Já havia linha nesse destino → soma-se-lhe, em vez de abrir uma segunda
+    const ja=editingLote.alocs.find(x=>x!==pool&&alocToDestino(x)===destK);
+    if(ja){ja.qtd=rnd((+ja.qtd||0)+q,3);if(!ja._from)ja._from=fromK;}
+    else editingLote.alocs.push(Object.assign(destinoAloc(v,q),{marca:pool.marca||'',_from:fromK}));
+    pool.qtd=rnd(Math.max(0,disp-q),3);
+    const idx=ja?editingLote.alocs.indexOf(ja):editingLote.alocs.length-1;
+    loteRenderAlocs();
+    const el=document.getElementById('lote-q-'+idx);if(el){el.focus();el.select();}
+  },'Dar a');
 }
 function loteDestPick(i){
   if(!isAdmin())return;
@@ -10581,7 +11010,18 @@ function loteAddAloc(){
   editingLote.alocs.push(m?{tipo:m.ref,data:m.data,qtd:0,marca:''}:{tipo:'Gerais',data:null,qtd:0,marca:''});
   loteRenderAlocs();
 }
-function loteDelAloc(i){if(!editingLote)return;editingLote.alocs.splice(i,1);loteRenderAlocs();}
+function loteDelAloc(i){
+  if(!editingLote)return;
+  const a=editingLote.alocs[i];
+  // Linha tirada de um depósito com o ⇄: apagá-la devolve-lhe o que levava.
+  // Sem isto a quantidade ficava a pairar por alocar e o depósito curto — que
+  // nunca é o que se quer dizer ao desfazer um ⇄.
+  if(a&&a._from){
+    const pool=editingLote.alocs.find(x=>x!==a&&alocToDestino(x)===a._from);
+    if(pool)pool.qtd=rnd((+pool.qtd||0)+(+a.qtd||0),3);
+  }
+  editingLote.alocs.splice(i,1);loteRenderAlocs();
+}
 async function saveLote(){
   if(!isAdmin()){toast('Só o admin ajusta alocações','bad');return;}
   if(contasFechadas()){toast('Contas fechadas — o stock já não se mexe','bad');return;}
