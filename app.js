@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v251 · 2026-08-07 · Folha do stock: linha mais limpa (sem 📌/🫙 e sem repetir a quantidade do destino único)';
+const APP_BUILD = 'v252 · 2026-08-07 · Folha do stock sem subtotal € por categoria (colava-se à coluna das quantidades)';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -13901,8 +13901,6 @@ function generatePDF(type,escopo){
     .sl-grp-h .sl-cont{margin-left:auto;font-weight:400;text-transform:none;letter-spacing:0;color:#999}
     .sl-grp-h{display:flex;align-items:center;gap:5px;font-size:.85em;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#2a9d6a;border-bottom:1.5px solid #50b96e;padding-bottom:2px;margin-bottom:3px}
     .sl-grp-h .sl-n{margin-left:auto;color:#999}
-    /* Folha do stock: o € do bloco (no separador é o mesmo, por container) */
-    .sl-grp-h .sl-eur{color:#8a8a8a;font-weight:400;text-transform:none;letter-spacing:0}
     .sl-row{display:flex;align-items:baseline;gap:5px;padding:1.5px 0;border-bottom:1px dotted #e8e8e8;break-inside:avoid;page-break-inside:avoid}
     .sl-box{flex:0 0 auto;display:inline-block;width:8px;height:8px;border:1px solid #999;border-radius:2px;vertical-align:baseline}
     .sl-box.on{background:#50b96e;border-color:#3d9a58}
@@ -14010,16 +14008,15 @@ const FOLHA_MAX_BLOCO=20;
    artigos ficava no topo da folha seguinte sem se saber de que bloco eram — numa
    lista de compras isso é mandar a pessoa ao corredor errado, e num inventário
    é contar a prateleira errada. Os pedaços saem com o mesmo tamanho (nada de um
-   "(cont.)" com uma linha só) e cada um cabe à vontade numa página.
-   `extra` = HTML a fechar o cabeçalho depois da contagem (o € do stock). */
-function folhaBloco(label,linhas,extra){
+   "(cont.)" com uma linha só) e cada um cabe à vontade numa página. */
+function folhaBloco(label,linhas){
   const nPartes=Math.ceil(linhas.length/FOLHA_MAX_BLOCO)||1;
   const porParte=Math.ceil(linhas.length/nPartes);
   let out='';
   for(let i=0;i<nPartes;i++){
     const parte=linhas.slice(i*porParte,(i+1)*porParte);
     if(!parte.length)continue;
-    const cab=i===0?`${label}<span class="sl-n">${linhas.length}</span>${extra||''}`:`${label} <span class="sl-cont">(cont.)</span>`;
+    const cab=i===0?`${label}<span class="sl-n">${linhas.length}</span>`:`${label} <span class="sl-cont">(cont.)</span>`;
     out+=`<div class="sl-grp"><div class="sl-grp-h">${cab}</div>${parte.join('')}</div>`;
   }
   return out;
@@ -14680,10 +14677,11 @@ function buildStockReport(sel){
   };
 
   let blocos='';
-  const fazBloco=(label,gs)=>{
-    const tot=rnd(gs.reduce((a,g)=>a+valDe(g,stockAggAlocs(g.lotes,g.u)),0),2);
-    blocos+=folhaBloco(label,gs.map(g=>stkRow(g)),tot>0.005?`<span class="sl-eur">${eur(tot)}</span>`:'');
-  };
+  /* Sem € por bloco, de propósito: o subtotal caía encostado à coluna das
+     quantidades e lia-se como se fosse dela ("3 · 90,75 €" por cima de um
+     "4,5 kg"). O total do que a folha leva está no subtítulo, longe dos
+     números das linhas, e o dinheiro a sério é conversa do relatório geral. */
+  const fazBloco=(label,gs)=>{blocos+=folhaBloco(label,gs.map(g=>stkRow(g)));};
   if(CATS_TABLE){
     // Por CATEGORIA, como os containers do separador — é por prateleira que se
     // confere. Sem categoria cai em "Outros", sempre no fim.
