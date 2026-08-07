@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v242 · 2026-08-07 · O admin pode agir por outro membro na lista de compras — ver o carrinho dele e registar-lhe a fatura em nome dele';
+const APP_BUILD = 'v243 · 2026-08-07 · Importar a fatura já não deixa um artigo vazio à cabeça da lista';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -8894,7 +8894,16 @@ function faturaAplicar(d){
   // Categorias sugeridas pela AI: gravam-se já (só onde não havia — a memória
   // artigo→categoria é global e vale mesmo que a compra não chegue a registar-se)
   catAIMappings(linhas.filter(l=>l.categoria)).then(n=>{if(n&&TAB==='stock')renderStock();});
-  const lotes=compraEdit.lotes||[];
+  /* A LINHA EM BRANCO NÃO É UM ARTIGO. O "🧾 Detalhar por artigo" abre com uma
+     linha vazia (e o ＋ Artigo acrescenta outras); lendo a fatura por cima
+     dela, ficava um cartão vazio à cabeça da lista — sem nome, sem preço e sem
+     nada que se lhe faça a não ser apagá-lo à mão. Só sai o que está mesmo por
+     escrever: nome, quantidade e valor vazios. O que a pessoa já tinha
+     escrito fica onde está, que a fatura não veio apagar trabalho ninguém. */
+  const lotes=(compraEdit.lotes||[]).filter(l=>!(l.free
+    &&!String(l.artigo||'').trim()
+    &&!String(l.qtd||'').trim()
+    &&(l.valor===''||l.valor==null)));
   /* Reset (re-importação): volta ao nome da lista para refazer o matching do
      zero (só nos do carrinho — num lote livre o _listArt é a ligação manual,
      não se pisa). O `_listArt` MANTÉM-SE: é o pedido de onde o cartão nasceu,
