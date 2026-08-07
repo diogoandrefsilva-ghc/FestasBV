@@ -1374,7 +1374,13 @@ button.cmp-chip.qt-tap:active{filter:brightness(.93)}
    espaçamento, e a frase partia-se em duas linhas dentro do cartão. */
 .modal label.lote-nostock{display:flex;align-items:center;gap:7px;margin:6px 0 0;font-size:12px;line-height:1.2;
   color:var(--muted);cursor:pointer;text-transform:none;letter-spacing:0;font-weight:500}
-.lote-nostock input{flex:0 0 auto;width:16px;height:16px;margin:0;accent-color:var(--green)}
+/* `-webkit-appearance:checkbox` TEM de vir aqui: `.modal input` põe
+   appearance:none (para os campos de texto) e isso apaga o visto do sistema —
+   a caixa ficava vazia mesmo marcada, e só o negrito do texto e o 🔗 a
+   desaparecer é que denunciavam o estado. O mesmo que `.lote-sug input` já
+   fazia; faltava-me copiar a lição. */
+.lote-nostock input{flex:0 0 auto;width:17px;height:17px;margin:0;padding:0;border:none;
+  -webkit-appearance:checkbox;appearance:checkbox;accent-color:var(--green)}
 .modal label.lote-nostock.on{color:var(--ink);font-weight:600}
 
 /* ── Itemização da fatura: cartão por artigo (registo da compra) ── */

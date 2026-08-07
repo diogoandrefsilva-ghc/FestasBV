@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v240 · 2026-08-07 · Reabrir uma compra deixa de perder os artigos que respondem ao mesmo pedido (as batatas fritas) — era o Guardar seguinte a apagá-los';
+const APP_BUILD = 'v241 · 2026-08-07 · O visto do “só despesa” aparece mesmo marcado (o modal apagava-lhe o visto do sistema)';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
