@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v244 · 2026-08-07 · Stock: um cartão por artigo E unidade — o bacalhau ao kg deixa de se somar com o às postas';
+const APP_BUILD = 'v245 · 2026-08-07 · Cash-flow: o detalhe abre em ficha de consulta e só se edita depois do ✏️';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -3634,8 +3634,18 @@ async function apagarPagPend(id){
   }catch(e){setSync('err','erro ao guardar');toast(permErrorMsg(e),'bad');}
 }
 
-/* ═══ EDIT / DELETE CASH FLOW ═══ */
 let editingCf=null;
+
+/* ═══ DETALHE DE UM CASH-FLOW (consulta) ═══
+   Tocar num movimento é, quase sempre, ir VER o que lá está — não mexer-lhe.
+   Por isso o modal abre numa ficha de leitura e o formulário só aparece a quem
+   pode editar, e só depois do ✏️. Antes caía-se direito no formulário: caixas
+   de texto, selects e datas para responder a uma pergunta que se lê de relance
+   ("quanto foi, quem pagou, para onde foi") — e para quem não é admin era um
+   formulário inteiro desativado, que é pior ainda.
+   Isto é só apresentação: quem grava continua a ser o editor de sempre
+   (editCfEntry/saveEditCf), intacto por baixo. */
+let cfView=null;   // {source,idx,editType} do movimento aberto em consulta
 
 function openCfDetail(source,idx){
   // Cash-flow que veio de uma compra da lista → abre o editor da compra (não o de despesa avulsa)
@@ -3643,19 +3653,235 @@ function openCfDetail(source,idx){
     const d=DATA.despesas[idx];
     if(d&&d.compraId){openCompra(d.compraId);return;}
   }
+  editingCf=null;
+  cfView={source,idx,editType:''};
+  document.getElementById('edit-cf-modal')?.classList.remove('ro-fields');
+  cfViewRender();
+  cfSetMode('view');
+  document.getElementById('edit-cf-bg').classList.add('show');
+  document.body.classList.add('no-scroll');
+}
+
+/* Tipo do movimento a partir da origem (a mesma classificação que a lista usa). */
+function cfViewTipoOf(source,idx){
+  if(source==='despesas')return'despesa';
+  if(source==='mealheiros')return'mealheiro';
+  const p=(DATA.pagamentos||[])[idx];
+  return p?cfType(p):'';
+}
+/* Editar continua a ser do admin — e, com as contas fechadas, despesas e
+   mealheiros (as entradas do apuramento) deixam de se mexer. Os pagamentos
+   continuam editáveis depois do fecho, como sempre. */
+function cfPodeEditar(t){
+  if(!isAdmin())return false;
+  return !(contasFechadas()&&(t==='despesa'||t==='mealheiro'));
+}
+/* Troca a ficha pelo formulário e vice-versa (o modal é o mesmo). */
+function cfSetMode(m){
+  const view=m!=='edit';
+  const set=(id,on)=>{const el=document.getElementById(id);if(el)el.style.display=on?'':'none';};
+  set('cf-view',view);set('cf-view-btns',view);
+  set('cf-edit-wrap',!view);set('cf-view-back',!view);
+  const nota=document.getElementById('cf-view-nota');
+  if(nota&&!view)nota.style.display='none';
+  const t=document.getElementById('edit-cf-title');
+  if(t)t.textContent=view?'Detalhe do movimento':'Editar movimento';
+  const modal=document.getElementById('edit-cf-modal');
+  if(modal)modal.scrollTop=0;
+}
+function cfUnlockEdit(){
+  if(!cfView)return;
+  const{source,idx}=cfView;
+  // A UI já esconde o botão; a guarda é para o esconder não ser a única proteção
+  if(!cfPodeEditar(cfViewTipoOf(source,idx)))return;
   editCfEntry(source,idx);
-  const et=editingCf&&editingCf.editType;
-  // Pós-fecho: despesas e mealheiros (entradas de apuramento) ficam só de leitura; pagamentos continuam editáveis
-  const bloquearPorFecho=contasFechadas()&&(et==='despesa'||et==='mealheiro');
-  const mbtns=document.querySelector('#edit-cf-modal .mbtns');
-  if(mbtns)mbtns.style.display=bloquearPorFecho?'none':'';
-  if(!isAdmin()||bloquearPorFecho){
-    const f=document.getElementById('edit-cf-form');
-    f.querySelectorAll('input,select,textarea').forEach(el=>{el.disabled=true;el.style.opacity='.75';});
-    f.querySelectorAll('.sd-chip,.cf-opt,.cfp-toggle,.cfp-btn,.cfp-del').forEach(el=>{el.style.pointerEvents='none';});
+  cfSetMode('edit');
+}
+/* ‹ Voltar: o que estivesse escrito no formulário desaparece — nada foi gravado. */
+function cfVoltarView(){
+  if(!cfView){closeEditCf();return;}
+  // Um guardar que falhou já pode ter mexido nos índices (uma despesa paga por
+  // vários é reescrita em bloco) — a ficha segue o que o editor tem.
+  if(editingCf&&editingCf.source===cfView.source)cfView.idx=editingCf.idx;
+  editingCf=null;
+  cfViewRender();
+  cfSetMode('view');
+}
+
+/* ── Peças da ficha ── */
+function cfvRow(k,v,sub){
+  if(!v)return'';
+  return `<div class="cfv-row"><span class="cfv-k sf">${k}</span><span class="cfv-v">${v}${sub?`<small>${sub}</small>`:''}</span></div>`;
+}
+function cfvBlk(h,body){return body?`<div class="cfv-blk"><div class="cfv-blk-h sf">${h}</div>${body}</div>`:'';}
+/* Transferência entre duas pessoas (reembolso e pagamento de dívida): o "de → para"
+   é a informação principal desses movimentos e merece mais do que uma linha de lista. */
+function cfvFlow(de,para){
+  return `<div class="cfv-flow">
+    <div class="cfv-flow-p"><small class="sf">de</small><b>${escHtml(de||'—')}</b></div>
+    <div class="cfv-flow-a">→</div>
+    <div class="cfv-flow-p to"><small class="sf">para</small><b>${escHtml(para||'—')}</b></div>
+  </div>`;
+}
+function cfvHero(o){
+  return `<div class="cfv-hero b-${o.type}${o.prov?' cfv-prov':''}">
+    <div class="cfv-kind k-${o.type} sf">${o.kind}</div>
+    <div class="cfv-val ${o.sign}">${o.sgn||''}${eur(o.valor)}</div>
+    ${o.title?`<div class="cfv-title">${o.title}</div>`:''}
+    ${o.when?`<div class="cfv-when">${o.when}</div>`:''}
+  </div>`;
+}
+/* Data por extenso — na ficha há espaço e é o dia da semana que situa o
+   movimento ("sábado" diz mais do que "08/08"). */
+function fmtDataLonga(ds){
+  if(!ds)return'';
+  const dt=new Date(ds+'T12:00:00');
+  if(isNaN(dt))return ds;
+  const s=dt.toLocaleDateString('pt-PT',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  return s.charAt(0).toUpperCase()+s.slice(1);
+}
+
+function cfViewRender(){
+  if(!cfView)return;
+  const{source,idx}=cfView;
+  const t=cfViewTipoOf(source,idx);
+  cfView.editType=t;
+  const box=document.getElementById('cf-view');
+  if(!box)return;
+  box.innerHTML=t==='despesa'?cfvDespesaHtml((DATA.despesas||[])[idx])
+    :t==='mealheiro'?cfvMealheiroHtml((DATA.mealheiros||[])[idx])
+    :t==='reembolso'?cfvReembolsoHtml((DATA.pagamentos||[])[idx])
+    :t==='saldar'?cfvSaldarHtml((DATA.pagamentos||[])[idx]):'';
+  const btn=document.getElementById('cf-view-edit');
+  if(btn)btn.style.display=cfPodeEditar(t)?'':'none';
+  // Só se explica o que tem explicação: contas fechadas trancam o movimento a
+  // toda a gente. Não ser admin não precisa de aviso — é a regra de sempre.
+  const nota=document.getElementById('cf-view-nota');
+  const fechadas=contasFechadas()&&(t==='despesa'||t==='mealheiro');
+  if(nota){
+    nota.textContent=fechadas?'🔒 Contas fechadas — este movimento já não se edita.':'';
+    nota.style.display=fechadas?'':'none';
   }
 }
 
+function cfvDespesaHtml(d){
+  if(!d)return'';
+  const prov=despProvisoria(d);
+  // Paga por vários = uma despesa só, em várias linhas: mostra-se o total.
+  const grupo=cfGrupoIdxs(d);
+  const total=grupo.length?rnd(grupo.reduce((a,i)=>a+(+DATA.despesas[i].valor||0),0),2):(+d.valor||0);
+  const tipo=d.tipo||'Gerais';
+  const dv=d.dataValor||'';
+  const meal=shopIsMeal(tipo)?(DATA.refeicoesDef||[]).find(r=>r.ref===tipo&&r.data===dv):null;
+  // "Onde entra" — a mesma pergunta do bloco dos cartões: a refeição concreta,
+  // a bebida dessa refeição, ou o tipo puro (a bolsa comum que se reparte).
+  let dest,destSub='';
+  if(tipo===TS_TIPO_DESP){
+    dest='👕 T-shirts';destSub='cada t-shirt é cobrada a quem lhe está imputada';
+  }else if(meal){
+    dest=`${d.bebida?DEST_BEB_ICON:shopTipoIcon(tipo)} ${tipo} · ${diaCurto(dv)}, ${fmtDiaMes(dv)}`;
+    destSub=[meal.prato?escHtml(meal.prato):'',d.bebida?'bebida — divide por quem come e por quem só bebe':''].filter(Boolean).join(' · ');
+  }else if(shopIsMeal(tipo)&&dv){
+    dest=`${shopTipoIcon(tipo)} ${tipo} · ${fmtDiaMes(dv)}`;destSub='fora das refeições definidas';
+  }else{
+    dest=`${shopTipoIcon(tipo)} ${escHtml(tipo)}`;
+    if(tipo==='Gerais'||tipo==='Bebidas'||tipo==='Cerveja')destSub='bolsa comum — reparte-se pelas refeições';
+  }
+  // Numa provisória a única data é a data-valor — e quando ela é a refeição já
+  // está dita no "Onde entra", que não se repete aqui.
+  const when=prov
+    ? '📌 Ainda por pagar'+((dv&&!shopIsMeal(tipo))?` · prevista para ${diaExtenso(dv)}, ${fmtDiaMes(dv)}`:'')
+    : (d.dataDesp?`📅 ${fmtDataLonga(d.dataDesp)}`:'');
+  let h=cfvHero({type:'despesa',prov,valor:total,sign:'neg',sgn:'−',when,
+    kind:`${prov?'📌':'🛒'} ${prov?'Provisória':'Despesa'} · ${escHtml(tipo)}${grupo.length?' · 👥':''}`,
+    title:escHtml(d.desc||'(sem descrição)')});
+  h+=`<div class="cfv-rows">
+    ${grupo.length?''   /* paga por vários: quem pagou é o bloco de baixo, com os valores */
+                  :cfvRow(prov?'Quem paga':'Quem pagou',escHtml(d.quem||'—'))}
+    ${cfvRow('Onde entra',dest,destSub)}
+    ${(!prov&&dv&&dv!==d.dataDesp&&!shopIsMeal(tipo))?cfvRow('Data-valor',fmtDiaMes(dv)):''}
+  </div>`;
+  if(grupo.length)h+=cfvBlk(`👥 Quem pagou · ${grupo.length} pessoas`,grupo.map(i=>{
+    const x=DATA.despesas[i];
+    return `<div class="cfv-line"><span>${escHtml(x.quem||'—')}</span><span>−${eur(x.valor)}</span></div>`;
+  }).join(''));
+  if(String(d.obs||'').trim())h+=cfvBlk('Observações',`<div class="cfv-blk-b">${escHtml(d.obs)}</div>`);
+  if(prov)h+='<div class="cfv-note gold">📌 Provisória: já conta nas contas e no custo da refeição — o que falta é o pagamento, e o valor ainda pode ser acertado.</div>';
+  return h;
+}
+
+function cfvMealheiroHtml(m){
+  if(!m)return'';
+  const st=m.subtipo||'lata';
+  const[ic,lb]={sobras_ano_anterior:[ICON_SACO,'Sobras do ano anterior'],outros:[ICON_MOEDA,'Outros']}[st]||[ICON_LATA,'Lata'];
+  const desc=String(m.desc||'').trim();
+  let h=cfvHero({type:'mealheiro',valor:+m.valor||0,sign:'pos',sgn:'+',
+    kind:`${ic} Mealheiro · ${lb}`,
+    title:desc?escHtml(desc):'Entrada no mealheiro',
+    when:m.data?`📅 ${fmtDataLonga(m.data)}`:''});
+  h+=`<div class="cfv-rows">
+    ${cfvRow('Quem recebeu',escHtml(m.quem||'—'))}
+    ${cfvRow('Tipo',`${ic} ${lb}`,st==='sobras_ano_anterior'?'soma ao saldo inicial do grupo'
+      :st==='outros'?'entrada avulsa — baixa a quota do grupo':'')}
+  </div>`;
+  return h;
+}
+
+function cfvReembolsoHtml(p){
+  if(!p)return'';
+  const desc=(p.ref||'').replace(/^Reembolso:?\s*/,'').trim();
+  let h=cfvHero({type:'reembolso',valor:+p.valor||0,sign:'mov',sgn:'',
+    kind:'💸 Reembolso',
+    title:escHtml(desc||`Reembolso a ${p.para||'—'}`),
+    when:p.data?`📅 ${fmtDataLonga(p.data)}`:''});
+  h+=cfvFlow(p.de,p.para);
+  h+='<div class="cfv-note">Devolução de dinheiro adiantado — não é despesa nova, só muda de bolso.</div>';
+  return h;
+}
+
+function cfvSaldarHtml(p){
+  if(!p)return'';
+  const tot=rnd(+p.valor||0,2);
+  const extra=rnd(Math.max(0,+p.extra||0),2);
+  const divida=rnd(tot-extra,2);
+  const keys=(p.ref||'').split(/,\s*/).map(x=>x.trim()).filter(Boolean);
+  let h=cfvHero({type:'saldar',valor:tot,sign:'set',sgn:'',
+    kind:'🤝 Pagar dívida',
+    title:keys.length?`Acerto de ${keys.length===1?'uma dívida':keys.length+' dívidas'}`:'Adiantamento — sem dívida associada',
+    when:p.data?`📅 ${fmtDataLonga(p.data)}`:''});
+  h+=cfvFlow(p.de,p.para);
+  // A repartição só se mostra quando há o que repartir: sem extra, a dívida É o total.
+  if(extra>0.005)h+=`<div class="cfv-rows">
+    ${cfvRow('Dívida',eur(divida))}
+    ${cfvRow('🐖 Extra',eur(extra),'vai para a poupança do grupo')}
+    ${cfvRow('Total entregue',eur(tot))}
+  </div>`;
+  // Sem dívidas associadas não há bloco: o título do cabeçalho já disse o que é
+  // ("Adiantamento") e uma caixa "Que dívidas pagou" a responder "nenhuma" é ruído.
+  h+=keys.length?cfvBlk('Que dívidas pagou',cfvSdChipsHtml(p.de,keys))
+    :'<div class="cfv-note">Pagamento livre — o valor fica como crédito da pessoa e abate a dívida que ela vier a ter.</div>';
+  return h;
+}
+
+/* Chips das dívidas que este pagamento saldou — só os nomes. Na edição os chips
+   levam o valor em ABERTO hoje, que é o que interessa a quem está a mexer no
+   pagamento; numa ficha de consulta esse número seria lido como "o que se pagou
+   aqui" e não é — por isso aqui vão sem valor. */
+function cfvSdChipsHtml(payer,keys){
+  const rel=_relatedNames(payer);
+  let mine='',other='',otherN=0;
+  keys.forEach(key=>{
+    const isConv=key.startsWith('conv:');
+    const nome=isConv?key.slice(5):(key.startsWith('own:')?key.slice(4):key);
+    const chip=_sdChip(key,escHtml(nome),isConv,0,true,'',true);
+    if(rel.has(nome))mine+=chip;else{other+=chip;otherN++;}
+  });
+  const tmp=document.createElement('div');
+  _sdRenderGroups(tmp,mine,other,otherN,true,true);
+  return `<div class="sd-list ${tmp.className}">${tmp.innerHTML}</div>`;
+}
+
+/* ═══ EDIT / DELETE CASH FLOW ═══ */
 function deleteCfFromDetail(){
   if(!editingCf)return;
   const{source,idx}=editingCf;
@@ -3678,18 +3904,9 @@ function deleteCfFromDetail(){
 function editCfEntry(source,idx){
   editingCf={source,idx};
   const f=document.getElementById('edit-cf-form');
-  const title=document.getElementById('edit-cf-title');
   const wheel=document.getElementById('ecf-wheel');
-  title.textContent='Detalhe Cash Flow';
-
-  // Determine the type for this entry
-  let editType='';
-  if(source==='despesas') editType='despesa';
-  else if(source==='mealheiros') editType='mealheiro';
-  else if(source==='pagamentos'){
-    const p=DATA.pagamentos[idx];
-    editType=cfType(p);
-  }
+  // O título do modal é do cfSetMode (consulta vs. edição)
+  const editType=cfViewTipoOf(source,idx);
   editingCf.editType=editType;
 
   // Build wheel showing selected type (read-only highlight)
@@ -3898,7 +4115,8 @@ function recalcEditSdVal(apply){
 function closeEditCf(){
   document.getElementById('edit-cf-bg').classList.remove('show');
   document.body.classList.remove('no-scroll');
-  editingCf=null;
+  editingCf=null;cfView=null;
+  cfSetMode('view');   // o movimento seguinte volta a abrir em consulta
 }
 
 async function saveEditCf(){
