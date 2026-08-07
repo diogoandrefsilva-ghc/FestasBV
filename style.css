@@ -1296,6 +1296,60 @@ button.cmp-chip.qt-tap:active{filter:brightness(.93)}
 .stk-chip.livre{background:rgba(196,144,32,.12);border-color:rgba(196,144,32,.4);color:#9A6E0E}
 /* Refeição já passada = stock consumido: fica esbatido, mas ainda editável */
 .stk-chip.usado{opacity:.62}
+/* ═══ Consumo do stock (2.º eixo) e artigos de despensa ═══════════════
+   Os chips acima são o eixo do CUSTO (onde o artigo está arrumado); esta linha
+   é o do CONSUMO (o que já se gastou). Fica discreta e separada por um filete:
+   é uma leitura a mais, não outro lote de chips a disputar a mesma atenção. */
+.stk-cons{margin-top:7px;padding-top:6px;border-top:1px dashed var(--line);font-size:11.5px;font-weight:600;color:var(--muted);display:flex;align-items:center;gap:5px;flex-wrap:wrap}
+.stk-cons b{color:var(--ink);font-weight:700;font-variant-numeric:tabular-nums}
+/* Despensa: não há contas — ou ainda há, ou acabou */
+.stk-cons.desp b{color:var(--green)}
+.stk-cons.desp.fim b{color:var(--red)}
+.stk-cons-mao{font-style:normal;font-size:10.5px;opacity:.7}
+/* 💡 no cartão: "parece artigo de despensa". É só o selo — a pergunta com
+   Sim/Não vive no modal, que é onde se decide; uma caixa de decisão em cada
+   linha da lista fazia do separador um questionário. */
+.stk-org.sug{opacity:.85}
+/* ── Bloco 🍽️ Consumo, dentro do modal do artigo ── */
+#lote-cons-wrap{margin-top:14px}
+.lote-cons-num{font-size:13.5px;font-weight:600;color:var(--muted);margin-top:2px}
+.lote-cons-num b{color:var(--ink);font-weight:700;font-variant-numeric:tabular-nums}
+/* O depósito (Bebidas/Gerais) é o caso que não se resolve sozinho — a nota diz
+   as duas saídas e por isso ganha destaque de aviso, não de erro */
+.note.lote-cons-pool{margin-top:6px;background:rgba(196,144,32,.1);border:1px solid rgba(196,144,32,.32);border-radius:9px;padding:7px 9px;color:#7A5A10}
+.lote-cons-acts{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-top:9px}
+.lote-cons-acts .lca-lbl{font-size:12.5px;font-weight:600;color:var(--muted)}
+.lote-cons-acts .lote-qty-w{flex:0 0 86px}
+.lote-cons-acts .lote-qty-w.nou{flex:0 0 66px}
+.lote-cons-acts input[type=number]{width:100%;height:34px;margin:0;text-align:right;padding:0 23px 0 6px;font-size:13px;font-weight:700;border:1px solid var(--line);border-radius:8px;background:#FFFDF6;color:var(--ink)}
+.lote-cons-acts .lote-qty-w.nou input[type=number]{padding-right:7px}
+.lote-cons-acts .btn{padding:7px 11px;font-size:12.5px}
+.lote-cons-acts .lca-auto{margin-left:auto;color:var(--faint)}
+/* Interruptor de dois estados (ainda há / acabou) — nos artigos de despensa é
+   isto que substitui as quantidades */
+.lote-cons-est{display:flex;gap:8px;margin-top:6px}
+.lce-opt{flex:1 1 0;min-width:0;padding:9px 8px;font-size:13px;font-weight:700;border:1px solid var(--line);border-radius:11px;background:var(--panel2);color:var(--muted);cursor:pointer;transition:.15s}
+.lce-opt:active{transform:scale(.985)}
+.lce-opt.on{background:rgba(30,122,77,.12);border-color:rgba(30,122,77,.45);color:var(--green)}
+.lce-opt.fim.on{background:rgba(179,64,47,.1);border-color:rgba(179,64,47,.4);color:var(--red)}
+.lce-opt:disabled{cursor:default;opacity:.75}
+/* O convite do 💡 — uma pergunta, duas respostas, e some-se em qualquer delas */
+.lote-cons-sug{background:rgba(196,144,32,.1);border:1px solid rgba(196,144,32,.34);border-radius:11px;padding:9px 10px;margin-bottom:10px}
+.lote-cons-sug .lcs-txt{font-size:12.5px;font-weight:600;line-height:1.45;color:#6B4E0C}
+.lote-cons-sug .lcs-btns{display:flex;gap:8px;margin-top:8px}
+.lote-cons-sug .lcs-btns .btn{flex:1 1 0;padding:7px 10px;font-size:12.5px}
+/* ── 🫙 Marca de despensa (campo do painel ✏️) ── */
+.lote-desp-row{display:flex;align-items:center;gap:10px}
+.lote-desp-sw{position:relative;flex:0 0 auto;width:44px;height:26px;border-radius:13px;border:1px solid var(--line);background:var(--panel2);cursor:pointer;transition:.18s}
+.lote-desp-sw i{position:absolute;top:2px;left:2px;width:20px;height:20px;border-radius:50%;background:var(--faint);transition:.18s}
+.lote-desp-sw.on{background:rgba(30,122,77,.18);border-color:rgba(30,122,77,.45)}
+.lote-desp-sw.on i{left:20px;background:var(--green)}
+.lote-desp-sw:disabled{cursor:default;opacity:.6}
+.lote-desp-txt{font-size:13px;font-weight:600;color:var(--ink)}
+/* ⇄ da linha de depósito: dar parte dele a uma refeição. Vive ao lado do ✕ e
+   com o mesmo peso — é ação da linha, não o assunto dela. */
+.lote-da{background:transparent;border:none;color:var(--faint);font-size:14px;cursor:pointer;padding:4px 3px;line-height:1;border-radius:6px;flex:0 0 auto}
+.lote-da:hover{color:var(--gold);background:rgba(196,144,32,.12)}
 /* Lotes no registo da compra */
 .cmp-lote-art{flex:1;min-width:0;font-size:13px;font-weight:600;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .cmp-lote-art-in{flex:1;min-width:0;font-size:13px;margin:0}

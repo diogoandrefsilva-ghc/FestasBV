@@ -24,22 +24,33 @@
 -- NORMALIZADO (minúsculas, sem acentos — o shopArtKey da app), tal como no
 -- artigo_categorias, por isso "Azeite" e "azeite" são o mesmo artigo.
 --
--- O QUE MUDA NA APP (nada disto apaga pedidos — é agregação, não destruição):
---   · lista da refeição  — a linha fica, marcada 🫙 (o cozinheiro continua a
---                          ver que o prato leva azeite);
---   · separador Compras  — todos os pedidos do artigo colapsam numa ÚNICA
---                          linha, numa secção 🫙 Despensa, com as refeições
---                          que o pediram por baixo. Um toque no ＋🛒 leva o
---                          grupo todo;
---   · cobertura          — havendo lote comprado desse artigo, TODOS os
---                          pedidos ficam cobertos (é o que significa "uma
---                          embalagem serve tudo"), sem obrigar a alocar a
---                          cada refeição uma a uma.
+-- É A MESMA DISTINÇÃO NO 🧺 STOCK, e é lá que ela hoje se usa: um artigo de
+-- despensa NÃO SE ESGOTA por alocação. E isso muda tudo o que a app pode dizer
+-- sobre ele:
 --
--- origem='heur' marca o que a deteção local propôs (repetido em ≥2 refeições
--- e sem quantidade indicada), 'ai' o que veio do Gemini, 'manual' o que foi
--- decidido por pessoas. Em qualquer dos casos só fica gravado depois de o
--- admin confirmar no 3.º passo do 🔤 Normalizar.
+--   10 pacotes de batatas fritas   alocar 3 ao almoço de sábado deixa 7. A
+--                                  conta faz-se, e sábado passado foram-se 3.
+--   1 frasco de pimenta            serve os jantares todos e ainda sobra para
+--                                  o ano seguinte. Alocá-lo a uma refeição não
+--                                  gasta nada — e dizer "25%" é inventar um
+--                                  número que ninguém sabe medir.
+--
+-- Por isso, num artigo marcado aqui:
+--   · a app DESLIGA a derivação do consumo (stock_consumo.sql): uma refeição
+--     passada já não o dá por gasto, que seria mentira;
+--   · o consumo passa a ser um INTERRUPTOR — ainda há / acabou —, que é a
+--     única pergunta a que se sabe responder olhando para a prateleira;
+--   · o cartão do stock troca as contas de quantidade por esse estado.
+--
+-- A alocação (o eixo do CUSTO) fica na mesma e continua livre: o frasco pode
+-- estar em Gerais ou repartido por refeições, como sempre esteve.
+--
+-- origem='heur' marca o que a deteção local propôs (o artigo é pedido em duas
+-- ou mais refeições e nenhuma escreve quantidade — o padrão do sal e do louro),
+-- 'ai' o que veio do Gemini, 'manual' o que foi decidido por pessoas. A app só
+-- SUGERE: nada fica gravado sem o admin confirmar, porque a deteção erra em
+-- casos legítimos (salsa, coentros e hortelã repetem-se entre refeições mas são
+-- fresco — compram-se por refeição e gastam-se).
 --
 -- Sem esta migração a app funciona à mesma: o fetch é tolerante
 -- (DESP_TABLE=false) e tudo o que é despensa fica simplesmente escondido.
@@ -57,10 +68,10 @@ GRANT ALL ON TABLE festasbv.artigos_despensa TO anon, authenticated;
 -- RLS
 ALTER TABLE festasbv.artigos_despensa ENABLE ROW LEVEL SECURITY;
 
--- Todos os membros leem (a marca 🫙 e o colapso da lista são para toda a
--- gente); só o admin decide o que é despensa — marcar um artigo muda a lista
--- de compras de todos, e a deteção erra em casos legítimos (salsa, coentros e
--- hortelã repetem-se entre refeições mas são fresco: compram-se por refeição).
+-- Todos os membros leem (a marca 🫙 e o estado "há/acabou" são para toda a
+-- gente — quem cozinha precisa de saber se ainda há sal); só o admin decide o
+-- que é despensa, que é uma marca GLOBAL: muda como o artigo é lido em todos
+-- os anos e para toda a gente.
 DROP POLICY IF EXISTS artigos_despensa_sel   ON festasbv.artigos_despensa;
 DROP POLICY IF EXISTS artigos_despensa_admin ON festasbv.artigos_despensa;
 
