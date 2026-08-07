@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v247 · 2026-08-07 · Separador Flows (a seguir ao Stock) e fechar um modal já não atira a lista para o topo';
+const APP_BUILD = 'v248 · 2026-08-07 · Sacos, taxas e vasilhame saem do cartão da compra e ganham bloco próprio na ficha';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -1846,14 +1846,27 @@ function groupCompraCfs(list){
    a conta do dinheiro, o stock é matéria da lista de compras. */
 function cfCompraLines(g){
   const out=[];
+  const soDesp=compraTemLotes(g.compraId);
   (g.lines||[]).forEach(l=>{
     if(l.obs===STOCK_OBS){
       if(l.sub==='Gerais')cfStockSplit(g.compraId,l.valor).forEach(s=>out.push(s));
       else out.push({...l,obs:''});   // linha antiga já com destino — só cai a nota
-    }else out.push(l);
+    }else out.push((soDesp&&l.obs)?{...l,obs:NOSTOCK_LBL}:l);   // sem observações não há nomes a esconder — a linha fica como estava
   });
   return out;
 }
+/* Uma compra tem lotes = os artigos dela estão no stock, e são esses que o
+   cartão detalha. O que sobrar em linhas de despesa é o "só despesa": o saco
+   da caixa, a taxa, o depósito das garrafas. */
+function compraTemLotes(compraId){return !!compraId&&stockArr().some(l=>l.compraId===compraId);}
+/* Nomes desses artigos NÃO vão para o cartão dos movimentos: quem passa a
+   lista de olhos quer saber para onde foi o dinheiro, e "Saco Plástico (2),
+   Depósito Garrafas" é ruído a ocupar as sub-linhas de uma compra que se lê de
+   relance. Fica a marca — que explica porque é que aquela linha não tem
+   artigos como as outras — e o detalhe está na ficha da compra (cfvCompraHtml).
+   Vale para qualquer linha de despesa da compra que não seja a do stock: por
+   definição é dinheiro que saiu sem entrar em stock. */
+const NOSTOCK_LBL='só despesa';
 /* Reparte o valor da linha "🧺 Stock" de uma compra pelos destinos dos seus
    lotes (refeição ou tipo puro) → mapa {chave de destino: valor}. O que ainda
    não está alocado fica em Gerais — e é mesmo isso que é, a bolsa comum, sem
@@ -3884,17 +3897,25 @@ function cfvCompraHtml(compraId){
     when:prov?'📌 Ainda por pagar':(d0.dataDesp?`📅 ${fmtDataLonga(d0.dataDesp)}`:'')});
   h+=`<div class="cfv-rows">${cfvRow(prov?'Quem paga':'Quem pagou',escHtml(d0.quem||'—'))}</div>`;
   const arts=cfvCompraArtigos(compraId,ds);
-  if(arts.length)h+=cfvBlk(`🧺 Artigos · ${arts.length}`,arts.map(a=>`<div class="cfv-item">
-    <span class="cfv-item-n">${escHtml(a.nome||'(sem nome)')}${a.sub?`<small>${a.sub}</small>`:''}</span>
-    <span class="cfv-item-q">${a.qtd?escHtml(a.qtd):''}</span>
-    <span class="cfv-item-v">${a.valor==null?'':eur(a.valor)}</span>
-  </div>`).join(''));
+  if(arts.length)h+=cfvBlk(`🧺 Artigos · ${arts.length}`,arts.map(cfvItemHtml).join(''));
+  /* Os que não são stock ficam num bloco à parte — entre os artigos e o "onde
+     entra" — porque são outra coisa: dinheiro da compra que não deu artigo
+     nenhum à cozinha. Fora do cartão dos movimentos (ver cfCompraLines) é aqui
+     que se vem ver o que foram. */
+  const nsRows=cfvCompraNaoStock(compraId,ds);
+  const ns=cfvArtigosObs(nsRows);
+  // O € é da LINHA de despesa, que junta os artigos do mesmo destino: com mais
+  // do que um artigo não há preço por artigo para mostrar (nunca foi gravado),
+  // e o que se diz é quanto pesam ao todo.
+  if(ns.length)h+=cfvBlk(`🧾 Só despesa · ${ns.length} · ${eur(rnd(nsRows.reduce((a,d)=>a+(+d.valor||0),0),2))}`,
+    ns.map(cfvItemHtml).join('')+
+    '<div class="cfv-blk-b cfv-blk-n">Não entram em stock — sacos, taxas, depósitos de vasilhame.</div>');
   const dest=cfvCompraDestinos(compraId,ds);
   if(dest.length)h+=cfvBlk('Onde entra',dest.map(x=>{
     const dl=destLabel(x.k);
     return `<div class="cfv-line"><span>${dl.icon} ${escHtml(dl.label)}${x.obs?' · <i>'+escHtml(x.obs)+'</i>':''}</span><span>−${eur(x.valor)}</span></div>`;
   }).join(''));
-  if(!arts.length)h+='<div class="cfv-note">Esta compra foi registada só por totais — não tem artigos detalhados.</div>';
+  if(!arts.length&&!ns.length)h+='<div class="cfv-note">Esta compra foi registada só por totais — não tem artigos detalhados.</div>';
   // Só se promete stock onde ele existe: a provisória do formato antigo não tem
   // lotes (só se converte ao voltar a gravar), e dizer-lhe "já entraram em stock"
   // era mandar quem cozinha procurar o que não está lá.
@@ -3922,8 +3943,16 @@ function cfvCompraArtigos(compraId,ds){
     ].filter(Boolean).join(' · ');
     return{nome:l.artigo,qtd:loteQtdLabel(l),valor:+l.valor||0,sub};
   });
+  return cfvArtigosObs(ds);
+}
+/* Artigos escritos nas OBSERVAÇÕES de uma despesa da compra — o formato dos que
+   não geram lote: a provisória antiga (uma despesa por artigo) e os "só
+   despesa" de qualquer compra (o saco, a taxa, o vasilhame: uma despesa por
+   destino, com os nomes na observação). */
+function cfvArtigosObs(ds){
   const out=[];
   ds.forEach(d=>{
+    if((d.obs||'')===STOCK_OBS)return;   // linha técnica do stock, não é artigo nenhum
     const a=provArtigos(d);
     if(!a.length)return;
     // Uma despesa por artigo (o normal) → o € é o do artigo. Nas antigas, com
@@ -3933,6 +3962,23 @@ function cfvCompraArtigos(compraId,ds){
     a.forEach(x=>out.push({nome:x.artigo,qtd:x.qtd,valor:um?(+d.valor||0):null,sub}));
   });
   return out;
+}
+/* Linhas de despesa "só despesa" da compra: as dos artigos que não entraram em
+   stock. Não têm marca gravada — o que as identifica é a compra ter lotes (os
+   seus artigos estão lá) e sobrar uma linha de despesa com nomes na observação.
+   Sem lotes, essas linhas SÃO os artigos da compra (provisória do formato
+   antigo) e já vão no bloco 🧺 — daí a compra ter de ter lotes para haver
+   bloco 🧾. */
+function cfvCompraNaoStock(compraId,ds){
+  if(!compraTemLotes(compraId))return [];
+  return ds.filter(d=>(d.obs||'')!==STOCK_OBS&&provArtigos(d).length);
+}
+function cfvItemHtml(a){
+  return `<div class="cfv-item">
+    <span class="cfv-item-n">${escHtml(a.nome||'(sem nome)')}${a.sub?`<small>${a.sub}</small>`:''}</span>
+    <span class="cfv-item-q">${a.qtd?escHtml(a.qtd):''}</span>
+    <span class="cfv-item-v">${a.valor==null?'':eur(a.valor)}</span>
+  </div>`;
 }
 function cfvDestCurto(v){return v?`${destLabel(v).icon} ${escHtml(destLabel(v).short)}`:'';}
 /* "Onde entra" — o dinheiro por destino. A linha "🧺 Stock" é técnica (entra por
