@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v246 · 2026-08-07 · Ficha de consulta também nas compras da lista — artigos, quantidades e preços sem abrir o editor';
+const APP_BUILD = 'v247 · 2026-08-07 · Separador Flows (a seguir ao Stock) e fechar um modal já não atira a lista para o topo';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -87,6 +87,31 @@ let DATA=null,CALC=null,TAB='saldos',GH_SHA=null;
 // Persistência do estado de navegação (sobrevive ao reload do PWA quando o iOS o descarrega)
 function lsSet(k,v){try{localStorage.setItem(k,v);}catch(_){}}
 function lsGet(k){try{return localStorage.getItem(k);}catch(_){return null;}}
+
+/* ── Travar o scroll do fundo enquanto há um modal aberto ──
+   O `.no-scroll` põe o body em `position:fixed`, e isso faz o browser esquecer
+   onde a página ia: ao fechar o modal voltava-se ao TOPO. Dá mais nas vistas
+   nos Flows, onde se anda a percorrer a lista e se entra num movimento para o
+   ver — mas era em todos os modais. Guarda-se a posição no `top` do body (que
+   é o que mantém a página quieta no sítio, em vez de saltar para cima) e
+   repõe-se ao destravar.
+   Trava a mais não grava nada: com o body já fixo o `window.scrollY` é 0, e um
+   modal aberto por cima de outro apagaria a posição a sério. */
+let SCROLL_Y=0;
+function lockScroll(){
+  const b=document.body;
+  if(b.classList.contains('no-scroll'))return;
+  SCROLL_Y=window.scrollY||window.pageYOffset||0;
+  b.style.top=(-SCROLL_Y)+'px';
+  b.classList.add('no-scroll');
+}
+function unlockScroll(){
+  const b=document.body;
+  if(!b.classList.contains('no-scroll'))return;
+  b.classList.remove('no-scroll');
+  b.style.top='';
+  window.scrollTo(0,SCROLL_Y);
+}
 
 /* ── Permissões: utilizadores ↔ membros ↔ casais ── */
 let USER_AMIGOS=[];   // [{email,amigo}]
@@ -412,9 +437,9 @@ function abrirValModal(){
   document.getElementById('val-form').innerHTML=f;
   document.getElementById('val-save').style.display=temAlgo?'':'none';
   document.getElementById('val-bg').classList.add('show');
-  document.body.classList.add('no-scroll');
+  lockScroll();
 }
-function closeValModal(){document.getElementById('val-bg').classList.remove('show');document.body.classList.remove('no-scroll');}
+function closeValModal(){document.getElementById('val-bg').classList.remove('show');unlockScroll();}
 function confirmarValidacaoUI(){
   const amigos=[];
   document.querySelectorAll('#val-form .val-opt.sel').forEach(c=>{const n=c.dataset.nome;if(n&&amigos.indexOf(n)<0)amigos.push(n);});
@@ -2089,13 +2114,13 @@ function openMember(nome){
     </div>`;
   document.getElementById('sheet-in').innerHTML=h;
   document.getElementById('sheet-bg').classList.add('show');document.getElementById('sheet').classList.add('show');
-  document.body.classList.add('no-scroll');
+  lockScroll();
   document.getElementById('sheet-in').scrollTop=0;
 }
 function closeSheet(){
   document.getElementById('sheet-bg').classList.remove('show');
   document.getElementById('sheet').classList.remove('show');
-  document.body.classList.remove('no-scroll');
+  unlockScroll();
 }
 
 /* SYNC */
@@ -3232,7 +3257,7 @@ function updateExtraTotal(){
 
 function openPayModal(){
   document.getElementById('pay-bg').classList.add('show');
-  document.body.classList.add('no-scroll');
+  lockScroll();
   // Que opções tem este utilizador? O admin tem tudo; um membro tem despesas
   // (ano aberto) e pagamentos de dívida — estes só existem se a migração dos
   // pendentes estiver feita e ele estiver ligado a um membro.
@@ -3260,7 +3285,7 @@ function openPayModal(){
 }
 function closePayModal(){
   document.getElementById('pay-bg').classList.remove('show');
-  document.body.classList.remove('no-scroll');
+  unlockScroll();
 }
 
 async function saveCashFlow(){
@@ -3667,7 +3692,7 @@ function openCfDetail(source,idx){
   cfViewRender();
   cfSetMode('view');
   document.getElementById('edit-cf-bg').classList.add('show');
-  document.body.classList.add('no-scroll');
+  lockScroll();
 }
 /* Caminho antigo (só para o caso acima): formulário direto, trancado a quem não
    pode gravar. Não é por aqui que se entra num detalhe — é pelo openCfDetail. */
@@ -4154,7 +4179,7 @@ function editCfEntry(source,idx){
 
   applyRoFields(document.getElementById('edit-cf-modal'),!isAdmin());
   document.getElementById('edit-cf-bg').classList.add('show');
-  document.body.classList.add('no-scroll');
+  lockScroll();
 }
 
 /* Subtipo do mealheiro no modal de edição */
@@ -4240,7 +4265,7 @@ function recalcEditSdVal(apply){
 
 function closeEditCf(){
   document.getElementById('edit-cf-bg').classList.remove('show');
-  document.body.classList.remove('no-scroll');
+  unlockScroll();
   editingCf=null;cfView=null;
   cfSetMode('view');   // o movimento seguinte volta a abrir em consulta
 }
@@ -4353,9 +4378,9 @@ function openAdmin(){
   renderPlantel();
   loadLimpeza();
   document.getElementById('admin-bg').classList.add('show');
-  document.body.classList.add('no-scroll');
+  lockScroll();
 }
-function closeAdmin(){document.getElementById('admin-bg').classList.remove('show');document.body.classList.remove('no-scroll');}
+function closeAdmin(){document.getElementById('admin-bg').classList.remove('show');unlockScroll();}
 
 /* Conta › a que membro esta conta está ligada e com quem faz casal (quem pode
    marcar presenças/convidados/despesas por mim). */
@@ -5138,7 +5163,7 @@ function catSugOpen(nomes,sug){
     .sort((a,b)=>(a.catId?0:1)-(b.catId?0:1)||a.artigo.localeCompare(b.artigo,'pt'));
   catSugRender();
   document.getElementById('catsug-bg').classList.add('show');
-  document.body.classList.add('no-scroll');
+  lockScroll();
 }
 async function catSugerir(){
   if(!CATS_TABLE||!isAdmin())return;
@@ -5162,7 +5187,7 @@ function catSugRender(){
 }
 function catSugClose(){
   document.getElementById('catsug-bg').classList.remove('show');
-  document.body.classList.remove('no-scroll');
+  unlockScroll();
   _catSug=null;
 }
 async function catSugApply(){
@@ -5468,7 +5493,7 @@ async function shopNormOpen(){
   if(!viaAI&&comAI)toast('AI indisponível — sugestões básicas (offline)','bad');
   shopNormRender();
   document.getElementById('shopnorm-bg').classList.add('show');
-  document.body.classList.add('no-scroll');
+  lockScroll();
 }
 /* Um cartão por grupo: o nome final em destaque (editável), as grafias em uso
    por baixo como opções tocáveis, e um interruptor para deixar o grupo como
@@ -5568,7 +5593,7 @@ function shopNormBarUpd(){
 }
 function shopNormClose(){
   document.getElementById('shopnorm-bg').classList.remove('show');
-  document.body.classList.remove('no-scroll');
+  unlockScroll();
   _normGroups=null;
 }
 async function shopNormApply(){
@@ -5768,7 +5793,7 @@ function shopRepStep(juntados){
   _repGrupos=gs;
   shopRepRender();
   document.getElementById('shoprep-bg').classList.add('show');
-  document.body.classList.add('no-scroll');
+  lockScroll();
   return true;
 }
 /* Encadeamento do botão: nomes → repetidos → categorias (cada passo só aparece
@@ -5873,7 +5898,7 @@ function shopRepBarUpd(){
 }
 function shopRepClose(){
   document.getElementById('shoprep-bg').classList.remove('show');
-  document.body.classList.remove('no-scroll');
+  unlockScroll();
   _repGrupos=null;
   const cont=_repCont;_repCont=null;
   shopCatStep(cont);   // passo seguinte: categorias
@@ -6156,7 +6181,7 @@ function shopHasLojas(list){return SHOP_LOJA_COL&&list.some(it=>shopLojaTxt(it))
 let SHOP_COMO=null;
 function shopComo(){return (isAdmin()&&SHOP_COMO)||null;}
 function shopComoSet(nome){SHOP_COMO=(nome||'').trim()||null;shopComoClose();renderCompras();}
-function shopComoClose(){const bg=document.getElementById('scomo-bg');if(bg){bg.classList.remove('show');document.body.classList.remove('no-scroll');}}
+function shopComoClose(){const bg=document.getElementById('scomo-bg');if(bg){bg.classList.remove('show');unlockScroll();}}
 function shopComoOpen(){
   if(!isAdmin())return;
   let bg=document.getElementById('scomo-bg');
@@ -6179,7 +6204,7 @@ function shopComoOpen(){
     `<div class="note" style="margin-bottom:10px">Passas a ver o <b>carrinho dessa pessoa</b> e tudo o que fizeres na lista fica em nome dela — reclamar, marcar apanhado e registar a compra. Não muda nada nos saldos nem nas presenças.</div>`+
     '<div class="slp-ops">'+op('','🙋 Eu ('+escHtml(eu)+')','o normal')+
       nomes.map(n=>op(n,'🛒 '+escHtml(n),'')).join('')+'</div>';
-  bg.classList.add('show');document.body.classList.add('no-scroll');
+  bg.classList.add('show');lockScroll();
 }
 // Nomes com que reclamo artigos (próprio + cônjuge; admin sem membro → 'Admin')
 function myClaimNames(){const c=shopComo();if(c)return new Set([c]);const s=new Set(MY_NAMES);const p=myPrimaryName()||(isAdmin()?'Admin':'');if(p)s.add(p);return s;}
@@ -7706,11 +7731,11 @@ function openShopItemModal(id,presetTipo,presetData){
   // Largar (só quem está a tratar) — no cartão só fica a bolinha do carrinho
   document.getElementById('shop-item-unclaim').style.display=(it&&shopMine(it))?'':'none';
   document.getElementById('shop-item-bg').classList.add('show');
-  document.body.classList.add('no-scroll');
+  lockScroll();
   if(!it)setTimeout(()=>document.getElementById('shop-artigo').focus(),50);
 }
 function deleteShopItemFromModal(){if(editingItemId!=null){const id=editingItemId;closeShopItemModal();deleteShopItem(id);}}
-function closeShopItemModal(){document.getElementById('shop-item-bg').classList.remove('show');document.body.classList.remove('no-scroll');editingItemId=null;shopCtxLock=null;}
+function closeShopItemModal(){document.getElementById('shop-item-bg').classList.remove('show');unlockScroll();editingItemId=null;shopCtxLock=null;}
 function _setEutratoKnob(on){
   const knob=document.getElementById('shop-eutrato-knob');
   const track=knob?.previousElementSibling;
@@ -7983,11 +8008,11 @@ function qtOpen(ids,artigo){
     bg.addEventListener('click',e=>{if(e.target===bg)qtClose();});
   }
   qtRender();
-  bg.classList.add('show');document.body.classList.add('no-scroll');
+  bg.classList.add('show');lockScroll();
 }
 function qtClose(){
   const bg=document.getElementById('qt-bg');
-  if(bg){bg.classList.remove('show');document.body.classList.remove('no-scroll');}
+  if(bg){bg.classList.remove('show');unlockScroll();}
 }
 function qtRender(){
   const box=document.getElementById('qt-inner');if(!box)return;
@@ -8275,9 +8300,9 @@ function openCompra(compraId,opts){
   }
 
   document.getElementById('shop-buy-bg').classList.add('show');
-  document.body.classList.add('no-scroll');
+  lockScroll();
 }
-function closeShopBuyModal(){document.getElementById('shop-buy-bg').classList.remove('show');document.body.classList.remove('no-scroll');}
+function closeShopBuyModal(){document.getElementById('shop-buy-bg').classList.remove('show');unlockScroll();}
 /* 📅 Efetiva ↔ 📌 Provisória (só na itemização de uma despesa do cash-flow).
    Provisória = ainda não foi comprado: sem data de pagamento e — ver saveCompra —
    sem lotes de stock. O destino de cada artigo fica (é ele que a mantém alocada
@@ -8899,11 +8924,11 @@ function listaFotoAbrir(d){
   if(ll&&SHOP_LOJA_COL)ll.innerHTML=shopLojaNomes().map(n=>`<option value="${escHtml(n)}">`).join('');
   listaFotoRenderDest();listaFotoRenderList();
   document.getElementById('shoplista-bg').classList.add('show');
-  document.body.classList.add('no-scroll');
+  lockScroll();
 }
 function listaFotoClose(){
   document.getElementById('shoplista-bg').classList.remove('show');
-  document.body.classList.remove('no-scroll');
+  unlockScroll();
   _listaFoto=null;_listaFotoCtx=null;
 }
 /* Destino de TODOS os artigos da foto. Trancado quando a foto foi tirada de
@@ -9971,11 +9996,11 @@ function openLoteModal(id){
   loteRenderAlocs();
   loteCobFill();
   document.getElementById('lote-bg').classList.add('show');
-  document.body.classList.add('no-scroll');
+  lockScroll();
 }
 // O reset do modo de edição fica para depois da animação de fecho — senão o
 // corpo do modal reaparece a meio do slide para baixo
-function closeLoteModal(){document.getElementById('lote-bg').classList.remove('show');document.body.classList.remove('no-scroll');editingLote=null;setTimeout(loteEditCancel,320);}
+function closeLoteModal(){document.getElementById('lote-bg').classList.remove('show');unlockScroll();editingLote=null;setTimeout(loteEditCancel,320);}
 // ✕ do cabeçalho: em modo de edição volta atrás (o modal por baixo ainda é o
 // assunto); fora dele fecha, como sempre
 function loteHdrClose(){
@@ -10641,7 +10666,7 @@ function stkAddOpen(loteId){
   document.getElementById('stkadd-save').textContent=lote?'Guardar':'Adicionar';
   stkAddRenderOrigem();stkAddRenderReq();
   document.getElementById('stkadd-bg').classList.add('show');
-  document.body.classList.add('no-scroll');
+  lockScroll();
 }
 /* Escolher o pedido preenche o resto tal como ele está na lista: artigo, a
    quantidade que falta (com a unidade em que foi pedida) e a embalagem. Tudo
@@ -10681,7 +10706,7 @@ function stkAddRenderReq(){
 function stkAddClose(voltar){
   const lote=stkAdd&&stkAdd.edit;
   document.getElementById('stkadd-bg').classList.remove('show');
-  document.body.classList.remove('no-scroll');
+  unlockScroll();
   stkAdd=null;
   if(voltar===true&&lote&&lote._id!=null)openLoteModal(lote._id);
 }
@@ -11206,7 +11231,7 @@ function openGuestModal(){
   const preRef=refs.includes(pre.ref)?pre.ref:refs[0];
   let html=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
     <h3 style="margin-bottom:0">Adicionar Convidado</h3>
-    <button onclick="this.closest('.modal-bg').classList.remove('show');document.body.classList.remove('no-scroll')" style="background:var(--panel2);border:1px solid var(--line);color:var(--muted);border-radius:9px;width:32px;height:32px;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0">✕</button>
+    <button onclick="this.closest('.modal-bg').classList.remove('show');unlockScroll()" style="background:var(--panel2);border:1px solid var(--line);color:var(--muted);border-radius:9px;width:32px;height:32px;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0">✕</button>
   </div>
   <label>Nome do convidado</label>
   <input type="text" id="guest-nome" placeholder="Nome">
@@ -11242,13 +11267,13 @@ function openGuestModal(){
     bg=document.createElement('div');bg.id='guest-modal-bg';bg.className='modal-bg';
     bg.innerHTML='<div class="modal" id="guest-modal-inner"></div>';
     document.body.appendChild(bg);
-    bg.addEventListener('click',e=>{if(e.target===bg){bg.classList.remove('show');document.body.classList.remove('no-scroll');}});
+    bg.addEventListener('click',e=>{if(e.target===bg){bg.classList.remove('show');unlockScroll();}});
   }
   document.getElementById('guest-modal-inner').innerHTML=html;
   delete _guestSemPagar['guest'];   // modal novo: sem memória do anterior
   guestACSync('guest');             // texto de ajuda + "Pagante?" no estado certo
   bg.classList.add('show');
-  document.body.classList.add('no-scroll');
+  lockScroll();
 }
 
 /* Convidado-criança não paga: esconde o "Pagante?" e força a oferta.
@@ -11367,7 +11392,7 @@ async function saveGuest(){
     syncMirror();
     marcaGuardado();
     const bg=document.getElementById('guest-modal-bg');
-    if(bg){bg.classList.remove('show');document.body.classList.remove('no-scroll');}
+    if(bg){bg.classList.remove('show');unlockScroll();}
     CALC=calcular(JSON.parse(JSON.stringify(DATA)));
     renderAll();
     toast('Convidado adicionado ✓','ok');
@@ -11414,7 +11439,7 @@ function editGuest(idx){
   const dataDia=diaExtenso((rd&&rd.data)||g.data)||g.dia;
   const html=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
     <h3 style="margin-bottom:0">Editar Convidado</h3>
-    <button onclick="this.closest('.modal-bg').classList.remove('show');document.body.classList.remove('no-scroll')" style="background:var(--panel2);border:1px solid var(--line);color:var(--muted);border-radius:9px;width:32px;height:32px;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0">✕</button>
+    <button onclick="this.closest('.modal-bg').classList.remove('show');unlockScroll()" style="background:var(--panel2);border:1px solid var(--line);color:var(--muted);border-radius:9px;width:32px;height:32px;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0">✕</button>
   </div>
   <div class="sf" style="font-size:11px;color:var(--faint);margin:-4px 0 12px">${dataDia} · ${g.ref} — convidado por ${g.membro}</div>
   <label>Nome do convidado</label>
@@ -11440,13 +11465,13 @@ function editGuest(idx){
     bg=document.createElement('div');bg.id='guest-modal-bg';bg.className='modal-bg';
     bg.innerHTML='<div class="modal" id="guest-modal-inner"></div>';
     document.body.appendChild(bg);
-    bg.addEventListener('click',e=>{if(e.target===bg){bg.classList.remove('show');document.body.classList.remove('no-scroll');}});
+    bg.addEventListener('click',e=>{if(e.target===bg){bg.classList.remove('show');unlockScroll();}});
   }
   document.getElementById('guest-modal-inner').innerHTML=html;
   delete _guestSemPagar['guest-edit'];   // não pisar o "Pagante?" gravado
   guestACSync('guest-edit');             // texto de ajuda já com a composição atual
   bg.classList.add('show');
-  document.body.classList.add('no-scroll');
+  lockScroll();
 }
 
 async function saveGuestEdit(idx){
@@ -11467,7 +11492,7 @@ async function saveGuestEdit(idx){
   const bg=document.getElementById('guest-modal-bg');
   const igualAC=!ac||(ac.adultos===gAdultos(g)&&ac.criancas===gCriancas(g));
   if(nome===g.nome&&pagante===g.pagante&&crianca===!!g.crianca&&igualAC){
-    if(bg){bg.classList.remove('show');document.body.classList.remove('no-scroll');}
+    if(bg){bg.classList.remove('show');unlockScroll();}
     return;
   }
   if(!g._id){toast('Sem ligação à base de dados — recarrega a página','bad');return;}
@@ -11484,7 +11509,7 @@ async function saveGuestEdit(idx){
     if(ac){g.adultos=ac.adultos;g.criancas=ac.criancas;}
     syncMirror();
     marcaGuardado();
-    if(bg){bg.classList.remove('show');document.body.classList.remove('no-scroll');}
+    if(bg){bg.classList.remove('show');unlockScroll();}
     CALC=calcular(JSON.parse(JSON.stringify(DATA)));
     renderAll();
     toast('Convidado atualizado ✓','ok');
@@ -11740,12 +11765,12 @@ function openRefdefModal(editIdx){
   if(save)save.style.display=ro?'none':'';
   applyRoFields(document.getElementById('refdef-modal'),ro);
   document.getElementById('refdef-bg').classList.add('show');
-  document.body.classList.add('no-scroll');
+  lockScroll();
 }
 
 function closeRefdefModal(){
   document.getElementById('refdef-bg').classList.remove('show');
-  document.body.classList.remove('no-scroll');
+  unlockScroll();
   editingRefdef=null;
 }
 
@@ -12041,11 +12066,11 @@ function openSwapModal(idx){
   renderSwapList();
   renderSwapPreview();
   document.getElementById('swap-bg').classList.add('show');
-  document.body.classList.add('no-scroll');
+  lockScroll();
 }
 function closeSwapModal(){
   document.getElementById('swap-bg').classList.remove('show');
-  document.body.classList.remove('no-scroll');
+  unlockScroll();
   swapFrom=null;swapTo=null;
 }
 // Abre a troca a partir do detalhe da refeição (fecha-o primeiro — só um modal
@@ -12212,11 +12237,11 @@ function cartazHtml(){
 function openCartaz(){
   document.getElementById('cartaz-body').innerHTML=cartazHtml();
   document.getElementById('cartaz-bg').classList.add('show');
-  document.body.classList.add('no-scroll');
+  lockScroll();
 }
 function closeCartaz(){
   document.getElementById('cartaz-bg').classList.remove('show');
-  document.body.classList.remove('no-scroll');
+  unlockScroll();
 }
 
 /* ── Cartaz em imagem ──────────────────────────────────────────────────────
@@ -13007,12 +13032,12 @@ function openTshirtModal(id){
   document.getElementById('ts-imput-wrap').style.display=(isAdmin()&&TS_IMPUT_COL)?'':'none';
   tsRenderImput();
   document.getElementById('ts-bg').classList.add('show');
-  document.body.classList.add('no-scroll');
+  lockScroll();
   if(!it)setTimeout(()=>document.getElementById('ts-nome').focus(),60);
 }
 function closeTshirtModal(){
   document.getElementById('ts-bg').classList.remove('show');
-  document.body.classList.remove('no-scroll');
+  unlockScroll();
   _tsEdit=null;
 }
 function tsPickTipo(t){
@@ -13309,11 +13334,11 @@ ${TSHIRTS_TABLE?`
   }
   document.getElementById('report-inner').innerHTML=html;
   bg.classList.add('show');
-  document.body.classList.add('no-scroll');
+  lockScroll();
 }
 function closeReports(){
   const bg=document.getElementById('report-bg');
-  if(bg){bg.classList.remove('show');document.body.classList.remove('no-scroll');}
+  if(bg){bg.classList.remove('show');unlockScroll();}
 }
 
 function fmtPdfDate(ds){
@@ -13523,11 +13548,11 @@ function shopPdfOpen(doEcra){
     bg.addEventListener('click',e=>{if(e.target===bg)shopPdfClose();});
   }
   shopPdfRender();
-  bg.classList.add('show');document.body.classList.add('no-scroll');
+  bg.classList.add('show');lockScroll();
 }
 function shopPdfClose(){
   const bg=document.getElementById('slpdf-bg');
-  if(bg){bg.classList.remove('show');document.body.classList.remove('no-scroll');}
+  if(bg){bg.classList.remove('show');unlockScroll();}
 }
 function shopPdfSetQuem(q){
   _slPdfQuem=q;

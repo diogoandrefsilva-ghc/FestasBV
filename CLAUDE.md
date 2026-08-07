@@ -243,6 +243,12 @@ Uma despesa de `tipo='T-shirts'` paga por alguém, mais **três preços — Home
 - Mudança **só visual** → `style.css`. Mudança de **lógica/dados** → `app.js`. Para localizar um botão/campo: procura o `id` no `index.html` e salta para o handler no `app.js`.
 - Faz **edições cirúrgicas** (diffs pequenos). **Nunca reescrevas o ficheiro inteiro.**
 
+## Abrir um modal não pode perder o sítio da lista (`lockScroll`/`unlockScroll`)
+O `.no-scroll` do body é `position:fixed` — e isso faz o browser **esquecer onde a página ia**: entrava-se num movimento a meio dos Flows e, ao voltar atrás, a lista estava no topo. Percebia-se pior nas listas longas (Flows, Compras, Stock), que são precisamente as que se percorrem.
+- **Trava-se e destrava-se num sítio só**: `lockScroll()` guarda o `scrollY` no `top` do body (`-scrollY`, é o que mantém a página quieta em vez de saltar) e `unlockScroll()` repõe-no. **Não voltes a escrever `document.body.classList.add('no-scroll')` à mão** num modal novo — sem o `top` o salto volta, e só nesse modal, que é o pior sítio para se dar por ele.
+- **Travar duas vezes não grava nada**: com o body já fixo o `window.scrollY` é 0, e um modal aberto por cima de outro apagaria a posição a sério. Destravar sem estar travado também não faz nada — é o que deixa os `close*` serem chamados à toa, como sempre foram.
+- Um modal que abre outro fecha o primeiro (repõe o scroll) e o segundo volta a travar no mesmo sítio: é tudo síncrono, não há pintura pelo meio nem salto à vista.
+
 ## Regras técnicas (não partir a app)
 - `app.js` carrega como `<script src>` **normal, NÃO module** — há `onclick="…"` no HTML, logo as funções têm de ser **globais**. Não converter para módulo.
 - **PWA/cache:** se mexeres em `app.js`, `style.css` ou `index.html`, **sobe `CACHE_NAME` no `sw.js`** (ex.: `app-cache-v3` → `v4`). Estes três já são *network-first* (atualizam sozinhos), mas o bump garante que ninguém fica com versão velha.
