@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v253 · 2026-08-07 · Aviso de compra descasada só quando ela JÁ abre descasada (editar valores deixou de o disparar) + confirmação a guardar';
+const APP_BUILD = 'v254 · 2026-08-07 · Stock: cobertura por quantidade (quanto de cada pedido é que este artigo cobre, já preenchido pela app) + modal do artigo sem os textos de apoio';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -6615,18 +6615,65 @@ function shopItemCoverage(it){
   const aloc=mealStockAllocFor(it.artigo,q.u,it.tipo,it.dataValor);
   return {need,aloc,falta:Math.max(0,rnd(need-aloc,3)),u:q.u};
 }
-/* Cobertura DITA À MÃO (db/cobertura.sql). Devolve:
-     ''      nada dito → vale o que a app deduz do stock
-     'ok'    coberto, ponto final
-     texto   o que ainda falta, como a pessoa escreveu ("1 kg")
+/* Cobertura DITA À MÃO (db/cobertura.sql) — o que está GRAVADO, já interpretado:
+     {modo:'auto'}     nada dito → vale o que a app deduz do stock
+     {modo:'num',n}    cobre n, NA UNIDADE DO PEDIDO ("cobre:0,5")
+     {modo:'ok'}       trata tudo
+     {modo:'txt',txt}  formato ANTIGO: o que FALTA, escrito à mão ("1 kg")
    Existe porque a dedução automática só funciona com unidades comparáveis: um
    pedido de "2 embalagens" e um lote de "5 kg" não se somam, e adivinhar a
    conversão seria pior do que não saber — daria a lista por tratada e a cozinha
-   sem batatas. Quem sabe é quem lá esteve; isto é onde o diz. */
-function shopCobDecl(it){
-  if(!COB_COL||!it)return '';
+   sem batatas. Quem sabe é quem lá esteve; isto é onde o diz.
+   O `cobre:` à frente do número NÃO é enfeite: sem ele, um "1" gravado à moda
+   antiga (= falta 1) passava a ler-se ao contrário (= cobre 1). É o que permite
+   mudar o vocabulário da coluna sem migração e sem reler mal o que lá está. */
+function shopCobInfo(it){
+  if(!COB_COL||!it)return {modo:'auto'};
   const v=String(it.cobertura||'').trim();
-  return v.toLowerCase()==='ok'?'ok':v;
+  if(!v)return {modo:'auto'};
+  if(v.toLowerCase()==='ok')return {modo:'ok'};
+  const m=v.match(/^cobre:\s*([\d.,]+)$/i);
+  if(m){const n=parseFloat(m[1].replace(',','.'));if(isFinite(n))return {modo:'num',n:Math.max(0,n)};}
+  return {modo:'txt',txt:v};
+}
+/* A MESMA declaração no vocabulário antigo — "o que ainda falta" —, que é o que
+   o resto da app lê ('' = a app decide · 'ok' = tratado · texto = falta isto).
+   Um "cobre 0,5" num pedido de 1 kg sai daqui como "0,5 kg"; cobrindo tudo, sai
+   'ok'. Assim a coluna interpreta-se num sítio só e a lista, as dicas de stock
+   e a folha PDF não precisam de saber que o formato mudou. */
+function shopCobDecl(it){
+  const info=shopCobInfo(it);
+  if(info.modo==='auto')return '';
+  if(info.modo==='ok')return 'ok';
+  if(info.modo==='txt')return info.txt;
+  const q=qtyParse(it.quantidade);
+  if(!q)return info.n>0.0005?'ok':'';   // pedido sem número: cobre / não cobre
+  const falta=rnd(q.n-info.n,3);
+  return falta<=0.0005?'ok':fmtQty(falta,q.u);
+}
+/* O que a APP deduz que este pedido tem coberto, na unidade dele — é este o
+   número que o bloco do stock mostra já preenchido, para não se ter de escrever
+   nada no caso normal. Devolve null quando não há conta a fazer (pedido sem
+   quantidade, ou unidades que não se comparam).
+   A cobertura é da REFEIÇÃO, não do pedido (o stock alocado é uma bolsa só),
+   por isso reparte-se pelos pedidos daquele artigo naquela refeição por ordem:
+   senão dois pedidos de 1 kg com 1 kg alocado apareciam ambos a "cobre 1". */
+function shopCobAuto(it){
+  const c=shopItemCoverage(it);
+  const q=qtyParse(it.quantidade);
+  if(!c||!q)return null;
+  const temLote=stockArr().some(l=>stockBacked(l)&&shopSameArtigo(loteReqArtigo(l),it.artigo));
+  const irm=shopArr().filter(x=>!shopIsRemoved(x)&&x.tipo===it.tipo&&x.dataValor===it.dataValor
+      &&shopSameArtigo(x.artigo,it.artigo)&&!(shopIsBought(x)&&!temLote))
+    .filter(x=>{const xq=qtyParse(x.quantidade);return xq&&sameUnit(xq.u,q.u);})
+    .sort((a,b)=>(a._id||0)-(b._id||0));
+  let resta=c.aloc;
+  for(const x of irm){
+    const n=Math.min(resta,qtyParse(x.quantidade).n);
+    if(x._id===it._id)return rnd(Math.max(0,n),3);
+    resta=rnd(resta-n,3);
+  }
+  return rnd(Math.min(c.aloc,q.n),3);
 }
 /* Stock livre deste artigo em unidades DIFERENTES da do pedido — para dizer
    "há 5 kg por alocar" a quem pediu "2 embalagens", em vez de silêncio. */
@@ -8085,9 +8132,10 @@ function shopCobFill(it){
   const dec=it?shopCobDecl(it):'';
   wrap.style.display=dec?'':'none';
   if(!dec)return;
-  wrap.innerHTML=dec==='ok'
-    ?'✅ <b>Tratado</b> — dito a partir do stock. Fica riscado na lista da refeição.<br><span class="cob-ro-sub">Para desfazer: 🧺 Stock › este artigo › "que pedidos é que isto trata?".</span>'
-    :`⚠️ <b>Falta ${escHtml(dec)}</b> — dito a partir do stock. Continua por comprar.<br><span class="cob-ro-sub">Para mudar: 🧺 Stock › este artigo › "que pedidos é que isto trata?".</span>`;
+  wrap.innerHTML=(dec==='ok'
+    ?'✅ <b>Tratado pelo stock</b>'
+    :`⚠️ <b>Falta ${escHtml(dec)}</b> — o stock cobre o resto`)
+    +'<br><span class="cob-ro-sub">Muda-se em 🧺 Stock › este artigo.</span>';
 }
 
 async function saveShopItem(){
@@ -10655,16 +10703,14 @@ function loteConsFill(){
       <button type="button" class="lce-opt${acabou?'':' on'}" ${podeEscrever?'':'disabled'} onclick="loteConsDesp(false)">🫙 ainda há</button>
       <button type="button" class="lce-opt fim${acabou?' on':''}" ${podeEscrever?'':'disabled'} onclick="loteConsDesp(true)">🚫 acabou</button>
     </div>
-    <div class="note" style="margin-top:6px">Uma embalagem serve o evento todo — alocá-la a uma refeição não a gasta. Por isso aqui não se contam quantidades: ou ainda há, ou acabou.</div>`;
+    <div class="note" style="margin-top:6px">Não se contam quantidades: ou ainda há, ou acabou.</div>`;
   }else{
-    h+=`<div class="lote-cons-num">Gasto: <b>${escHtml(fmtQty(c.cons,u))}</b> · Por gastar: <b>${escHtml(fmtQty(c.resta,u))}</b></div>`;
-    h+=`<div class="note" style="margin-top:2px">${c.manual
-      ?'Dito à mão — a app deixou de o deduzir das refeições.'
-      :'Contado sozinho: o que está alocado a refeições cujo dia já passou.'}</div>`;
-    /* O depósito é o caso que nem a alocação nem a data conseguem esclarecer:
-       100 cervejas em "Bebidas" podem estar todas na garagem ou já bebidas, e
-       a app não tem por onde saber. Daí a nota — e as duas saídas. */
-    if(c.pool&&!c.manual)h+=`<div class="note lote-cons-pool">🍻 Há stock parado numa bolsa comum (Bebidas/Gerais), que não tem dia para passar. Ou o vais dando às refeições com o ⇄ da linha, ou dizes aqui quanto já se gastou.</div>`;
+    /* Nem "contado sozinho" nem a nota do depósito: o automático é o normal e
+       não se anuncia, e o stock parado numa bolsa comum já se vê na alocação,
+       logo acima — dizê-lo aqui era encher o modal a repetir o que está à
+       vista. Só o que FOGE ao normal leva marca, e é uma marca, não um
+       parágrafo: o consumo dito à mão, que é o que explica o ↺ ao lado. */
+    h+=`<div class="lote-cons-num">Gasto: <b>${escHtml(fmtQty(c.cons,u))}</b> · Por gastar: <b>${escHtml(fmtQty(c.resta,u))}</b>${c.manual?' <i class="lcn-man">dito à mão</i>':''}</div>`;
     if(podeEscrever)h+=`<div class="lote-cons-acts">
       <span class="lca-lbl">Já se gastou</span>
       <div class="lote-qty-w${uLbl?'':' nou'}"><input type="number" step="any" min="0" inputmode="decimal" id="lote-cons-in" value="${c.cons||''}" placeholder="0">${uLbl?`<i>${escHtml(uLbl)}</i>`:''}</div>
@@ -10803,10 +10849,10 @@ function loteCobFill(){
      de" — só que oferecida onde a pergunta nasce. */
   const nomes=(podeMexer&&!its.length)?loteCobNomesLista():[];
   wrap.style.display=(its.length||nomes.length)?'':'none';
+  const nota=document.getElementById('lote-cob-nota');
   if(!its.length){
     if(!nomes.length)return;
-    const nota=document.getElementById('lote-cob-nota');
-    if(nota)nota.innerHTML=`Nenhum pedido da lista se chama <b>${escHtml(editingLote.product||editingLote.reqName)}</b>. Se este artigo responde a algum, diz qual — e a partir daí podes dá-lo por tratado.`;
+    if(nota){nota.innerHTML=`Nenhum pedido se chama <b>${escHtml(editingLote.product||editingLote.reqName)}</b>.`;nota.style.display='';}
     document.getElementById('lote-cob-list').innerHTML=
       `<div class="lote-cob-it"><div class="lote-req-inline">🔗 responde ao pedido de
         <select onchange="loteReqChanged(this.value)">
@@ -10815,35 +10861,89 @@ function loteCobFill(){
         </select></div></div>`;
     return;
   }
-  const nota=document.getElementById('lote-cob-nota');
-  if(nota)nota.innerHTML='A app já dá por tratado o que consegue comparar. Marca aqui o que ela não consegue — <b>"2 embalagens" e "5 kg" não se somam</b> — e o pedido fica riscado na lista da refeição.';
+  if(nota){nota.innerHTML='';nota.style.display='none';}
   const cont=document.getElementById('lote-cob-list');
+  /* Uma linha por pedido, com a QUANTIDADE que este stock cobre — já preenchida
+     com o que a app deduziu. É o mesmo gesto para os dois casos que antes eram
+     ecrãs diferentes: pedido de 1 kg com 0,5 kg cá dentro escreve-se "0,5" e
+     fica meio quilo por comprar; cobrindo tudo, o pedido fica riscado na lista.
+     Nada disto se grava sozinho — enquanto ninguém mexer, o número continua a
+     ser o deduzido e acompanha as alocações (tira-se o stock, volta a faltar).
+     Escrito à mão, passa a mandar (shopCobDecl) e o ↺ devolve-o à app. */
   cont.innerHTML=its.map(it=>{
-    const dec=shopCobDecl(it);
-    const falta=dec&&dec!=='ok';
-    const q=shopQtyLabel(it);
+    const info=shopCobInfo(it);
+    const q=qtyParse(it.quantidade);
+    const auto=shopCobAuto(it);
+    // A quantidade só no cabeçalho quando a linha a não repete — o "de 3 kg" ao
+    // lado da caixa já a diz; a etiqueta fica para o que ela não cabe (a
+    // embalagem: "6 × 2,5 kg").
+    const qLblRaw=shopQtyLabel(it);
+    const qLbl=(q&&qLblRaw===fmtQty(q.n,q.u))?'':qLblRaw;
     const onde=shopIsMeal(it.tipo)&&it.dataValor?`${shopTipoIcon(it.tipo)} ${fmtDiaMes(it.dataValor)}`:`${shopTipoIcon(it.tipo)} ${escHtml(it.tipo)}`;
-    // Sem declaração, dizer o que a app deduziu — é o que faz decidir se vale
-    // a pena marcar seja o que for.
-    const auto=shopIsCovered(it)?'a app já o dá por tratado':'a app não o dá por tratado';
+    const rst=info.modo==='auto'?'':`<button type="button" class="lcr-rst" title="Voltar ao que a app deduz" onclick="loteCobSet(${it._id},'')">↺</button>`;
+    let linha;
+    if(q){
+      // Valor a mostrar: o dito à mão, ou — não havendo — o que a app deduziu.
+      const val=info.modo==='num'?info.n
+        :info.modo==='ok'?q.n
+        :info.modo==='txt'?null            // formato antigo: fala em falta, não em cobertura
+        :auto;
+      /* O que sobra lê-se do número que está na caixa — é o que a pessoa tem à
+         frente. Sem número (formato antigo, ou unidades que a app não consegue
+         comparar) não se afirma nada: a caixa fica em branco à espera. */
+      const falta=val==null?null:rnd(q.n-val,3);
+      const est=info.modo==='txt'?`<span class="lcr-falta">falta ${escHtml(info.txt)}</span>`
+        :falta==null?''
+        :falta<=0.0005?'<span class="lcr-ok">trata tudo ✓</span>'
+        :`<span class="lcr-falta">falta ${escHtml(fmtQty(falta,q.u))}</span>`;
+      const uLbl=fmtQty(0,q.u).split(' ')[1]||'';
+      // Um toque para dizer "trata tudo" — sem ele, cobrir o pedido inteiro
+      // obrigava a escrever à mão o número que já está escrito ao lado.
+      const tudo=(falta==null||falta>0.0005)
+        ?`<button type="button" class="lcr-tudo" title="Cobre o pedido todo" onclick="loteCobSet(${it._id},'cobre:${rnd(q.n,3)}')">✓</button>`:'';
+      linha=`<div class="lote-cob-row">
+        <span class="lcr-lbl">cobre</span>
+        <div class="lote-qty-w${uLbl?'':' nou'}"><input type="number" step="any" min="0" inputmode="decimal" value="${val==null?'':val}" placeholder="0" onchange="loteCobNum(${it._id},this.value)">${uLbl?`<i>${escHtml(uLbl)}</i>`:''}</div>
+        <span class="lcr-de">de ${escHtml(fmtQty(q.n,q.u))}</span>${est}${tudo}${rst}
+      </div>`;
+    }else{
+      /* Pedido sem quantidade (louro, sal): não há número para repartir — a
+         pergunta é só se este stock o trata. O chip diz o que está DITO; se a
+         app já o dava por tratado, a nota ao lado evita a leitura de que só
+         fica tratado depois de se lhe tocar. */
+      const on=info.modo==='ok';
+      const der=info.modo==='auto'&&shopIsCovered(it);
+      linha=`<div class="lote-cob-row">
+        <button type="button" class="sd-chip${on?' on':''}" onclick="loteCobSet(${it._id},'${on?'':'ok'}')">trata ✓</button>
+        ${der?'<span class="lcr-ok">a app já o dá por tratado</span>':''}${rst}
+      </div>`;
+    }
     return `<div class="lote-cob-it">
-      <div class="lote-cob-hd"><b>${escHtml(it.artigo)}</b>${q?` <i>(${escHtml(q)})</i>`:''} <span class="cmp-badge">${onde}</span>${dec?'':`<i class="lote-cob-auto">${escHtml(auto)}</i>`}</div>
-      <div class="cmp-sort" style="margin:6px 0 0">
-        <span class="sd-chip${dec?'':' on'}" onclick="loteCobSet(${it._id},'')">a app decide</span>
-        <span class="sd-chip${dec==='ok'?' on':''}" onclick="loteCobSet(${it._id},'ok')">trata ✓</span>
-        <span class="sd-chip${falta?' on':''}" onclick="loteCobSet(${it._id},'falta')">falta…</span>
-      </div>
-      ${falta?`<input type="text" class="lote-cob-txt" maxlength="30" value="${escHtml(dec)}" placeholder="Quanto falta? Ex: 1 kg" onchange="loteCobSet(${it._id},this.value)">`:''}
+      <div class="lote-cob-hd"><b>${escHtml(it.artigo)}</b>${qLbl?` <i>(${escHtml(qLbl)})</i>`:''} <span class="cmp-badge">${onde}</span></div>
+      ${linha}
     </div>`;
   }).join('');
+}
+/* Quanto deste pedido é que o stock cobre, escrito à mão. Grava-se como
+   "cobre:<n>" — na unidade do PEDIDO, que é a única em que a frase faz sentido
+   ("do 1 kg pedido, isto cobre 0,5"). Igualar ao pedido é o mesmo que dizer
+   "trata tudo"; apagar o campo devolve a decisão à app. */
+function loteCobNum(id,v){
+  const it=shopArr().find(x=>x._id===id);if(!it)return;
+  const s=String(v==null?'':v).trim();
+  if(!s)return loteCobSet(id,'');
+  const q=qtyParse(it.quantidade);
+  let n=parseFloat(s.replace(',','.'));
+  if(!isFinite(n)||n<0)n=0;
+  if(q&&n-q.n>0.0005)n=q.n;   // não se cobre mais do que o que foi pedido
+  return loteCobSet(id,'cobre:'+rnd(n,3));
 }
 /* Grava já — este bloco não faz parte do "Guardar" do modal (que é das
    alocações): são pedidos da lista, cada um a sua linha, e ficam gravados
    à medida que se marcam. */
 async function loteCobSet(id,v){
   const it=shopArr().find(x=>x._id===id);if(!it)return;
-  const val=v==='falta'?(shopCobDecl(it)&&shopCobDecl(it)!=='ok'?shopCobDecl(it):' '):v;
-  const txt=String(val||'').trim();
+  const txt=String(v||'').trim();
   const antes=it.cobertura||'';
   it.cobertura=txt;   // otimista: o ecrã responde já
   loteCobFill();
