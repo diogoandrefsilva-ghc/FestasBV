@@ -3653,6 +3653,11 @@ function openCfDetail(source,idx){
     const d=DATA.despesas[idx];
     if(d&&d.compraId){openCompra(d.compraId);return;}
   }
+  // HTML velho ainda em cache: o app.js e o index.html são os dois network-first,
+  // mas são dois pedidos — quem apanhe o deploy a meio fica com o novo app.js e o
+  // index.html de antes, e sem a ficha no DOM o modal abria VAZIO. Volta ao
+  // editor de sempre, que é o que esse HTML sabe mostrar.
+  if(!document.getElementById('cf-view')){cfEditorDireto(source,idx);return;}
   editingCf=null;
   cfView={source,idx,editType:''};
   document.getElementById('edit-cf-modal')?.classList.remove('ro-fields');
@@ -3660,6 +3665,19 @@ function openCfDetail(source,idx){
   cfSetMode('view');
   document.getElementById('edit-cf-bg').classList.add('show');
   document.body.classList.add('no-scroll');
+}
+/* Caminho antigo (só para o caso acima): formulário direto, trancado a quem não
+   pode gravar. Não é por aqui que se entra num detalhe — é pelo openCfDetail. */
+function cfEditorDireto(source,idx){
+  editCfEntry(source,idx);
+  const t=editingCf&&editingCf.editType;
+  const btns=document.querySelector('#edit-cf-modal .mbtns');
+  if(btns)btns.style.display=cfPodeEditar(t)?'':'none';
+  if(!cfPodeEditar(t)){
+    const f=document.getElementById('edit-cf-form');
+    f.querySelectorAll('input,select,textarea').forEach(el=>{el.disabled=true;el.style.opacity='.75';});
+    f.querySelectorAll('.sd-chip,.cf-opt,.cfp-toggle,.cfp-btn,.cfp-del').forEach(el=>{el.style.pointerEvents='none';});
+  }
 }
 
 /* Tipo do movimento a partir da origem (a mesma classificação que a lista usa). */
@@ -4001,7 +4019,7 @@ function editCfEntry(source,idx){
       ${(!isAdmin()&&!String(d.obs||'').trim())?''   /* consulta: caixa vazia que não se pode preencher não acrescenta nada */
         :`<label>Observações</label>
       <textarea id="ecf-obs" rows="2" placeholder="Detalhe adicional (opcional)">${escHtml(d.obs||'')}</textarea>`}`;
-    // Já — e não no setTimeout: o openCfDetail desativa os campos logo a seguir,
+    // Já — e não no setTimeout: o cfEditorDireto desativa os campos logo a seguir,
     // e o que nascesse depois disso ficava editável em modo consulta.
     if(grupo.length)pagAbrir('ecf',grupo.map(i=>({quem:DATA.despesas[i].quem,valor:DATA.despesas[i].valor})));
     CF_BEB.ecf=!!d.bebida;
