@@ -287,6 +287,17 @@ Uma linha de `convidados` pode valer **várias bocas**: guarda-se o nome de quem
 - O flag `crianca` mantém-se mas é **derivado**: `crianca = (adultos === 0)`. Linha sem adultos → sem "Pagante?" (não há nada a pagar).
 - Migração: `db/convidados_acompanhantes.sql`. Tolerante: sem ela, `CONV_AC_COLS=false`, os campos ficam escondidos e cada convidado vale 1 pessoa.
 
+## Convidado que SÓ BEBE (🍺) — e não paga o que o membro paga
+Um membro já podia vir só ao copo (`modo:'bebe'` nas presenças). Um convidado não: ou comia, ou não existia. Passa a existir o mesmo eixo na linha do convidado (`convidados.modo`), e com ele a pergunta que estava por responder — **quanto custa o copo a quem não é do grupo**.
+- **`Qbebe` NÃO é `Pbebe`, e é esse o ponto.** O membro que só bebe paga o **custo** (bebida + indiretos da refeição, sem mínimo). O convidado paga esse custo **arredondado para cima, mais um extra, nunca abaixo de um mínimo** — exatamente a forma da quota do convidado que come (`minConv`/`extraConv`), com parâmetros **próprios por refeição** (`min_conv_bebe`/`extra_conv_bebe`, em Refeições › toca na refeição). Cobrar-lhe o `Pbebe` era não ter feito nada: o preço tem de poder ser outro.
+- **`gModo(g)`/`gSoBebe(g)` são a leitura; `gComem`/`gBebem`/`gSomaAdultosCome`/`gSomaAdultosBebe` são as contagens.** Nunca somes `gSomaAdultos` sobre a lista toda outra vez — era assim que o convidado do copo entrava na conta das bocas.
+- **Quem só bebe NÃO é boca na cozinha**: sai do `totalComeRefeicao`, do total da grelha de presenças, da linha "Convidados" do rodapé (que é a dos que comem) e do painel "Quem vai?" — tal como o membro que só bebe, que também não aparece em nenhum deles. Aparece na secção **"Só bebem"** do rodapé, em linha própria, e no cartão da refeição numa célula própria (`Convidado 🍻`) com a `Qbebe` ao lado.
+- **Entra no denominador da bebida e dos indiretos** (`Nbebe` passa a contar `EcBebe`), como o membro que só bebe: ele bebe, logo divide. O `Ec`/`E` continua a ser só quem come — o `D` do cartão e os custos diretos não se mexem.
+- **Uma criança ou come ou não conta — não há "só bebe"** (é a mesma regra dos filhos, cuja presença nem tem coluna `modo`). Por isso uma linha de bebida é **só de adultos**: o campo "Crianças" desaparece no modal, o `gCriancas` devolve 0 nessas linhas venha o que vier da BD, e a BD tem o CHECK a dizer o mesmo. Se um dia quiseres crianças a beber, é um estado novo — não é este.
+- **O lanche legado não tem "só bebe" nenhum** e por isso a pergunta desaparece lá (`guestModoSel`) e os campos do preço também: naquele ramo do `calcular()` a `Qbebe` é 0, e um convidado de bebida num lanche pagaria zero em silêncio.
+- Nos relatórios e no detalhe do saldo a linha leva 🍺 (`convModoSuf`) e o agregado do grupo separa as duas espécies: sem isso, duas linhas do mesmo convidado à mesma refeição liam-se como um erro de contas — o que as distingue é o preço, e o preço não se explica sozinho.
+- Migração: `db/convidados_bebe.sql`. Tolerante, e com **um flag só para as três colunas** (`CONV_BEBE_COLS`): sem os parâmetros da refeição não há preço a cobrar, e um convidado marcado `bebe` sem preço era dinheiro a desaparecer calado. Sem ela, a opção nem aparece. Os parâmetros nascem a **zero** de propósito — quanto vale o copo é decisão do admin, não defeito da app.
+
 ## T-shirts (separador 👕)
 Levantamento das t-shirts a encomendar **e** a fatura delas, que **entra nas contas** (desde `db/tshirts_cashflow.sql`).
 

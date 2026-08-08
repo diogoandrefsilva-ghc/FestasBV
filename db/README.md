@@ -58,8 +58,14 @@ Numa BD limpa, correr por esta ordem (há dependências entre eles):
     alocação (sal, pimenta, louro). Uma embalagem serve o evento todo, por isso
     neles a derivação do consumo desliga-se e vale um interruptor: ainda há /
     acabou. Marca global por nome normalizado, como as categorias
+18. `convidados_bebe.sql` — `convidados.modo` + `refeicoes_def.min_conv_bebe` /
+    `.extra_conv_bebe`: o convidado que **só vem ao copo**. Não conta como boca
+    na cozinha e paga quota **própria** — o que o membro que só bebe paga,
+    arredondado para cima, mais um extra e nunca abaixo de um mínimo. Depende
+    de `convidados_acompanhantes.sql` (a restrição "linha de bebida é só de
+    adultos" precisa da coluna `criancas`)
 
-Os passos 4–17 são migrações add-on idempotentes: correr uma vez cada. A app é
+Os passos 4–18 são migrações add-on idempotentes: correr uma vez cada. A app é
 tolerante a qualquer uma delas faltar — sonda a coluna/tabela e esconde o que
 ainda não existe. (Há mais add-ons no diretório que nunca entraram nesta lista —
 `cobertura.sql`, `bebida_refeicao.sql`, `stock_artigo_fatura.sql`,

@@ -560,6 +560,20 @@ setTimeout(function(){ if (window.fbvEsconderSplash) window.fbvEsconderSplash();
         <label>Mín. Convidado (€)</label>
         <input type="number" id="rd-minconv" step="0.5" min="0" value="10" placeholder="10" inputmode="decimal">
       </div>
+      <div id="rd-convbebe-wrap" style="grid-column:1/-1;display:none">
+        <label>🍺 Convidado que só bebe</label>
+        <div class="inline-row">
+          <div>
+            <label>Extra (€)</label>
+            <input type="number" id="rd-extraconvbebe" step="0.5" min="0" value="0" placeholder="0" inputmode="decimal">
+          </div>
+          <div>
+            <label>Mínimo (€)</label>
+            <input type="number" id="rd-minconvbebe" step="0.5" min="0" value="0" placeholder="0" inputmode="decimal">
+          </div>
+        </div>
+        <div class="note" style="margin-top:6px">O que um membro que só bebe paga (bebida + indiretos), arredondado para cima, mais o extra — e nunca abaixo do mínimo. É isto que torna o copo do convidado diferente do do membro. A zero, ele paga só o custo arredondado.</div>
+      </div>
     </div>
     <div class="mbtns">
       <button class="btn ghost" onclick="closeRefdefModal()">Cancelar</button>

@@ -451,6 +451,9 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
    mais que uma boca. Fica em tinta neutra para não competir com Oferta/Criança,
    que dizem quem paga o quê. */
 .pres-guest-card .pg-badge.heads{background:var(--panel);border:1px solid var(--line);color:var(--muted)}
+/* "Só bebe": mesma tinta do estado 'bebe' das presenças dos membros — é o
+   mesmo eixo, agora na linha do convidado. */
+.pres-guest-card .pg-badge.bebe{background:rgba(168,123,20,.14);color:var(--gold);display:inline-flex;align-items:center;gap:4px}
 .pres-guest-add{display:flex;align-items:center;gap:6px;padding:10px 16px;border-radius:10px;border:1.5px dashed var(--line);background:transparent;color:var(--barrete);font-size:13px;font-weight:600;cursor:pointer;transition:.15s;width:100%;justify-content:center;margin-top:8px}
 .pres-guest-add:active{background:rgba(30,122,77,.06);transform:scale(.97)}
 
