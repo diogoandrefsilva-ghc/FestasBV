@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v255 · 2026-08-08 · Compras: ligar um artigo a um pedido (🔗) marca-o nos artigos da lista — o pedido fica tratado por esta compra em vez de ficar na lista sem se perceber porquê';
+const APP_BUILD = 'v255 · 2026-08-08 · Compras: um artigo ligado a um pedido (🔗) marca-o nos artigos da lista — inclusive ao reabrir a compra, para o pedido de tipo puro ficar tratado ao gravar';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -8580,10 +8580,13 @@ function openCompra(compraId,opts){
     const mineOwn=pickItems.filter(it=>shopMineOwn(it));
     const anyCart=mineOwn.some(it=>it.noCarrinho);
     const defOn=it=>!o.detalhe&&shopMineOwn(it)&&(!anyCart||it.noCarrinho);
-    const nOn=pickItems.filter(it=>isEdit?it.compraId===compraId:defOn(it)).length;
+    /* Um pedido que um artigo desta compra liga (🔗) nasce marcado, venha a
+       ligação de agora ou da BD — ver compraLoteLiga. */
+    const pickOn=it=>(isEdit?it.compraId===compraId:defOn(it))||compraLoteLiga(it);
+    const nOn=pickItems.filter(pickOn).length;
     let rows='';
     pickItems.slice().sort((a,b)=>a.artigo.localeCompare(b.artigo,'pt')).forEach(it=>{
-      const on=isEdit?it.compraId===compraId:defOn(it);
+      const on=pickOn(it);
       const ql=shopQtyLabel(it);
       rows+=`<label class="cmp-pick-row"><input type="checkbox" class="shop-pick" value="${it._id}" ${on?'checked':''} onchange="compraPickChanged(this)">
         <span>${escHtml(it.artigo)}${ql?' <i>('+escHtml(ql)+')</i>':''}${shopIsRemoved(it)?' ⚠️':''}${shopEncomenda(it)?' <i title="Já encomendado noutra despesa provisória">📌</i>':''}</span>
@@ -8692,10 +8695,10 @@ function compraPickChanged(cb){
    deixava o pedido na lista POR TRATAR, sem nada a dizer porquê: ficava a
    parecer que ligar não servia de nada, e o pedido só se resolvia depois, à
    mão, pela cobertura no separador Stock.
-   Marca os pedidos TODOS daquele artigo (é o que estão no picker, que é a
-   unidade com que a lista trabalha) e deixa-os à vista para se desmarcar o que
-   esta compra não cobre. Desmarcar é que é conservador: só o que foi marcado
-   POR AQUI (`dataset.auto`) e a que já nenhum artigo desta compra liga.
+   Marca os pedidos TODOS daquele artigo (é a unidade com que a lista trabalha)
+   e deixa-os à vista para se desmarcar o que esta compra não cobre. Desmarcar
+   é que é conservador: só o que foi marcado POR AQUI (`dataset.auto`) e a que
+   já nenhum artigo desta compra liga.
    Devolve se alguma caixa mudou. */
 function compraPickAuto(artigo,on){
   if(!artigo)return false;
@@ -8709,12 +8712,27 @@ function compraPickAuto(artigo,on){
   });
   return mudou;
 }
-function compraPickIds(artigo){return new Set(shopArr().filter(x=>shopSameArtigo(x.artigo,artigo)).map(x=>x._id));}
+/* SÓ OS PEDIDOS DE TIPO PURO (Gerais/Bebidas/…). Nas refeições a ligação já tem
+   efeito por si: é o `_listArt` que faz a cobertura casar o pedido genérico com
+   o produto concreto (`loteReqArtigo`), e o pedido fica tratado pela ALOCAÇÃO,
+   continuando vivo na lista — é o modelo "a lista nunca morre". Fechá-lo aqui
+   tirava-o desse modelo e, pior, uma ligação por NOME fecharia de caminho os
+   pedidos do mesmo artigo para os outros jantares. Fora das refeições não há
+   cobertura nenhuma (`shopItemCoverage` devolve `null`): ou o picker o fecha,
+   ou o pedido fica na lista para sempre. */
+function compraPickIds(artigo){return new Set(shopArr().filter(x=>!shopIsMeal(x.tipo)&&shopSameArtigo(x.artigo,artigo)).map(x=>x._id));}
 // Este artigo tem, neste momento, algum pedido marcado no picker? (a nota do 🔗)
 function compraPickTrata(artigo){
   if(!artigo)return false;
   const ids=compraPickIds(artigo);
   return [...document.querySelectorAll('.shop-pick')].some(cb=>cb.checked&&ids.has(+cb.value));
+}
+/* Pedido que um artigo JÁ GRAVADO desta compra liga (🔗). O `compraPickAuto` só
+   apanha o momento em que se faz a ligação; uma compra que reabre traz as
+   ligações da BD e ninguém dispara `onchange` — era por aqui que o pedido
+   continuava por tratar por mais vezes que se gravasse a compra. */
+function compraLoteLiga(it){
+  return !shopIsMeal(it.tipo)&&(compraEdit.lotes||[]).some(l=>l._listArt&&shopSameArtigo(l._listArt,it.artigo));
 }
 /* Linhas de repartição (compra NOVA): geradas dos artigos marcados no picker —
    TODOS eles, um grupo por refeição/tipo, artigos nas observações. Regenera a
