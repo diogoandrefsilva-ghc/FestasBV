@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v254 · 2026-08-07 · Stock: cobertura por quantidade (quanto de cada pedido é que este artigo cobre, já preenchido pela app) + modal do artigo sem os textos de apoio';
+const APP_BUILD = 'v255 · 2026-08-08 · Compras: ligar um artigo a um pedido (🔗) marca-o nos artigos da lista — o pedido fica tratado por esta compra em vez de ficar na lista sem se perceber porquê';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -8585,7 +8585,7 @@ function openCompra(compraId,opts){
     pickItems.slice().sort((a,b)=>a.artigo.localeCompare(b.artigo,'pt')).forEach(it=>{
       const on=isEdit?it.compraId===compraId:defOn(it);
       const ql=shopQtyLabel(it);
-      rows+=`<label class="cmp-pick-row"><input type="checkbox" class="shop-pick" value="${it._id}" ${on?'checked':''} onchange="compraPickChanged()">
+      rows+=`<label class="cmp-pick-row"><input type="checkbox" class="shop-pick" value="${it._id}" ${on?'checked':''} onchange="compraPickChanged(this)">
         <span>${escHtml(it.artigo)}${ql?' <i>('+escHtml(ql)+')</i>':''}${shopIsRemoved(it)?' ⚠️':''}${shopEncomenda(it)?' <i title="Já encomendado noutra despesa provisória">📌</i>':''}</span>
         <span class="cmp-badge">${shopTipoIcon(it.tipo)}${shopIsMeal(it.tipo)&&it.dataValor?' '+fmtDiaMes(it.dataValor):' '+it.tipo}</span></label>`;
     });
@@ -8676,10 +8676,45 @@ function setShopBuyQuando(q){
 // Alterna "preço por artigo" ↔ "só totais": mostra/esconde as secções e refaz
 // as linhas de detalhe (no modo por artigo entram também os artigos de tipo)
 function compraSetMode(det){compraEdit.det=!!det;compraRefreshLotes();compraSeedLines();compraApplyMode();}
-function compraPickChanged(){
+function compraPickChanged(cb){
+  // Marcado à mão deixa de ser marca automática do 🔗 (ver compraPickAuto):
+  // desfazer a ligação não pode soltar um pedido que uma pessoa marcou.
+  if(cb&&cb.dataset)delete cb.dataset.auto;
   const c=document.getElementById('shop-pick-count');
   if(c){const all=[...document.querySelectorAll('.shop-pick')];c.textContent=all.filter(x=>x.checked).length+'/'+all.length;}
   compraRefreshLotes();compraSeedLines();
+}
+/* ── O 🔗 de um artigo MARCA o pedido no picker ──
+   Quem fecha os pedidos da lista é o picker, e só ele: `saveCompra` lê as
+   caixas marcadas, não as ligações dos lotes. Por isso ligar à mão um artigo
+   do talão ao pedido ("Rede Electrossoldada 13x25" → "Grelha para Fogareiro")
+   gravava a ligação no lote — aparecia no detalhe do movimento e no stock — e
+   deixava o pedido na lista POR TRATAR, sem nada a dizer porquê: ficava a
+   parecer que ligar não servia de nada, e o pedido só se resolvia depois, à
+   mão, pela cobertura no separador Stock.
+   Marca os pedidos TODOS daquele artigo (é o que estão no picker, que é a
+   unidade com que a lista trabalha) e deixa-os à vista para se desmarcar o que
+   esta compra não cobre. Desmarcar é que é conservador: só o que foi marcado
+   POR AQUI (`dataset.auto`) e a que já nenhum artigo desta compra liga.
+   Devolve se alguma caixa mudou. */
+function compraPickAuto(artigo,on){
+  if(!artigo)return false;
+  if(!on&&(compraEdit.lotes||[]).some(l=>l._listArt&&shopSameArtigo(l._listArt,artigo)))return false;
+  const ids=compraPickIds(artigo);
+  let mudou=false;
+  document.querySelectorAll('.shop-pick').forEach(cb=>{
+    if(!ids.has(+cb.value)||cb.disabled)return;
+    if(on){if(!cb.checked){cb.checked=true;cb.dataset.auto='1';mudou=true;}}
+    else if(cb.dataset.auto){cb.checked=false;delete cb.dataset.auto;mudou=true;}
+  });
+  return mudou;
+}
+function compraPickIds(artigo){return new Set(shopArr().filter(x=>shopSameArtigo(x.artigo,artigo)).map(x=>x._id));}
+// Este artigo tem, neste momento, algum pedido marcado no picker? (a nota do 🔗)
+function compraPickTrata(artigo){
+  if(!artigo)return false;
+  const ids=compraPickIds(artigo);
+  return [...document.querySelectorAll('.shop-pick')].some(cb=>cb.checked&&ids.has(+cb.value));
 }
 /* Linhas de repartição (compra NOVA): geradas dos artigos marcados no picker —
    TODOS eles, um grupo por refeição/tipo, artigos nas observações. Regenera a
@@ -9057,7 +9092,14 @@ function compraLoteHtml(l,i){
     const opts=`<option value="">— não é da lista —</option>`+
       nomes.map(n=>`<option value="${escHtml(n)}"${shopSameArtigo(n,cur)?' selected':''}>${escHtml(n)}</option>`).join('')+
       (cur&&!known?`<option value="${escHtml(cur)}" selected>${escHtml(cur)}</option>`:'');
-    return `<div class="lote-req-inline">🔗 pertence a <select onchange="compraLoteSetReq(${i},this.value)">${opts}</select></div>`;
+    /* Ligado à mão, diz-se o que a ligação FAZ ao pedido. O picker está
+       recolhido na edição — marcar-lhe a caixa sem se ver nada era o mesmo
+       silêncio que fazia parecer que ligar não servia de nada. Só nos artigos
+       avulsos: nos que nasceram do carrinho o pedido é a origem do cartão e
+       repeti-lo nos 20 artigos de uma compra normal era ruído. */
+    const nota=(l.free&&cur&&compraPickTrata(cur))
+      ?`<div class="lote-hint">🛒 O pedido <b>${escHtml(cur)}</b> fica tratado por esta compra.</div>`:'';
+    return `<div class="lote-req-inline">🔗 pertence a <select onchange="compraLoteSetReq(${i},this.value)">${opts}</select></div>${nota}`;
   })():'';
   const cls='lote-card'+(l._fat==='ok'?' is-ok':l._fat==='miss'?' is-miss':l._fat==='warn'?' is-warn':'');
   return `<div class="${cls}">${head}${fields}${qtyHint}${destBlock}${nsInline}${reqInline}${fat}</div>`;
@@ -9065,15 +9107,20 @@ function compraLoteHtml(l,i){
 function compraLoteSetReq(i,v){
   const l=(compraEdit.lotes||[])[i];if(!l)return;
   const novo=(v||'').trim();
+  const velho=l._listArt||'';
   l._listArt=novo||null;
   /* Desligar um artigo que veio do carrinho é dizer "esta linha do talão não é
      o pedido que a app julgou": passa a artigo avulso — ganha o ✕ e o "só
      despesa", e deixa de contar como stock daquele pedido. */
   if(!novo&&!l.free)l.free=true;
+  // A ligação marca o pedido no picker — é ele que o fecha (ver compraPickAuto)
+  let mudou=false;
+  if(velho&&!shopSameArtigo(velho,novo))mudou=compraPickAuto(velho,false);
+  if(novo&&compraPickAuto(novo,true))mudou=true;
   /* Redesenha sempre: a ligação não muda só este cartão. É ela que tira ao
      PEDIDO do outro lado o ⚠ "não encontrado" e o aviso do topo — deixá-la sem
      efeito visível era o que fazia parecer que ligar não servia de nada. */
-  compraRenderLotes();
+  if(mudou)compraPickChanged();else compraRenderLotes();
 }
 // Trazer para a compra um pedido que a fatura não cobriu (a leitura falhou, ou
 // comprou-se sem estar no talão): volta a ser um cartão, para levar preço.
