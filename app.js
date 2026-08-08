@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v255 · 2026-08-08 · Compras: um artigo ligado a um pedido (🔗) marca-o nos artigos da lista — inclusive ao reabrir a compra, para o pedido de tipo puro ficar tratado ao gravar';
+const APP_BUILD = 'v256 · 2026-08-08 · Compras: a ordenação 📅 Refeição segue os DIAS — Gerais/Bebidas à cabeça e depois as refeições por data do evento, em vez de juntar os almoços todos antes dos jantares';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -6059,6 +6059,19 @@ function shopMineActive(it){return shopMine(it)&&!shopIsBought(it);}
 function shopTipoIcon(t){return{Gerais:'🧾',Bebidas:'🥤',Almoço:'☀️',Jantar:'🌙',Renda:'🏠',Cerveja:'🍺'}[t]||'🛒';}
 function shopIsMeal(t){return t==='Almoço'||t==='Jantar';}
 function shopGroupKey(it){return it.tipo+'|'+(it.dataValor||'');}
+/* Ordem "por refeição" (ecrã e folha PDF): os TIPOS PUROS — a bolsa comum,
+   Gerais e Bebidas — à cabeça, e depois as refeições pela DATA do evento, não
+   pelo tipo. Agrupar Almoço com Almoço punha o jantar de 8/ago depois do almoço
+   de 10/ago, quando quem lê a lista segue os dias: é dia a dia que se cozinha e
+   se vai às compras. Dentro do mesmo dia manda a ordem dos tipos (almoço antes
+   do jantar). Sem data-valor não há sítio na sequência dos dias — fica com os
+   puros, ordenado por tipo, como sempre esteve. */
+const SHOP_TIPO_ORD={};SHOP_TIPOS.forEach((t,i)=>SHOP_TIPO_ORD[t]=i);
+function shopTipoOrd(t){return SHOP_TIPO_ORD[t]!=null?SHOP_TIPO_ORD[t]:99;}
+function shopRefCmp(a,b){
+  const da=a.dataValor||'',db=b.dataValor||'';
+  return ((da?1:0)-(db?1:0))||da.localeCompare(db)||(shopTipoOrd(a.tipo)-shopTipoOrd(b.tipo));
+}
 function shopGroupLabel(tipo,dataValor){
   if(shopIsMeal(tipo)&&dataValor){
     const rd=(DATA.refeicoesDef||[]).find(r=>r.ref===tipo&&r.data===dataValor);
@@ -7498,7 +7511,6 @@ function renderCompras(){
   const act=items.filter(it=>!shopIsBought(it));          // tudo o que não está comprado (pedidos de stock são pendentes por design)
   const canW=shopCanWrite();
   const fechadas=contasFechadas();
-  const ord={};SHOP_TIPOS.forEach((t,i)=>ord[t]=i);
   // A ordenação por loja só existe quando há lojas indicadas (senão era um chip
   // que dava sempre um grupo só). Se estava escolhida e as lojas desapareceram,
   // cai para o defeito sem obrigar o utilizador a mexer.
@@ -7512,13 +7524,16 @@ function renderCompras(){
     const ca=artCat(a.artigo),cb=artCat(b.artigo);
     return ((ca?0:1)-(cb?0:1))||(ca&&cb?ca.nome.localeCompare(cb.nome,'pt'):0);
   };
+  // O desempate por destino é sempre o `shopRefCmp` (puros à cabeça, depois por
+  // data): nas vistas que juntam o mesmo artigo ele ordena as sub-linhas e os
+  // chips de destino do cabeçalho, que também se leem por ordem de dias.
   const sortF=byLoja
-    ?(a,b)=>shopLojaCmp(a,b)||a.artigo.localeCompare(b.artigo,'pt')||(ord[a.tipo]-ord[b.tipo])||((a.dataValor||'').localeCompare(b.dataValor||''))
+    ?(a,b)=>shopLojaCmp(a,b)||a.artigo.localeCompare(b.artigo,'pt')||shopRefCmp(a,b)
     :byCat
-    ?(a,b)=>catCmp(a,b)||a.artigo.localeCompare(b.artigo,'pt')||(ord[a.tipo]-ord[b.tipo])||((a.dataValor||'').localeCompare(b.dataValor||''))
+    ?(a,b)=>catCmp(a,b)||a.artigo.localeCompare(b.artigo,'pt')||shopRefCmp(a,b)
     :byArt
-    ?(a,b)=>a.artigo.localeCompare(b.artigo,'pt')||(ord[a.tipo]-ord[b.tipo])||((a.dataValor||'').localeCompare(b.dataValor||''))
-    :(a,b)=>(ord[a.tipo]-ord[b.tipo])||((a.dataValor||'').localeCompare(b.dataValor||''))||a.artigo.localeCompare(b.artigo,'pt');
+    ?(a,b)=>a.artigo.localeCompare(b.artigo,'pt')||shopRefCmp(a,b)
+    :(a,b)=>shopRefCmp(a,b)||a.artigo.localeCompare(b.artigo,'pt');
   // Por artigo: lista plana com o badge da refeição em cada cartão
   const listOf=(arr,mineView)=>byLoja?shopLojaGroupedList(arr,mineView)
     :byCat?shopCatGroupedList(arr,mineView)
@@ -14466,7 +14481,6 @@ function buildShopReport(sel){
   });
 
   // Categoria manda na folha; os chips só decidem quando não há categorias.
-  const ord={};SHOP_TIPOS.forEach((t,i)=>ord[t]=i);
   const byCat=CATS_TABLE;
   const byArt=!byCat&&SHOP_ORDER==='art';
   const byLoja=!byCat&&SHOP_ORDER==='loja'&&shopHasLojas(comprar);
@@ -14610,7 +14624,7 @@ function buildShopReport(sel){
     }else{
       const gs={},order=[];
       comprar.forEach(it=>{const k=shopGroupKey(it);if(!gs[k]){gs[k]={it,items:[]};order.push(k);}gs[k].items.push(it);});
-      order.sort((a,b)=>(ord[gs[a].it.tipo]-ord[gs[b].it.tipo])||((gs[a].it.dataValor||'').localeCompare(gs[b].it.dataValor||'')));
+      order.sort((a,b)=>shopRefCmp(gs[a].it,gs[b].it));
       order.forEach(k=>{bloco(shopGroupLabel(gs[k].it.tipo,gs[k].it.dataValor),gs[k].items,{loja:true});});
     }
   }
