@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v258 · 2026-08-08 · Stock sem compra: quantidade opcional — e alocar a uma refeição um lote sem quantidade passa a definir a quantidade dele, em vez de não deixar alocar nada';
+const APP_BUILD = 'v259 · 2026-08-08 · Cartão da refeição: no bloco 🧺 Comprado, os artigos de talho e peixaria passam a vir à cabeça (o fresco primeiro), com o resto por nome';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -5086,6 +5086,16 @@ function catEmoji(nome){
   for(const [re,e] of MAP)if(re.test(s))return e;
   return '🏷️';
 }
+/* Fresco = talho e peixaria, pela CATEGORIA do artigo (mesmas palavras-chave
+   do catEmoji — o que é cada produto sabe-se num sítio só). Serve para o pôr
+   à cabeça do "🧺 Comprado" do cartão da refeição: é o que se confere e se
+   trata primeiro na cozinha. Artigo sem categoria (ou sem a migração das
+   categorias) não é fresco — aqui não se adivinha pelo nome, que era um
+   dicionário sem fim e enganava-se calado. */
+function artFresco(artigo){
+  const c=artCat(artigo);
+  return !!c&&/(talho|carne|peix|marisc)/.test(shopArtKey(c.nome));
+}
 /* Definir/alterar a categoria de um artigo a partir da UI. Regras:
    preencher um buraco pode qualquer membro; mudar/limpar o que já está
    definido é só do admin (o RLS garante o mesmo no servidor). */
@@ -7338,7 +7348,8 @@ function mealShopSection(rd){
       alocs.push({l,qtd:+a.qtd,val:rnd(unit*a.qtd,2),org:origemMeta(l)});
     });
   });
-  alocs.sort((a,b)=>a.l.artigo.localeCompare(b.l.artigo,'pt'));
+  // A ordem das linhas do "🧺 Comprado" decide-se toda de uma vez lá em baixo
+  // (fresco primeiro), por isso não se ordena aqui.
   /* 📌 Despesas provisórias desta refeição que NÃO viraram stock (formato
      antigo, ou escritas só no cash-flow): o custo já está contado na refeição,
      por isso aparecem no bloco de baixo para o cozinheiro saber com o que pode
@@ -7352,8 +7363,8 @@ function mealShopSection(rd){
   const canAdd=shopCanWrite()&&!contasFechadas()&&!past;
   if(!items.length&&!alocs.length&&!provs.length&&!canAdd)return '';
   const key=rd.data+'|'+rd.ref;
-  const alocLines=alocs.map(x=>`<div class="msl-it stk" onclick="openLoteModal(${x.l._id})">
-      ${mslLead(x.l.artigo,loteQtdLabel(x.l,x.qtd))}<span class="msl-st ok">${x.org?x.org.ic+' '+escHtml(x.org.lbl):eur(x.val)}</span></div>`).join('');
+  const alocLines=alocs.map(x=>({art:x.l.artigo,html:`<div class="msl-it stk" onclick="openLoteModal(${x.l._id})">
+      ${mslLead(x.l.artigo,loteQtdLabel(x.l,x.qtd))}<span class="msl-st ok">${x.org?x.org.ic+' '+escHtml(x.org.lbl):eur(x.val)}</span></div>`}));
   const lineOf=(it,dim)=>{
     /* Tratado ≠ comprado. Um pedido coberto pelo stock (ou encomendado numa
        provisória do formato antigo, que não gera lotes) continua PENDENTE —
@@ -7416,20 +7427,24 @@ function mealShopSection(rd){
      para saber o que havia. Sem itemização (provisória escrita só no cash-flow)
      não há artigos nenhuns e fica a própria despesa, que é tudo o que existe. */
   let nProvArts=0;
-  const provLines=provs.map(({d,i})=>{
+  const provLines=[];
+  provs.forEach(({d,i})=>{
     const abre=d.compraId?`openCfDetail('compra','${d.compraId}')`:`openCfDetail('despesas',${i})`;
     const arts=provArtigos(d);
     nProvArts+=arts.length||1;
-    if(!arts.length)return `<div class="msl-it prov" onclick="${abre}" title="Provisório">
-      ${mslLead('*'+(d.desc||'Despesa provisória'),'')}<span class="msl-st prov">${eur(d.valor)}</span></div>`;
+    if(!arts.length){provLines.push({art:d.desc||'Despesa provisória',
+      html:`<div class="msl-it prov" onclick="${abre}" title="Provisório">
+      ${mslLead('*'+(d.desc||'Despesa provisória'),'')}<span class="msl-st prov">${eur(d.valor)}</span></div>`});return;}
     // Uma despesa por artigo (o normal desde que as provisórias se gravam assim)
     // → o € da linha é o do artigo, como nas outras linhas do bloco. Nas antigas,
     // com tudo numa despesa só, não há preço por artigo para mostrar.
-    if(arts.length===1)return `<div class="msl-it prov" onclick="${abre}" title="${escHtml(d.desc||'')} — provisório">
-      ${mslLead('*'+arts[0].artigo,arts[0].qtd)}<span class="msl-st prov">${eur(d.valor)}</span></div>`;
-    return arts.map(a=>`<div class="msl-it prov" onclick="${abre}" title="${escHtml(d.desc||'')} — provisório">
-      ${mslLead('*'+a.artigo,a.qtd)}</div>`).join('');
-  }).join('');
+    if(arts.length===1){provLines.push({art:arts[0].artigo,
+      html:`<div class="msl-it prov" onclick="${abre}" title="${escHtml(d.desc||'')} — provisório">
+      ${mslLead('*'+arts[0].artigo,arts[0].qtd)}<span class="msl-st prov">${eur(d.valor)}</span></div>`});return;}
+    arts.forEach(a=>provLines.push({art:a.artigo,
+      html:`<div class="msl-it prov" onclick="${abre}" title="${escHtml(d.desc||'')} — provisório">
+      ${mslLead('*'+a.artigo,a.qtd)}</div>`}));
+  });
   const nProv=provs.length;
   const nComp=alocs.length+bought.length+nProvArts;
   const det=(sub,lbl,cnt,body)=>{
@@ -7459,8 +7474,17 @@ function mealShopSection(rd){
   provs.forEach(({d})=>{const k=d.desc||'despesa provisória';porQuem[k]=rnd((porQuem[k]||0)+d.valor,2);});
   const provQuem=Object.keys(porQuem).map(k=>`${escHtml(k)} · ${eur(porQuem[k])}`).join(' · ');
   const provLeg=nProv?`<div class="msl-leg-prov"><b>*</b> provisório — ainda por comprar${provQuem?': '+provQuem:''}</div>`:'';
+  /* 🥩🐟 TALHO E PEIXARIA À CABEÇA. O bloco é uma lista só — venha a linha do
+     stock alocado, do pedido comprado sem lote ou de uma provisória —, por isso
+     a ordem decide-se aqui, sobre as três de uma vez: separar por origem punha
+     a carne no fim do bloco só porque a compra dela ainda não tem lote. O fresco
+     primeiro porque é o que se confere à chegada e o que estraga se falhar; o
+     resto por nome, como sempre. O que é fresco vem da CATEGORIA (artFresco):
+     sem categoria atribuída, o artigo fica no grupo de baixo. */
   const compDet=nComp?det('|c','🧺 Comprado',nComp,
-    alocLines+bought.map(it=>lineOf(it,false)).join('')+provLines+provLeg):'';
+    alocLines.concat(bought.map(it=>({art:it.artigo,html:lineOf(it,false)})),provLines)
+      .sort((a,b)=>(artFresco(b.art)?1:0)-(artFresco(a.art)?1:0)||a.art.localeCompare(b.art,'pt'))
+      .map(x=>x.html).join('')+provLeg):'';
   return `<div class="rdc sf msl" onclick="event.stopPropagation()">${past?compDet+listaDet:listaDet+compDet}</div>`;
 }
 
