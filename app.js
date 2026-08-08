@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v260 · 2026-08-08 · 🧺 Comprado: a categoria de um lote passa a ler-se pelo nome do pedido (os artigos do talão com nome próprio já não caíam sem categoria) e, dentro de cada categoria, o maior primeiro — o que se pesa antes do que se conta';
+const APP_BUILD = 'v261 · 2026-08-08 · 🍺 Convidado que só bebe: a linha do convidado diz o que vem fazer e quem só vem ao copo paga quota própria — outra da do membro que só bebe (extra + mínimo por refeição)';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -132,6 +132,13 @@ let CONV_CRIANCA_COL=false;   // convidados já tem a coluna 'crianca'?
 // ficam escondidos e cada convidado vale uma pessoa (adulto ou criança,
 // conforme o flag 'crianca') — a app funciona exatamente como antes.
 let CONV_AC_COLS=false;
+// Convidado que SÓ BEBE (migração db/convidados_bebe.sql): convidados.modo +
+// refeicoes_def.min_conv_bebe/.extra_conv_bebe. É UM flag só para as três
+// colunas de propósito — sem os parâmetros da refeição não há preço para lhe
+// cobrar, e um convidado marcado 'bebe' sem preço era dinheiro a desaparecer
+// calado. Sem a migração, CONV_BEBE_COLS=false: a opção fica escondida, os
+// campos da refeição também, e nunca se grava nada.
+let CONV_BEBE_COLS=false;
 // despesas já tem a coluna 'grupo_pag' (migração db/despesas_pagadores.sql)?
 // É o token que junta as linhas de uma despesa paga por VÁRIAS pessoas: cada
 // pagador tem a sua linha (é o que as contas precisam — o dinheiro saiu do
@@ -275,13 +282,30 @@ function agregadoTemUtilizador(nome){if(amigoTemUtilizador(nome))return true;con
    vale uma pessoa e o flag `crianca` diz de que tipo. */
 function _gTemAC(g){return !!g&&(g.adultos!=null||g.criancas!=null);}
 function gAdultos(g){if(!g)return 0;return _gTemAC(g)?Math.max(0,Math.floor(+g.adultos||0)):(g.crianca?0:1);}
-function gCriancas(g){if(!g)return 0;return _gTemAC(g)?Math.max(0,Math.floor(+g.criancas||0)):(g.crianca?1:0);}
+// Uma linha que só vem ao copo não traz crianças (ver gModo): a app nunca as
+// grava e a BD não as deixa entrar, mas quem lê é sempre este helper — assim
+// uma linha estranha não põe uma criança a beber em contagem nenhuma.
+function gCriancas(g){if(!g||gSoBebe(g))return 0;return _gTemAC(g)?Math.max(0,Math.floor(+g.criancas||0)):(g.crianca?1:0);}
 function gPessoas(g){return gAdultos(g)+gCriancas(g);}          // bocas da linha
 // A linha é só de crianças? (o convidado que lhe dá o nome é ele próprio criança)
 function gSoCriancas(g){return gAdultos(g)===0&&gCriancas(g)>0;}
 function gSomaAdultos(lista){return (lista||[]).reduce((a,g)=>a+gAdultos(g),0);}
 function gSomaCriancas(lista){return (lista||[]).reduce((a,g)=>a+gCriancas(g),0);}
 function gSomaPessoas(lista){return (lista||[]).reduce((a,g)=>a+gPessoas(g),0);}
+/* ── O convidado veio comer ou só ao copo? ──
+   Mesmo eixo das presenças dos membros ('come' | 'bebe'), mas na linha do
+   convidado. Quem só bebe NÃO é boca na cozinha e paga a quota da bebida
+   (Qbebe), que é outra da do membro que só bebe — ver calcular().
+   Uma criança ou come ou não conta (não há "só bebe"), por isso uma linha
+   de bebida é só de adultos: é o que a app grava e o que a BD restringe. */
+function gModo(g){return (g&&g.modo==='bebe')?'bebe':'come';}
+function gSoBebe(g){return gModo(g)==='bebe';}
+function gComem(lista){return (lista||[]).filter(g=>!gSoBebe(g));}
+function gBebem(lista){return (lista||[]).filter(g=>gSoBebe(g));}
+// Adultos que comem / que só bebem — os denominadores e as contagens de bocas
+// passam TODAS por aqui, nunca por gSomaAdultos sobre a lista toda.
+function gSomaAdultosCome(lista){return gSomaAdultos(gComem(lista));}
+function gSomaAdultosBebe(lista){return gSomaAdultos(gBebem(lista));}
 // "3 adultos + 2 crianças" (partes a zero ficam de fora; '' quando não há nada)
 function composicaoConv(ad,cr){
   const p=[];
@@ -302,6 +326,10 @@ function gMult(g){
 // Idem, mas só a parte dos adultos — para listas que já são só de adultos
 // (o painel "Convidado" do cartão da refeição, os relatórios das quotas).
 function gMultAd(g){const ad=gAdultos(g);return ad>1?' ×'+ad:'';}
+// Marca de "só veio ao copo" numa linha de _convs (ecrã e relatórios). Sem ela
+// duas linhas do mesmo convidado à mesma refeição liam-se como um erro de
+// contas — o que as distingue é o preço, e o preço não se explica sozinho.
+function convModoSuf(c){return (c&&c.modo==='bebe')?' 🍺':'';}
 
 /* ── Filhos (crianças) ──────────────────────────────────────────────────
    Não pagam nada: não entram em nenhuma conta de dinheiro (calcular() nem
@@ -676,7 +704,11 @@ function calcular(data){
     // com ele conta 6. É este número que entra nos denominadores e no "E" do
     // cartão. As crianças que venham na linha não entram — não pagam nada,
     // tal como os filhos dos membros (que também não vivem no calcular()).
-    const Ec=gSomaAdultos(convidados.filter(g=>g.dia===rd.dia&&g.ref===rd.ref&&g.pagante==='Sim'));
+    const convsPag=convidados.filter(g=>g.dia===rd.dia&&g.ref===rd.ref&&g.pagante==='Sim');
+    const Ec=gSomaAdultosCome(convsPag);
+    // Convidados que só vieram ao copo: não são boca na cozinha, mas bebem e
+    // por isso entram no mesmo denominador dos membros que só bebem.
+    const EcBebe=gSomaAdultosBebe(convsPag);
     if(rd.ref==='Lanche'){
       // LEGADO: lanche herda o indireto unitário do almoço anterior (taxa para o fundo).
       // Mantido para anos antigos não migrados ao modelo "só bebe".
@@ -687,12 +719,15 @@ function calcular(data){
       if(Ec===0)Q=0;else Q=P===0?0:Math.max(5,roundup(P,0)+rd.extraConv);
       const indir=rnd(L*D,2);
       const cBebidas=rnd(indir*fracBebidas,2),cCerveja=rnd(indir*fracCerveja,2),cGerais=rnd(indir-cBebidas-cCerveja,2);
-      refeicoes.push({...rd,D,E:Ec,Ncomem:D,Nbebe:0,Fdir:0,Fbeb:0,bebidaPP:0,I:0,L,P,Pbebe:0,Q,dirRef:0,cBebidas,cCerveja,cGerais,custoTotal:indir,custoUnit:L,custoUnitBebe:0,temBebe:false});
+      // O lanche legado não tem "só bebe" nenhum (nem de membros nem de
+      // convidados) — por isso a UI também não deixa marcar um convidado
+      // de bebida numa refeição destas.
+      refeicoes.push({...rd,D,E:Ec,Ebebe:0,Ncomem:D,Nbebe:0,Fdir:0,Fbeb:0,bebidaPP:0,I:0,L,P,Pbebe:0,Q,Qbebe:0,dirRef:0,cBebidas,cCerveja,cGerais,custoTotal:indir,custoUnit:L,custoUnitBebe:0,temBebe:false});
       continue;
     }
     // Refeição normal (Almoço/Jantar): estados come / só bebe
-    const Ncomem=countModo(rd.data,rd.ref,'come')+Ec;   // convidados comem sempre
-    const Nbebe=countModo(rd.data,rd.ref,'bebe');
+    const Ncomem=countModo(rd.data,rd.ref,'come')+Ec;   // convidados que comem
+    const Nbebe=countModo(rd.data,rd.ref,'bebe')+EcBebe;
     // O que está alocado a esta refeição divide-se em dois baldes: a COMIDA, que
     // só quem come paga, e a BEBIDA (marcada), que quem só veio ao copo também
     // bebeu — essa divide-se pelos dois grupos, como o indireto da refeição.
@@ -713,10 +748,18 @@ function calcular(data){
     const Pbebe=Lbebe;                                   // sem mínimo
     let Q;
     if(Ec===0)Q=0;else Q=P===0?0:Math.max(rd.minConv,roundup(P,0)+rd.extraConv);
+    /* Quota do convidado que SÓ BEBE. Mesma forma da quota de quem come —
+       o que o membro paga, arredondado para cima, mais um extra, nunca
+       abaixo de um mínimo — mas com parâmetros PRÓPRIOS: é isso que a faz
+       ser outra coisa que o Pbebe do membro, que é o custo a peso e sem
+       mínimo. Sem custo de bebida nem indiretos não há nada a cobrar
+       (Pbebe===0), tal como na quota de quem come. */
+    let Qbebe;
+    if(EcBebe===0)Qbebe=0;else Qbebe=Pbebe===0?0:Math.max(rd.minConvBebe||0,roundup(Pbebe,0)+(rd.extraConvBebe||0));
     const dirRef=rnd(Fdir+Fbeb,2);                       // total alocado à refeição
     const cBebidas=rnd(I*fracBebidas,2),cCerveja=rnd(I*fracCerveja,2),cGerais=rnd(I-cBebidas-cCerveja,2);
     const custoTotal=rnd(Fdir+Fbeb+I,2);
-    refeicoes.push({...rd,D:Ncomem,E:Ec,Ncomem,Nbebe,Fdir:rnd(Fdir,2),Fbeb:rnd(Fbeb,2),bebidaPP,I,L,P,Pbebe,Q,dirRef,cBebidas,cCerveja,cGerais,custoTotal,custoUnit:L,custoUnitBebe:Lbebe,temBebe:Nbebe>0});
+    refeicoes.push({...rd,D:Ncomem,E:Ec,Ebebe:EcBebe,Ncomem,Nbebe,Fdir:rnd(Fdir,2),Fbeb:rnd(Fbeb,2),bebidaPP,I,L,P,Pbebe,Q,Qbebe,dirRef,cBebidas,cCerveja,cGerais,custoTotal,custoUnit:L,custoUnitBebe:Lbebe,temBebe:Nbebe>0});
   }
 
   const rmap={};for(const r of refeicoes)rmap[r.data+'|'+r.ref]=r;
@@ -735,12 +778,14 @@ function calcular(data){
       }
     });
     m.Sown=rnd(m._refs.reduce((a,x)=>a+x.p,0),2);
-    // Cada ADULTO da linha paga a quota Q da refeição: a linha custa Q × n.
+    // Cada ADULTO da linha paga a quota da refeição: a linha custa quota × n.
+    // Quem só veio ao copo paga a Qbebe, não a Q — é a mesma linha, outro preço.
     // Linhas só de crianças não geram dívida nenhuma, logo nem aparecem.
     m._convs=convidados.filter(g=>g.membro===m.nome&&g.pagante==='Sim'&&gAdultos(g)>0).map(g=>{
       const r=reffor(g.dia,g.ref);
       const n=gAdultos(g);
-      return{nome:g.nome,dia:g.dia,ref:g.ref,n,q:rnd((r?r.Q:0)*n,2)};
+      const bebe=gSoBebe(g);
+      return{nome:g.nome,dia:g.dia,ref:g.ref,n,modo:bebe?'bebe':'come',q:rnd((r?(bebe?r.Qbebe:r.Q):0)*n,2)};
     });
     m.AA=rnd(m._convs.reduce((a,x)=>a+x.q,0),2);
   }
@@ -1435,7 +1480,10 @@ function renderAll(){
         const guestsAll=(DATA.convidados||[]).filter(g=>g.dia===rd.dia&&g.ref===rd.ref);
         // Só quem tem adultos é que entra no painel "Convidado" (que é o dos
         // que pagam quota); as crianças da linha vão para o painel "Criança".
-        const guestsPay=guestsAll.filter(g=>g.pagante==='Sim'&&gAdultos(g)>0);
+        // Quem só veio ao copo tem painel próprio: paga outro preço.
+        const guestsPayAll=guestsAll.filter(g=>g.pagante==='Sim'&&gAdultos(g)>0);
+        const guestsPay=gComem(guestsPayAll);
+        const guestsBebe=gBebem(guestsPayAll);
         const kidsList=criancasNoSlotNomes(rkey);   // filhos inscritos + convidados-criança
         const nCriancas=criancasNoSlot(rkey);       // bocas (um convidado-criança pode valer várias)
         const pid='rdp'+rd._idx;
@@ -1443,12 +1491,19 @@ function renderAll(){
         // é o container "Quem vai?", não se repete aqui.
         const pplPanel=(sfx,html)=>`<div class="rdc-ppl" id="${pid}${sfx}" style="display:none">${html}</div>`;
         const memPanel=membrosCome.length?pplPanel('m',membrosCome.map(n=>`<span class="rdc-ppl-it">${escHtml(n)}</span>`).join('')):'';
-        const guestPanel=guestsPay.length?pplPanel('g',guestsPay.map(g=>`<span class="rdc-ppl-it">${escHtml(g.nome)}${gMultAd(g)}${g.membro?`<small> · ${escHtml(g.membro)}</small>`:''}</span>`).join('')):'';
+        const gPplIt=g=>`<span class="rdc-ppl-it">${escHtml(g.nome)}${gMultAd(g)}${g.membro?`<small> · ${escHtml(g.membro)}</small>`:''}</span>`;
+        const guestPanel=guestsPay.length?pplPanel('g',guestsPay.map(gPplIt).join('')):'';
+        const guestBebePanel=guestsBebe.length?pplPanel('gb',guestsBebe.map(gPplIt).join('')):'';
         const kidPanel=nCriancas?pplPanel('k',kidsList.map(k=>`<span class="rdc-ppl-it">${escHtml(k.nome)}${k.n>1?' ×'+k.n:''}${k.de?`<small> · ${escHtml(k.de)}</small>`:''}</span>`).join('')):'';
         const cellAttrs=(sfx,has)=>has?`class="rdc-cell rdc-cell-btn" data-tgt="${pid}${sfx}" onclick="togglePeople('${pid}${sfx}')"`:'class="rdc-cell"';
         const arrow=has=>has?'<span class="rdc-cell-arrow">›</span>':'';
         const membroCell=`<div ${cellAttrs('m',membrosCome.length)}><div class="rdc-cell-k">Membro${membrosCount?`<span class="rdc-cell-n">${membrosCount}</span>`:''}${arrow(membrosCome.length)}</div><div class="rdc-cell-v rdc-cell-v-gold">${calcRef.D>0?eur(calcRef.P):'<span class="rdc-na">N/A</span>'}</div></div>`;
         const convCell=`<div ${cellAttrs('g',guestsPay.length)}><div class="rdc-cell-k">Convidado${calcRef.E?`<span class="rdc-cell-n">${calcRef.E}</span>`:''}${arrow(guestsPay.length)}</div><div class="rdc-cell-v">${calcRef.E?eur(calcRef.Q):'<span class="rdc-na">N/A</span>'}</div></div>`;
+        /* Convidado que só veio ao copo: célula própria, e só quando existe —
+           ao contrário do membro, cujo preço de bebida vive no bloco 🍻 (que
+           é onde se explica de que é feito), aqui o que interessa é a quota,
+           que não é o custo nem é a do convidado que come. */
+        const convBebeCell=calcRef.Ebebe?`<div ${cellAttrs('gb',guestsBebe.length)}><div class="rdc-cell-k">Convidado ${DEST_BEB_ICON}<span class="rdc-cell-n">${calcRef.Ebebe}</span>${arrow(guestsBebe.length)}</div><div class="rdc-cell-v">${eur(calcRef.Qbebe||0)}</div></div>`:'';
         // Crianças: só bocas para a cozinha/compras — não pagam nada
         const kidsCell=nCriancas?`<div ${cellAttrs('k',nCriancas)}><div class="rdc-cell-k">Criança<span class="rdc-cell-n">${nCriancas}</span>${arrow(1)}</div><div class="rdc-cell-v"><span class="rdc-na">não paga</span></div></div>`:'';
         const presNota=calcRef.D>0?'':'<div class="rdc-sempres">Sem presenças marcadas</div>';
@@ -1456,8 +1511,8 @@ function renderAll(){
         costBox=`<div class="rdc rdc-hero rdc-costs sf">
           <div class="rdc-hdr rdc-costs-hdr${cOpen?' open':''}" onclick="toggleCosts(this,'${cid}','${mkey}')"><span class="rdc-lbl rdc-lbl-green">Custo da refeição</span><span class="rdc-tot">${eur(calcRef.custoTotal)}</span>${ppTag(rnd(indPP+dirPP+bebPP,2))}<span class="rdc-fold-arrow">›</span></div>
           ${presNota}
-          <div class="rdc-cells">${membroCell}${convCell}${kidsCell}</div>
-          ${memPanel}${guestPanel}${kidPanel}
+          <div class="rdc-cells">${membroCell}${convCell}${convBebeCell}${kidsCell}</div>
+          ${memPanel}${guestPanel}${guestBebePanel}${kidPanel}
           <div class="rdc-costs-body" id="${cid}"${cOpen?'':' style="display:none"'}>${costDet}</div>
         </div>`;
         // "Quem vai?" — toda a gente da refeição, agrupada por agregado.
@@ -1466,7 +1521,7 @@ function renderAll(){
         const nBocas=totalComeRefeicao(rd.dia,rd.ref==='Lanche'?'Tarde':rd.ref);
         quemBox=nBocas?`<details class="rdc rdc-fold rdc-quem sf"${MEAL_QUEM_OPEN[mkey]?' open':''} ontoggle="MEAL_QUEM_OPEN['${mkey}']=this.open">
           <summary class="rdc-hdr"><span class="rdc-lbl">👥 ${rd.data<hojeISO()?'Quem foi?':'Quem vai?'}</span><span class="msl-count">${nBocas}</span><span class="rdc-fold-arrow">›</span></summary>
-          <div class="rdc-ppl casais">${casaisPanelHtml(membrosCome,guestsAll,rkey)}</div>
+          <div class="rdc-ppl casais">${casaisPanelHtml(membrosCome,gComem(guestsAll),rkey)}</div>
         </details>`:'';
       }
       // Ementa do dia — card campino em destaque: prato grande + entradas/sobremesa em linha
@@ -2022,7 +2077,7 @@ function openMember(nome){
         <span><span class="ct-val minus">${eur(m.AA)}</span><span class="ct-arrow">▼</span></span>
       </div>`;
       h+='<div class="collapse-body"><div class="meals">';
-      m._convs.forEach(c=>h+=`<div class="meal"><span class="d">${c.nome}${c.n>1?' ×'+c.n:''} · ${c.dia} ${c.ref}</span><span class="p">${eur(c.q)}</span></div>`);
+      m._convs.forEach(c=>h+=`<div class="meal"><span class="d">${c.nome}${c.n>1?' ×'+c.n:''}${convModoSuf(c)} · ${c.dia} ${c.ref}</span><span class="p">${eur(c.q)}</span></div>`);
       h+='</div></div>';
     }
     if((m.TS||0)>0.005){
@@ -2162,7 +2217,7 @@ async function carregar(){
     const sel='*,membros(*,presencas(*)),refeicoes_def(*),despesas(*),convidados(*),mealheiros(*),pagamentos(*)';
     // shoplist vai numa fetch SEPARADA e tolerante a falha: se a tabela ainda
     // não existir (migração por correr) o resto da app continua a funcionar.
-    const [res,uaRes,cjRes,vlRes,slRes,stRes,ctRes,acRes,npRes,flRes,fpRes,ccRes,sljRes,cobRes,cpRes,stmRes,sfRes,ttRes,tsRes,tiRes,ppRes,dgRes,dbRes,scRes,adRes]=await Promise.all([
+    const [res,uaRes,cjRes,vlRes,slRes,stRes,ctRes,acRes,npRes,flRes,fpRes,ccRes,sljRes,cobRes,cpRes,stmRes,sfRes,ttRes,tsRes,tiRes,ppRes,dgRes,dbRes,scRes,adRes,cbRes]=await Promise.all([
       sbFetch(`${SB_URL}/rest/v1/eventos?select=${encodeURIComponent(sel)}&order=ano.asc`,{headers:sbHeaders(),cache:'no-store'}),
       sbFetch(`${SB_URL}/rest/v1/user_amigos?select=email,amigo`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null),
       sbFetch(`${SB_URL}/rest/v1/conjuges?select=amigo_a,amigo_b`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null),
@@ -2212,7 +2267,10 @@ async function carregar(){
       sbFetch(`${SB_URL}/rest/v1/stock_lotes?select=consumido&limit=1`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null),
       // artigos de despensa (db/despensa.sql): os que não se esgotam por
       // alocação. Tolerante — sem a migração, DESP_TABLE=false
-      sbFetch(`${SB_URL}/rest/v1/artigos_despensa?select=*`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null)
+      sbFetch(`${SB_URL}/rest/v1/artigos_despensa?select=*`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null),
+      // sonda à coluna convidados.modo (db/convidados_bebe.sql): o convidado
+      // que só vem ao copo. Os parâmetros do preço vêm no próprio evento.
+      sbFetch(`${SB_URL}/rest/v1/convidados?select=modo&limit=1`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null)
     ]);
     if(!res.ok)throw new Error('HTTP '+res.status);
     const rows=await res.json();
@@ -2261,6 +2319,10 @@ async function carregar(){
     // Só gravamos os responsáveis se as colunas já existirem no Supabase
     // (senão o replace das refeições falhava todo — padrão dividas_publicas)
     REFDEF_RESP_COLS=rows.some(ev=>(ev.refeicoes_def||[]).some(r=>'resp_cozinha' in r));
+    // Convidado que só bebe: precisa da coluna do convidado E dos parâmetros
+    // do preço na refeição. Faltando um dos lados, a opção nem aparece — ver
+    // CONV_BEBE_COLS. (Sem refeições definidas não há convidados nenhuns.)
+    CONV_BEBE_COLS=!!(cbRes&&cbRes.ok)&&rows.some(ev=>(ev.refeicoes_def||[]).some(r=>'min_conv_bebe' in r));
     const shopByEv={};shopRows.forEach(s=>{(shopByEv[s.evento_id]=shopByEv[s.evento_id]||[]).push(s);});
     computeMyNames();
     const N=v=>v==null?0:Number(v);
@@ -2286,11 +2348,11 @@ async function carregar(){
         _id:m.id,nome:m.nome,fator:N(m.fator),sexo:m.sexo==='F'?'F':'M',
         presencas:(m.presencas||[]).map(p=>({k:`${p.dia}|${p.ref}`,modo:p.modo==='bebe'?'bebe':'come'}))
       })),
-      refeicoesDef:(ev.refeicoes_def||[]).map(r=>({data:r.data,dia:r.dia,ref:r.ref,prato:r.prato||'',peso:N(r.peso),minMEO:N(r.min_meo),minConv:N(r.min_conv),extraConv:N(r.extra_conv),responsaveis:parseResps(r.resp_cozinha),menu:r.menu||''})),
+      refeicoesDef:(ev.refeicoes_def||[]).map(r=>({data:r.data,dia:r.dia,ref:r.ref,prato:r.prato||'',peso:N(r.peso),minMEO:N(r.min_meo),minConv:N(r.min_conv),extraConv:N(r.extra_conv),minConvBebe:N(r.min_conv_bebe),extraConvBebe:N(r.extra_conv_bebe),responsaveis:parseResps(r.resp_cozinha),menu:r.menu||''})),
       despesas:(ev.despesas||[]).map(d=>({_id:d.id,quem:d.quem,dataDesp:d.data_desp,dataValor:d.data_valor,desc:d.descricao,tipo:d.tipo,valor:N(d.valor),obs:d.observacoes||'',compraId:d.compra_id||null,grupoPag:d.grupo_pag||null,bebida:!!d.bebida})),
       convidados:(ev.convidados||[]).map(c=>{
         const cri=!!c.crianca;
-        const row={_id:c.id,membro:c.membro,nome:c.nome,data:c.data,dia:c.dia,ref:c.ref,pagante:c.pagante?'Sim':'Não',crianca:cri,preco:N(c.preco)};
+        const row={_id:c.id,membro:c.membro,nome:c.nome,data:c.data,dia:c.dia,ref:c.ref,pagante:c.pagante?'Sim':'Não',crianca:cri,modo:c.modo==='bebe'?'bebe':'come',preco:N(c.preco)};
         // Sem as colunas novas não se põem os campos: gAdultos/gCriancas caem
         // no flag `crianca` e a linha vale 1 pessoa, como sempre valeu.
         if(CONV_AC_COLS){
@@ -2397,6 +2459,7 @@ async function sbGuardarEvento(y,slot){
       await sbReq('POST','refeicoes_def',y.refeicoesDef.map(r=>{
         const row={evento_id:eid,data:r.data,dia:r.dia,ref:r.ref,prato:r.prato||null,peso:r.peso||0,min_meo:r.minMEO||0,min_conv:r.minConv||0,extra_conv:r.extraConv||0};
         if(REFDEF_RESP_COLS){row.resp_cozinha=joinResps(r.responsaveis);row.menu=r.menu||null;}
+        if(CONV_BEBE_COLS){row.min_conv_bebe=r.minConvBebe||0;row.extra_conv_bebe=r.extraConvBebe||0;}
         return row;
       }));
     if(y.despesas&&y.despesas.length){
@@ -2413,6 +2476,7 @@ async function sbGuardarEvento(y,slot){
         const row={evento_id:eid,membro:c.membro,nome:c.nome,data:c.data||null,dia:c.dia,ref:c.ref,pagante:c.pagante==='Sim',preco:c.preco||0};
         if(CONV_CRIANCA_COL)row.crianca=!!c.crianca;
         if(CONV_AC_COLS){row.adultos=gAdultos(c);row.criancas=gCriancas(c);}
+        if(CONV_BEBE_COLS)row.modo=gModo(c);
         return row;
       }),{Prefer:'return=representation'});
       if(Array.isArray(cres))cres.forEach((r,i)=>{if(y.convidados[i])y.convidados[i]._id=r.id;});
@@ -2530,9 +2594,11 @@ function fraseHistorico(tipo,accao,alvo,autor,d){
     // Uma pessoa só: mantém-se a frase de sempre, com o (criança) quando é o caso
     const kid=(tot?(ad===0&&cr===1):d.crianca)?' (criança)':'';
     const mais=tot>1?` e mais ${tot-1} (${composicaoConv(ad,cr)})`:'';
-    if(accao==='removeu')return `${A} já não vai levar ${alvo}${kid}${mais} ao ${refDia}${dono}`;
-    if(accao==='editou')return `${A} alterou o convidado ${alvo}${kid}${mais} no ${refDia}${dono}`;
-    return `${A} vai levar ${alvo}${kid}${mais} ao ${refDia}${dono}`;
+    // Só veio ao copo: diz-se, senão a cozinha contava-o como mais uma boca
+    const beb=d.modo==='bebe'?' (só bebida)':'';
+    if(accao==='removeu')return `${A} já não vai levar ${alvo}${kid}${mais}${beb} ao ${refDia}${dono}`;
+    if(accao==='editou')return `${A} alterou o convidado ${alvo}${kid}${mais}${beb} no ${refDia}${dono}`;
+    return `${A} vai levar ${alvo}${kid}${mais}${beb} ao ${refDia}${dono}`;
   }
   if(tipo==='crianca'){
     const tot=(d.totalCome!=null)?` — ${d.totalCome} a comer`:'';
@@ -2588,7 +2654,8 @@ function totalComeRefeicao(dia,ref){
   const slot=dia+'|'+ref;
   const nMembros=membros.filter(m=>presModo(m,slot)==='come').length;
   const refConv=(ref==='Tarde')?'Lanche':ref;
-  const nConv=gSomaAdultos(((DATA&&DATA.convidados)||[]).filter(g=>g.dia===dia&&g.ref===refConv));
+  // Só os convidados que COMEM: quem veio ao copo não é boca na cozinha
+  const nConv=gSomaAdultosCome(((DATA&&DATA.convidados)||[]).filter(g=>g.dia===dia&&g.ref===refConv));
   return nMembros+nConv+criancasNoSlot(slot);
 }
 function _flushPresLog(key){
@@ -11760,7 +11827,7 @@ function renderPresencaGrid(){
       const parts=s.key.split('|');
       const slotDia=parts[0];
       const slotRef=parts[1]==='Tarde'?'Lanche':parts[1];
-      const gCount=gSomaAdultos((DATA.convidados||[]).filter(g=>g.dia===slotDia&&g.ref===slotRef));
+      const gCount=gSomaAdultosCome((DATA.convidados||[]).filter(g=>g.dia===slotDia&&g.ref===slotRef));
       const nCri=criancasNoSlot(s.key);
       const adultos=memCome+gCount;
       const total=adultos+nCri;
@@ -11880,10 +11947,12 @@ function renderPresencaGrid(){
   days.forEach(d=>{d.slots.forEach(s=>{const count=mbrs.filter(m=>presModo(m,s.key)==='come').length;h+=`<td class="pres-count sf${count>0?' has':''}">${count}</td>`;});});
   h+='</tr>';
 
-  // Convidados adultos (também comem) — os convidados-criança contam na linha "Crianças"
+  // Convidados adultos que COMEM — os convidados-criança contam na linha
+  // "Crianças" e os que só vieram ao copo na secção "Só bebem", lá em baixo
   let totalGuestAll=0;
+  const convDoSlot=s=>{const parts=s.key.split('|');const slotRef=parts[1]==='Tarde'?'Lanche':parts[1];return (DATA.convidados||[]).filter(g=>g.dia===parts[0]&&g.ref===slotRef);};
   h+='<tr><td class="pres-name pres-foot-cell" style="border-bottom:none"><span class="sf pres-foot-sub">Convidados</span></td>';
-  days.forEach(d=>{d.slots.forEach(s=>{const parts=s.key.split('|');const slotDia=parts[0];const slotRef=parts[1]==='Tarde'?'Lanche':parts[1];const guestCount=gSomaAdultos((DATA.convidados||[]).filter(g=>g.dia===slotDia&&g.ref===slotRef));totalGuestAll+=guestCount;h+=`<td class="pres-count sf${guestCount>0?' has':''}" style="${guestCount>0?'color:var(--gold)':''}">${guestCount||'—'}</td>`;});});
+  days.forEach(d=>{d.slots.forEach(s=>{const guestCount=gSomaAdultosCome(convDoSlot(s));totalGuestAll+=guestCount;h+=`<td class="pres-count sf${guestCount>0?' has':''}" style="${guestCount>0?'color:var(--gold)':''}">${guestCount||'—'}</td>`;});});
   h+='</tr>';
 
   // Crianças (filhos dos membros + convidados-criança): comem, não pagam.
@@ -11907,6 +11976,14 @@ function renderPresencaGrid(){
   h+='<tr><td class="pres-name pres-foot-cell" style="border-bottom:none"><span class="sf pres-foot-sub">Membros</span></td>';
   days.forEach(d=>{d.slots.forEach(()=>{const c=bebeRow[bi++];h+=`<td class="pres-count sf${c>0?' has':''}" style="${c>0?'color:var(--gold)':''}">${c||'—'}</td>`;});});
   h+='</tr>';
+
+  // Convidados que só bebem — a linha só aparece havendo algum, para não pôr
+  // uma fila de traços em todos os anos que nunca tiveram nenhum
+  if((DATA.convidados||[]).some(g=>gSoBebe(g))){
+    h+='<tr><td class="pres-name pres-foot-cell" style="border-bottom:none"><span class="sf pres-foot-sub">Convidados</span></td>';
+    days.forEach(d=>{d.slots.forEach(s=>{const c=gSomaAdultosBebe(convDoSlot(s));h+=`<td class="pres-count sf${c>0?' has':''}" style="${c>0?'color:var(--gold)':''}">${c||'—'}</td>`;});});
+    h+='</tr>';
+  }
 
   h+='</tfoot></table></div>';
   h+='</div>';
@@ -12027,12 +12104,14 @@ function guestCardsHtml(lista,diaToDate){
       :(g.pagante==='Sim'||!ad?'':'<span class="pg-badge free sf">Oferta</span>');
     // Acompanhantes sem nome: o badge diz de que é feita a linha e chega
     const headsBadge=(ad+cr)>1?`<span class="pg-badge heads sf">${composicaoConv(ad,cr)}</span>`:'';
+    // Só veio ao copo: não é boca na cozinha e paga a quota da bebida
+    const bebeBadge=gSoBebe(g)?`<span class="pg-badge bebe sf">${BEER_SVG_SM} Só bebe</span>`:'';
     h+=`<div class="pres-guest-card">
       <div class="pg-info sf">
         <span class="pg-name">${escHtml(g.nome)}</span>
         <span class="pg-meta">convidado por ${escHtml(g.membro||'')}</span>
       </div>
-      ${headsBadge}${paysBadge}
+      ${bebeBadge}${headsBadge}${paysBadge}
       ${(isAdmin()||(MY_NAMES.includes(g.membro)&&diaEditavel(g.dia)))?`<div class="card-actions">
         <button class="card-act edit write-action" onclick="editGuest(${g._idx})" title="Editar"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>
         <button class="card-act del write-action" onclick="deleteGuest(${g._idx})" title="Remover">✕</button>
@@ -12085,11 +12164,12 @@ function openGuestModal(){
   </div>
   <label>Nome do convidado</label>
   <input type="text" id="guest-nome" placeholder="Nome">
+  ${guestModoHtml('guest','come')}
   ${CONV_AC_COLS?`<div class="inline-row">
     <div><label>Adultos</label>
       <select id="guest-adultos" onchange="guestACSync('guest')">${guestNumOptions(1)}</select>
     </div>
-    <div><label>Crianças</label>
+    <div id="guest-criancas-cell"><label>Crianças</label>
       <select id="guest-criancas" onchange="guestACSync('guest')">${guestNumOptions(0)}</select>
     </div>
   </div>
@@ -12101,7 +12181,7 @@ function openGuestModal(){
       <select id="guest-dia">${days.map(d=>`<option value="${d}"${d===preDia?' selected':''}>${d}</option>`).join('')}</select>
     </div>
     <div><label>Refeição</label>
-      <select id="guest-ref">${refs.map(r=>`<option value="${r}"${r===preRef?' selected':''}>${r}</option>`).join('')}</select>
+      <select id="guest-ref" onchange="guestACSync('guest')">${refs.map(r=>`<option value="${r}"${r===preRef?' selected':''}>${r}</option>`).join('')}</select>
     </div>
   </div>
   ${(CONV_CRIANCA_COL&&!CONV_AC_COLS)?`<label>Criança?</label>
@@ -12146,6 +12226,19 @@ const GUEST_AC_HINT='Só o nome de quem conheces. Os que vêm com ele contam aqu
    O valor atual entra sempre na lista, mesmo acima do máximo: uma linha
    antiga com mais gente não pode ser silenciosamente encolhida ao editá-la. */
 const GUEST_MAX_PESSOAS=15;
+/* "O que vem fazer?" — o mesmo eixo das presenças dos membros, na linha do
+   convidado. Só aparece com a migração db/convidados_bebe.sql: sem ela não há
+   onde guardar o modo nem parâmetros para lhe cobrar o copo.
+   (pref = 'guest' | 'guest-edit') */
+function guestModoHtml(pref,modo){
+  if(!CONV_BEBE_COLS)return'';
+  const b=modo==='bebe';
+  return `<div id="${pref}-modo-row"><label>O que vem fazer?</label>
+    <select id="${pref}-modo" onchange="guestACSync('${pref}')">
+      <option value="come"${b?'':' selected'}>🍽 Come — paga a quota da refeição</option>
+      <option value="bebe"${b?' selected':''}>🍺 Só bebe — paga a quota da bebida</option>
+    </select></div>`;
+}
 function guestNumOptions(atual){
   const n=Math.max(0,Math.floor(+atual||0));
   let o='';
@@ -12159,7 +12252,29 @@ function guestACNums(pref){
 }
 // Estado anterior do "não há adultos", por modal — ver guestACSync
 const _guestSemPagar={};
+/* O modo escolhido no modal, já com as regras aplicadas: uma refeição legada
+   (Lanche) não tem "só bebe" — nem de membros nem de convidados —, por isso
+   ali a pergunta desaparece e a resposta volta a ser "come". Sem isto um
+   convidado de bebida num lanche pagava zero em silêncio (ver calcular()). */
+function guestModoSel(pref){
+  const sel=document.getElementById(pref+'-modo');
+  if(!sel)return'come';
+  const ref=document.getElementById(pref+'-ref');
+  const refLbl=document.getElementById(pref+'-ref-lbl');           // modal de editar: a refeição é fixa
+  const nome=ref?ref.value:(refLbl?refLbl.dataset.ref:'');
+  const podeBeber=nome!=='Lanche';
+  const linha=document.getElementById(pref+'-modo-row');
+  if(linha)linha.style.display=podeBeber?'':'none';
+  if(!podeBeber&&sel.value!=='come')sel.value='come';
+  return sel.value==='bebe'?'bebe':'come';
+}
 function guestACSync(pref){
+  const bebe=guestModoSel(pref)==='bebe';
+  // Uma criança ou come ou não conta: numa linha de bebida não há crianças
+  const cell=document.getElementById(pref+'-criancas-cell');
+  const cSel=document.getElementById(pref+'-criancas');
+  if(cell)cell.style.display=bebe?'none':'';
+  if(bebe&&cSel&&cSel.value!=='0')cSel.value='0';
   const {ad,cr,temCampos}=guestACNums(pref);
   const row=document.getElementById(pref+'-pagante-row');
   // Sem adultos ninguém paga: esconde o "Pagante?" e força a oferta
@@ -12179,6 +12294,14 @@ function guestACSync(pref){
   if(!hint)return;
   const tot=ad+cr;
   if(tot<=0){hint.textContent='Tem de vir pelo menos uma pessoa.';return;}
+  // Quem só vem ao copo não é boca na cozinha — a frase não pode falar de
+  // bocas nem de quota da refeição, que é precisamente o que ele não paga
+  if(bebe){
+    hint.textContent=ad===1
+      ?'1 adulto — não conta como boca na refeição e paga a quota da bebida.'
+      :`${ad} adultos — não contam como bocas na refeição e pagam ${ad} quotas de bebida.`;
+    return;
+  }
   if(!cr)hint.textContent=ad===1
     ?'1 adulto — paga 1 quota de convidado.'
     :`${ad} adultos — ${ad} bocas na refeição e ${ad} quotas de convidado.`;
@@ -12216,8 +12339,10 @@ async function saveGuest(){
   // Sem a migração, cai-se no select "Criança?" de sempre.
   const ac=CONV_AC_COLS?guestACVal('guest'):null;
   if(CONV_AC_COLS&&!ac)return;
+  const modo=guestModoSel('guest');
   const cEl=document.getElementById('guest-crianca');
   const crianca=ac?ac.adultos===0:(!!cEl&&cEl.value==='1');
+  if(modo==='bebe'&&crianca){toast('Uma criança ou come ou não conta — não há "só bebe"','bad');return;}
   // Quem não traz adultos não paga quota — manda sobre o "Pagante?"
   const pagante=crianca?'Não':document.getElementById('guest-pagante').value;
   if(!nome){toast('Indica o nome do convidado','bad');return;}
@@ -12232,13 +12357,14 @@ async function saveGuest(){
   try{
     const row={evento_id:DATA._sbId,membro,nome,data:null,dia,ref,pagante:pagante==='Sim',preco:0};
     if(CONV_CRIANCA_COL)row.crianca=crianca;
-    if(ac){row.adultos=ac.adultos;row.criancas=ac.criancas;}
+    if(ac){row.adultos=ac.adultos;row.criancas=modo==='bebe'?0:ac.criancas;}
+    if(CONV_BEBE_COLS)row.modo=modo;
     const ins=await queueWrite(()=>sbReq('POST','convidados',[row],{Prefer:'return=representation'}));
     if(!DATA.convidados)DATA.convidados=[];
-    const novo={_id:ins&&ins[0]?ins[0].id:null,nome,membro,dia,ref,pagante,crianca};
+    const novo={_id:ins&&ins[0]?ins[0].id:null,nome,membro,dia,ref,pagante,crianca,modo};
     if(ac){novo.adultos=ac.adultos;novo.criancas=ac.criancas;}
     DATA.convidados.push(novo);
-    sbLog('convidado','adicionou',nome,{membro,dia,ref,pagante,crianca,adultos:gAdultos(novo),criancas:gCriancas(novo)});
+    sbLog('convidado','adicionou',nome,{membro,dia,ref,pagante,crianca,modo,adultos:gAdultos(novo),criancas:gCriancas(novo)});
     syncMirror();
     marcaGuardado();
     const bg=document.getElementById('guest-modal-bg');
@@ -12266,7 +12392,7 @@ async function deleteGuest(idx){
   try{
     await queueWrite(()=>sbReq('DELETE',`convidados?id=eq.${g._id}`));
     DATA.convidados.splice(idx,1);
-    sbLog('convidado','removeu',g.nome,{membro:g.membro,dia:g.dia,ref:g.ref,crianca:!!g.crianca,adultos:_ad,criancas:_cr});
+    sbLog('convidado','removeu',g.nome,{membro:g.membro,dia:g.dia,ref:g.ref,crianca:!!g.crianca,modo:gModo(g),adultos:_ad,criancas:_cr});
     syncMirror();
     marcaGuardado();
     CALC=calcular(JSON.parse(JSON.stringify(DATA)));
@@ -12291,14 +12417,15 @@ function editGuest(idx){
     <h3 style="margin-bottom:0">Editar Convidado</h3>
     <button onclick="this.closest('.modal-bg').classList.remove('show');unlockScroll()" style="background:var(--panel2);border:1px solid var(--line);color:var(--muted);border-radius:9px;width:32px;height:32px;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0">✕</button>
   </div>
-  <div class="sf" style="font-size:11px;color:var(--faint);margin:-4px 0 12px">${dataDia} · ${g.ref} — convidado por ${g.membro}</div>
+  <div class="sf" id="guest-edit-ref-lbl" data-ref="${escHtml(g.ref)}" style="font-size:11px;color:var(--faint);margin:-4px 0 12px">${dataDia} · ${g.ref} — convidado por ${g.membro}</div>
   <label>Nome do convidado</label>
   <input type="text" id="guest-edit-nome" placeholder="Nome" value="${escHtml(g.nome)}">
+  ${guestModoHtml('guest-edit',gModo(g))}
   ${CONV_AC_COLS?`<div class="inline-row">
     <div><label>Adultos</label>
       <select id="guest-edit-adultos" onchange="guestACSync('guest-edit')">${guestNumOptions(gAdultos(g))}</select>
     </div>
-    <div><label>Crianças</label>
+    <div id="guest-edit-criancas-cell"><label>Crianças</label>
       <select id="guest-edit-criancas" onchange="guestACSync('guest-edit')">${guestNumOptions(gCriancas(g))}</select>
     </div>
   </div>
@@ -12330,8 +12457,10 @@ async function saveGuestEdit(idx){
   const nome=(document.getElementById('guest-edit-nome').value||'').trim();
   const ac=document.getElementById('guest-edit-adultos')?guestACVal('guest-edit'):null;
   if(document.getElementById('guest-edit-adultos')&&!ac)return;
+  const modo=guestModoSel('guest-edit');
   const cEl=document.getElementById('guest-edit-crianca');
   const crianca=ac?ac.adultos===0:(cEl?cEl.value==='1':!!g.crianca);
+  if(modo==='bebe'&&crianca){toast('Uma criança ou come ou não conta — não há "só bebe"','bad');return;}
   // Quem não traz adultos não paga quota — manda sobre o "Pagante?"
   const pagante=crianca?'Não':document.getElementById('guest-edit-pagante').value;
   if(!nome){toast('Indica o nome do convidado','bad');return;}
@@ -12340,23 +12469,25 @@ async function saveGuestEdit(idx){
     toast('Não podes editar este convidado','bad');return;
   }
   const bg=document.getElementById('guest-modal-bg');
-  const igualAC=!ac||(ac.adultos===gAdultos(g)&&ac.criancas===gCriancas(g));
-  if(nome===g.nome&&pagante===g.pagante&&crianca===!!g.crianca&&igualAC){
+  const criancasFim=modo==='bebe'?0:(ac?ac.criancas:gCriancas(g));
+  const igualAC=!ac||(ac.adultos===gAdultos(g)&&criancasFim===gCriancas(g));
+  if(nome===g.nome&&pagante===g.pagante&&crianca===!!g.crianca&&modo===gModo(g)&&igualAC){
     if(bg){bg.classList.remove('show');unlockScroll();}
     return;
   }
   if(!g._id){toast('Sem ligação à base de dados — recarrega a página','bad');return;}
   setSync('load','a guardar…');
-  const _ant={nome:g.nome,pagante:g.pagante,crianca:!!g.crianca,adultos:gAdultos(g),criancas:gCriancas(g)};
+  const _ant={nome:g.nome,pagante:g.pagante,crianca:!!g.crianca,modo:gModo(g),adultos:gAdultos(g),criancas:gCriancas(g)};
   try{
     const patch={nome,pagante:pagante==='Sim'};
     if(CONV_CRIANCA_COL)patch.crianca=crianca;
-    if(ac){patch.adultos=ac.adultos;patch.criancas=ac.criancas;}
+    if(ac){patch.adultos=ac.adultos;patch.criancas=criancasFim;}
+    if(CONV_BEBE_COLS)patch.modo=modo;
     await queueWrite(()=>sbReq('PATCH',`convidados?id=eq.${g._id}`,patch));
-    const _dep={nome,pagante,crianca,adultos:ac?ac.adultos:_ant.adultos,criancas:ac?ac.criancas:_ant.criancas};
-    sbLog('convidado','editou',nome,{membro:g.membro,dia:g.dia,ref:g.ref,crianca,adultos:_dep.adultos,criancas:_dep.criancas,de:_ant,para:_dep});
-    g.nome=nome;g.pagante=pagante;g.crianca=crianca;
-    if(ac){g.adultos=ac.adultos;g.criancas=ac.criancas;}
+    const _dep={nome,pagante,crianca,modo,adultos:ac?ac.adultos:_ant.adultos,criancas:criancasFim};
+    sbLog('convidado','editou',nome,{membro:g.membro,dia:g.dia,ref:g.ref,crianca,modo,adultos:_dep.adultos,criancas:_dep.criancas,de:_ant,para:_dep});
+    g.nome=nome;g.pagante=pagante;g.crianca=crianca;g.modo=modo;
+    if(ac){g.adultos=ac.adultos;g.criancas=criancasFim;}
     syncMirror();
     marcaGuardado();
     if(bg){bg.classList.remove('show');unlockScroll();}
@@ -12590,6 +12721,10 @@ function openRefdefModal(editIdx){
     document.getElementById('rd-minmeo').value=rd.minMEO||0;
     document.getElementById('rd-minconv').value=rd.minConv||10;
     document.getElementById('rd-extraconv').value=rd.extraConv||2;
+    // Estes dois mostram-se como estão gravados (nada de substituir o zero por
+    // um defeito): um zero aqui é uma decisão, não um campo por preencher.
+    document.getElementById('rd-minconvbebe').value=rd.minConvBebe||0;
+    document.getElementById('rd-extraconvbebe').value=rd.extraConvBebe||0;
   } else {
     document.getElementById('rd-resp-chips').innerHTML=_respChips([]);
     document.getElementById('rd-entradas').value='';
@@ -12603,7 +12738,14 @@ function openRefdefModal(editIdx){
     document.getElementById('rd-minmeo').value='0';
     document.getElementById('rd-minconv').value='10';
     document.getElementById('rd-extraconv').value='2';
+    document.getElementById('rd-minconvbebe').value='0';
+    document.getElementById('rd-extraconvbebe').value='0';
   }
+  // Preço do convidado que só bebe (db/convidados_bebe.sql). O lanche legado
+  // não tem "só bebe" nenhum — nem de membros nem de convidados —, por isso
+  // ali nem se pergunta.
+  const cbWrap=document.getElementById('rd-convbebe-wrap');
+  if(cbWrap)cbWrap.style.display=(CONV_BEBE_COLS&&document.getElementById('rd-ref').value!=='Lanche')?'':'none';
 
   _respCount();
   document.getElementById('rd-del').style.display=(isEdit&&!ro)?'':'none';
@@ -12656,6 +12798,8 @@ async function saveRefdef(){
   const minMEO=parseFloat(document.getElementById('rd-minmeo').value)||0;
   const minConv=parseFloat(document.getElementById('rd-minconv').value)||0;
   const extraConv=parseFloat(document.getElementById('rd-extraconv').value)||0;
+  const minConvBebe=parseFloat(document.getElementById('rd-minconvbebe').value)||0;
+  const extraConvBebe=parseFloat(document.getElementById('rd-extraconvbebe').value)||0;
 
   if(!data){toast('Seleciona uma data','bad');return;}
   const dia=dataToDia(data);
@@ -12674,7 +12818,7 @@ async function saveRefdef(){
     (document.getElementById('rd-menu').value||'').trim(),
     (document.getElementById('rd-sobremesa-notas').value||'').trim()
   ):((anterior&&anterior.menu)||'');
-  const entry={data,dia,ref,prato:prato||'',peso:ref==='Lanche'?null:peso,minMEO,minConv,extraConv,responsaveis,menu};
+  const entry={data,dia,ref,prato:prato||'',peso:ref==='Lanche'?null:peso,minMEO,minConv,extraConv,minConvBebe,extraConvBebe,responsaveis,menu};
 
   document.getElementById('rd-save').disabled=true;
   if(wasEdit){
@@ -12710,13 +12854,18 @@ function resumoRefeicao(rd){
   });
   const srt=a=>a.sort((x,y)=>x.localeCompare(y,'pt'));
   srt(comem);srt(bebem);
-  const conv=(DATA.convidados||[]).filter(g=>g.dia===rd.dia&&g.ref===rd.ref);
+  const convTodos=(DATA.convidados||[]).filter(g=>g.dia===rd.dia&&g.ref===rd.ref);
+  // Quem cozinha precisa de saber quantos pratos faz: os convidados que só
+  // vêm ao copo não são bocas e por isso contam-se à parte, com os membros
+  // que só bebem — não somados aos convidados que comem.
+  const conv=gComem(convTodos),convBeb=gBebem(convTodos);
   const convBocas=gSomaPessoas(conv);   // um convidado pode levar acompanhantes
   const convCri=gSomaCriancas(conv);
-  const L=[`👥 ${comem.length} a comer · ${bebem.length} só bebem · ${convBocas} convidados${convCri?` (${convCri} criança${convCri===1?'':'s'})`:''}`];
+  const nBebem=bebem.length+gSomaAdultos(convBeb);
+  const L=[`👥 ${comem.length} a comer · ${nBebem} só bebem · ${convBocas} convidados${convCri?` (${convCri} criança${convCri===1?'':'s'})`:''}`];
   if(rd.prato)L.unshift('🍲 '+rd.prato);
   if(comem.length)L.push('🍽 '+comem.join(', '));
-  if(bebem.length)L.push('🥤 '+bebem.join(', '));
+  if(bebem.length||convBeb.length)L.push('🥤 '+bebem.concat(convBeb.map(g=>g.nome+gMultAd(g)+(g.membro?' ('+g.membro+')':''))).join(', '));
   if(conv.length)L.push('🎟 '+conv.map(g=>g.nome+gMult(g)+(g.membro?' ('+g.membro+')':'')).join(', '));
   if(rd.menu)L.push('📋 '+rd.menu);
   return L.join('\n');
@@ -12866,7 +13015,8 @@ async function trocaEscrever(plano,inverso){
 function trocaMemoria(A,B){
   const kA=A.ref+'|'+A.data, kB=B.ref+'|'+B.data;
   // 1) a ementa e os responsáveis mudam de sítio; o slot e os parâmetros da
-  //    conta (peso, minMEO, minConv, extraConv) ficam colados ao dia
+  //    conta (peso, minMEO, minConv, extraConv e os do convidado que só bebe)
+  //    ficam colados ao dia
   ['prato','menu','responsaveis'].forEach(k=>{const t=A[k];A[k]=B[k];B[k]=t;});
   // 2) pedidos da lista de compras
   shopArr().forEach(it=>{
@@ -15286,7 +15436,7 @@ function buildPersonReport(pessoa){
   if(m._convs.length){
     h+='<h2>Convidados</h2>';
     h+='<table><tr><th>Nome</th><th>Dia / Ref</th><th class="right">Valor</th></tr>';
-    m._convs.forEach(c=>{h+=`<tr><td>${c.nome}${c.n>1?' ×'+c.n:''}</td><td>${c.dia} · ${c.ref}</td><td class="right">${eur(c.q)}</td></tr>`;});
+    m._convs.forEach(c=>{h+=`<tr><td>${c.nome}${c.n>1?' ×'+c.n:''}${convModoSuf(c)}</td><td>${c.dia} · ${c.ref}</td><td class="right">${eur(c.q)}</td></tr>`;});
     h+=`<tr style="border-top:2px solid #ddd;font-weight:700"><td colspan="2"><b>Total Convidados</b></td><td class="right"><b>${eur(m.AA)}</b></td></tr>`;
     h+='</table>';
   }
@@ -15402,7 +15552,7 @@ function saldosMembrosHtml(){
     const refsBebe=allR.filter(x=>x.modo==='bebe').map(x=>({k:`${x.dia} · ${x.ref}`,v:rnd(x.p,2)}));
     const refeCome=rnd(refsCome.reduce((a,x)=>a+x.v,0),2);
     const refeBebe=rnd(refsBebe.reduce((a,x)=>a+x.v,0),2);
-    const convsList=[...(m._convs||[])].sort((a,b)=>oKey(a)-oKey(b)).map(x=>({k:`${x.nome}${x.n>1?' ×'+x.n:''} — ${x.dia} · ${x.ref}`,v:rnd(x.q,2)}));
+    const convsList=[...(m._convs||[])].sort((a,b)=>oKey(a)-oKey(b)).map(x=>({k:`${x.nome}${x.n>1?' ×'+x.n:''}${convModoSuf(x)} — ${x.dia} · ${x.ref}`,v:rnd(x.q,2)}));
     // T-shirts imputadas: uma dividida aparece com a fração ao lado
     const tshirts=rnd(m.TS||0,2);
     const tshirtsList=(m._tshirts||[]).map(x=>({k:`${x.nome} — ${x.tipo} ${x.tamanho}${x.partes>1?` (1/${x.partes})`:''}`,v:rnd(x.v,2)}));
@@ -15418,11 +15568,13 @@ function saldosMembrosHtml(){
   const aggRCome={},aggRBebe={},aggC={};
   ms.forEach(m=>{
     (m._refs||[]).forEach(x=>{const tgt=x.modo==='bebe'?aggRBebe:aggRCome;const k=x.dia+'|'+nrm(x.ref);(tgt[k]=tgt[k]||{dia:x.dia,ref:nrm(x.ref),n:0,v:0});tgt[k].n++;tgt[k].v+=x.p;});
-    (m._convs||[]).forEach(x=>{const k=x.dia+'|'+nrm(x.ref);(aggC[k]=aggC[k]||{dia:x.dia,ref:nrm(x.ref),n:0,v:0});aggC[k].n+=(x.n||1);aggC[k].v+=x.q;});
+    // Convidados que comem e convidados que só bebem são linhas SEPARADAS:
+    // pagam preços diferentes, e juntá-los dava um "N conv." a esconder isso
+    (m._convs||[]).forEach(x=>{const beb=x.modo==='bebe';const k=x.dia+'|'+nrm(x.ref)+(beb?'|b':'');(aggC[k]=aggC[k]||{dia:x.dia,ref:nrm(x.ref),bebe:beb,n:0,v:0});aggC[k].n+=(x.n||1);aggC[k].v+=x.q;});
   });
   T.refsCome=Object.values(aggRCome).sort((a,b)=>oKey(a)-oKey(b)).map(a=>({k:`${a.dia} · ${a.ref} — ${a.n} 🧑`,v:rnd(a.v,2)}));
   T.refsBebe=Object.values(aggRBebe).sort((a,b)=>oKey(a)-oKey(b)).map(a=>({k:`${a.dia} · ${a.ref} — ${a.n} 🧑`,v:rnd(a.v,2)}));
-  T.convsList=Object.values(aggC).sort((a,b)=>oKey(a)-oKey(b)).map(a=>({k:`${a.dia} · ${a.ref} — ${a.n} conv.`,v:rnd(a.v,2)}));
+  T.convsList=Object.values(aggC).sort((a,b)=>oKey(a)-oKey(b)||((a.bebe?1:0)-(b.bebe?1:0))).map(a=>({k:`${a.dia} · ${a.ref} — ${a.n} conv.${a.bebe?' 🍺':''}`,v:rnd(a.v,2)}));
   // T-shirts do grupo: agrupadas por tipologia (é assim que a fatura vem)
   const aggTS={};
   ms.forEach(m=>(m._tshirts||[]).forEach(x=>{(aggTS[x.tipo]=aggTS[x.tipo]||{tipo:x.tipo,n:0,v:0});aggTS[x.tipo].n+=1/x.partes;aggTS[x.tipo].v+=x.v;}));
