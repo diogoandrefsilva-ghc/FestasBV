@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v259 · 2026-08-08 · Cartão da refeição: o bloco 🧺 Comprado passa a ter ordem — talho e peixaria à cabeça e, a seguir, por categoria, da que mais pesa no custo da refeição para a que menos pesa (tudo corrido, sem cabeçalhos)';
+const APP_BUILD = 'v260 · 2026-08-08 · 🧺 Comprado: a categoria de um lote passa a ler-se pelo nome do pedido (os artigos do talão com nome próprio já não caíam sem categoria) e, dentro de cada categoria, o maior primeiro — o que se pesa antes do que se conta';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -5092,10 +5092,8 @@ function catEmoji(nome){
    trata primeiro na cozinha. Artigo sem categoria (ou sem a migração das
    categorias) não é fresco — aqui não se adivinha pelo nome, que era um
    dicionário sem fim e enganava-se calado. */
-function artFresco(artigo){
-  const c=artCat(artigo);
-  return !!c&&/(talho|carne|peix|marisc)/.test(shopArtKey(c.nome));
-}
+function catFresco(c){return !!c&&/(talho|carne|peix|marisc)/.test(shopArtKey(c.nome));}
+function artFresco(artigo){return catFresco(artCat(artigo));}
 /* Definir/alterar a categoria de um artigo a partir da UI. Regras:
    preencher um buraco pode qualquer membro; mudar/limpar o que já está
    definido é só do admin (o RLS garante o mesmo no servidor). */
@@ -7334,6 +7332,15 @@ function mslWho(nome){
   const n=String(nome||'').trim();if(!n)return '';
   return `<span class="msl-who" title="No carrinho de ${escHtml(n)}"><i class="msl-ic-cart"></i>${escHtml(n.split(/\s+/)[0])}</span>`;
 }
+/* Quantidade de uma linha do bloco "Comprado" para ORDENAR (não para mostrar):
+   o número já normalizado pelo qtyParse (500 g → 0,5 kg) e a unidade. Sem
+   número legível fica {qn:0}, que a ordenação manda para o fim do seu grupo. */
+function mslQtd(raw){const p=qtyParse(normalizeQty(raw)||'');return{qn:p?p.n:0,qu:p?p.u:''};}
+/* Peso (kg, L) antes do que se conta (unidades, pacotes, latas…): comparar
+   "0,455 kg" com "4 unidades" não quer dizer nada, por isso a unidade decide
+   antes do número — é a mesma regra do resto do stock, onde unidades diferentes
+   nunca se somam nem se convertem. */
+function mslURank(u){const k=uKey(u);return (k==='kg'||k==='l')?0:1;}
 function mealShopSection(rd){
   if(!shopIsMeal(rd.ref))return '';
   const items=shopArr().filter(it=>it.tipo===rd.ref&&it.dataValor===rd.data&&!shopIsRemoved(it))
@@ -7363,7 +7370,13 @@ function mealShopSection(rd){
   const canAdd=shopCanWrite()&&!contasFechadas()&&!past;
   if(!items.length&&!alocs.length&&!provs.length&&!canAdd)return '';
   const key=rd.data+'|'+rd.ref;
-  const alocLines=alocs.map(x=>({art:x.l.artigo,val:x.val,html:`<div class="msl-it stk" onclick="openLoteModal(${x.l._id})">
+  /* `cat` = o nome por que se pergunta a CATEGORIA, que num lote é o do pedido
+     genérico (loteReqArtigo) e não o do talão: é a esse que a categoria está
+     agarrada (é ele o cartão do separador Stock). Sem isto, "Bifes de Acém
+     Redondo (9)" ficava sem categoria e caía no fim do bloco, longe do talho a
+     que pertence — com o agravante de ser das linhas mais caras da refeição. */
+  const alocLines=alocs.map(x=>({art:x.l.artigo,cat:loteReqArtigo(x.l)||x.l.artigo,val:x.val,
+    qn:+x.qtd||0,qu:x.l.unidade,html:`<div class="msl-it stk" onclick="openLoteModal(${x.l._id})">
       ${mslLead(x.l.artigo,loteQtdLabel(x.l,x.qtd))}<span class="msl-st ok">${x.org?x.org.ic+' '+escHtml(x.org.lbl):eur(x.val)}</span></div>`}));
   const lineOf=(it,dim)=>{
     /* Tratado ≠ comprado. Um pedido coberto pelo stock (ou encomendado numa
@@ -7438,15 +7451,15 @@ function mealShopSection(rd){
     // Uma despesa por artigo (o normal desde que as provisórias se gravam assim)
     // → o € da linha é o do artigo, como nas outras linhas do bloco. Nas antigas,
     // com tudo numa despesa só, não há preço por artigo para mostrar.
-    if(arts.length===1){provLines.push({art:arts[0].artigo,val:d.valor,
+    if(arts.length===1){provLines.push(Object.assign({art:arts[0].artigo,val:d.valor,
       html:`<div class="msl-it prov" onclick="${abre}" title="${escHtml(d.desc||'')} — provisório">
-      ${mslLead('*'+arts[0].artigo,arts[0].qtd)}<span class="msl-st prov">${eur(d.valor)}</span></div>`});return;}
+      ${mslLead('*'+arts[0].artigo,arts[0].qtd)}<span class="msl-st prov">${eur(d.valor)}</span></div>`},mslQtd(arts[0].qtd)));return;}
     // Provisória antiga, com os artigos todos numa despesa só: não há preço por
     // artigo e nenhum se inventa na linha. O `val` reparte o total para PESAR a
     // categoria na ordenação — é peso, não preço, e nunca chega ao ecrã.
-    arts.forEach(a=>provLines.push({art:a.artigo,val:d.valor/arts.length,
+    arts.forEach(a=>provLines.push(Object.assign({art:a.artigo,val:d.valor/arts.length,
       html:`<div class="msl-it prov" onclick="${abre}" title="${escHtml(d.desc||'')} — provisório">
-      ${mslLead('*'+a.artigo,a.qtd)}</div>`}));
+      ${mslLead('*'+a.artigo,a.qtd)}</div>`},mslQtd(a.qtd))));
   });
   const nProv=provs.length;
   const nComp=alocs.length+bought.length+nProvArts;
@@ -7485,25 +7498,32 @@ function mealShopSection(rd){
      Ordena as três origens DE UMA VEZ (stock alocado, pedido comprado sem lote,
      provisória): separá-las punha a carne no fim do bloco só porque a compra
      dela ainda não tinha lote — e é ela que se confere à chegada.
-     · Fresco = talho e peixaria (artFresco), pela CATEGORIA do artigo. Sem
+     · Fresco = talho e peixaria (catFresco), pela CATEGORIA do artigo. Sem
        categoria atribuída não é fresco: aqui não se adivinha pelo nome.
      · O peso é o € DESTA refeição, não o do ano — o que manda é o que pesa
        nesta ementa. Uma linha sem € conhecido (pedido comprado sem lote) vale 0
        e não empurra a categoria para cima.
-     · Sem categoria fica no fim, como nas outras vistas agrupadas. */
-  const compLinhas=alocLines.concat(bought.map(it=>({art:it.artigo,val:0,html:lineOf(it,false)})),provLines);
+     · Sem categoria fica no fim, como nas outras vistas agrupadas.
+     · Dentro da categoria, o MAIOR primeiro — quem cozinha vê logo as peças
+       grandes —, com o que se pesa antes do que se conta (mslURank). */
+  const compLinhas=alocLines.concat(
+    bought.map(it=>Object.assign({art:it.artigo,val:0,html:lineOf(it,false)},mslQtd(it.quantidade))),
+    provLines);
   const catPeso={};
   compLinhas.forEach(x=>{
-    const c=artCat(x.art);x.ck=c?'c'+c.id:'none';x.cn=c?c.nome:'';
+    const c=artCat(x.cat||x.art);
+    x.fr=catFresco(c)?0:1;x.ck=c?'c'+c.id:'none';x.cn=c?c.nome:'';
     if(c)catPeso[x.ck]=(catPeso[x.ck]||0)+(+x.val||0);
   });
   const compDet=nComp?det('|c','🧺 Comprado',nComp,
     compLinhas.sort((a,b)=>
-        (artFresco(b.art)?1:0)-(artFresco(a.art)?1:0)                 // fresco primeiro
+        a.fr-b.fr                                                     // fresco primeiro
         ||(a.ck==='none'?1:0)-(b.ck==='none'?1:0)                     // sem categoria no fim
         ||(catPeso[b.ck]||0)-(catPeso[a.ck]||0)                       // categoria mais cara primeiro
         ||a.cn.localeCompare(b.cn,'pt')                               // empate: categoria por nome
-        ||a.art.localeCompare(b.art,'pt'))                            // dentro da categoria, por nome
+        ||mslURank(a.qu)-mslURank(b.qu)                               // kg/L antes de unidades
+        ||(b.qn||0)-(a.qn||0)                                         // maior quantidade primeiro
+        ||a.art.localeCompare(b.art,'pt'))                            // empate: por nome
       .map(x=>x.html).join('')+provLeg):'';
   return `<div class="rdc sf msl" onclick="event.stopPropagation()">${past?compDet+listaDet:listaDet+compDet}</div>`;
 }
