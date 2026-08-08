@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v259 · 2026-08-08 · Cartão da refeição: no bloco 🧺 Comprado, os artigos de talho e peixaria passam a vir à cabeça (o fresco primeiro), com o resto por nome';
+const APP_BUILD = 'v259 · 2026-08-08 · Cartão da refeição: o bloco 🧺 Comprado passa a ter ordem — talho e peixaria à cabeça e, a seguir, por categoria, da que mais pesa no custo da refeição para a que menos pesa (tudo corrido, sem cabeçalhos)';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -7363,7 +7363,7 @@ function mealShopSection(rd){
   const canAdd=shopCanWrite()&&!contasFechadas()&&!past;
   if(!items.length&&!alocs.length&&!provs.length&&!canAdd)return '';
   const key=rd.data+'|'+rd.ref;
-  const alocLines=alocs.map(x=>({art:x.l.artigo,html:`<div class="msl-it stk" onclick="openLoteModal(${x.l._id})">
+  const alocLines=alocs.map(x=>({art:x.l.artigo,val:x.val,html:`<div class="msl-it stk" onclick="openLoteModal(${x.l._id})">
       ${mslLead(x.l.artigo,loteQtdLabel(x.l,x.qtd))}<span class="msl-st ok">${x.org?x.org.ic+' '+escHtml(x.org.lbl):eur(x.val)}</span></div>`}));
   const lineOf=(it,dim)=>{
     /* Tratado ≠ comprado. Um pedido coberto pelo stock (ou encomendado numa
@@ -7432,16 +7432,19 @@ function mealShopSection(rd){
     const abre=d.compraId?`openCfDetail('compra','${d.compraId}')`:`openCfDetail('despesas',${i})`;
     const arts=provArtigos(d);
     nProvArts+=arts.length||1;
-    if(!arts.length){provLines.push({art:d.desc||'Despesa provisória',
+    if(!arts.length){provLines.push({art:d.desc||'Despesa provisória',val:d.valor,
       html:`<div class="msl-it prov" onclick="${abre}" title="Provisório">
       ${mslLead('*'+(d.desc||'Despesa provisória'),'')}<span class="msl-st prov">${eur(d.valor)}</span></div>`});return;}
     // Uma despesa por artigo (o normal desde que as provisórias se gravam assim)
     // → o € da linha é o do artigo, como nas outras linhas do bloco. Nas antigas,
     // com tudo numa despesa só, não há preço por artigo para mostrar.
-    if(arts.length===1){provLines.push({art:arts[0].artigo,
+    if(arts.length===1){provLines.push({art:arts[0].artigo,val:d.valor,
       html:`<div class="msl-it prov" onclick="${abre}" title="${escHtml(d.desc||'')} — provisório">
       ${mslLead('*'+arts[0].artigo,arts[0].qtd)}<span class="msl-st prov">${eur(d.valor)}</span></div>`});return;}
-    arts.forEach(a=>provLines.push({art:a.artigo,
+    // Provisória antiga, com os artigos todos numa despesa só: não há preço por
+    // artigo e nenhum se inventa na linha. O `val` reparte o total para PESAR a
+    // categoria na ordenação — é peso, não preço, e nunca chega ao ecrã.
+    arts.forEach(a=>provLines.push({art:a.artigo,val:d.valor/arts.length,
       html:`<div class="msl-it prov" onclick="${abre}" title="${escHtml(d.desc||'')} — provisório">
       ${mslLead('*'+a.artigo,a.qtd)}</div>`}));
   });
@@ -7474,16 +7477,33 @@ function mealShopSection(rd){
   provs.forEach(({d})=>{const k=d.desc||'despesa provisória';porQuem[k]=rnd((porQuem[k]||0)+d.valor,2);});
   const provQuem=Object.keys(porQuem).map(k=>`${escHtml(k)} · ${eur(porQuem[k])}`).join(' · ');
   const provLeg=nProv?`<div class="msl-leg-prov"><b>*</b> provisório — ainda por comprar${provQuem?': '+provQuem:''}</div>`:'';
-  /* 🥩🐟 TALHO E PEIXARIA À CABEÇA. O bloco é uma lista só — venha a linha do
-     stock alocado, do pedido comprado sem lote ou de uma provisória —, por isso
-     a ordem decide-se aqui, sobre as três de uma vez: separar por origem punha
-     a carne no fim do bloco só porque a compra dela ainda não tem lote. O fresco
-     primeiro porque é o que se confere à chegada e o que estraga se falhar; o
-     resto por nome, como sempre. O que é fresco vem da CATEGORIA (artFresco):
-     sem categoria atribuída, o artigo fica no grupo de baixo. */
+  /* ORDEM DO BLOCO: 🥩🐟 o fresco à cabeça, e a seguir por CATEGORIA, da que
+     mais pesa no custo desta refeição para a que menos pesa. Tudo CORRIDO, sem
+     cabeçalhos: num cartão de refeição um cabeçalho por categoria eram mais
+     linhas de arrumação do que de conteúdo — a lógica lê-se na mesma, porque os
+     artigos da mesma categoria ficam juntos e o que pesa aparece em cima.
+     Ordena as três origens DE UMA VEZ (stock alocado, pedido comprado sem lote,
+     provisória): separá-las punha a carne no fim do bloco só porque a compra
+     dela ainda não tinha lote — e é ela que se confere à chegada.
+     · Fresco = talho e peixaria (artFresco), pela CATEGORIA do artigo. Sem
+       categoria atribuída não é fresco: aqui não se adivinha pelo nome.
+     · O peso é o € DESTA refeição, não o do ano — o que manda é o que pesa
+       nesta ementa. Uma linha sem € conhecido (pedido comprado sem lote) vale 0
+       e não empurra a categoria para cima.
+     · Sem categoria fica no fim, como nas outras vistas agrupadas. */
+  const compLinhas=alocLines.concat(bought.map(it=>({art:it.artigo,val:0,html:lineOf(it,false)})),provLines);
+  const catPeso={};
+  compLinhas.forEach(x=>{
+    const c=artCat(x.art);x.ck=c?'c'+c.id:'none';x.cn=c?c.nome:'';
+    if(c)catPeso[x.ck]=(catPeso[x.ck]||0)+(+x.val||0);
+  });
   const compDet=nComp?det('|c','🧺 Comprado',nComp,
-    alocLines.concat(bought.map(it=>({art:it.artigo,html:lineOf(it,false)})),provLines)
-      .sort((a,b)=>(artFresco(b.art)?1:0)-(artFresco(a.art)?1:0)||a.art.localeCompare(b.art,'pt'))
+    compLinhas.sort((a,b)=>
+        (artFresco(b.art)?1:0)-(artFresco(a.art)?1:0)                 // fresco primeiro
+        ||(a.ck==='none'?1:0)-(b.ck==='none'?1:0)                     // sem categoria no fim
+        ||(catPeso[b.ck]||0)-(catPeso[a.ck]||0)                       // categoria mais cara primeiro
+        ||a.cn.localeCompare(b.cn,'pt')                               // empate: categoria por nome
+        ||a.art.localeCompare(b.art,'pt'))                            // dentro da categoria, por nome
       .map(x=>x.html).join('')+provLeg):'';
   return `<div class="rdc sf msl" onclick="event.stopPropagation()">${past?compDet+listaDet:listaDet+compDet}</div>`;
 }
