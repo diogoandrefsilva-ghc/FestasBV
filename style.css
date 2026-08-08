@@ -797,6 +797,12 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .rdc-people{font-size:11.5px;color:var(--muted);margin-top:5px}
 .rdc-people b{color:var(--ink)}
 .rdc-cells{display:flex;gap:8px;margin-top:8px;align-items:stretch}
+/* Mais de duas espécies de gente não cabem numa linha (ver rdc-cells no
+   app.js): passam a DUAS COLUNAS. Em número ímpar o último ocupa a linha
+   toda, em vez de ficar órfão a meia largura. */
+.rdc-cells-wrap{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
+.rdc-cells-wrap>.rdc-cell{min-width:0}
+.rdc-cells-wrap>:last-child:nth-child(odd){grid-column:1/-1}
 .rdc-cell{flex:1;background:var(--panel);border-radius:8px;padding:6px 10px 7px;text-align:center}
 .rdc-cell-k{font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--faint);font-weight:600}
 .rdc-cell-v{font-size:18px;font-weight:700;color:var(--ink);margin-top:0;font-variant-numeric:tabular-nums}
@@ -825,7 +831,12 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .rdc-ppl-it{font-size:11px;background:var(--panel);border:1px solid var(--line);border-radius:7px;padding:3px 8px;color:var(--ink);font-weight:600}
 .rdc-ppl-it small{color:var(--faint);font-weight:400}
 /* Contagem dentro das células membro/convidado */
-.rdc-cell-k{display:inline-flex;align-items:center;gap:5px;justify-content:center}
+/* O rótulo parte-se antes de rebentar a célula: num telemóvel estreito é
+   preferível "CONVIDADO" e a contagem em duas linhas a um › cortado. */
+.rdc-cell-k{display:inline-flex;align-items:center;gap:5px;justify-content:center;flex-wrap:wrap}
+/* 🍻 do "Convidado que só bebe": desenhado, à medida do rótulo (um emoji sai
+   maior que o texto e com cor própria — ver a mesma razão no --ic-cart) */
+.rdc-cell-k svg{width:12px;height:12px;flex:none}
 .rdc-cell-n{background:rgba(110,75,25,.12);color:var(--muted);font-size:9.5px;font-weight:700;padding:1px 6px;border-radius:20px;letter-spacing:0}
 .rdc-na{font-size:15px;font-weight:600;color:#BBB3A4}
 .rdc-sempres{font-size:11.5px;color:var(--faint);text-align:center;margin-top:6px}

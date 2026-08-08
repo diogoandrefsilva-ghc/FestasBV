@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v261 · 2026-08-08 · 🍺 Convidado que só bebe: a linha do convidado diz o que vem fazer e quem só vem ao copo paga quota própria — outra da do membro que só bebe (extra + mínimo por refeição)';
+const APP_BUILD = 'v261 · 2026-08-08 · 🍺 Convidado que só bebe: a linha do convidado diz o que vem fazer e quem só vem ao copo paga quota própria — outra da do membro que só bebe (extra + mínimo por refeição). As células do custo da refeição passam a duas colunas: quatro não cabiam numa linha';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -1503,15 +1503,25 @@ function renderAll(){
            ao contrário do membro, cujo preço de bebida vive no bloco 🍻 (que
            é onde se explica de que é feito), aqui o que interessa é a quota,
            que não é o custo nem é a do convidado que come. */
-        const convBebeCell=calcRef.Ebebe?`<div ${cellAttrs('gb',guestsBebe.length)}><div class="rdc-cell-k">Convidado ${DEST_BEB_ICON}<span class="rdc-cell-n">${calcRef.Ebebe}</span>${arrow(guestsBebe.length)}</div><div class="rdc-cell-v">${eur(calcRef.Qbebe||0)}</div></div>`:'';
+        // O 🍻 aqui é DESENHADO (não emoji): num rótulo de 10px o emoji sai
+        // maior que o texto, com cor própria, e era ele que partia o "Convidado"
+        // para a linha de baixo.
+        const convBebeCell=calcRef.Ebebe?`<div ${cellAttrs('gb',guestsBebe.length)}><div class="rdc-cell-k">Convidado${BEER_SVG_SM}<span class="rdc-cell-n">${calcRef.Ebebe}</span>${arrow(guestsBebe.length)}</div><div class="rdc-cell-v">${eur(calcRef.Qbebe||0)}</div></div>`:'';
         // Crianças: só bocas para a cozinha/compras — não pagam nada
         const kidsCell=nCriancas?`<div ${cellAttrs('k',nCriancas)}><div class="rdc-cell-k">Criança<span class="rdc-cell-n">${nCriancas}</span>${arrow(1)}</div><div class="rdc-cell-v"><span class="rdc-na">não paga</span></div></div>`:'';
+        /* As espécies de gente podem ser quatro (membro · convidado ·
+           convidado do copo · criança) e não cabem numa linha: "CONVIDADO"
+           sozinho já não cabe em 1/4 da largura — a quarta célula saía do
+           ecrã. Passando de duas, vão a DUAS COLUNAS (2×2, ou 2+1 a toda a
+           largura). Não se encolhe o texto nem o valor para caber numa linha:
+           é o que se lê, e a três colunas já vinham partidos ao meio. */
+        const cells=[membroCell,convCell,convBebeCell,kidsCell].filter(Boolean);
         const presNota=calcRef.D>0?'':'<div class="rdc-sempres">Sem presenças marcadas</div>';
         const mkey=rd.data+'|'+rd.ref,cid='rdcb'+rd._idx,cOpen=!!MEAL_COST_OPEN[mkey];
         costBox=`<div class="rdc rdc-hero rdc-costs sf">
           <div class="rdc-hdr rdc-costs-hdr${cOpen?' open':''}" onclick="toggleCosts(this,'${cid}','${mkey}')"><span class="rdc-lbl rdc-lbl-green">Custo da refeição</span><span class="rdc-tot">${eur(calcRef.custoTotal)}</span>${ppTag(rnd(indPP+dirPP+bebPP,2))}<span class="rdc-fold-arrow">›</span></div>
           ${presNota}
-          <div class="rdc-cells">${membroCell}${convCell}${convBebeCell}${kidsCell}</div>
+          <div class="rdc-cells${cells.length>2?' rdc-cells-wrap':''}">${cells.join('')}</div>
           ${memPanel}${guestPanel}${guestBebePanel}${kidPanel}
           <div class="rdc-costs-body" id="${cid}"${cOpen?'':' style="display:none"'}>${costDet}</div>
         </div>`;
