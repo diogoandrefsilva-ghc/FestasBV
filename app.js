@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v261 · 2026-08-08 · 🍺 Convidado que só bebe: a linha do convidado diz o que vem fazer e quem só vem ao copo paga quota própria — outra da do membro que só bebe (extra + mínimo por refeição). As células do custo da refeição passam a duas colunas: quatro não cabiam numa linha';
+const APP_BUILD = 'v262 · 2026-08-08 · Custo da refeição passa a tabela de preços: quem (membros · convidados) × o quê (come · só bebe · criança). O membro que só bebe e os filhos deixam de estar escondidos noutros sítios';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -369,13 +369,16 @@ function criancasNoSlotNomes(slotKey){
   const parts=(slotKey||'').split('|');
   const dia=parts[0],ref=parts[1]==='Tarde'?'Lanche':parts[1];
   const nomes=new Set((DATA.membros||[]).map(m=>m.nome));
+  // `origem` separa os filhos dos membros das crianças que vêm com convidados:
+  // são linhas diferentes na grelha do custo da refeição. Quem as conta é
+  // sempre esta função — não recontar filhos e convidados-criança à parte.
   const out=FILHOS.filter(f=>paisDoFilho(f).some(p=>nomes.has(p))&&filhoCome(f.id,slotKey))
-    .map(f=>({nome:f.nome,de:paisDoFilho(f).join(' / '),n:1}));
+    .map(f=>({nome:f.nome,de:paisDoFilho(f).join(' / '),n:1,origem:'membro'}));
   // Crianças de convidados: quando a linha também tem adultos, as crianças não
   // se chamam como ele — ficam "crianças de João Pedro".
   (DATA.convidados||[]).filter(g=>g.dia===dia&&g.ref===ref&&gCriancas(g)>0)
     .forEach(g=>out.push({nome:gSoCriancas(g)?g.nome:'crianças de '+g.nome,
-                          de:g.membro||'',n:gCriancas(g)}));
+                          de:g.membro||'',n:gCriancas(g),origem:'convidado'}));
   return out.sort((a,b)=>a.nome.localeCompare(b.nome,'pt'));
 }
 // Amigos que o admin pode validar: membros sem utilizador no agregado, fora do próprio agregado do admin.
@@ -1474,55 +1477,68 @@ function renderAll(){
             ${calcRef.temBebe?`<div class="rdc-unit"><span>Quem só bebe paga<span class="rdc-note"> = bebida + indiretos</span></span><span class="rdc-unit-v">${eur(calcRef.custoUnitBebe||0)}</span></div>`:''}
           </details>`;
         }
-        const membrosCount=Math.max(0,calcRef.D-calcRef.E);
         const rkey=`${rd.dia}|${rd.ref==='Lanche'?'Tarde':rd.ref}`;
-        const membrosCome=(DATA.membros||[]).filter(m=>(m.presencas||[]).some(p=>p.k===rkey&&p.modo==='come')).map(m=>m.nome).sort((a,b)=>a.localeCompare(b,'pt'));
+        const presDe=modo=>(DATA.membros||[]).filter(m=>(m.presencas||[]).some(p=>p.k===rkey&&p.modo===modo)).map(m=>m.nome).sort((a,b)=>a.localeCompare(b,'pt'));
+        const membrosCome=presDe('come'),membrosBebe=presDe('bebe');
         const guestsAll=(DATA.convidados||[]).filter(g=>g.dia===rd.dia&&g.ref===rd.ref);
-        // Só quem tem adultos é que entra no painel "Convidado" (que é o dos
-        // que pagam quota); as crianças da linha vão para o painel "Criança".
-        // Quem só veio ao copo tem painel próprio: paga outro preço.
+        // Só quem tem adultos é que entra nas células de convidado (que são as
+        // de quem paga quota); as crianças da linha vão para a célula "Criança".
+        // Quem só veio ao copo tem célula própria: paga outro preço.
         const guestsPayAll=guestsAll.filter(g=>g.pagante==='Sim'&&gAdultos(g)>0);
         const guestsPay=gComem(guestsPayAll);
         const guestsBebe=gBebem(guestsPayAll);
-        const kidsList=criancasNoSlotNomes(rkey);   // filhos inscritos + convidados-criança
-        const nCriancas=criancasNoSlot(rkey);       // bocas (um convidado-criança pode valer várias)
+        // Filhos dos membros e crianças de convidados são linhas diferentes da
+        // grelha, mas contam-se no mesmo sítio (ver criancasNoSlotNomes)
+        const kidsAll=criancasNoSlotNomes(rkey);
+        const kidsMem=kidsAll.filter(k=>k.origem==='membro');
+        const kidsConv=kidsAll.filter(k=>k.origem==='convidado');
+        const nKids=l=>l.reduce((a,k)=>a+(k.n||1),0);
         const pid='rdp'+rd._idx;
-        // Cada botão lista só o seu grupo — a vista de conjunto (por agregado)
-        // é o container "Quem vai?", não se repete aqui.
+        /* A grelha é uma TABELA DE PREÇOS de duas entradas: quem (membro ·
+           convidado) × o quê (come · só bebe · criança). Antes era uma fila de
+           células soltas, e a mesma pergunta — "quanto paga esta espécie de
+           gente?" — respondia-se em sítios diferentes conforme a espécie: o
+           membro que só bebe só aparecia dentro do bloco 🍻, e as crianças dos
+           membros vinham somadas às dos convidados numa célula só.
+           As linhas mostram-se SEMPRE as duas, com as três colunas: é o que
+           faz disto uma tabela em vez de uma fila de cartões que muda de
+           forma a cada refeição. Célula sem ninguém fica apagada (`off`) e
+           sem contagem — o valor continua lá, que é o preço em vigor. */
         const pplPanel=(sfx,html)=>`<div class="rdc-ppl" id="${pid}${sfx}" style="display:none">${html}</div>`;
-        const memPanel=membrosCome.length?pplPanel('m',membrosCome.map(n=>`<span class="rdc-ppl-it">${escHtml(n)}</span>`).join('')):'';
         const gPplIt=g=>`<span class="rdc-ppl-it">${escHtml(g.nome)}${gMultAd(g)}${g.membro?`<small> · ${escHtml(g.membro)}</small>`:''}</span>`;
-        const guestPanel=guestsPay.length?pplPanel('g',guestsPay.map(gPplIt).join('')):'';
-        const guestBebePanel=guestsBebe.length?pplPanel('gb',guestsBebe.map(gPplIt).join('')):'';
-        const kidPanel=nCriancas?pplPanel('k',kidsList.map(k=>`<span class="rdc-ppl-it">${escHtml(k.nome)}${k.n>1?' ×'+k.n:''}${k.de?`<small> · ${escHtml(k.de)}</small>`:''}</span>`).join('')):'';
-        const cellAttrs=(sfx,has)=>has?`class="rdc-cell rdc-cell-btn" data-tgt="${pid}${sfx}" onclick="togglePeople('${pid}${sfx}')"`:'class="rdc-cell"';
-        const arrow=has=>has?'<span class="rdc-cell-arrow">›</span>':'';
-        const membroCell=`<div ${cellAttrs('m',membrosCome.length)}><div class="rdc-cell-k">Membro${membrosCount?`<span class="rdc-cell-n">${membrosCount}</span>`:''}${arrow(membrosCome.length)}</div><div class="rdc-cell-v rdc-cell-v-gold">${calcRef.D>0?eur(calcRef.P):'<span class="rdc-na">N/A</span>'}</div></div>`;
-        const convCell=`<div ${cellAttrs('g',guestsPay.length)}><div class="rdc-cell-k">Convidado${calcRef.E?`<span class="rdc-cell-n">${calcRef.E}</span>`:''}${arrow(guestsPay.length)}</div><div class="rdc-cell-v">${calcRef.E?eur(calcRef.Q):'<span class="rdc-na">N/A</span>'}</div></div>`;
-        /* Convidado que só veio ao copo: célula própria, e só quando existe —
-           ao contrário do membro, cujo preço de bebida vive no bloco 🍻 (que
-           é onde se explica de que é feito), aqui o que interessa é a quota,
-           que não é o custo nem é a do convidado que come. */
-        // O 🍻 aqui é DESENHADO (não emoji): num rótulo de 10px o emoji sai
-        // maior que o texto, com cor própria, e era ele que partia o "Convidado"
-        // para a linha de baixo.
-        const convBebeCell=calcRef.Ebebe?`<div ${cellAttrs('gb',guestsBebe.length)}><div class="rdc-cell-k">Convidado${BEER_SVG_SM}<span class="rdc-cell-n">${calcRef.Ebebe}</span>${arrow(guestsBebe.length)}</div><div class="rdc-cell-v">${eur(calcRef.Qbebe||0)}</div></div>`:'';
-        // Crianças: só bocas para a cozinha/compras — não pagam nada
-        const kidsCell=nCriancas?`<div ${cellAttrs('k',nCriancas)}><div class="rdc-cell-k">Criança<span class="rdc-cell-n">${nCriancas}</span>${arrow(1)}</div><div class="rdc-cell-v"><span class="rdc-na">não paga</span></div></div>`:'';
-        /* As espécies de gente podem ser quatro (membro · convidado ·
-           convidado do copo · criança) e não cabem numa linha: "CONVIDADO"
-           sozinho já não cabe em 1/4 da largura — a quarta célula saía do
-           ecrã. Passando de duas, vão a DUAS COLUNAS (2×2, ou 2+1 a toda a
-           largura). Não se encolhe o texto nem o valor para caber numa linha:
-           é o que se lê, e a três colunas já vinham partidos ao meio. */
-        const cells=[membroCell,convCell,convBebeCell,kidsCell].filter(Boolean);
+        const kPplIt=k=>`<span class="rdc-ppl-it">${escHtml(k.nome)}${k.n>1?' ×'+k.n:''}${k.de?`<small> · ${escHtml(k.de)}</small>`:''}</span>`;
+        const nomeIt=n=>`<span class="rdc-ppl-it">${escHtml(n)}</span>`;
+        /* Uma célula = rótulo (+ contagem) + valor. Com gente, abre a lista.
+           SEM o › que as células soltas tinham: em seis células eram seis
+           setas a dizer o mesmo, e com contagens de dois dígitos ("SÓ BEBE 🍻
+           12 ›") a seta saltava para uma segunda linha e desalinhava a altura
+           da faixa. Quem convida ao toque é a contagem. */
+        const cel=(sfx,lbl,n,valor,lista,vcls)=>{
+          const has=n>0&&lista;
+          const attrs=has?`class="rdc-cell rdc-cell-btn" data-tgt="${pid}${sfx}" onclick="togglePeople('${pid}${sfx}')"`
+                         :`class="rdc-cell${n>0?'':' off'}"`;
+          return{cell:`<div ${attrs}><div class="rdc-cell-k">${lbl}${n>0?`<span class="rdc-cell-n">${n}</span>`:''}</div><div class="rdc-cell-v${vcls?' '+vcls:''}">${valor}</div></div>`,
+                 panel:has?pplPanel(sfx,lista):''};
+        };
+        const NA='<span class="rdc-na">N/A</span>',NAOPAGA='<span class="rdc-na">não paga</span>';
+        const LBL_BEBE='Só bebe'+BEER_SVG_SM;
+        const nMemCome=Math.max(0,calcRef.D-calcRef.E),nMemBebe=Math.max(0,(calcRef.Nbebe||0)-(calcRef.Ebebe||0));
+        const linha=[
+          cel('m','Come',nMemCome,calcRef.D>0?eur(calcRef.P):NA,membrosCome.length?membrosCome.map(nomeIt).join(''):'','rdc-cell-v-gold'),
+          cel('mb',LBL_BEBE,nMemBebe,calcRef.D>0?eur(calcRef.Pbebe||0):NA,membrosBebe.length?membrosBebe.map(nomeIt).join(''):'','rdc-cell-v-gold'),
+          cel('mk','Criança',nKids(kidsMem),NAOPAGA,kidsMem.map(kPplIt).join('')),
+          cel('g','Come',calcRef.E,calcRef.E?eur(calcRef.Q):NA,guestsPay.map(gPplIt).join('')),
+          cel('gb',LBL_BEBE,calcRef.Ebebe,calcRef.Ebebe?eur(calcRef.Qbebe||0):NA,guestsBebe.map(gPplIt).join('')),
+          cel('gk','Criança',nKids(kidsConv),NAOPAGA,kidsConv.map(kPplIt).join(''))
+        ];
+        const faixa=(tit,idx)=>`<div class="rdc-grp">${tit}</div><div class="rdc-cells">${idx.map(i=>linha[i].cell).join('')}</div>${idx.map(i=>linha[i].panel).join('')}`;
+        const cellsHtml=faixa('Membros',[0,1,2])+faixa('Convidados',[3,4,5]);
         const presNota=calcRef.D>0?'':'<div class="rdc-sempres">Sem presenças marcadas</div>';
         const mkey=rd.data+'|'+rd.ref,cid='rdcb'+rd._idx,cOpen=!!MEAL_COST_OPEN[mkey];
         costBox=`<div class="rdc rdc-hero rdc-costs sf">
           <div class="rdc-hdr rdc-costs-hdr${cOpen?' open':''}" onclick="toggleCosts(this,'${cid}','${mkey}')"><span class="rdc-lbl rdc-lbl-green">Custo da refeição</span><span class="rdc-tot">${eur(calcRef.custoTotal)}</span>${ppTag(rnd(indPP+dirPP+bebPP,2))}<span class="rdc-fold-arrow">›</span></div>
           ${presNota}
-          <div class="rdc-cells${cells.length>2?' rdc-cells-wrap':''}">${cells.join('')}</div>
-          ${memPanel}${guestPanel}${guestBebePanel}${kidPanel}
+          ${cellsHtml}
           <div class="rdc-costs-body" id="${cid}"${cOpen?'':' style="display:none"'}>${costDet}</div>
         </div>`;
         // "Quem vai?" — toda a gente da refeição, agrupada por agregado.
