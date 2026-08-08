@@ -400,7 +400,7 @@ setTimeout(function(){ if (window.fbvEsconderSplash) window.fbvEsconderSplash();
     <datalist id="stkadd-list"></datalist>
     <div class="inline-row">
       <div style="flex:3"><label>Tamanho / embalagem</label><input type="text" id="stkadd-tam" maxlength="20" placeholder="Ex: lata 250 ml" onblur="this.value=normalizeQty(this.value)"></div>
-      <div style="flex:2"><label>Qtd.</label><input type="text" id="stkadd-qtd" maxlength="20" placeholder="Ex: 4" onblur="this.value=normalizeQty(this.value)"></div>
+      <div style="flex:2"><label>Qtd. <i style="font-weight:400;color:var(--faint)">(opcional)</i></label><input type="text" id="stkadd-qtd" maxlength="20" placeholder="Ex: 4 — ou só kg" onblur="this.value=normalizeQty(this.value)"></div>
     </div>
     <div class="mbtns">
       <button class="btn ghost" onclick="stkAddClose(true)">Cancelar</button>

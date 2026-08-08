@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v256 · 2026-08-08 · Compras: a ordenação 📅 Refeição segue os DIAS — Gerais/Bebidas à cabeça e depois as refeições por data do evento, em vez de juntar os almoços todos antes dos jantares';
+const APP_BUILD = 'v257 · 2026-08-08 · Stock sem compra: a quantidade passou a ser opcional — uma oferta pode entrar só com a unidade ("kg") ou sem nada, em vez de obrigar a inventar um número';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -6415,7 +6415,12 @@ function umbConsumo(lotes,artigo){
   });
   cons=rnd(Math.max(0,Math.min(cons,tot)),3);
   const desp=ehDespensa(artigo||((lotes||[])[0]?loteReqArtigo(lotes[0]):''));
-  return {tot,cons,resta:rnd(Math.max(0,tot-cons),3),pool,manual,desp};
+  const resta=rnd(Math.max(0,tot-cons),3);
+  /* "Acabou" (a leitura da despensa) é DITO, não deduzido: é o consumo à mão a
+     levar o lote todo. Lê-lo só do resto a zero dava um artigo sem quantidade
+     escrita por acabado à cabeça — e sem maneira de dizer o contrário, que o
+     "ainda há" também deixa o resto a zero. */
+  return {tot,cons,resta,pool,manual,desp,acabou:manual&&!(resta>0.0005)};
 }
 /* Reparte um consumo dito à mão pelos lotes, do mais antigo para o mais novo
    (a mesma ordem FIFO por que se alocam) — gasta-se primeiro o que entrou
@@ -6508,6 +6513,20 @@ function qtyParse(raw){
   if(u==='ml'){n=n/1000;u='l';}
   return{n,u};
 }
+/* Como o qtyParse, mas a quantidade é OPCIONAL: aceita o campo vazio e a
+   unidade sozinha ("kg", "unidades") → {n:0,u}. Há stock que entra sem número —
+   uma oferta chega como "ofereceram-nos batatas" e ninguém as pesou —, e
+   obrigar a inventar um número era escrever no stock uma coisa que ninguém
+   sabe. A unidade, essa, costuma saber-se, e é ela que decide em que cartão o
+   artigo cai (o guarda-chuva é artigo+unidade). null = texto que não é nem
+   número nem unidade; quem chama que se queixe. */
+function qtyParseOpt(raw){
+  const q=qtyParse(raw);if(q)return q;
+  const norm=(raw||'').trim().toLowerCase().replace(/\.$/,'').normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  if(!norm)return{n:0,u:''};
+  for(const k in _QTY_UNITS)if(_QTY_UNITS[k].includes(norm))return{n:0,u:k==='g'?'kg':k==='ml'?'l':k};
+  return null;
+}
 function fmtQty(n,u){
   const s=String(Math.round(n*1000)/1000).replace('.',',');
   const pl={duzia:['dúzia','dúzias'],pacote:['pacote','pacotes'],lata:['lata','latas'],garrafa:['garrafa','garrafas'],caixa:['caixa','caixas'],saco:['saco','sacos'],grade:['grade','grades'],fatia:['fatia','fatias'],molho:['molho','molhos']};
@@ -6535,7 +6554,10 @@ function uLabel(u){return fmtQty(2,uKey(u)).replace(/^2\s*/,'')||'unidades';}
 function loteQtdLabel(l,qtd){
   const n=qtd==null?(l&&l.qtd||0):qtd;
   const t=((l&&l.tamanho)||'').trim();
-  const q=fmtQty(n,(l&&l.unidade)||'');
+  // Um lote pode não ter quantidade escrita (uma oferta que ninguém pesou), e
+  // aí não se escreve "0 kg" — isso lê-se como "acabou", que é o contrário do
+  // que se passa: o artigo está cá, o que falta é o número.
+  const q=n>0.0005?fmtQty(n,(l&&l.unidade)||''):'sem quantidade';
   return t?`${q} × ${t}`:q;
 }
 
@@ -7773,6 +7795,10 @@ function stockArticleCard(g){
   const dests=soLivre?[]:Object.keys(ag.dest).sort(destKeyCmp);
   const chips=dests.map(k=>stockDestChip(k,ag.dest[k].qtd,ag.u,c.desp)).join('')
     +((ag.freeQ>0.0005&&(st==='all'||st==='poralocar'))?`<span class="stk-chip livre">🧺 por alocar · ${escHtml(fmtQty(ag.freeQ,ag.u))}</span>`:'');
+  /* Sem quantidade escrita não há chips (nada alocado, nada por alocar) nem
+     rodapé de consumo, e o cartão ficava só com o nome, a parecer avariado.
+     Diz-se o que ele é: o artigo está cá, não se sabe quanto. */
+  const semQ=!(ag.totQ>0.0005)?`<span class="stk-chip livre">🧺 sem quantidade</span>`:'';
   // Marcas debaixo do guarda-chuva (Ruffles · Lays) — só quando diferem do nome
   const marcas=(g.marcas&&g.marcas.length)?`<div class="stk-marcas">${g.marcas.map(m=>escHtml(m)).join(' · ')}</div>`:'';
   // Selo de origem: parte (ou tudo) deste artigo não veio de uma compra
@@ -7792,7 +7818,7 @@ function stockArticleCard(g){
   return `<div class="stk-card stk-tap" onclick="openLoteModal(${g.lotes[0]._id})">
     <div class="stk-card-top"><b>${escHtml(g.artigo)}</b>${unTag}${orgTag}<span class="stk-chev">›</span></div>
     ${marcas}
-    <div class="stk-chips">${chips}</div>
+    <div class="stk-chips">${chips||semQ}</div>
     ${stockConsLinha(c,ag.u)}
   </div>`;
 }
@@ -7805,7 +7831,7 @@ function stockArticleCard(g){
    Gerais, que é precisamente o caso em que os chips não sabem dizer se aquilo
    ainda está na garagem ou já se bebeu. */
 function stockConsLinha(c,u){
-  if(c.desp){const ha=c.resta>0.0005;return `<div class="stk-cons desp${ha?'':' fim'}">🫙 despensa · <b>${ha?'ainda há':'acabou'}</b></div>`;}
+  if(c.desp){const ha=!c.acabou;return `<div class="stk-cons desp${ha?'':' fim'}">🫙 despensa · <b>${ha?'ainda há':'acabou'}</b></div>`;}
   if(!(c.cons>0.0005)&&!c.pool)return '';
   const mao=c.manual?'<i class="stk-cons-mao" title="Consumo dito à mão — a app não o está a deduzir">✍️</i>':'';
   // "Gasto:" e não "3 pacotes gastos": a quantidade sai do fmtQty e não há
@@ -10412,14 +10438,17 @@ function openLoteModal(id){
   const outras=stockOutrasUnidades(reqName,u);
   const outrasHtml=outras.length?`<div class="lote-outras">
     <span class="lo-lbl">Também há deste artigo:</span>
-    ${outras.map(o=>`<button type="button" class="lo-btn" onclick="openLoteModal(${o.id})">${escHtml(fmtQty(o.qtd,o.u))} · ${eur(o.val)} ›</button>`).join('')}
+    ${outras.map(o=>`<button type="button" class="lo-btn" onclick="openLoteModal(${o.id})">${escHtml(o.qtd>0.0005?fmtQty(o.qtd,o.u):'sem quantidade, em '+uLabel(o.u))} · ${eur(o.val)} ›</button>`).join('')}
     <i>Unidades diferentes não se somam — está noutro cartão do stock.</i>
   </div>`:'';
+  // Sem quantidade escrita (uma oferta que ninguém pesou) não se diz "0 kg" —
+  // e o número desaparece do cabeçalho da origem em vez de ir lá a zero
+  const semQtd0=!(totQ>0.0005);
   document.getElementById('lote-info').innerHTML=
-    `<div class="lote-sum">Em stock: <b>${escHtml(fmtQty(totQ,editingLote.u))}</b> · <b>${semCusto?'sem custo':eur(totV)}</b></div>`+
+    `<div class="lote-sum">Em stock: <b>${escHtml(semQtd0?'sem quantidade':fmtQty(totQ,editingLote.u))}</b> · <b>${semCusto?'sem custo':eur(totV)}</b></div>`+
     outrasHtml+
     `<div class="lote-acc">
-      ${loteAccSec('cmp',anyOrg?'📦':'🛒',anyOrg?'Origem':'Compras',totQ,cmpSum,comprasRows)}
+      ${loteAccSec('cmp',anyOrg?'📦':'🛒',anyOrg?'Origem':'Compras',semQtd0?null:totQ,cmpSum,comprasRows)}
       ${loteAccSec('need','📋','Pedidos na lista',
         (!needKeys.length&&semQtd.length)?null:demTot,
         (!needKeys.length&&semQtd.length)?`${semQtd.length} ${semQtd.length===1?'refeição':'refeições'}`:'',
@@ -10778,7 +10807,7 @@ function loteConsFill(){
     // Despensa: não há contas a fazer. Alocar não gasta, e "25%" de um frasco
     // de pimenta é um número que ninguém sabe medir — a única pergunta com
     // resposta é se ainda há.
-    const acabou=!(c.resta>0.0005);
+    const acabou=c.acabou;
     h+=`<div class="lote-cons-est">
       <button type="button" class="lce-opt${acabou?'':' on'}" ${podeEscrever?'':'disabled'} onclick="loteConsDesp(false)">🫙 ainda há</button>
       <button type="button" class="lce-opt fim${acabou?' on':''}" ${podeEscrever?'':'disabled'} onclick="loteConsDesp(true)">🚫 acabou</button>
@@ -10818,7 +10847,8 @@ async function loteConsDarBaixa(){
   const lotes=loteUmbAtual();
   const tot=rnd(lotes.reduce((s,l)=>s+(+l.qtd||0),0),3);
   if(v<0){toast('O consumo não pode ser negativo','bad');return;}
-  if(v-tot>0.0005){toast(`Só há ${fmtQty(tot,editingLote.u)} — não se pode gastar mais`,'bad');return;}
+  if(v-tot>0.0005){toast(tot>0.0005?`Só há ${fmtQty(tot,editingLote.u)} — não se pode gastar mais`
+    :'Este stock entrou sem quantidade escrita — escreve-a primeiro','bad');return;}
   setSync('load','a guardar…');
   if(await umbConsSet(lotes,rnd(v,3))){loteConsRefresh();toast('Consumo atualizado ✓','ok');}
   else setSync('err','erro ao guardar');
@@ -11114,7 +11144,13 @@ function loteRenderAlocs(){
   // O que sobra na bolsa comum é o que o alocado não levou (0 € se o que sobra
   // for stock oferecido / do ano anterior)
   const restoVal=Math.max(0,rnd(editingLote.totV-lineVal.reduce((s,v)=>s+(+v||0),0),2));
-  document.getElementById('lote-resto').innerHTML=livre>0
+  /* Um lote que entrou sem quantidade escrita não tem total a que comparar: nem
+     sobra nada para a bolsa comum, nem se pode alocar "a mais". Diz-se isso, em
+     vez de "Stock totalmente alocado" (falso) ou do ⚠️ contra um total de 0. */
+  document.getElementById('lote-resto').innerHTML=!(editingLote.totQ>0.0005)
+    ?(tot>0.0005?`Alocado ${escHtml(fmtQty(rnd(tot,3),editingLote.u))} — este stock entrou sem quantidade escrita.`
+      :'Entrou sem quantidade escrita — não há o que repartir.')
+    :livre>0
     ?`Alocado ${escHtml(fmtQty(rnd(tot,3),editingLote.u))} de ${escHtml(fmtQty(editingLote.totQ,editingLote.u))} — <b>${escHtml(fmtQty(livre,editingLote.u))}</b> (${eur(restoVal)}) fica na bolsa comum.`
     :livre<0?`⚠️ Alocaste ${escHtml(fmtQty(rnd(tot,3),editingLote.u))} — mais do que há em stock (${escHtml(fmtQty(editingLote.totQ,editingLote.u))}).`
     :'Stock totalmente alocado.';
@@ -11359,7 +11395,12 @@ function stkAddOpen(loteId){
   document.getElementById('stkadd-art').value=lote?lote.artigo:'';
   // Quantidade e tamanho como na lista: a qtd é texto e traz a unidade lá dentro
   // ("6", "2,5 kg"), a embalagem fica no campo ao lado
-  document.getElementById('stkadd-qtd').value=lote?fmtQty(lote.qtd,lote.unidade):'';
+  // Sem quantidade escrita fica só a unidade ("kg") — é o que se gravou e é o
+  // que se torna a gravar se ninguém lhe mexer; "0 kg" convidava a deixar o
+  // zero lá ficar como se fosse um número a sério
+  document.getElementById('stkadd-qtd').value=lote
+    ?(lote.qtd>0.0005?fmtQty(lote.qtd,lote.unidade):(lote.unidade?uLabel(lote.unidade):''))
+    :'';
   const tamEl=document.getElementById('stkadd-tam');
   tamEl.value=lote?(lote.tamanho||''):'';
   tamEl.parentElement.style.display=STOCK_TAM_COL?'':'none';
@@ -11453,15 +11494,21 @@ function stkTrimAlocs(alocs,qtd){
 async function stkAddSave(){
   if(!stkAdd||!isAdmin()||contasFechadas())return;
   const artigo=(document.getElementById('stkadd-art').value||'').trim();
-  // Quantidade lida como na lista: o texto traz a unidade lá dentro ("6",
-  // "2,5 kg", "3 pacotes") e o qtyParse separa-as — é o mesmo parser dos dois
-  // lados, e é isso que garante que o lote e o pedido falam a mesma língua.
-  const q=qtyParse(normalizeQty(document.getElementById('stkadd-qtd').value||''));
+  /* Quantidade lida como na lista: o texto traz a unidade lá dentro ("6",
+     "2,5 kg", "3 pacotes") e o parser separa-as — é o mesmo dos dois lados, e é
+     isso que garante que o lote e o pedido falam a mesma língua.
+     Aqui ela é OPCIONAL (qtyParseOpt): o que entra sem ser comprado entra muitas
+     vezes sem número — "ofereceram-nos batatas", e ninguém as pesou. Obrigar a
+     escrever um número punha no stock uma quantidade inventada, que é pior do
+     que não ter nenhuma: a partir daí a app conta com ela para cobrir pedidos e
+     para o que ainda há por gastar. Só a unidade ("kg") já basta e é o que
+     interessa guardar — é ela que decide em que cartão o artigo cai. */
+  const q=qtyParseOpt(normalizeQty(document.getElementById('stkadd-qtd').value||''));
   const qtd=q?rnd(q.n,3):0;
   const unidade=q?q.u:'';
   const tamanho=STOCK_TAM_COL?normalizeQty(document.getElementById('stkadd-tam').value||'').slice(0,20):'';
   if(!artigo){toast('Falta o nome do artigo','bad');return;}
-  if(!(qtd>0)){toast('Falta a quantidade','bad');return;}
+  if(!q){toast('Não percebi a quantidade — um número ("2,5 kg"), só a unidade ("kg"), ou nada','bad');return;}
   const origem=stkAdd.origem;
   // Ligação ao pedido da lista: só quando o produto tem outro nome (Lays ↔
   // batatas fritas). Nome igual não precisa de ligação — o próprio nome casa.
@@ -11478,7 +11525,7 @@ async function stkAddSave(){
   const t=lote?stkTrimAlocs(lote.alocacoes,qtd):null;
   const alocacoes=lote?t.alocs:fifoAlocar(listArt||artigo,qtd,unidade,null,null);
   const cortado=lote?t.cortado:0;
-  if(cortado>0.0005&&!confirm(`${artigo} passa a ${fmtQty(qtd,unidade)}, menos do que está alocado às refeições.\n\nTiram-se ${fmtQty(cortado,unidade)} às refeições mais tarde. Continuar?`))return;
+  if(cortado>0.0005&&!confirm(`${artigo} passa a ${qtd>0.0005?fmtQty(qtd,unidade):'sem quantidade escrita'}, menos do que está alocado às refeições.\n\nTiram-se ${fmtQty(cortado,unidade)} às refeições mais tarde. Continuar?`))return;
   // A origem vive no compra_id ('x-oferta-…' / 'x-anterior-…'), logo mudá-la é
   // reescrevê-lo. O sufixo antigo mantém-se para não nascer um lote "novo".
   const sufixo=(lote&&(/^x-\w+-(.+)$/.exec(lote.compraId||'')||[])[1])||String(Date.now());
@@ -14844,6 +14891,7 @@ function buildStockReport(sel){
 
   const stkRow=g=>{
     const ag=stockAggAlocs(g.lotes,g.u),c=g.cons;
+    const qMost=qtdDe(g,ag);
     const meta=[];
     // O mesmo nome em duas unidades dá dois cartões: cada um diz qual é o seu
     if(g.multiU)meta.push(escHtml('em '+uLabel(g.u)));
@@ -14860,7 +14908,6 @@ function buildStockReport(sel){
        repete — o título já o diz — e no "por alocar" não vem ao caso: ali o que
        interessa é precisamente a parte que ainda não tem destino. */
     if(!dest&&esc!=='poralocar'){
-      const qMost=qtdDe(g,ag);
       const ent=Object.keys(ag.dest).sort(destKeyCmp).map(k=>({t:stockDestTxt(k),q:ag.dest[k].qtd}));
       /* Num artigo de DESPENSA o "por alocar" não diz nada a quem confere a
          prateleira: o frasco está cá e não se gasta por alocação — é conversa
@@ -14879,13 +14926,13 @@ function buildStockReport(sel){
        já se gastou, e só depois de se ter gasto alguma coisa ("0 gasto" é
        repetir a quantidade do lado). */
     const mao=c.manual?' ✍️':'';
-    if(c.desp){if(!(c.resta>0.0005))meta.push(`🫙 <b>acabou</b>${mao}`);}
+    if(c.desp){if(c.acabou)meta.push(`🫙 <b>acabou</b>${mao}`);}
     else if(c.cons>0.0005)meta.push(escHtml(esc==='porgastar'
       ?`🍽️ ${fmtQty(c.cons,ag.u)} já gasto de ${fmtQty(c.tot,ag.u)}`
       :`🍽️ gasto ${fmtQty(c.cons,ag.u)} · por gastar ${fmtQty(c.resta,ag.u)}`)+mao);
     // data-k = a chave do cartão (artigo+unidade), para o picar na
     // pré-visualização — e para o pico valer nas duas se o artigo aparecer duas vezes
-    return `<div class="sl-row" data-k="${escHtml(shopArtKey(g.artigo)+'|'+uKey(g.u))}"><i class="sl-box"></i><span class="sl-nm">${escHtml(g.artigo)}${meta.length?` <i class="sl-meta">${meta.join(' · ')}</i>`:''}</span><span class="sl-q">${escHtml(fmtQty(qtdDe(g,ag),ag.u))}</span></div>`;
+    return `<div class="sl-row" data-k="${escHtml(shopArtKey(g.artigo)+'|'+uKey(g.u))}"><i class="sl-box"></i><span class="sl-nm">${escHtml(g.artigo)}${meta.length?` <i class="sl-meta">${meta.join(' · ')}</i>`:''}</span><span class="sl-q">${escHtml(qMost>0.0005?fmtQty(qMost,ag.u):'—')}</span></div>`;
   };
 
   let blocos='';
