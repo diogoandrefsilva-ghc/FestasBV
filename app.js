@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v257 · 2026-08-08 · Stock sem compra: a quantidade passou a ser opcional — uma oferta pode entrar só com a unidade ("kg") ou sem nada, em vez de obrigar a inventar um número';
+const APP_BUILD = 'v258 · 2026-08-08 · Stock sem compra: quantidade opcional — e alocar a uma refeição um lote sem quantidade passa a definir a quantidade dele, em vez de não deixar alocar nada';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -10287,7 +10287,15 @@ function resolveUmbrella(lotesFifo,alocs,lineVal){
     if(ex)ex.qtd=rnd(ex.qtd+take,3);
     else{const o={tipo:a.tipo,data:a.data,qtd:rnd(take,3)};if(a.bebida)o.bebida=true;out[l._id].push(o);}
     if(lineVal&&a._i!=null)lineVal[a._i]=rnd((lineVal[a._i]||0)+unit[l._id]*take,2);};
-  const fill=(a,lots)=>{let rest=a.qtd;for(const l of lots){if(rest<=0.0005)break;const c=cap[l._id];if(c<=0.0005)continue;const take=Math.min(c,rest);put(l,a,take);cap[l._id]=rnd(c-take,3);rest=rnd(rest-take,3);}return rest;};
+  const fill=(a,lots)=>{let rest=a.qtd;for(const l of lots){if(rest<=0.0005)break;const c=cap[l._id];if(c<=0.0005)continue;const take=Math.min(c,rest);put(l,a,take);cap[l._id]=rnd(c-take,3);rest=rnd(rest-take,3);}
+    /* O que sobrar vai para um lote SEM QUANTIDADE escrita, havendo-o: esse não
+       tem tecto (uma oferta que ninguém pesou), e capá-lo a zero deixava-o
+       inalocável — o mesmo que dizer que não está cá. Fica para o FIM de
+       propósito: primeiro serve-se o stock que diz quanto é, senão uma oferta a
+       0 € apanhava as alocações de uma compra a sério e o custo da refeição
+       vinha a menos. Quanto ele passa a ter é o saveLote que grava. */
+    if(rest>0.0005){const l=lots.find(x=>!(x.qtd>0.0005));if(l){put(l,a,rest);rest=0;}}
+    return rest;};
   alocs.filter(a=>a.marca).forEach(a=>fill(a,lotesFifo.filter(l=>shopSameArtigo(l.artigo,a.marca))));
   alocs.filter(a=>!a.marca).forEach(a=>fill(a,lotesFifo));
   return out;
@@ -11144,12 +11152,13 @@ function loteRenderAlocs(){
   // O que sobra na bolsa comum é o que o alocado não levou (0 € se o que sobra
   // for stock oferecido / do ano anterior)
   const restoVal=Math.max(0,rnd(editingLote.totV-lineVal.reduce((s,v)=>s+(+v||0),0),2));
-  /* Um lote que entrou sem quantidade escrita não tem total a que comparar: nem
-     sobra nada para a bolsa comum, nem se pode alocar "a mais". Diz-se isso, em
-     vez de "Stock totalmente alocado" (falso) ou do ⚠️ contra um total de 0. */
+  /* Um lote que entrou sem quantidade escrita não tem total a que comparar: nada
+     sobra para a bolsa comum e não há "a mais" que avisar. Em vez do ⚠️ contra um
+     total de 0 (ou do falso "totalmente alocado"), diz-se a regra: o que se lhe
+     entregar passa a ser a quantidade dele. */
   document.getElementById('lote-resto').innerHTML=!(editingLote.totQ>0.0005)
-    ?(tot>0.0005?`Alocado ${escHtml(fmtQty(rnd(tot,3),editingLote.u))} — este stock entrou sem quantidade escrita.`
-      :'Entrou sem quantidade escrita — não há o que repartir.')
+    ?(tot>0.0005?`Sem quantidade escrita — ao guardar, este stock fica com <b>${escHtml(fmtQty(rnd(tot,3),editingLote.u))}</b>.`
+      :'Entrou sem quantidade escrita — o que alocares passa a ser a quantidade dele.')
     :livre>0
     ?`Alocado ${escHtml(fmtQty(rnd(tot,3),editingLote.u))} de ${escHtml(fmtQty(editingLote.totQ,editingLote.u))} — <b>${escHtml(fmtQty(livre,editingLote.u))}</b> (${eur(restoVal)}) fica na bolsa comum.`
     :livre<0?`⚠️ Alocaste ${escHtml(fmtQty(rnd(tot,3),editingLote.u))} — mais do que há em stock (${escHtml(fmtQty(editingLote.totQ,editingLote.u))}).`
@@ -11296,11 +11305,18 @@ async function saveLote(){
   editingLote.alocs.forEach(a=>{const q=+a.qtd||0;if(q<=0)return;const dk=alocToDestino(a);if(!dk)return;const k=(a.marca||'')+_ALOC_SEP+dk;by[k]=rnd((by[k]||0)+q,3);});
   const alocs=Object.keys(by).map(k=>{const p=k.split(_ALOC_SEP);const a=destinoAloc(p[1],by[k]);a.marca=p[0]||'';return a;});
   const tot=alocs.reduce((s,a)=>s+a.qtd,0);
-  if(tot-editingLote.totQ>0.0005){toast(`Alocaste ${fmtQty(rnd(tot,3),editingLote.u)} — só há ${fmtQty(editingLote.totQ,editingLote.u)} em stock`,'bad');return;}
-  // Fixaste mais de uma marca do que existe dessa marca?
-  const brandCap={};editingLote.lotesFifo.forEach(l=>{brandCap[l.artigo]=rnd((brandCap[l.artigo]||0)+l.qtd,3);});
+  /* Um lote sem quantidade escrita não tem total a que comparar: não há "mais do
+     que há em stock" para avisar, porque o que se lhe alocar passa a SER a
+     quantidade dele (o PATCH lá em baixo). Com stock que diz quanto é, o aviso
+     é o de sempre. */
+  const semQtd=editingLote.lotesFifo.some(l=>!(l.qtd>0.0005));
+  if(!semQtd&&tot-editingLote.totQ>0.0005){toast(`Alocaste ${fmtQty(rnd(tot,3),editingLote.u)} — só há ${fmtQty(editingLote.totQ,editingLote.u)} em stock`,'bad');return;}
+  // Fixaste mais de uma marca do que existe dessa marca? (pela mesma razão, uma
+  // marca cujos lotes não têm quantidade escrita não tem tecto que se valide)
+  const brandCap={},brandSemQ={};
+  editingLote.lotesFifo.forEach(l=>{brandCap[l.artigo]=rnd((brandCap[l.artigo]||0)+l.qtd,3);if(!(l.qtd>0.0005))brandSemQ[l.artigo]=true;});
   const brandUse={};alocs.forEach(a=>{if(a.marca)brandUse[a.marca]=rnd((brandUse[a.marca]||0)+a.qtd,3);});
-  for(const b in brandUse){if(brandUse[b]-(brandCap[b]||0)>0.0005){toast(`Fixaste ${fmtQty(brandUse[b],editingLote.u)} de "${b}" — só há ${fmtQty(brandCap[b]||0,editingLote.u)}`,'bad');return;}}
+  for(const b in brandUse){if(!brandSemQ[b]&&brandUse[b]-(brandCap[b]||0)>0.0005){toast(`Fixaste ${fmtQty(brandUse[b],editingLote.u)} de "${b}" — só há ${fmtQty(brandCap[b]||0,editingLote.u)}`,'bad');return;}}
   // Distribui pelos lotes físicos: marca fixada primeiro, genérico por FIFO.
   // Gravam-se TODOS os lotes do guarda-chuva (mesmo os que ficam a zero, para
   // limpar alocações antigas).
@@ -11310,8 +11326,16 @@ async function saveLote(){
   try{
     for(const id of editingLote.allIds){
       const nova=plan[id]||[];
-      await queueWrite(()=>sbReq('PATCH',`stock_lotes?id=eq.${id}`,{alocacoes:nova}));
-      const l=stockArr().find(x=>x._id===id);if(l)l.alocacoes=nova;
+      const l=stockArr().find(x=>x._id===id);
+      const patch={alocacoes:nova};
+      /* Um lote sem quantidade escrita passa a TER a que se lhe entregou: não se
+         pode dar mais do que há, logo quem alocou 900 disse que havia 900. É o
+         que mantém a invariante de que o alocado nunca passa o stock — sem ela,
+         o "por alocar", o consumo e a folha do 🖨 ficavam a adivinhar. */
+      const novaQ=rnd(nova.reduce((s,a)=>s+(+a.qtd||0),0),3);
+      if(l&&!(+l.qtd>0.0005)&&novaQ>0.0005)patch.qtd=novaQ;
+      await queueWrite(()=>sbReq('PATCH',`stock_lotes?id=eq.${id}`,patch));
+      if(l){l.alocacoes=nova;if(patch.qtd!=null)l.qtd=patch.qtd;}
     }
     syncMirror();marcaGuardado();
     btn.disabled=false;closeLoteModal();
