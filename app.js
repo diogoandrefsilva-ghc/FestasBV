@@ -8278,14 +8278,13 @@ function stockConsLinha(c,u){
    alocado está nos dois (é `Object.keys(dest).length` contra `freeQ>0`, não um
    booleano). Esteve fora daqui por se lhe ter chamado complemento — e a
    contagem mostra que não é.
-   Os chips deste separador NÃO levam ícone, ao contrário dos das Compras: com
-   quatro mais o "Tudo", o ícone come a largura dos rótulos e "Por gastar" passa
-   a "POR GA…" em qualquer telemóvel (medido dos 320px aos 430px). Entre o
-   ícone e o rótulo inteiro manda o rótulo — é ele que diz qual é o eixo. */
-let STOCK_FILTER='all';
+   Os chips deste separador NÃO levam ícone, ao contrário dos das Compras: são
+   quatro rótulos completos, e entre o ícone e a palavra manda a palavra — é
+   ela que diz qual é o eixo. Sem chip ativo vê-se todo o stock. */
+let STOCK_FILTER='';
 // Containers de categoria abertos/fechados (só na sessão; abertos por defeito)
 const STOCK_CAT_OPEN={};
-function setStockFilter(f){STOCK_FILTER=f;renderStock();}
+function setStockFilter(f){STOCK_FILTER=STOCK_FILTER===f?'':f;renderStock();}
 /* Um DESTINO de alocação já passou? Serve só para pintar o chip do que ficou
    para trás. É eixo do custo — não confundir com o consumo (umbConsumo), que
    é o que responde a "isto ainda cá está". */
@@ -8311,7 +8310,7 @@ function stockGroupEstados(ag,c){
    No eixo do consumo não há € por destino que sirva — o que se gastou pode
    estar espalhado por vários —, por isso vale a proporção do total. */
 function stockEstadoVal(ag,st,c){
-  if(st==='all')return ag.totV;
+  if(!st||st==='all')return ag.totV;
   if(st==='poralocar')return ag.freeV;
   // O alocado é o resto do total, e tira-se por subtração para os dois chips do
   // eixo do custo somarem exatamente o € do container em "Tudo"
@@ -8387,13 +8386,12 @@ function renderStock(){
   const FILTROS=[['consumido','Consumido'],['porgastar','Por gastar'],['alocado','Alocado'],['poralocar','Por alocar']]
     .map(f=>f.concat(arr.filter(g=>g.estados.has(f[0])).length));
   h+=`<div class="cmp-sort stk-filter">
-    <span class="sd-chip txt${STOCK_FILTER==='all'?' on':''}" onclick="setStockFilter('all')">Tudo</span>
     ${FILTROS.map(([s,lbl,n])=>`<span class="sd-chip${STOCK_FILTER===s?' on':''}${n?'':' vazio'}" onclick="setStockFilter('${s}')"><small>${lbl}</small><b class="stk-n">${n}</b></span>`).join('')}
   </div>`;
-  const vis=STOCK_FILTER==='all'?arr:arr.filter(g=>g.estados.has(STOCK_FILTER));
+  const vis=!STOCK_FILTER?arr:arr.filter(g=>g.estados.has(STOCK_FILTER));
   const VAZIO={consumido:'Ainda não se gastou nada.',porgastar:'Não há stock por gastar — foi tudo consumido.',
     alocado:'Nada está alocado — o stock todo está por arrumar no custo.',poralocar:'Não há stock por alocar — está tudo com destino.'};
-  if(!vis.length)h+=`<div class="empty sf">${stkBuscando?`Nenhum artigo com <b>${escHtml(STOCK_Q.trim())}</b>${STOCK_FILTER==='all'?'':' neste estado'}.`:(VAZIO[STOCK_FILTER]||'Não há stock neste estado.')}</div>`;
+  if(!vis.length)h+=`<div class="empty sf">${stkBuscando?`Nenhum artigo com <b>${escHtml(STOCK_Q.trim())}</b>${STOCK_FILTER?' neste estado':''}.`:(VAZIO[STOCK_FILTER]||'Não há stock neste estado.')}</div>`;
   else if(!CATS_TABLE)h+=vis.map(g=>stockArticleCard(g)).join('');
   else{
     // Containers por categoria de produto (Sumos, Talho, …), colapsáveis; os
