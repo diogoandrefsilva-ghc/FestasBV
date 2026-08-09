@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v266 · 2026-08-09 · O stock passa a guardar PARA QUE foi comprado, à parte de quem paga hoje: sobraram 2 bifes dos 9 do jantar de sábado e o cartão da refeição di-lo, com o valor a deduzir. Mais a 2.ª medida (4 kg = 9 bifes), agora sem o 6,999';
+const APP_BUILD = 'v267 · 2026-08-09 · O stock passa a guardar PARA QUE foi comprado, à parte de quem paga hoje: sobraram 2 bifes dos 9 do jantar de sábado e o cartão da refeição di-lo, com o valor a deduzir. No cartão da refeição vem primeiro a compra (9 un · 98,67 €) e por baixo o que sobrou ou foi realocado, a deduzir. E a 2.ª medida deixa de dizer 6,999 un onde escreveste 7';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -6721,13 +6721,30 @@ function umbEquiv(lotes){
     const m=loteEquiv(l);
     if(!m){ok=false;return;}
     if(u==null)u=m.u;else if(!sameUnit(u,m.u))ok=false;
-    n=rnd(n+m.n,3);q=rnd(q+(+l.qtd||0),3);
+    n=rnd(n+m.n,QD);q=rnd(q+(+l.qtd||0),QD);
   });
   if(!ok||u==null||!(q>0.0005)||!(n>0.0005))return null;
   return {u,n,q,f:n/q};
 }
-// Canónica → 2.ª medida (é o que se MOSTRA: 3 casas bastam para se ler)
-function equivDe(m,q){return m?rnd((+q||0)*m.f,3):0;}
+/* Canónica → 2.ª medida (é o que se MOSTRA).
+   NÃO SE ANUNCIA PRECISÃO QUE A CANÓNICA NÃO TEM. Uma quantidade gravada ao
+   gramo (o que todos os lotes anteriores ao `QD` têm) não distingue 6,999 un de
+   7 un: 3,072 kg pode ser qualquer das duas, e a que alguém escreveu foi 7. Sem
+   isto a app devolvia o arredondamento dela em vez do número da pessoa — e
+   guardar com mais casas só arrumava o problema para os lotes NOVOS, deixando os
+   que já lá estavam a dizer "6,999 un" para sempre.
+   A margem é o que o gramo vale nesta medida (0,0005 × fator); dentro dela
+   escolhe-se o número inteiro, ou o meio, porque é isso que se escreve. Fora
+   dela não se mexe: um pedaço a sério de 6,3 continua 6,3. E a regra degrada
+   bem — num fator de 1000 un/kg o gramo VALE uma unidade, e aí é mesmo só ao
+   inteiro que se pode falar. */
+function equivDe(m,q){
+  if(!m)return 0;
+  const v=(+q||0)*m.f,marg=0.0005*m.f;
+  const i=Math.round(v);if(Math.abs(v-i)<=marg)return i;
+  const h=Math.round(v*2)/2;if(Math.abs(v-h)<=marg)return h;
+  return rnd(v,3);
+}
 /* 2.ª medida → canónica (é o que se GRAVA). Seis casas e não três de propósito:
    a 3 casas cada linha podia arredondar até 0,0005 e três linhas somavam 0,0015
    — o suficiente para o "alocaste mais do que há" disparar contra um stock que
@@ -7664,29 +7681,55 @@ function mealShopSection(rd){
      (fresco à cabeça, categoria por peso) — entrada própria era vê-la aterrar
      longe do artigo a que pertence. */
   const alocLines=alocs.map(x=>{
-    const unit=x.l.qtd>0?x.l.valor/x.l.qtd:0;
-    const origQ=alocsQtdDe(loteAlocOrig(x.l),mealK);
-    const saiu=rnd(origQ-x.qtd,3),veio=rnd(x.qtd-origQ,3);
-    const temOrig=!!loteAlocOrig(x.l);
-    // Base: o que a compra destinava aqui (havendo saída); senão, o de hoje
-    const baseQ=saiu>0.0005?origQ:x.qtd;
-    const baseVal=saiu>0.0005?rnd(unit*origQ,2):x.val;
-    const delta=rnd(x.val-baseVal,2);
+    const l=x.l,unit=l.qtd>0?l.valor/l.qtd:0;
+    /* PRIMEIRO O QUE SE COMPROU, DEPOIS O QUE SOBROU OU SAIU.
+       A base da linha é a COMPRA — os 9 bifes, os 98,67 € do talão — e por baixo
+       vem, parcela a parcela, tudo o que não está nesta refeição, com o € em
+       sinal contrário. O que fica é o que a refeição paga.
+       Isto NÃO precisa do objetivo gravado: quem sabe o que se comprou é o
+       próprio lote (`qtd`/`valor`). O objetivo, quando existe, só acrescenta uma
+       coisa — dizer que era para AQUI mesmo depois de o custo ter saído todo.
+       Só se decompõe quando esta refeição é o único destino-refeição do lote (ou
+       o objetivo diz que era só dela): um lote repartido de propósito por dois
+       jantares não foi "comprado para" nenhum deles, e ali a linha de sempre —
+       a parte de cada um — é a leitura certa. */
+    const porDest=alocsPorDest(l.alocacoes);
+    const soRef=k=>alocIsMeal(destinoAloc(k,0));
+    const refs=Object.keys(porDest).filter(soRef);
+    const orig=loteAlocOrig(l);
+    const oRefs=orig?Object.keys(alocsPorDest(orig)).filter(soRef):[];
+    const decompor=(+l.qtd>0.0005)&&(x.foi
+      ||(refs.length===1&&refs[0]===mealK)
+      ||(oRefs.length===1&&oRefs[0]===mealK));
+    let baseQ=x.qtd,baseVal=x.val,sub='';
+    if(decompor){
+      baseQ=+l.qtd;baseVal=rnd(+l.valor||0,2);
+      // As parcelas que não estão aqui: o que foi para outro destino, e o que
+      // ficou por alocar (que é a bolsa comum — dilui-se por todos)
+      const fora=Object.keys(porDest).filter(k=>k!==mealK).sort(destKeyCmp)
+        .map(k=>({q:porDest[k],txt:`${escHtml(loteQtdLabel(l,porDest[k]))} realocados a ${stockDestTxt(k)}`,cls:'saiu'}));
+      const livre=rnd(baseQ-Object.keys(porDest).reduce((s,k)=>s+porDest[k],0),QD);
+      if(livre>0.0005)fora.push({q:livre,txt:`sobraram ${escHtml(loteQtdLabel(l,livre))} — na bolsa comum`,cls:'sobra'});
+      /* O € de cada parcela sai do preço unitário, mas a SOMA é imposta por
+         subtração: base + Σparcelas ≡ x.val, que é o que o calcular() cobra a
+         esta refeição. O cêntimo que sobrar vai para a parcela maior, onde menos
+         se nota — a mesma regra da fatura. */
+      const vals=fora.map(f=>rnd(unit*f.q,2));
+      const alvo=rnd(baseVal-x.val,2);
+      const resto=rnd(alvo-vals.reduce((s,v)=>s+v,0),2);
+      if(Math.abs(resto)>=0.005&&vals.length){
+        let iM=0;fora.forEach((f,i)=>{if(f.q>fora[iM].q)iM=i;});
+        vals[iM]=rnd(vals[iM]+resto,2);
+      }
+      sub=fora.map((f,i)=>`<div class="msl-sub ${f.cls}"><span class="ms-t">↳ ${f.txt}</span>${x.org?'':`<span class="ms-v">${eur(-vals[i])}</span>`}</div>`).join('');
+    }
     const dir=x.org?x.org.ic+' '+escHtml(x.org.lbl):eur(baseVal);
-    let sub='';
-    if(temOrig&&saiu>0.0005)
-      sub=`<div class="msl-sub saiu"><span class="ms-t">↳ ${escHtml(loteQtdLabel(x.l,saiu))} ${mealRealocTxt(x.l,true)}</span>${x.org?'':`<span class="ms-v">${eur(delta)}</span>`}</div>`;
-    /* Recebeu: a base já é o que se cobra (não há sinal a mostrar), só falta
-       dizer de onde veio. A quantidade só se escreve quando a linha não é toda
-       sobra — senão repetia o número que está ao lado. */
-    else if(temOrig&&veio>0.0005)
-      sub=`<div class="msl-sub veio"><span class="ms-t">↳ ${origQ>0.0005?escHtml(loteQtdLabel(x.l,veio))+' — ':''}${mealRealocTxt(x.l,false)}</span></div>`;
     /* `qn` é só para ORDENAR: o que já não está aqui vai para o fim do seu grupo
-       (com a quantidade original ordenava-se como se fosse das peças maiores da
+       (com a quantidade da compra ordenava-se como se fosse das peças maiores da
        refeição, e é o contrário — é um aparte). */
-    return {art:x.l.artigo,cat:loteReqArtigo(x.l)||x.l.artigo,val:x.val,
-      qn:x.foi?0:(+baseQ||0),qu:x.l.unidade,html:`<div class="msl-it stk${x.foi?' msl-dim':''}" onclick="openLoteModal(${x.l._id})">
-      ${mslLead(x.l.artigo,loteQtdLabel(x.l,baseQ))}<span class="msl-st ok">${dir}</span></div>${sub}`};
+    return {art:l.artigo,cat:loteReqArtigo(l)||l.artigo,val:x.val,
+      qn:x.foi?0:(+baseQ||0),qu:l.unidade,html:`<div class="msl-it stk${x.foi?' msl-dim':''}" onclick="openLoteModal(${l._id})">
+      ${mslLead(l.artigo,loteQtdLabel(l,baseQ))}<span class="msl-st ok">${dir}</span></div>${sub}`};
   });
   const lineOf=(it,dim)=>{
     /* Tratado ≠ comprado. Um pedido coberto pelo stock (ou encomendado numa

@@ -1381,6 +1381,10 @@ button.cmp-chip.qt-tap:active{filter:brightness(.93)}
 .msl-sub .ms-v{flex:0 0 auto;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
 .msl-sub.saiu{color:#9A6E0E}
 .msl-sub.saiu .ms-v{color:var(--red)}
+/* Sobrou e ficou por alocar: dilui-se pela bolsa comum. Mesmo peso do que foi
+   realocado — as duas são parcelas da compra que esta refeição não paga. */
+.msl-sub.sobra{color:#9A6E0E}
+.msl-sub.sobra .ms-v{color:var(--red)}
 .msl-sub.veio{color:var(--green)}
 /* Modal do lote: linhas de alocação */
 .lote-ln{display:flex;align-items:center;gap:7px;margin-top:8px}
