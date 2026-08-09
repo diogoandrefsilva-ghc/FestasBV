@@ -70,7 +70,14 @@ Numa BD limpa, correr por esta ordem (há dependências entre eles):
     conversão —, é ela que deixa alocar e dar baixa a contar peças. As alocações
     continuam a gravar-se na unidade da compra: **não entra em conta nenhuma**
 
-Os passos 4–19 são migrações add-on idempotentes: correr uma vez cada. A app é
+20. `stock_alocacao_original.sql` — `stock_lotes.aloc_original`: **para que é que
+    o lote foi comprado**, à parte de **de quem é o custo hoje** (`alocacoes`).
+    Comprei 9 bifes para o jantar de sábado, sobraram 2 e foram para o almoço de
+    domingo: o custo vai com eles e o objetivo da compra não se apaga. O editor
+    da compra escreve o objetivo, o separador Stock escreve o custo, e `NULL`
+    (lotes anteriores) = objetivo desconhecido. **Não entra em conta nenhuma**
+
+Os passos 4–20 são migrações add-on idempotentes: correr uma vez cada. A app é
 tolerante a qualquer uma delas faltar — sonda a coluna/tabela e esconde o que
 ainda não existe. (Há mais add-ons no diretório que nunca entraram nesta lista —
 `cobertura.sql`, `bebida_refeicao.sql`, `stock_artigo_fatura.sql`,

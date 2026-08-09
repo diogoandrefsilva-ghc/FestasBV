@@ -1372,6 +1372,16 @@ button.cmp-chip.qt-tap:active{filter:brightness(.93)}
 .cmp-lote-art-in{flex:1;min-width:0;font-size:13px;margin:0}
 .cmp-lote-qtd{flex:0 0 110px;font-size:13px;margin:0}
 .msl-dim{opacity:.55}
+/* ── Sub-linha do 🧺 Comprado: o que saiu do objetivo desta refeição ──
+   Pendura da linha do artigo (recuada, mais pequena) e o € vai em sinal
+   contrário, a deduzir do que foi comprado. Não é uma linha do bloco — é a
+   explicação de uma —, por isso não leva o peso de uma. */
+.msl-sub{display:flex;align-items:baseline;gap:6px;padding:0 3px 4px 14px;margin:-2px -3px 0;font-size:10.5px;line-height:1.35;color:var(--muted)}
+.msl-sub .ms-t{flex:1;min-width:0}
+.msl-sub .ms-v{flex:0 0 auto;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
+.msl-sub.saiu{color:#9A6E0E}
+.msl-sub.saiu .ms-v{color:var(--red)}
+.msl-sub.veio{color:var(--green)}
 /* Modal do lote: linhas de alocação */
 .lote-ln{display:flex;align-items:center;gap:7px;margin-top:8px}
 .lote-ln select{flex:1;min-width:0;margin:0}
@@ -1542,6 +1552,18 @@ button.cmp-chip.qt-tap:active{filter:brightness(.93)}
 .price-in i{position:absolute;right:11px;top:50%;transform:translateY(-50%);font-style:normal;font-size:14px;color:var(--muted);font-weight:600;pointer-events:none}
 .lote-hint{margin-top:5px;font-size:11px;line-height:1.35;color:var(--gold)}
 .lote-hint b{color:var(--ink);font-weight:700}
+/* Aviso do artigo já realocado no stock: o destino aqui é o OBJETIVO da compra,
+   não onde o custo está. Leva o caminho para o sítio onde ele está de facto. */
+.lote-hint.div{color:var(--muted);background:rgba(196,144,32,.08);border:1px solid rgba(196,144,32,.28);border-radius:9px;padding:6px 8px}
+.lote-hint.div .lh-go{margin-left:4px;background:transparent;border:none;padding:0;font:inherit;font-weight:700;color:var(--green);cursor:pointer;text-decoration:underline}
+/* ── 📥 Objetivo da compra no modal do artigo (só quando discorda do hoje) ── */
+.lote-orig{margin-top:12px;background:rgba(196,144,32,.08);border:1px solid rgba(196,144,32,.3);border-radius:11px;padding:9px 10px}
+.lote-orig .lo-hd{font-size:12.5px;font-weight:700;color:#6B4E0C}
+.lote-orig .lo-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.lote-orig .lo-chip{font-size:11px;font-weight:700;border-radius:20px;padding:3px 9px;white-space:nowrap;border:1px solid var(--line);background:var(--panel)}
+.lote-orig .lo-chip.saiu{color:var(--red);border-color:rgba(179,64,47,.35);background:rgba(179,64,47,.07)}
+.lote-orig .lo-chip.entrou{color:var(--green);border-color:rgba(30,122,77,.35);background:rgba(30,122,77,.07)}
+.lote-orig .lo-undo{margin-top:8px;padding:6px 11px;font-size:12px}
 /* Bloco recolhível "🛒 Artigos da lista" no registo da compra */
 .pick-det{margin-top:12px;border:1px solid var(--line);border-radius:12px;background:var(--panel);padding:0 12px}
 .pick-det>summary{display:flex;align-items:center;gap:8px;list-style:none;cursor:pointer;padding:11px 0;font-size:13.5px;font-weight:700;color:var(--ink)}

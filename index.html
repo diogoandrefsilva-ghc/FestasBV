@@ -360,6 +360,12 @@ setTimeout(function(){ if (window.fbvEsconderSplash) window.fbvEsconderSplash();
         <div class="note" id="lote-req-note" style="margin-top:2px">Liga este stock a um pedido da lista com outro nome (ex.: Lays → batatas fritas), para o dar por coberto.</div>
       </div>
     </div>
+    <!-- 📥 Para que é que isto foi COMPRADO (db/stock_alocacao_original.sql), à
+         parte de para onde vai o custo hoje (o bloco 💶, logo abaixo). Só
+         aparece quando as duas discordam — igual não há nada a dizer. -->
+    <div id="lote-orig-wrap" style="display:none">
+      <div id="lote-orig-body"></div>
+    </div>
     <!-- O (quantidade) é escrito pelo loteRenderAlocs() e acompanha o que se
          está a alocar — fecha a leitura de cima: comprado · pedido · alocado -->
     <label id="lote-aloc-lbl">💶 Alocação</label>

@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v263 · 2026-08-09 · 2.ª medida do stock: os 4,032 kg de acém que são 9 bifes. Declara-se no modal do artigo e passa a poder alocar-se e dar baixa a contar peças — o custo continua a andar em kg';
+const APP_BUILD = 'v264 · 2026-08-09 · O stock passa a guardar PARA QUE foi comprado, à parte de quem paga hoje: sobraram 2 bifes dos 9 do jantar de sábado e o cartão da refeição di-lo, com o valor a deduzir. Mais a 2.ª medida (4 kg = 9 bifes)';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -181,6 +181,15 @@ let STOCK_CONS_COL=false;
    migração, STOCK_MED2_COLS=false: nunca se lê nem se grava e as unidades
    voltam a não se converter em sítio nenhum. */
 let STOCK_MED2_COLS=false;
+/* stock_lotes já tem a coluna 'aloc_original' (db/stock_alocacao_original.sql)?
+   É PARA QUE É QUE o lote foi comprado, à parte de DE QUEM É O CUSTO hoje
+   (`alocacoes`). Comprei 9 bifes para o jantar de sábado, sobraram 2 e foram
+   para o almoço de domingo: o custo vai com eles, mas o objetivo da compra não
+   se apaga. `null` num lote = objetivo desconhecido (é o caso de todos os lotes
+   anteriores à migração) e aí não se conta história nenhuma. Sem a migração,
+   STOCK_ALOCORIG_COL=false e o editor da compra volta a mexer directamente na
+   alocação real, como sempre fez. */
+let STOCK_ALOCORIG_COL=false;
 /* Artigos de DESPENSA (db/despensa.sql): os que NÃO SE ESGOTAM por alocação —
    o sal, a pimenta, o louro. Um frasco serve o evento todo e ainda sobra para o
    ano seguinte, por isso neles o consumo não se deriva (seria mentira) e vale
@@ -2250,7 +2259,7 @@ async function carregar(){
     const sel='*,membros(*,presencas(*)),refeicoes_def(*),despesas(*),convidados(*),mealheiros(*),pagamentos(*)';
     // shoplist vai numa fetch SEPARADA e tolerante a falha: se a tabela ainda
     // não existir (migração por correr) o resto da app continua a funcionar.
-    const [res,uaRes,cjRes,vlRes,slRes,stRes,ctRes,acRes,npRes,flRes,fpRes,ccRes,sljRes,cobRes,cpRes,stmRes,sfRes,ttRes,tsRes,tiRes,ppRes,dgRes,dbRes,scRes,adRes,cbRes,sm2Res]=await Promise.all([
+    const [res,uaRes,cjRes,vlRes,slRes,stRes,ctRes,acRes,npRes,flRes,fpRes,ccRes,sljRes,cobRes,cpRes,stmRes,sfRes,ttRes,tsRes,tiRes,ppRes,dgRes,dbRes,scRes,adRes,cbRes,sm2Res,aoRes]=await Promise.all([
       sbFetch(`${SB_URL}/rest/v1/eventos?select=${encodeURIComponent(sel)}&order=ano.asc`,{headers:sbHeaders(),cache:'no-store'}),
       sbFetch(`${SB_URL}/rest/v1/user_amigos?select=email,amigo`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null),
       sbFetch(`${SB_URL}/rest/v1/conjuges?select=amigo_a,amigo_b`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null),
@@ -2306,7 +2315,10 @@ async function carregar(){
       sbFetch(`${SB_URL}/rest/v1/convidados?select=modo&limit=1`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null),
       // sonda às colunas stock_lotes.qtd2/unidade2 (db/stock_medida2.sql): a
       // 2.ª medida do lote (4,032 kg = 9 bifes). Sem elas não há conversão.
-      sbFetch(`${SB_URL}/rest/v1/stock_lotes?select=qtd2,unidade2&limit=1`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null)
+      sbFetch(`${SB_URL}/rest/v1/stock_lotes?select=qtd2,unidade2&limit=1`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null),
+      // sonda à coluna stock_lotes.aloc_original (db/stock_alocacao_original.sql):
+      // para que é que o lote foi comprado, à parte de quem paga o custo hoje
+      sbFetch(`${SB_URL}/rest/v1/stock_lotes?select=aloc_original&limit=1`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null)
     ]);
     if(!res.ok)throw new Error('HTTP '+res.status);
     const rows=await res.json();
@@ -2352,6 +2364,9 @@ async function carregar(){
     // 2.ª medida do lote: sem as colunas, kg e peças não se convertem em sítio
     // nenhum — a app volta a contar só na unidade da compra
     STOCK_MED2_COLS=STOCK_TABLE&&!!(sm2Res&&sm2Res.ok);
+    // Objetivo da compra: sem a coluna, o editor da compra volta a mexer na
+    // alocação real (e não há sobras nem realocações para contar)
+    STOCK_ALOCORIG_COL=STOCK_TABLE&&!!(aoRes&&aoRes.ok);
     DESP_TABLE=!!(adRes&&adRes.ok);
     ART_DESP={};
     if(DESP_TABLE)(await adRes.json()).forEach(r=>{ART_DESP[r.artigo_key]={origem:r.origem||'manual'};});
@@ -2407,7 +2422,12 @@ async function carregar(){
       shoplist:(shopByEv[ev.id]||[]).map(s=>({_id:s.id,artigo:s.artigo,quantidade:s.quantidade||'',tamanho:s.tamanho||'',loja:s.loja||'',tipo:s.tipo,dataValor:s.data_valor,estado:s.estado||'pendente',tratadoPor:s.tratado_por||null,noCarrinho:!!s.no_carrinho,compraId:s.compra_id||null,cfDesc:s.cf_desc||null,cobertura:s.cobertura||'',valor:s.valor!=null?N(s.valor):null,criadoPor:s.criado_por||'',criadoEm:s.criado_em,compradoEm:s.comprado_em})),
       // `_cons` (stock_lotes.consumido) é NULL de propósito quando ninguém o
       // escreveu: null = derivar das alocações, número = foi dito à mão
-      stockLotes:(stockByEv[ev.id]||[]).map(l=>({_id:l.id,compraId:l.compra_id,artigo:l.artigo,qtd:N(l.qtd),unidade:l.unidade||'',tamanho:l.tamanho||'',qtd2:l.qtd2==null?null:Number(l.qtd2),unidade2:l.unidade2||'',valor:N(l.valor),alocacoes:Array.isArray(l.alocacoes)?l.alocacoes:[],_listArt:l.lista_artigo||null,_fatNome:l.artigo_fatura||null,_cons:l.consumido==null?null:Number(l.consumido),criadoEm:l.criado_em})),
+      stockLotes:(stockByEv[ev.id]||[]).map(l=>({_id:l.id,compraId:l.compra_id,artigo:l.artigo,qtd:N(l.qtd),unidade:l.unidade||'',tamanho:l.tamanho||'',qtd2:l.qtd2==null?null:Number(l.qtd2),unidade2:l.unidade2||'',valor:N(l.valor),alocacoes:Array.isArray(l.alocacoes)?l.alocacoes:[],
+        /* `_alocOrig` null = objetivo DESCONHECIDO (lote anterior à migração), que
+           não é o mesmo que `[]` = comprado sem destino declarado. É essa
+           distinção que impede os lotes antigos de aparecerem todos como
+           "realocados" nos cartões das refeições. */
+        _alocOrig:Array.isArray(l.aloc_original)?l.aloc_original:null,_listArt:l.lista_artigo||null,_fatNome:l.artigo_fatura||null,_cons:l.consumido==null?null:Number(l.consumido),criadoEm:l.criado_em})),
       tshirts:(tsByEv[ev.id]||[]).map(t=>({_id:t.id,membro:t.membro,nome:t.nome,tipo:t.tipo,tamanho:t.tamanho,imputadoA:Array.isArray(t.imputado_a)?t.imputado_a.filter(Boolean):[],criadoPor:t.criado_por||'',criadoEm:t.criado_em}))
     }));
     ALL_YEARS.sort((a,b)=>(a.evento.ano||0)-(b.evento.ano||0));
@@ -7149,6 +7169,69 @@ function resolveLoteAlocs(l){
   return fifoAlocar(l.artigo,l.qtd,l.unidade,null,(l.keys&&l.keys.length)?l.keys:null);
 }
 
+/* ── O OBJETIVO da compra vs a alocação de HOJE ───────────────────────
+   `aloc_original` = para que refeição/tipo é que o lote foi COMPRADO;
+   `alocacoes`     = de quem é o custo hoje (a única que o calcular() lê).
+   Comprei 9 bifes para o jantar de sábado, sobraram 2 e foram para o almoço de
+   domingo: o custo vai com eles e o objetivo da compra fica registado.
+   `null` = objetivo desconhecido (lote anterior à migração) → não se conta
+   história nenhuma. `[]` = comprado sem destino declarado, que é uma resposta. */
+function loteAlocOrig(l){
+  if(!STOCK_ALOCORIG_COL||!l)return null;
+  return Array.isArray(l._alocOrig)?l._alocOrig:null;
+}
+// Alocações agrupadas por chave de destino, ignorando quantidades a zero
+function alocsPorDest(arr){
+  const m={};
+  (arr||[]).forEach(a=>{const q=+a.qtd||0;if(q<=0.0005)return;const k=alocToDestino(a);if(!k&&k!=='')return;m[k]=rnd((m[k]||0)+q,3);});
+  return m;
+}
+function alocsQtdDe(arr,k){return alocsPorDest(arr)[k]||0;}
+/* "Divergiu" COMPARA-SE, não se marca — sem flag para poder mentir (é o mesmo
+   raciocínio do `consumido`: null = a app deriva, valor = a mão manda). */
+function alocsIguais(a,b){
+  const A=alocsPorDest(a),B=alocsPorDest(b);
+  const ks=new Set(Object.keys(A).concat(Object.keys(B)));
+  for(const k of ks)if(Math.abs((A[k]||0)-(B[k]||0))>0.0005)return false;
+  return true;
+}
+function loteDivergiu(l){const o=loteAlocOrig(l);return !!o&&!alocsIguais(o,l&&l.alocacoes);}
+/* O que MUDOU entre o objetivo e o hoje, destino a destino: `de` = quem perdeu
+   (o original dava-lhe mais), `para` = quem ganhou. É um DELTA POR DESTINO e
+   não um par: com um doador e um recetor o par é inequívoco e nomeia-se; com
+   vários não há como saber quem alimentou quem, e não se inventa.
+   null = nada a dizer (objetivo desconhecido, ou alocação igual ao objetivo). */
+function loteRealoc(l){
+  const o=loteAlocOrig(l);if(!o)return null;
+  const A=alocsPorDest(o),B=alocsPorDest(l&&l.alocacoes);
+  const de={},para={};
+  new Set(Object.keys(A).concat(Object.keys(B))).forEach(k=>{
+    const d=rnd((B[k]||0)-(A[k]||0),3);
+    if(d<-0.0005)de[k]=-d;else if(d>0.0005)para[k]=d;
+  });
+  if(!Object.keys(de).length&&!Object.keys(para).length)return null;
+  return {de,para};
+}
+// O único destino de um lado do delta, quando é só um — é o que permite nomear
+// "realocados ao Almoço de domingo" sem inventar um par que não se demonstra.
+function realocUnico(m){const ks=Object.keys(m||{});return ks.length===1?ks[0]:null;}
+/* Apara alocações que passaram a não caber no lote (a compra corrigiu a
+   quantidade para baixo e a alocação real já tinha divergido). Corta pelo FIM da
+   ordem dos destinos — a refeição mais tardia perde primeiro, que a mais cedo já
+   aconteceu. Devolve {alocs,cortado}. */
+function alocsApara(arr,cap){
+  const lim=rnd(Math.max(0,+cap||0),3);
+  const list=(arr||[]).filter(a=>+a.qtd>0.0005)
+    .sort((a,b)=>destKeyCmp(alocToDestino(a),alocToDestino(b)));
+  let tot=rnd(list.reduce((s,a)=>s+(+a.qtd||0),0),3);
+  let cortado=0;
+  for(let i=list.length-1;i>=0&&tot-lim>0.0005;i--){
+    const q=+list[i].qtd||0,tira=Math.min(q,rnd(tot-lim,3));
+    list[i]=Object.assign({},list[i],{qtd:rnd(q-tira,3)});
+    tot=rnd(tot-tira,3);cortado=rnd(cortado+tira,3);
+  }
+  return {alocs:list.filter(a=>+a.qtd>0.0005),cortado};
+}
 /* Uma alocação aponta a uma REFEIÇÃO (tipo Almoço/Jantar + data) ou a um TIPO
    puro (Gerais/Bebidas/Cerveja/Renda, sem data — cai no pool desse tipo). */
 function alocIsMeal(a){return shopIsMeal(a&&a.tipo)&&!!(a&&a.data);}
@@ -7503,12 +7586,31 @@ function mslQtd(raw){const p=qtyParse(normalizeQty(raw)||'');return{qn:p?p.n:0,q
    antes do número — é a mesma regra do resto do stock, onde unidades diferentes
    nunca se somam nem se convertem. */
 function mslURank(u){const k=uKey(u);return (k==='kg'||k==='l')?0:1;}
+/* A frase da sub-linha do bloco 🧺: o que saiu do objetivo desta refeição e para
+   onde foi, ou de onde veio o que aqui está a mais.
+   O par só se NOMEIA quando se demonstra: havendo um doador só, tudo o que os
+   outros destinos ganharam veio dele; com vários doadores não há como saber quem
+   alimentou quem, e inventar o par era pôr a linha a mentir. */
+function mealRealocTxt(l,saiu){
+  const r=loteRealoc(l);if(!r)return '';
+  if(saiu){
+    const outros=Object.keys(r.para).sort(destKeyCmp);
+    if(!outros.length)return 'voltaram à bolsa comum';
+    if(realocUnico(r.de))return 'realocados a '+outros.map(k=>stockDestTxt(k)).join(' · ');
+    return 'realocados para outras refeições';
+  }
+  const fontes=Object.keys(r.de).sort(destKeyCmp);
+  if(!fontes.length)return 'não estava no objetivo da compra';
+  if(realocUnico(r.para))return 'sobra de '+fontes.map(k=>stockDestTxt(k)).join(' · ');
+  return 'sobra de outra refeição';
+}
 function mealShopSection(rd){
   if(!shopIsMeal(rd.ref))return '';
   const items=shopArr().filter(it=>it.tipo===rd.ref&&it.dataValor===rd.data&&!shopIsRemoved(it))
     .sort((a,b)=>a.artigo.localeCompare(b.artigo,'pt'));
   // Lotes de stock alocados a ESTA refeição (reservado se ainda não passou a data)
   const alocs=[];
+  const mealK=rd.ref+'|'+rd.data;
   stockArr().forEach(l=>{
     if(!stockBacked(l))return;
     (l.alocacoes||[]).forEach(a=>{
@@ -7516,6 +7618,12 @@ function mealShopSection(rd){
       const unit=l.qtd>0?l.valor/l.qtd:0;
       alocs.push({l,qtd:+a.qtd,val:rnd(unit*a.qtd,2),org:origemMeta(l)});
     });
+    /* Comprado PARA esta refeição e hoje sem nada alocado aqui (foi tudo para
+       outra refeição ou para a bolsa comum): sem isto o artigo DESAPARECIA do
+       cartão em silêncio — que é exactamente a informação que se queria deixar
+       de perder. Entra com qtd 0, e por isso não mexe um cêntimo no total. */
+    if(alocsQtdDe(loteAlocOrig(l),mealK)>0.0005&&!(alocsQtdDe(l.alocacoes,mealK)>0.0005))
+      alocs.push({l,qtd:0,val:0,org:origemMeta(l),foi:true});
   });
   // A ordem das linhas do "🧺 Comprado" decide-se toda de uma vez lá em baixo
   // (fresco primeiro), por isso não se ordena aqui.
@@ -7537,9 +7645,42 @@ function mealShopSection(rd){
      agarrada (é ele o cartão do separador Stock). Sem isto, "Bifes de Acém
      Redondo (9)" ficava sem categoria e caía no fim do bloco, longe do talho a
      que pertence — com o agravante de ser das linhas mais caras da refeição. */
-  const alocLines=alocs.map(x=>({art:x.l.artigo,cat:loteReqArtigo(x.l)||x.l.artigo,val:x.val,
-    qn:+x.qtd||0,qu:x.l.unidade,html:`<div class="msl-it stk" onclick="openLoteModal(${x.l._id})">
-      ${mslLead(x.l.artigo,loteQtdLabel(x.l,x.qtd))}<span class="msl-st ok">${x.org?x.org.ic+' '+escHtml(x.org.lbl):eur(x.val)}</span></div>`}));
+  /* A linha do lote decompõe-se quando o objetivo da compra e a alocação de hoje
+     discordam: em cima o que foi COMPRADO para esta refeição, por baixo o que
+     saiu (com o € em sinal contrário) ou de onde veio.
+     A REGRA que faz isto ser seguro: a dedução nunca se calcula por si — é
+     `€real − base`, por subtração. Assim `base + dedução ≡ x.val`, que é
+     exactamente o que o calcular() cobra a esta refeição, e nenhum cêntimo de
+     arredondamento pode fugir do cartão para as contas.
+     Iguais (o caso normal), é a linha de sempre: sem sub-linha, sem −0,00 €.
+     A sub-linha vai DENTRO do html da linha porque este bloco é ordenado
+     (fresco à cabeça, categoria por peso) — entrada própria era vê-la aterrar
+     longe do artigo a que pertence. */
+  const alocLines=alocs.map(x=>{
+    const unit=x.l.qtd>0?x.l.valor/x.l.qtd:0;
+    const origQ=alocsQtdDe(loteAlocOrig(x.l),mealK);
+    const saiu=rnd(origQ-x.qtd,3),veio=rnd(x.qtd-origQ,3);
+    const temOrig=!!loteAlocOrig(x.l);
+    // Base: o que a compra destinava aqui (havendo saída); senão, o de hoje
+    const baseQ=saiu>0.0005?origQ:x.qtd;
+    const baseVal=saiu>0.0005?rnd(unit*origQ,2):x.val;
+    const delta=rnd(x.val-baseVal,2);
+    const dir=x.org?x.org.ic+' '+escHtml(x.org.lbl):eur(baseVal);
+    let sub='';
+    if(temOrig&&saiu>0.0005)
+      sub=`<div class="msl-sub saiu"><span class="ms-t">↳ ${escHtml(loteQtdLabel(x.l,saiu))} ${mealRealocTxt(x.l,true)}</span>${x.org?'':`<span class="ms-v">${eur(delta)}</span>`}</div>`;
+    /* Recebeu: a base já é o que se cobra (não há sinal a mostrar), só falta
+       dizer de onde veio. A quantidade só se escreve quando a linha não é toda
+       sobra — senão repetia o número que está ao lado. */
+    else if(temOrig&&veio>0.0005)
+      sub=`<div class="msl-sub veio"><span class="ms-t">↳ ${origQ>0.0005?escHtml(loteQtdLabel(x.l,veio))+' — ':''}${mealRealocTxt(x.l,false)}</span></div>`;
+    /* `qn` é só para ORDENAR: o que já não está aqui vai para o fim do seu grupo
+       (com a quantidade original ordenava-se como se fosse das peças maiores da
+       refeição, e é o contrário — é um aparte). */
+    return {art:x.l.artigo,cat:loteReqArtigo(x.l)||x.l.artigo,val:x.val,
+      qn:x.foi?0:(+baseQ||0),qu:x.l.unidade,html:`<div class="msl-it stk${x.foi?' msl-dim':''}" onclick="openLoteModal(${x.l._id})">
+      ${mslLead(x.l.artigo,loteQtdLabel(x.l,baseQ))}<span class="msl-st ok">${dir}</span></div>${sub}`};
+  });
   const lineOf=(it,dim)=>{
     /* Tratado ≠ comprado. Um pedido coberto pelo stock (ou encomendado numa
        provisória do formato antigo, que não gera lotes) continua PENDENTE —
@@ -7624,7 +7765,10 @@ function mealShopSection(rd){
       ${mslLead('*'+a.artigo,a.qtd)}</div>`},mslQtd(a.qtd))));
   });
   const nProv=provs.length;
-  const nComp=alocs.length+bought.length+nProvArts;
+  /* Os artigos que foram comprados para aqui e já não estão aqui NÃO contam:
+     a contagem do bloco é do que esta refeição tem, e essa linha existe
+     precisamente para dizer que aquilo saiu. */
+  const nComp=alocs.filter(x=>!x.foi).length+bought.length+nProvArts;
   const det=(sub,lbl,cnt,body)=>{
     const k=key+sub;
     return `<details class="rdc-det msl-det"${MEAL_SHOP_OPEN[k]?' open':''} ontoggle="MEAL_SHOP_OPEN['${k}']=this.open">
@@ -8772,7 +8916,14 @@ function openCompra(compraId,opts){
     // Lotes já gravados desta compra: reconstrói destino/split das alocações
     // (1 alocação → destino simples; várias → split; nenhuma → por alocar).
     compraEdit.lotes=stockArr().filter(l=>l.compraId===compraId).map(l=>{
-      const al=(l.alocacoes||[]).filter(a=>+a.qtd>0);
+      /* O destino deste editor é o OBJETIVO da compra (`aloc_original`), não a
+         alocação de hoje: mexer no stock não pode reescrever para que é que a
+         compra foi feita, e mexer aqui não pode mandar o custo para outro sítio
+         sem se dizer. Sem objetivo gravado (lote anterior à migração, ou sem a
+         coluna) mostra-se a alocação real — é a única coisa que existe, e o
+         comportamento volta a ser o de sempre. */
+      const orig=loteAlocOrig(l);
+      const al=(orig||l.alocacoes||[]).filter(a=>+a.qtd>0);
       /* A ligação GRAVADA manda. Reabrir a compra deitava-a fora e adivinhava
          outra por semelhança de nomes — e como o `artigo` do lote é o nome do
          talão, a adivinhação errava: um lote gravado com lista_artigo="Batatas
@@ -8791,6 +8942,11 @@ function openCompra(compraId,opts){
       const base={_id:l._id,artigo:l.artigo,_listArt:link?link.artigo:null,_fatNome:l._fatNome||null,_m2n:l.qtd2==null?null:l.qtd2,_m2u:l.unidade2||'',qtd:fmtQty(l.qtd,l.unidade),valor:l.valor,keys:[],free:!link,destino:'',splits:null};
       if(al.length>1)base.splits=al.map(a=>({destino:alocToDestino(a),qtd:a.qtd}));
       else if(al.length===1)base.destino=alocToDestino(al[0]);
+      /* A alocação REAL viaja na volta: o Guardar apaga e reinsere os lotes
+         todos, e num lote já divergido é ela que tem de sobreviver — reconstruí-la
+         do editor era desfazer no silêncio a realocação que alguém fez no stock. */
+      base._alocReal=(l.alocacoes||[]).filter(a=>+a.qtd>0);
+      base._div=loteDivergiu(l);
       return base;
     });
   }
@@ -9361,6 +9517,15 @@ function compraLoteHtml(l,i){
   const fat=(!l.free&&l._sug?`<label class="lote-sug"><input type="checkbox" onchange="faturaSugToggle(${i})">
         <div class="sug-txt"><b>Corresponde a esta linha da fatura?</b><span>${escHtml(l._sug.artigo)}${l._sug.qtd?' · '+escHtml(l._sug.qtd):''}</span></div>
         <span class="sug-price">${eur(l._sug.valor)}</span>${nao(`faturaSugReject(${i})`)}</label>`:'');
+  /* O destino deste editor é o OBJETIVO da compra, e num lote já realocado no
+     stock ele deixou de ser onde o custo está. Sem este aviso, mudar o destino
+     aqui e não ver nada mexer era magia — e a ficha da compra passava a mentir a
+     quem a lesse meses depois. Diz onde é que está de facto, e leva lá. */
+  const divHint=(STOCK_ALOCORIG_COL&&l._div&&l._alocReal&&l._alocReal.length&&l._id!=null)?(()=>{
+    const por=Object.entries(alocsPorDest(l._alocReal)).sort((a,b)=>destKeyCmp(a[0],b[0]))
+      .map(([k,q])=>`${stockDestTxt(k)} ${escHtml(fmtQty(q,qtyParse(l.qtd)?qtyParse(l.qtd).u:''))}`).join(' · ');
+    return `<div class="lote-hint div">♻️ Já foi <b>realocado no stock</b>: ${por}. Isto aqui é o objetivo da compra — mudá-lo não move o custo. <button type="button" class="lh-go" onclick="event.stopPropagation();openLoteModal(${l._id})">ver no stock ›</button></div>`;
+  })():'';
   // Pediste X no carrinho mas o talão traz Y → o talão manda no stock
   const qtyHint=(!l.free&&l._fat==='warn'&&l._qtdPedida)
     ?`<div class="lote-hint">📝 Pediste <b>${escHtml(String(l._qtdPedida))}</b> no carrinho; o talão tem <b>${escHtml(l.qtd||'—')}</b> — é esta que entra em stock.</div>`:'';
@@ -9398,7 +9563,7 @@ function compraLoteHtml(l,i){
     return `<div class="lote-req-inline">🔗 pertence a <select onchange="compraLoteSetReq(${i},this.value)">${opts}</select></div>${nota}`;
   })():'';
   const cls='lote-card'+(l._fat==='ok'?' is-ok':l._fat==='miss'?' is-miss':l._fat==='warn'?' is-warn':'');
-  return `<div class="${cls}">${head}${fields}${qtyHint}${destBlock}${nsInline}${reqInline}${fat}</div>`;
+  return `<div class="${cls}">${head}${fields}${qtyHint}${divHint}${destBlock}${nsInline}${reqInline}${fat}</div>`;
 }
 function compraLoteSetReq(i,v){
   const l=(compraEdit.lotes||[])[i];if(!l)return;
@@ -9495,8 +9660,13 @@ function compraLoteDelSplit(i,j){
   if(l.splits.length<=1){l.destino=l.splits.length?(l.splits[0].destino||''):(l.destino||'');l.splits=null;}
   compraRenderLotes();
 }
-function compraDestPick(i){const l=(compraEdit.lotes||[])[i];if(!l)return;openDestPicker(l.destino,v=>{l.destino=v;l.splits=null;compraRenderLotes();},'Alocar '+(l.artigo||'artigo'));}
-function compraSplitDestPick(i,j){const l=(compraEdit.lotes||[])[i];if(!l||!l.splits||!l.splits[j])return;openDestPicker(l.splits[j].destino,v=>{l.splits[j].destino=v;compraRenderLotes();},'Destino');}
+/* "Comprado para" e não "Alocar a": desde que o objetivo da compra se guarda à
+   parte (aloc_original), este campo responde a *para que é que isto foi
+   comprado* — não a de quem é o custo, que se decide no separador Stock. Sem a
+   coluna é o mesmo campo de sempre e o nome antigo é o verdadeiro. */
+function compraDestTitulo(){return STOCK_ALOCORIG_COL?'Comprado para':'Alocar a';}
+function compraDestPick(i){const l=(compraEdit.lotes||[])[i];if(!l)return;openDestPicker(l.destino,v=>{l.destino=v;l.splits=null;compraRenderLotes();},STOCK_ALOCORIG_COL?'Comprado para':'Alocar '+(l.artigo||'artigo'));}
+function compraSplitDestPick(i,j){const l=(compraEdit.lotes||[])[i];if(!l||!l.splits||!l.splits[j])return;openDestPicker(l.splits[j].destino,v=>{l.splits[j].destino=v;compraRenderLotes();},compraDestTitulo());}
 /* Destino de defeito de um artigo escrito à mão. A vir do cash-flow herda o que
    lá estava escolhido: o tipo, e a refeição quando a data-valor casa mesmo com
    uma refeição definida (senão o destino ficava a apontar para lado nenhum). */
@@ -10208,6 +10378,7 @@ async function saveCompra(){
   // diretas por tipo/refeição (tipoFix e artigos fora da lista com destino tipo)
   const det=!!compraEdit.det;
   const lotes=[];const tipoRows={};const naoDetetados=[];   // tipoRows: 'Tipo'|'Tipo|data' → artigos; naoDetetados: artigos do carrinho sem preço
+  const aparados=[];   // artigos cuja alocação real deixou de caber na qtd nova
   const provItens=[];   // provisória: artigos que ficam só como detalhe da despesa
   const semLinha=[];   // pedidos do carrinho sem preço próprio — cobertos ou não, decide-se no fim
   // "Só totais" numa compra nova: o detalhe está escondido → não entra no registo
@@ -10273,7 +10444,17 @@ async function saveCompra(){
       const splits=(l.splits&&l.splits.length)?l.splits.filter(s=>s.destino&&(parseFloat(String(s.qtd).replace(',','.'))>0)):null;
       // Um lote livre ligado a um pedido (marca de "Batatas Fritas") mantém as
       // refeições herdadas — assim conta como necessidade de stock desse pedido.
-      lotes.push({artigo,qtd:q.n,unidade:q.u,valor:v,destino:(l.destino!=null?l.destino:''),splits:(splits&&splits.length?splits:null),keys:(l.free&&!l._listArt)?[]:(l.keys||[]),_listArt:l._listArt||null,_fatNome:l._fatNome||null,_m2n:l._m2n==null?null:l._m2n,_m2u:l._m2u||''});
+      /* `_alocReal`/`_div` seguem para a gravação: num lote já realocado no
+         stock é a alocação real que manda no custo, e o destino escrito aqui é
+         só o objetivo da compra (ver openCompra). */
+      lotes.push({artigo,qtd:q.n,unidade:q.u,valor:v,destino:(l.destino!=null?l.destino:''),splits:(splits&&splits.length?splits:null),keys:(l.free&&!l._listArt)?[]:(l.keys||[]),_listArt:l._listArt||null,_fatNome:l._fatNome||null,_m2n:l._m2n==null?null:l._m2n,_m2u:l._m2u||'',_alocReal:l._alocReal||null,_div:!!l._div});
+      /* A quantidade nova não chega para o que já está alocado? Só acontece num
+         lote divergido cuja qtd se corrigiu para baixo. Apara-se — mas não em
+         silêncio: é custo a mudar de sítio, e quem grava tem de o poder recusar. */
+      if(l._div&&l._alocReal&&l._alocReal.length){
+        const ap=alocsApara(l._alocReal,q.n);
+        if(ap.cortado>0.0005)aparados.push({artigo,cortado:ap.cortado,u:q.u});
+      }
       continue;
     }
     // Sem tabela de stock: item detalhado → despesa direta do tipo/refeição
@@ -10381,6 +10562,14 @@ async function saveCompra(){
       if(!confirm(`⚠️ Esta compra vale ${eur(reg)} nos cash-flows, mas o detalhe abriu a somar ${eur(compraEdit._totIni)} — uma diferença de ${eur(Math.abs(rnd(reg-compraEdit._totIni,2)))} que já lá estava.\n\nGuardar reescreve a compra por este detalhe: passa a valer ${eur(novo)}.\n\nGuardar assim mesmo?`))return;
     }
   }
+  /* Alocação real que já não cabe na quantidade nova (só num lote realocado no
+     stock cuja qtd baixou aqui). Apara-se do fim da ordem dos destinos — a
+     refeição mais tardia perde primeiro, que a mais cedo já aconteceu — e
+     pergunta-se, porque é custo a sair de uma refeição. */
+  if(aparados.length){
+    const lst=aparados.map(a=>`· ${a.artigo} — ${fmtQty(a.cortado,a.u)}`).join('\n');
+    if(!confirm(`⚠️ Estes artigos foram realocados no stock e a quantidade nova já não chega para o que lá está alocado:\n\n${lst}\n\nVou aparar o excesso pelo fim (a refeição mais tardia perde primeiro).\n\nGuardar assim mesmo?`))return;
+  }
   const compraId=compraEdit.id||('c'+Date.now());
   const compradoEm=new Date().toISOString();
   const btn=document.getElementById('shop-buy-save');btn.disabled=true;
@@ -10418,15 +10607,22 @@ async function saveCompra(){
         for(const l of lotes){
           // Resolve pelo destino/split escolhido; sem destino cai em FIFO (que
           // já vê os lotes anteriores empilhados nesta mesma gravação)
-          l.alocacoes=resolveLoteAlocs(l);
-          stockArr().push({_id:null,compraId,artigo:l.artigo,qtd:l.qtd,unidade:l.unidade,valor:l.valor,alocacoes:l.alocacoes,_listArt:l._listArt||null,_fatNome:l._fatNome||null,qtd2:l._m2n==null?null:l._m2n,unidade2:l._m2u||'',criadoEm:new Date().toISOString()});
+          const obj=resolveLoteAlocs(l);
+          /* O destino do editor é o OBJETIVO da compra. A alocação real HERDA-O
+             enquanto ninguém tiver mexido no stock — é isso que mantém a
+             correção de um destino errado a ser uma edição só. Divergida, ela
+             sobrevive (aparada à quantidade nova, se for preciso) e o objetivo
+             muda sozinho: são duas perguntas diferentes a partir daqui. */
+          l.alocOrig=obj;
+          l.alocacoes=(l._div&&l._alocReal&&l._alocReal.length)?alocsApara(l._alocReal,l.qtd).alocs:obj;
+          stockArr().push({_id:null,compraId,artigo:l.artigo,qtd:l.qtd,unidade:l.unidade,valor:l.valor,alocacoes:l.alocacoes,_alocOrig:STOCK_ALOCORIG_COL?obj:null,_listArt:l._listArt||null,_fatNome:l._fatNome||null,qtd2:l._m2n==null?null:l._m2n,unidade2:l._m2u||'',criadoEm:new Date().toISOString()});
         }
         // `lista_artigo` vai SEMPRE (null quando o lote não responde a pedido
         // nenhum): num INSERT em bloco o PostgREST exige as mesmas chaves em
         // todas as linhas — só nas que tinham ligação, uma compra que misture
         // artigos da lista com artigos de fora rebentava com "All object keys
         // must match" e não gravava nada.
-        const lres=await queueWrite(()=>sbReq('POST','stock_lotes',lotes.map(l=>({evento_id:DATA._sbId,compra_id:compraId,artigo:l.artigo,qtd:l.qtd,unidade:l.unidade,valor:l.valor,alocacoes:l.alocacoes,lista_artigo:l._listArt||null,...(STOCK_FAT_COL?{artigo_fatura:l._fatNome||null}:{}),...(STOCK_MED2_COLS?{qtd2:l._m2n==null?null:l._m2n,unidade2:l._m2u||null}:{})})),{Prefer:'return=representation'}));
+        const lres=await queueWrite(()=>sbReq('POST','stock_lotes',lotes.map(l=>({evento_id:DATA._sbId,compra_id:compraId,artigo:l.artigo,qtd:l.qtd,unidade:l.unidade,valor:l.valor,alocacoes:l.alocacoes,lista_artigo:l._listArt||null,...(STOCK_FAT_COL?{artigo_fatura:l._fatNome||null}:{}),...(STOCK_MED2_COLS?{qtd2:l._m2n==null?null:l._m2n,unidade2:l._m2u||null}:{}),...(STOCK_ALOCORIG_COL?{aloc_original:l.alocOrig||[]}:{})})),{Prefer:'return=representation'}));
         /* Gravou tantos artigos quantos foram enviados? Um INSERT que devolva
            menos linhas do que recebeu é a compra a ficar com menos artigos do
            que o dinheiro que lançou — e sem esta conta ninguém dava por isso
@@ -10722,6 +10918,7 @@ function openLoteModal(id){
   loteDespFill();
   loteReqFill();
   loteMed2Fill();
+  loteOrigFill();
   loteRenderAlocs();
   loteConsFill();
   loteCobFill();
@@ -11407,6 +11604,58 @@ function loteMed2Fill(){
   document.getElementById('lote-med2-body').innerHTML=h;
   wrap.style.display='';
 }
+/* ── 📥 Para que é que isto foi comprado ──────────────────────────────
+   O objetivo da compra (`aloc_original`) ao lado do custo de hoje (o bloco 💶).
+   **Só aparece quando as duas discordam**: iguais — que é o caso normal — não há
+   nada a dizer, e uma caixa a repetir o bloco de baixo em cada artigo do stock
+   era ecrã gasto a dizer o óbvio. Nada aqui se edita: o objetivo muda-se no
+   editor da compra, que é de quem ele é. */
+function loteOrigFill(){
+  const wrap=document.getElementById('lote-orig-wrap');if(!wrap)return;
+  const lotes=editingLote?loteUmbAtual():[];
+  const divs=lotes.filter(loteDivergiu);
+  if(!STOCK_ALOCORIG_COL||!divs.length){wrap.style.display='none';return;}
+  // Soma os deltas dos lotes divergidos: com várias marcas debaixo do mesmo
+  // guarda-chuva a pergunta é a mesma — o que saiu do objetivo e para onde foi
+  const de={},para={};
+  divs.forEach(l=>{const r=loteRealoc(l);if(!r)return;
+    for(const k in r.de)de[k]=rnd((de[k]||0)+r.de[k],3);
+    for(const k in r.para)para[k]=rnd((para[k]||0)+r.para[k],3);});
+  const linha=(m,cls,pref)=>Object.keys(m).sort(destKeyCmp)
+    .map(k=>`<span class="lo-chip ${cls}">${stockDestTxt(k)} · ${pref}${escHtml(loteM2Fmt(m[k]))}</span>`).join('');
+  const podeVoltar=isAdmin()&&!contasFechadas();
+  document.getElementById('lote-orig-body').innerHTML=
+    `<div class="lote-orig">
+      <div class="lo-hd">♻️ Realocado desde a compra</div>
+      <div class="lo-chips">${linha(de,'saiu','−')}${linha(para,'entrou','+')}</div>
+      <div class="note" style="margin-top:4px">O custo segue a alocação de baixo. Isto diz só o que a compra tinha por objetivo — e o que saiu dele.</div>
+      ${podeVoltar?`<button type="button" class="btn ghost lo-undo" onclick="loteOrigVoltar()">↺ voltar ao que foi comprado</button>`:''}
+    </div>`;
+  wrap.style.display='';
+}
+/* Devolve a alocação real ao objetivo da compra — o irmão do "↺ automático" do
+   consumo. Não passa pelo Guardar do modal: é desfazer, e desfazer responde já.
+   Escreve só `alocacoes`; `aloc_original` não se toca (é da compra). */
+async function loteOrigVoltar(){
+  if(!editingLote)return;
+  if(!isAdmin()||contasFechadas()){toast('Só o admin ajusta alocações','bad');return;}
+  const lotes=loteUmbAtual().filter(loteDivergiu);
+  if(!lotes.length)return;
+  if(!confirm('Voltar a alocação ao que a compra dizia? O custo volta com ela.'))return;
+  setSync('load','a guardar…');
+  try{
+    for(const l of lotes){
+      const nova=alocsApara(loteAlocOrig(l)||[],l.qtd).alocs;
+      await queueWrite(()=>sbReq('PATCH',`stock_lotes?id=eq.${l._id}`,{alocacoes:nova}));
+      l.alocacoes=nova;
+    }
+    syncMirror();marcaGuardado();
+    CALC=calcular(JSON.parse(JSON.stringify(DATA)));
+    const id=editingLote.allIds.filter(x=>x!=null)[0];
+    closeLoteModal();renderAll();if(id!=null)openLoteModal(id);
+    toast('Alocação de volta ao objetivo da compra ✓','ok');
+  }catch(e){setSync('err','erro ao guardar');toast(permErrorMsg(e),'bad');}
+}
 // Abre os campos a quem os quer. Não grava nada — enquanto ninguém escrever, o
 // artigo continua a contar-se só na unidade da compra.
 function loteMed2Abrir(){if(!editingLote)return;editingLote._m2open=true;loteMed2Fill();}
@@ -11416,7 +11665,7 @@ function loteMed2Contar(on){
   editingLote.m2on=!!on;
   _LOTE_M2[loteM2Key()]=!!on;
   try{localStorage.setItem('festasbv_lote_m2',JSON.stringify(_LOTE_M2));}catch(e){}
-  loteMed2Fill();loteRenderAlocs();loteConsFill();
+  loteMed2Fill();loteOrigFill();loteRenderAlocs();loteConsFill();
 }
 /* Declara (ou apaga) a 2.ª medida de UM lote. Campo vazio limpa. Recusa a mesma
    unidade da compra — não é segunda leitura de nada — e recusa texto sem
@@ -11442,7 +11691,7 @@ async function loteMed2Set(id,raw){
     // O fator mudou → tudo o que conta na 2.ª medida tem de ser relido
     editingLote.med2=umbMed2(loteUmbAtual());
     if(!editingLote.med2)editingLote.m2on=false;
-    loteMed2Fill();loteRenderAlocs();loteConsFill();
+    loteMed2Fill();loteOrigFill();loteRenderAlocs();loteConsFill();
     if(STOCK_TABLE&&TAB==='stock')renderStock();
     toast(n?`⇄ ${fmtQty(n,u)} ✓`:'Segunda medida removida ✓','ok');
   }catch(e){setSync('err','erro ao guardar');toast(permErrorMsg(e),'bad');loteMed2Fill();}
