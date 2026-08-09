@@ -64,9 +64,9 @@ Numa BD limpa, correr por esta ordem (há dependências entre eles):
     arredondado para cima, mais um extra e nunca abaixo de um mínimo. Depende
     de `convidados_acompanhantes.sql` (a restrição "linha de bebida é só de
     adultos" precisa da coluna `criancas`)
-19. `stock_medida2.sql` — `stock_lotes.qtd2` / `.unidade2`: a **2.ª medida** de um
-    lote, o mesmo stock contado de outra maneira (os 4,032 kg de acém que são 9
-    bifes). Declarada por quem arrumou as compras — a app **nunca** adivinha uma
+19. `stock_equivalencia.sql` — `stock_lotes.qtd_equiv` / `.unidade_equiv`: a
+    **2.ª medida** de um lote, o mesmo stock contado de outra maneira (os
+    4,032 kg de acém que são 9 bifes). Declarada por quem arrumou as compras — a app **nunca** adivinha uma
     conversão —, é ela que deixa alocar e dar baixa a contar peças. As alocações
     continuam a gravar-se na unidade da compra: **não entra em conta nenhuma**
 

@@ -1,5 +1,5 @@
 -- =====================================================================
--- FestasBV — Migração: 2.ª medida de um lote (festasbv.stock_lotes.qtd2)
+-- FestasBV — Migração: 2.ª medida de um lote (stock_lotes.qtd_equiv)
 -- Correr no SQL Editor do Supabase (projeto festasbv).
 -- É IDEMPOTENTE: pode ser corrido mais que uma vez sem erro.
 -- Depende de: stock.sql.
@@ -18,7 +18,7 @@
 -- fazer a regra de três de cabeça (2 de 9 → 0,896 kg) e escrever o resultado.
 --
 -- O QUE ESTAS COLUNAS SÃO: a MESMA quantidade do lote, contada de outra
--- maneira. `qtd2 = 9`, `unidade2 = 'bifes'` a par de `qtd = 4.032`,
+-- maneira. `qtd_equiv = 9`, `unidade_equiv = 'bifes'` a par de `qtd = 4.032`,
 -- `unidade = 'kg'` quer dizer *estes 4,032 kg são 9 bifes* — e é isso que dá à
 -- app o fator de conversão DESTE lote (2,232 bifes por kg).
 --
@@ -39,17 +39,23 @@
 --     tem de ser de uma pessoa e não da app.
 --
 -- Sem esta migração a app funciona à mesma: a sonda é tolerante
--- (STOCK_MED2_COLS=false), as colunas nunca são lidas nem escritas e tudo se
+-- (STOCK_EQUIV_COLS=false), as colunas nunca são lidas nem escritas e tudo se
 -- comporta como antes.
 -- =====================================================================
 
+-- NOME DAS COLUNAS: `qtd_equiv`/`unidade_equiv` e não `qtd2`/`unidade2` — num
+-- schema o «2» é a POSIÇÃO e não o significado, e quem lê a tabela dois anos
+-- depois não tem como saber de que é que aquilo é o segundo. "equiv" diz a
+-- relação (é a quantidade EQUIVALENTE, noutra unidade) sem presumir qual dos
+-- lados é o verdadeiro nem para que serve — aguenta o caso inverso, comprar 24
+-- latas e declarar que são 8 L.
 ALTER TABLE festasbv.stock_lotes
-  ADD COLUMN IF NOT EXISTS qtd2     numeric,
-  ADD COLUMN IF NOT EXISTS unidade2 text;
+  ADD COLUMN IF NOT EXISTS qtd_equiv     numeric,
+  ADD COLUMN IF NOT EXISTS unidade_equiv text;
 
-COMMENT ON COLUMN festasbv.stock_lotes.qtd2 IS
+COMMENT ON COLUMN festasbv.stock_lotes.qtd_equiv IS
   'A mesma quantidade do lote contada noutra unidade (9 bifes para os 4,032 kg). NULL = não declarada. Dá o fator de conversão DESTE lote; não entra no calcular().';
-COMMENT ON COLUMN festasbv.stock_lotes.unidade2 IS
+COMMENT ON COLUMN festasbv.stock_lotes.unidade_equiv IS
   'Unidade da 2.ª medida (bifes, un, kg, …). Tem de ser diferente de `unidade` — a mesma unidade não é uma segunda medida.';
 
 -- Sem policies novas: as colunas vivem na stock_lotes e herdam as dela (ver

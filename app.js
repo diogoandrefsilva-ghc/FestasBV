@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v264 · 2026-08-09 · O stock passa a guardar PARA QUE foi comprado, à parte de quem paga hoje: sobraram 2 bifes dos 9 do jantar de sábado e o cartão da refeição di-lo, com o valor a deduzir. Mais a 2.ª medida (4 kg = 9 bifes)';
+const APP_BUILD = 'v265 · 2026-08-09 · O stock passa a guardar PARA QUE foi comprado, à parte de quem paga hoje: sobraram 2 bifes dos 9 do jantar de sábado e o cartão da refeição di-lo, com o valor a deduzir. Mais a 2.ª medida (4 kg = 9 bifes)';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -174,13 +174,13 @@ let STOCK_FAT_COL=false;
    se gastou. Sem a migração, STOCK_CONS_COL=false — o consumo volta a ser só o
    derivado das alocações (o comportamento de sempre) e não se escreve nada. */
 let STOCK_CONS_COL=false;
-/* stock_lotes já tem as colunas 'qtd2'/'unidade2' (db/stock_medida2.sql)? É a
+/* stock_lotes já tem 'qtd_equiv'/'unidade_equiv' (db/stock_equivalencia.sql)? É a
    MESMA quantidade do lote contada noutra unidade — 4,032 kg de acém que são
    9 bifes. Dá o fator de conversão DESTE lote, e é o que permite alocar e dar
    baixa a contar peças enquanto o dinheiro continua a andar em kg. Sem a
-   migração, STOCK_MED2_COLS=false: nunca se lê nem se grava e as unidades
+   migração, STOCK_EQUIV_COLS=false: nunca se lê nem se grava e as unidades
    voltam a não se converter em sítio nenhum. */
-let STOCK_MED2_COLS=false;
+let STOCK_EQUIV_COLS=false;
 /* stock_lotes já tem a coluna 'aloc_original' (db/stock_alocacao_original.sql)?
    É PARA QUE É QUE o lote foi comprado, à parte de DE QUEM É O CUSTO hoje
    (`alocacoes`). Comprei 9 bifes para o jantar de sábado, sobraram 2 e foram
@@ -2313,9 +2313,9 @@ async function carregar(){
       // sonda à coluna convidados.modo (db/convidados_bebe.sql): o convidado
       // que só vem ao copo. Os parâmetros do preço vêm no próprio evento.
       sbFetch(`${SB_URL}/rest/v1/convidados?select=modo&limit=1`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null),
-      // sonda às colunas stock_lotes.qtd2/unidade2 (db/stock_medida2.sql): a
+      // sonda a stock_lotes.qtd_equiv/unidade_equiv (db/stock_equivalencia.sql): a
       // 2.ª medida do lote (4,032 kg = 9 bifes). Sem elas não há conversão.
-      sbFetch(`${SB_URL}/rest/v1/stock_lotes?select=qtd2,unidade2&limit=1`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null),
+      sbFetch(`${SB_URL}/rest/v1/stock_lotes?select=qtd_equiv,unidade_equiv&limit=1`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null),
       // sonda à coluna stock_lotes.aloc_original (db/stock_alocacao_original.sql):
       // para que é que o lote foi comprado, à parte de quem paga o custo hoje
       sbFetch(`${SB_URL}/rest/v1/stock_lotes?select=aloc_original&limit=1`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null)
@@ -2363,7 +2363,7 @@ async function carregar(){
     STOCK_CONS_COL=STOCK_TABLE&&!!(scRes&&scRes.ok);
     // 2.ª medida do lote: sem as colunas, kg e peças não se convertem em sítio
     // nenhum — a app volta a contar só na unidade da compra
-    STOCK_MED2_COLS=STOCK_TABLE&&!!(sm2Res&&sm2Res.ok);
+    STOCK_EQUIV_COLS=STOCK_TABLE&&!!(sm2Res&&sm2Res.ok);
     // Objetivo da compra: sem a coluna, o editor da compra volta a mexer na
     // alocação real (e não há sobras nem realocações para contar)
     STOCK_ALOCORIG_COL=STOCK_TABLE&&!!(aoRes&&aoRes.ok);
@@ -2422,7 +2422,7 @@ async function carregar(){
       shoplist:(shopByEv[ev.id]||[]).map(s=>({_id:s.id,artigo:s.artigo,quantidade:s.quantidade||'',tamanho:s.tamanho||'',loja:s.loja||'',tipo:s.tipo,dataValor:s.data_valor,estado:s.estado||'pendente',tratadoPor:s.tratado_por||null,noCarrinho:!!s.no_carrinho,compraId:s.compra_id||null,cfDesc:s.cf_desc||null,cobertura:s.cobertura||'',valor:s.valor!=null?N(s.valor):null,criadoPor:s.criado_por||'',criadoEm:s.criado_em,compradoEm:s.comprado_em})),
       // `_cons` (stock_lotes.consumido) é NULL de propósito quando ninguém o
       // escreveu: null = derivar das alocações, número = foi dito à mão
-      stockLotes:(stockByEv[ev.id]||[]).map(l=>({_id:l.id,compraId:l.compra_id,artigo:l.artigo,qtd:N(l.qtd),unidade:l.unidade||'',tamanho:l.tamanho||'',qtd2:l.qtd2==null?null:Number(l.qtd2),unidade2:l.unidade2||'',valor:N(l.valor),alocacoes:Array.isArray(l.alocacoes)?l.alocacoes:[],
+      stockLotes:(stockByEv[ev.id]||[]).map(l=>({_id:l.id,compraId:l.compra_id,artigo:l.artigo,qtd:N(l.qtd),unidade:l.unidade||'',tamanho:l.tamanho||'',qtdEquiv:l.qtd_equiv==null?null:Number(l.qtd_equiv),unidadeEquiv:l.unidade_equiv||'',valor:N(l.valor),alocacoes:Array.isArray(l.alocacoes)?l.alocacoes:[],
         /* `_alocOrig` null = objetivo DESCONHECIDO (lote anterior à migração), que
            não é o mesmo que `[]` = comprado sem destino declarado. É essa
            distinção que impede os lotes antigos de aparecerem todos como
@@ -6679,7 +6679,7 @@ function sameUnit(a,b){return uKey(a)===uKey(b);}
 /* A unidade sozinha, para se falar dela sem número à frente ("em kg", "em
    unidades"). Sai do próprio fmtQty para os plurais serem os mesmos. */
 function uLabel(u){return fmtQty(2,uKey(u)).replace(/^2\s*/,'')||'unidades';}
-/* ── A 2.ª MEDIDA de um lote (db/stock_medida2.sql) ───────────────────
+/* ── A 2.ª MEDIDA de um lote (db/stock_equivalencia.sql) ───────────────────
    O MESMO stock contado de outra maneira: os 4,032 kg de acém que são 9 bifes.
    Não é outro lote nem outro artigo — é a mesma mercadoria, com duas leituras.
    `unidade` (a da compra) é a do DINHEIRO e continua a ser a única que se grava
@@ -6694,11 +6694,11 @@ function uLabel(u){return fmtQty(2,uKey(u)).replace(/^2\s*/,'')||'unidades';}
    tem de ser noutra unidade — em kg os mesmos kg não são segunda leitura de
    nada. Qualquer palavra serve de unidade (o qtyParse guarda o que não conhece),
    e é isso que deixa escrever "9 bifes" em vez de "9 un". */
-function loteMed2(l){
-  if(!STOCK_MED2_COLS||!l)return null;
-  const n=+l.qtd2||0;
+function loteEquiv(l){
+  if(!STOCK_EQUIV_COLS||!l)return null;
+  const n=+l.qtdEquiv||0;
   if(!(n>0.0005)||!(+l.qtd>0.0005))return null;
-  const u=l.unidade2||'';
+  const u=l.unidadeEquiv||'';
   if(sameUnit(u,l.unidade))return null;
   return {n,u,f:n/(+l.qtd)};
 }
@@ -6706,12 +6706,12 @@ function loteMed2(l){
    quando TODOS os lotes com quantidade a declaram, e na mesma unidade: com meio
    guarda-chuva por declarar não há fator para a outra metade, e um fator médio
    inventado com o que falta é exatamente a adivinhação que isto não faz. */
-function umbMed2(lotes){
-  if(!STOCK_MED2_COLS)return null;
+function umbEquiv(lotes){
+  if(!STOCK_EQUIV_COLS)return null;
   let u=null,n=0,q=0,ok=true;
   (lotes||[]).forEach(l=>{
     if(!(+l.qtd>0.0005))return;   // stock sem quantidade escrita não pesa no fator
-    const m=loteMed2(l);
+    const m=loteEquiv(l);
     if(!m){ok=false;return;}
     if(u==null)u=m.u;else if(!sameUnit(u,m.u))ok=false;
     n=rnd(n+m.n,3);q=rnd(q+(+l.qtd||0),3);
@@ -6720,12 +6720,12 @@ function umbMed2(lotes){
   return {u,n,q,f:n/q};
 }
 // Canónica → 2.ª medida (é o que se MOSTRA: 3 casas bastam para se ler)
-function med2De(m,q){return m?rnd((+q||0)*m.f,3):0;}
+function equivDe(m,q){return m?rnd((+q||0)*m.f,3):0;}
 /* 2.ª medida → canónica (é o que se GRAVA). Seis casas e não três de propósito:
    a 3 casas cada linha podia arredondar até 0,0005 e três linhas somavam 0,0015
    — o suficiente para o "alocaste mais do que há" disparar contra um stock que
    estava exatamente todo alocado. */
-function med2Para(m,v){return m?rnd((+v||0)/m.f,6):0;}
+function equivPara(m,v){return m?rnd((+v||0)/m.f,6):0;}
 /* Quantidade de UM lote como a lista a escreve: "6 × 2,5 kg". O `tamanho` é a
    embalagem e vive à parte da quantidade — nos pedidos (shopQtyLabel) e agora
    também nos lotes, para os dois lados se lerem da mesma maneira. Como na
@@ -6745,10 +6745,10 @@ function loteQtdLabel(l,qtd){
      relatórios usam, e "0,896 kg" não diz nada a quem vai servir a mesa — "2
      bifes" diz. Do lote inteiro é a medida declarada (=, exata); de uma parte
      dele é a conversão pelo fator (≈, que arredonda). */
-  const m=n>0.0005?loteMed2(l):null;
+  const m=n>0.0005?loteEquiv(l):null;
   if(!m)return base;
   const inteiro=Math.abs(n-(+l.qtd||0))<0.0005;
-  return `${base} ${inteiro?'=':'≈'} ${fmtQty(inteiro?m.n:med2De(m,n),m.u)}`;
+  return `${base} ${inteiro?'=':'≈'} ${fmtQty(inteiro?m.n:equivDe(m,n),m.u)}`;
 }
 
 /* Procura de um artigo por refeição (o que foi pedido na lista, comprado ou
@@ -8175,8 +8175,8 @@ function stockArticleCard(g){
      chips seria "☀️ Sáb 08/08 · 0,896 kg (2 bifes)" seis vezes na mesma frase; e
      sem ela na lista não se via de fora quais são os artigos que se contam em
      peças — que é justamente como se pensa neles. */
-  const m2=umbMed2(g.lotes);
-  const med2=m2?`<div class="stk-med2">⇄ ao todo <b>${escHtml(fmtQty(m2.n,m2.u))}</b></div>`:'';
+  const eq=umbEquiv(g.lotes);
+  const equiv=eq?`<div class="stk-equiv">⇄ ao todo <b>${escHtml(fmtQty(eq.n,eq.u))}</b></div>`:'';
   // Selo de origem: parte (ou tudo) deste artigo não veio de uma compra
   const origs=[...new Set(g.lotes.map(loteOrigem).filter(Boolean))];
   const orgTag=(origs.length?`<span class="stk-org" title="${escHtml(origs.map(o=>STOCK_ORIGENS[o].lbl).join(' · '))}">${origs.map(o=>STOCK_ORIGENS[o].ic).join('')}</span>`:'')
@@ -8193,7 +8193,7 @@ function stockArticleCard(g){
   const unTag=g.multiU?`<span class="stk-un">em ${escHtml(uLabel(g.u))}</span>`:'';
   return `<div class="stk-card stk-tap" onclick="openLoteModal(${g.lotes[0]._id})">
     <div class="stk-card-top"><b>${escHtml(g.artigo)}</b>${unTag}${orgTag}<span class="stk-chev">›</span></div>
-    ${marcas}${med2}
+    ${marcas}${equiv}
     <div class="stk-chips">${chips||semQ}</div>
     ${stockConsLinha(c,ag.u)}
   </div>`;
@@ -8939,7 +8939,7 @@ function openCompra(compraId,opts){
          isto uma correção qualquer na compra deitava fora a conversão que alguém
          declarou no stock — calada, e sem nada no ecrã da compra que a mostrasse.
          Não se edita aqui de propósito (é o modal do stock que a declara). */
-      const base={_id:l._id,artigo:l.artigo,_listArt:link?link.artigo:null,_fatNome:l._fatNome||null,_m2n:l.qtd2==null?null:l.qtd2,_m2u:l.unidade2||'',qtd:fmtQty(l.qtd,l.unidade),valor:l.valor,keys:[],free:!link,destino:'',splits:null};
+      const base={_id:l._id,artigo:l.artigo,_listArt:link?link.artigo:null,_fatNome:l._fatNome||null,_eqN:l.qtdEquiv==null?null:l.qtdEquiv,_eqU:l.unidadeEquiv||'',qtd:fmtQty(l.qtd,l.unidade),valor:l.valor,keys:[],free:!link,destino:'',splits:null};
       if(al.length>1)base.splits=al.map(a=>({destino:alocToDestino(a),qtd:a.qtd}));
       else if(al.length===1)base.destino=alocToDestino(al[0]);
       /* A alocação REAL viaja na volta: o Guardar apaga e reinsere os lotes
@@ -10447,7 +10447,7 @@ async function saveCompra(){
       /* `_alocReal`/`_div` seguem para a gravação: num lote já realocado no
          stock é a alocação real que manda no custo, e o destino escrito aqui é
          só o objetivo da compra (ver openCompra). */
-      lotes.push({artigo,qtd:q.n,unidade:q.u,valor:v,destino:(l.destino!=null?l.destino:''),splits:(splits&&splits.length?splits:null),keys:(l.free&&!l._listArt)?[]:(l.keys||[]),_listArt:l._listArt||null,_fatNome:l._fatNome||null,_m2n:l._m2n==null?null:l._m2n,_m2u:l._m2u||'',_alocReal:l._alocReal||null,_div:!!l._div});
+      lotes.push({artigo,qtd:q.n,unidade:q.u,valor:v,destino:(l.destino!=null?l.destino:''),splits:(splits&&splits.length?splits:null),keys:(l.free&&!l._listArt)?[]:(l.keys||[]),_listArt:l._listArt||null,_fatNome:l._fatNome||null,_eqN:l._eqN==null?null:l._eqN,_eqU:l._eqU||'',_alocReal:l._alocReal||null,_div:!!l._div});
       /* A quantidade nova não chega para o que já está alocado? Só acontece num
          lote divergido cuja qtd se corrigiu para baixo. Apara-se — mas não em
          silêncio: é custo a mudar de sítio, e quem grava tem de o poder recusar. */
@@ -10615,14 +10615,14 @@ async function saveCompra(){
              muda sozinho: são duas perguntas diferentes a partir daqui. */
           l.alocOrig=obj;
           l.alocacoes=(l._div&&l._alocReal&&l._alocReal.length)?alocsApara(l._alocReal,l.qtd).alocs:obj;
-          stockArr().push({_id:null,compraId,artigo:l.artigo,qtd:l.qtd,unidade:l.unidade,valor:l.valor,alocacoes:l.alocacoes,_alocOrig:STOCK_ALOCORIG_COL?obj:null,_listArt:l._listArt||null,_fatNome:l._fatNome||null,qtd2:l._m2n==null?null:l._m2n,unidade2:l._m2u||'',criadoEm:new Date().toISOString()});
+          stockArr().push({_id:null,compraId,artigo:l.artigo,qtd:l.qtd,unidade:l.unidade,valor:l.valor,alocacoes:l.alocacoes,_alocOrig:STOCK_ALOCORIG_COL?obj:null,_listArt:l._listArt||null,_fatNome:l._fatNome||null,qtdEquiv:l._eqN==null?null:l._eqN,unidadeEquiv:l._eqU||'',criadoEm:new Date().toISOString()});
         }
         // `lista_artigo` vai SEMPRE (null quando o lote não responde a pedido
         // nenhum): num INSERT em bloco o PostgREST exige as mesmas chaves em
         // todas as linhas — só nas que tinham ligação, uma compra que misture
         // artigos da lista com artigos de fora rebentava com "All object keys
         // must match" e não gravava nada.
-        const lres=await queueWrite(()=>sbReq('POST','stock_lotes',lotes.map(l=>({evento_id:DATA._sbId,compra_id:compraId,artigo:l.artigo,qtd:l.qtd,unidade:l.unidade,valor:l.valor,alocacoes:l.alocacoes,lista_artigo:l._listArt||null,...(STOCK_FAT_COL?{artigo_fatura:l._fatNome||null}:{}),...(STOCK_MED2_COLS?{qtd2:l._m2n==null?null:l._m2n,unidade2:l._m2u||null}:{}),...(STOCK_ALOCORIG_COL?{aloc_original:l.alocOrig||[]}:{})})),{Prefer:'return=representation'}));
+        const lres=await queueWrite(()=>sbReq('POST','stock_lotes',lotes.map(l=>({evento_id:DATA._sbId,compra_id:compraId,artigo:l.artigo,qtd:l.qtd,unidade:l.unidade,valor:l.valor,alocacoes:l.alocacoes,lista_artigo:l._listArt||null,...(STOCK_FAT_COL?{artigo_fatura:l._fatNome||null}:{}),...(STOCK_EQUIV_COLS?{qtd_equiv:l._eqN==null?null:l._eqN,unidade_equiv:l._eqU||null}:{}),...(STOCK_ALOCORIG_COL?{aloc_original:l.alocOrig||[]}:{})})),{Prefer:'return=representation'}));
         /* Gravou tantos artigos quantos foram enviados? Um INSERT que devolva
            menos linhas do que recebeu é a compra a ficar com menos artigos do
            que o dinheiro que lançou — e sem esta conta ninguém dava por isso
@@ -10808,8 +10808,8 @@ function openLoteModal(id){
      desligar neste artigo fica desligada (é escolha de leitura, guardada no
      aparelho). Nada disto muda o que está gravado — as alocações são sempre em
      `u`, a unidade da compra. */
-  editingLote.med2=umbMed2(lotes);
-  editingLote.m2on=!!editingLote.med2&&_LOTE_M2[loteM2Key()]!==false;
+  editingLote.equiv=umbEquiv(lotes);
+  editingLote.eqOn=!!editingLote.equiv&&_LOTE_EQUIV[loteEqKey()]!==false;
   document.getElementById('lote-title').textContent='🧺 '+reqName;
   // A origem (esquerda) — saiu do cartão do ecrã principal. Normalmente são as
   // compras; um lote sem compra (oferta / ano anterior) diz-se pelo nome e é
@@ -10894,9 +10894,9 @@ function openLoteModal(id){
   const semQtd0=!(totQ>0.0005);
   // Declarada a 2.ª medida, ela vai à cabeça com a outra: "4,032 kg = 9 bifes" é
   // o que este stock É, e é a primeira coisa que se quer ler ao abrir o cartão
-  const m2sum=editingLote.med2?` = <b>${escHtml(fmtQty(editingLote.med2.n,editingLote.med2.u))}</b>`:'';
+  const eqSum=editingLote.equiv?` = <b>${escHtml(fmtQty(editingLote.equiv.n,editingLote.equiv.u))}</b>`:'';
   document.getElementById('lote-info').innerHTML=
-    `<div class="lote-sum">Em stock: <b>${escHtml(semQtd0?'sem quantidade':fmtQty(totQ,editingLote.u))}</b>${m2sum} · <b>${semCusto?'sem custo':eur(totV)}</b></div>`+
+    `<div class="lote-sum">Em stock: <b>${escHtml(semQtd0?'sem quantidade':fmtQty(totQ,editingLote.u))}</b>${eqSum} · <b>${semCusto?'sem custo':eur(totV)}</b></div>`+
     outrasHtml+
     `<div class="lote-acc">
       ${loteAccSec('cmp',anyOrg?'📦':'🛒',anyOrg?'Origem':'Compras',semQtd0?null:totQ,cmpSum,comprasRows)}
@@ -10917,7 +10917,7 @@ function openLoteModal(id){
   loteCatFill();
   loteDespFill();
   loteReqFill();
-  loteMed2Fill();
+  loteEquivFill();
   loteOrigFill();
   loteRenderAlocs();
   loteConsFill();
@@ -11246,9 +11246,9 @@ function loteConsFill(){
   const c=umbConsumo(lotes,nome);
   const canEdit=isAdmin()&&!contasFechadas();
   // Conta-se na mesma medida que a alocação — a escolha é do modal, não do bloco
-  // (é a mesma pergunta), e por isso as quantidades passam todas pelo loteM2*
-  const m2=loteM2();
-  const uLbl=loteM2ULbl();
+  // (é a mesma pergunta), e por isso as quantidades passam todas pelo loteEq*
+  const eq=loteEq();
+  const uLbl=loteEqULbl();
   const podeEscrever=canEdit&&STOCK_CONS_COL;
   let h='';
   /* O convite da despensa vive aqui, e não no cartão da lista: é a resposta a
@@ -11275,10 +11275,10 @@ function loteConsFill(){
        logo acima — dizê-lo aqui era encher o modal a repetir o que está à
        vista. Só o que FOGE ao normal leva marca, e é uma marca, não um
        parágrafo: o consumo dito à mão, que é o que explica o ↺ ao lado. */
-    h+=`<div class="lote-cons-num">Gasto: <b>${escHtml(loteM2Fmt(c.cons))}</b> · Por gastar: <b>${escHtml(loteM2Fmt(c.resta))}</b>${c.manual?' <i class="lcn-man">dito à mão</i>':''}</div>`;
+    h+=`<div class="lote-cons-num">Gasto: <b>${escHtml(loteEqFmt(c.cons))}</b> · Por gastar: <b>${escHtml(loteEqFmt(c.resta))}</b>${c.manual?' <i class="lcn-man">dito à mão</i>':''}</div>`;
     if(podeEscrever)h+=`<div class="lote-cons-acts">
       <span class="lca-lbl">Já se gastou</span>
-      <div class="lote-qty-w${uLbl?'':' nou'}"><input type="number" step="any" min="0" inputmode="decimal" id="lote-cons-in" value="${(m2?med2De(m2,c.cons)||'':c.cons||'')}" placeholder="0">${uLbl?`<i>${escHtml(uLbl)}</i>`:''}</div>
+      <div class="lote-qty-w${uLbl?'':' nou'}"><input type="number" step="any" min="0" inputmode="decimal" id="lote-cons-in" value="${(eq?equivDe(eq,c.cons)||'':c.cons||'')}" placeholder="0">${uLbl?`<i>${escHtml(uLbl)}</i>`:''}</div>
       <button type="button" class="btn ghost" onclick="loteConsDarBaixa()">Dar baixa</button>
       ${c.manual?'<button type="button" class="btn ghost lca-auto" onclick="loteConsAuto()">↺ automático</button>':''}
     </div>`;
@@ -11301,13 +11301,13 @@ async function loteConsDarBaixa(){
   const el=document.getElementById('lote-cons-in');if(!el)return;
   // O campo está na medida em uso; o que se grava é a canónica (é nela que o
   // consumo se compara com a quantidade do lote)
-  const m2=loteM2();
+  const eq=loteEq();
   let v=parseFloat(String(el.value).replace(',','.'))||0;
-  if(m2)v=med2Para(m2,v);
+  if(eq)v=equivPara(eq,v);
   const lotes=loteUmbAtual();
   const tot=rnd(lotes.reduce((s,l)=>s+(+l.qtd||0),0),3);
   if(v<0){toast('O consumo não pode ser negativo','bad');return;}
-  if(v-tot>0.0005){toast(tot>0.0005?`Só há ${loteM2Fmt(tot)} — não se pode gastar mais`
+  if(v-tot>0.0005){toast(tot>0.0005?`Só há ${loteEqFmt(tot)} — não se pode gastar mais`
     :'Este stock entrou sem quantidade escrita — escreve-a primeiro','bad');return;}
   setSync('load','a guardar…');
   if(await umbConsSet(lotes,rnd(v,3))){loteConsRefresh();toast('Consumo atualizado ✓','ok');}
@@ -11538,22 +11538,22 @@ async function loteCobSet(id,v){
 // A escolha de "contar em" fica no aparelho, por artigo: quem declarou a 2.ª
 // medida quer contar nela, e voltar a escolhê-la em cada abertura do modal era
 // pedir a mesma coisa outra vez. Ausente = ligada (declarar é pedi-la).
-let _LOTE_M2=(function(){try{return JSON.parse(localStorage.getItem('festasbv_lote_m2'))||{};}catch(e){return{};}})();
-function loteM2Key(){return shopArtKey((editingLote&&(editingLote.reqName||editingLote.artigo))||'')+'|'+uKey(editingLote?editingLote.u:'');}
-function loteM2Ativa(){return !!(editingLote&&editingLote.med2&&editingLote.m2on);}
+let _LOTE_EQUIV=(function(){try{return JSON.parse(localStorage.getItem('festasbv_lote_equiv'))||{};}catch(e){return{};}})();
+function loteEqKey(){return shopArtKey((editingLote&&(editingLote.reqName||editingLote.artigo))||'')+'|'+uKey(editingLote?editingLote.u:'');}
+function loteEqAtiva(){return !!(editingLote&&editingLote.equiv&&editingLote.eqOn);}
 // A medida em que o modal está a contar (null = a da compra, a canónica)
-function loteM2(){return loteM2Ativa()?editingLote.med2:null;}
+function loteEq(){return loteEqAtiva()?editingLote.equiv:null;}
 // Quantidade canónica escrita na medida em que se está a contar
-function loteM2Fmt(q){const m=loteM2();return m?fmtQty(med2De(m,q),m.u):fmtQty(rnd(q||0,3),editingLote.u);}
+function loteEqFmt(q){const m=loteEq();return m?fmtQty(equivDe(m,q),m.u):fmtQty(rnd(q||0,3),editingLote.u);}
 // …e com a canónica atrás, onde a conta tem de se poder conferir
-function loteM2Both(q){const m=loteM2();const c=fmtQty(rnd(q||0,3),editingLote.u);return m?`${fmtQty(med2De(m,q),m.u)} (${c})`:c;}
+function loteEqBoth(q){const m=loteEq();const c=fmtQty(rnd(q||0,3),editingLote.u);return m?`${fmtQty(equivDe(m,q),m.u)} (${c})`:c;}
 // O sufixo do campo da quantidade ("kg", "bifes") na medida em uso
-function loteM2ULbl(){const m=loteM2();return m?(fmtQty(0,m.u).split(' ')[1]||''):(fmtQty(0,editingLote.u).split(' ')[1]||'');}
-function loteMed2Fill(){
-  const wrap=document.getElementById('lote-med2-wrap');if(!wrap)return;
+function loteEqULbl(){const m=loteEq();return m?(fmtQty(0,m.u).split(' ')[1]||''):(fmtQty(0,editingLote.u).split(' ')[1]||'');}
+function loteEquivFill(){
+  const wrap=document.getElementById('lote-equiv-wrap');if(!wrap)return;
   if(!editingLote||!STOCK_TABLE){wrap.style.display='none';return;}
-  const podeEscrever=isAdmin()&&!contasFechadas()&&STOCK_MED2_COLS;
-  const m=editingLote.med2;
+  const podeEscrever=isAdmin()&&!contasFechadas()&&STOCK_EQUIV_COLS;
+  const m=editingLote.equiv;
   // A quem não a pode declarar só se mostra o que ela diz — e só quando há algo
   // dito. Um campo trancado e vazio era uma caixa a ocupar ecrã para nada.
   if(!podeEscrever&&!m){wrap.style.display='none';return;}
@@ -11565,9 +11565,9 @@ function loteMed2Fill(){
   // em kg e ponto). Um campo vazio com etiqueta em cada modal era mais uma caixa
   // a pedir resposta a quem não tem pergunta nenhuma: fica um convite de uma
   // linha, e os campos aparecem a quem lhe toca. Declarada, abre à vista.
-  const abrir=!!m||!!editingLote._m2open;
+  const abrir=!!m||!!editingLote._eqOpen;
   if(podeEscrever&&!abrir){
-    h+=`<button type="button" class="lote-med2-add" onclick="loteMed2Abrir()">⇄ contar também em peças</button>`;
+    h+=`<button type="button" class="lote-equiv-add" onclick="loteEquivAbrir()">⇄ contar também em peças</button>`;
   }else if(podeEscrever){
     /* Um campo por lote, na ordem FIFO — a 2.ª medida é de cada mercadoria, não
        do cartão: 9 bifes numa compra e 6 noutra são dois fatores. Com um lote só
@@ -11577,14 +11577,14 @@ function loteMed2Fill(){
        uma grelha de unidades a palavra com que se conta em casa. */
     h+=`<label>⇄ Segunda medida</label>`;
     h+=lotes.map(l=>{
-      const mine=loteMed2(l);
+      const mine=loteEquiv(l);
       const val=mine?fmtQty(mine.n,mine.u):'';
       const nm=lotes.length>1
-        ?`<span class="lm2-nm">${escHtml(l.artigo)} · ${escHtml(l.qtd>0.0005?fmtQty(l.qtd,l.unidade):'sem quantidade')}</span>`:'';
-      const eq=(mine&&+l.qtd>0.0005)?`<span class="lm2-eq">= ${escHtml(fmtQty(l.qtd,l.unidade))}</span>`:'';
-      return `<div class="lote-med2-row">${nm}
-        <input class="lm2-in" type="text" maxlength="24" value="${escHtml(val)}" placeholder="ex.: 9 bifes"
-          onchange="loteMed2Set(${l._id},this.value)">${eq}</div>`;
+        ?`<span class="leq-nm">${escHtml(l.artigo)} · ${escHtml(l.qtd>0.0005?fmtQty(l.qtd,l.unidade):'sem quantidade')}</span>`:'';
+      const eq=(mine&&+l.qtd>0.0005)?`<span class="leq-eq">= ${escHtml(fmtQty(l.qtd,l.unidade))}</span>`:'';
+      return `<div class="lote-equiv-row">${nm}
+        <input class="leq-in" type="text" maxlength="24" value="${escHtml(val)}" placeholder="ex.: 9 bifes"
+          onchange="loteEquivSet(${l._id},this.value)">${eq}</div>`;
     }).join('');
     /* Uma nota só, e só enquanto não há nada declarado — é aí que ela responde a
        "para que serve isto". Declarada, o "= 4,032 kg" ao lado do campo e o
@@ -11592,16 +11592,16 @@ function loteMed2Fill(){
        ser manual a ocupar ecrã (a mesma regra do bloco do consumo). */
     if(!m)h+=`<div class="note" style="margin-top:4px">O mesmo stock contado de outra maneira — <b>9 bifes</b> para os <b>4 kg</b> de acém. Escreve-o na unidade que usas; a partir daí podes alocar e dar baixa a contar peças.</div>`;
   }else if(m){
-    h+=`<div class="lote-med2-ro">⇄ <b>${escHtml(fmtQty(m.q,editingLote.u))}</b> = <b>${escHtml(fmtQty(m.n,m.u))}</b></div>`;
+    h+=`<div class="lote-equiv-ro">⇄ <b>${escHtml(fmtQty(m.q,editingLote.u))}</b> = <b>${escHtml(fmtQty(m.n,m.u))}</b></div>`;
   }
   /* O "contar em" é UMA escolha para o modal todo — alocação e consumo —, e não
      uma por bloco: são as duas a mesma pergunta ("em que é que eu conto este
      artigo?") e responder-lhe duas vezes era convidar a que discordassem. */
-  if(m)h+=`<div class="lote-cons-est lote-med2-sw">
-    <button type="button" class="lce-opt${editingLote.m2on?'':' on'}" onclick="loteMed2Contar(false)">${escHtml(uLabel(editingLote.u))}</button>
-    <button type="button" class="lce-opt${editingLote.m2on?' on':''}" onclick="loteMed2Contar(true)">${escHtml(uLabel(m.u))}</button>
+  if(m)h+=`<div class="lote-cons-est lote-equiv-sw">
+    <button type="button" class="lce-opt${editingLote.eqOn?'':' on'}" onclick="loteEquivContar(false)">${escHtml(uLabel(editingLote.u))}</button>
+    <button type="button" class="lce-opt${editingLote.eqOn?' on':''}" onclick="loteEquivContar(true)">${escHtml(uLabel(m.u))}</button>
   </div>`;
-  document.getElementById('lote-med2-body').innerHTML=h;
+  document.getElementById('lote-equiv-body').innerHTML=h;
   wrap.style.display='';
 }
 /* ── 📥 Para que é que isto foi comprado ──────────────────────────────
@@ -11622,7 +11622,7 @@ function loteOrigFill(){
     for(const k in r.de)de[k]=rnd((de[k]||0)+r.de[k],3);
     for(const k in r.para)para[k]=rnd((para[k]||0)+r.para[k],3);});
   const linha=(m,cls,pref)=>Object.keys(m).sort(destKeyCmp)
-    .map(k=>`<span class="lo-chip ${cls}">${stockDestTxt(k)} · ${pref}${escHtml(loteM2Fmt(m[k]))}</span>`).join('');
+    .map(k=>`<span class="lo-chip ${cls}">${stockDestTxt(k)} · ${pref}${escHtml(loteEqFmt(m[k]))}</span>`).join('');
   const podeVoltar=isAdmin()&&!contasFechadas();
   document.getElementById('lote-orig-body').innerHTML=
     `<div class="lote-orig">
@@ -11658,43 +11658,43 @@ async function loteOrigVoltar(){
 }
 // Abre os campos a quem os quer. Não grava nada — enquanto ninguém escrever, o
 // artigo continua a contar-se só na unidade da compra.
-function loteMed2Abrir(){if(!editingLote)return;editingLote._m2open=true;loteMed2Fill();}
+function loteEquivAbrir(){if(!editingLote)return;editingLote._eqOpen=true;loteEquivFill();}
 // Trocar a medida em que se conta: só apresentação — nenhuma alocação se mexe
-function loteMed2Contar(on){
-  if(!editingLote||!editingLote.med2)return;
-  editingLote.m2on=!!on;
-  _LOTE_M2[loteM2Key()]=!!on;
-  try{localStorage.setItem('festasbv_lote_m2',JSON.stringify(_LOTE_M2));}catch(e){}
-  loteMed2Fill();loteOrigFill();loteRenderAlocs();loteConsFill();
+function loteEquivContar(on){
+  if(!editingLote||!editingLote.equiv)return;
+  editingLote.eqOn=!!on;
+  _LOTE_EQUIV[loteEqKey()]=!!on;
+  try{localStorage.setItem('festasbv_lote_equiv',JSON.stringify(_LOTE_EQUIV));}catch(e){}
+  loteEquivFill();loteOrigFill();loteRenderAlocs();loteConsFill();
 }
 /* Declara (ou apaga) a 2.ª medida de UM lote. Campo vazio limpa. Recusa a mesma
    unidade da compra — não é segunda leitura de nada — e recusa texto sem
    número: sem número não há fator, e é o fator que isto existe para dar. */
-async function loteMed2Set(id,raw){
-  if(!STOCK_MED2_COLS){toast('Falta correr db/stock_medida2.sql','bad');return;}
+async function loteEquivSet(id,raw){
+  if(!STOCK_EQUIV_COLS){toast('Falta correr db/stock_equivalencia.sql','bad');return;}
   if(!isAdmin()||contasFechadas())return;
   const l=stockArr().find(x=>x._id===id);if(!l)return;
   const s=String(raw==null?'':raw).trim();
   let n=null,u=null;
   if(s){
     const q=qtyParse(s);
-    if(!q||!(q.n>0.0005)){toast('Escreve quanto é e em quê — ex.: "9 bifes"','bad');loteMed2Fill();return;}
-    if(sameUnit(q.u,l.unidade)){toast(`Este stock já está em ${uLabel(l.unidade)} — a segunda medida tem de ser noutra unidade`,'bad');loteMed2Fill();return;}
-    if(!(+l.qtd>0.0005)){toast('Este stock entrou sem quantidade escrita — escreve-a primeiro','bad');loteMed2Fill();return;}
+    if(!q||!(q.n>0.0005)){toast('Escreve quanto é e em quê — ex.: "9 bifes"','bad');loteEquivFill();return;}
+    if(sameUnit(q.u,l.unidade)){toast(`Este stock já está em ${uLabel(l.unidade)} — a segunda medida tem de ser noutra unidade`,'bad');loteEquivFill();return;}
+    if(!(+l.qtd>0.0005)){toast('Este stock entrou sem quantidade escrita — escreve-a primeiro','bad');loteEquivFill();return;}
     n=rnd(q.n,3);u=uKey(q.u)||'un';   // um número seco conta-se em unidades
   }
   setSync('load','a guardar…');
   try{
-    await queueWrite(()=>sbReq('PATCH',`stock_lotes?id=eq.${id}`,{qtd2:n,unidade2:u}));
-    l.qtd2=n;l.unidade2=u||'';
+    await queueWrite(()=>sbReq('PATCH',`stock_lotes?id=eq.${id}`,{qtd_equiv:n,unidade_equiv:u}));
+    l.qtdEquiv=n;l.unidadeEquiv=u||'';
     syncMirror();marcaGuardado();
     // O fator mudou → tudo o que conta na 2.ª medida tem de ser relido
-    editingLote.med2=umbMed2(loteUmbAtual());
-    if(!editingLote.med2)editingLote.m2on=false;
-    loteMed2Fill();loteOrigFill();loteRenderAlocs();loteConsFill();
+    editingLote.equiv=umbEquiv(loteUmbAtual());
+    if(!editingLote.equiv)editingLote.eqOn=false;
+    loteEquivFill();loteOrigFill();loteRenderAlocs();loteConsFill();
     if(STOCK_TABLE&&TAB==='stock')renderStock();
     toast(n?`⇄ ${fmtQty(n,u)} ✓`:'Segunda medida removida ✓','ok');
-  }catch(e){setSync('err','erro ao guardar');toast(permErrorMsg(e),'bad');loteMed2Fill();}
+  }catch(e){setSync('err','erro ao guardar');toast(permErrorMsg(e),'bad');loteEquivFill();}
 }
 function loteRenderAlocs(){
   if(!editingLote)return;
@@ -11709,8 +11709,8 @@ function loteRenderAlocs(){
   // percebe se o 0,5 são quilos, litros ou unidades. Vazio = à unidade.
   // Com a 2.ª medida em uso é ela que se escreve nos campos (2 bifes, não
   // 0,896 kg): o número que se grava continua a ser o canónico.
-  const m2=loteM2();
-  const uLbl=loteM2ULbl();
+  const eq=loteEq();
+  const uLbl=loteEqULbl();
   const dem=stockDemandFor(editingLote.reqName||editingLote.artigo,editingLote.u);
   // Cada alocação cabe numa LINHA só: artigo/refeição · qtd · € · ✕.
   // Com uma marca só, as linhas são a lista toda (uma refeição por linha, sem
@@ -11722,7 +11722,7 @@ function loteRenderAlocs(){
   const solo=!editingLote.multi;
   // Peças da linha, iguais nos dois modos
   const qtyCell=(i,a)=>`<div class="lote-qty-w${uLbl?'':' nou'}">
-      <input type="number" step="any" min="0" inputmode="decimal" id="lote-q-${i}" ${canEdit?'':'disabled'} value="${(m2?med2De(m2,a.qtd)||'':a.qtd||'')}" placeholder="qtd" onchange="loteAlocQtd(${i},this.value)">
+      <input type="number" step="any" min="0" inputmode="decimal" id="lote-q-${i}" ${canEdit?'':'disabled'} value="${(eq?equivDe(eq,a.qtd)||'':a.qtd||'')}" placeholder="qtd" onchange="loteAlocQtd(${i},this.value)">
       ${uLbl?`<i>${escHtml(uLbl)}</i>`:''}
     </div>`;
   /* ⇄ só nas linhas de TIPO PURO com quantidade — o depósito (Bebidas, Gerais),
@@ -11774,7 +11774,7 @@ function loteRenderAlocs(){
   // 💶 e não 🍽️: este bloco é o eixo do CUSTO. O 🍽️ passou para o bloco do
   // Consumo, logo abaixo — ter o prato nos dois era a confusão que os dois
   // eixos vieram desfazer.
-  if(lbl)lbl.innerHTML=`💶 Alocação <span class="lote-acc-q">(${escHtml(loteM2Fmt(tot))})</span>`;
+  if(lbl)lbl.innerHTML=`💶 Alocação <span class="lote-acc-q">(${escHtml(loteEqFmt(tot))})</span>`;
   // O que sobra na bolsa comum é o que o alocado não levou (0 € se o que sobra
   // for stock oferecido / do ano anterior)
   const restoVal=Math.max(0,rnd(editingLote.totV-lineVal.reduce((s,v)=>s+(+v||0),0),2));
@@ -11790,8 +11790,8 @@ function loteRenderAlocs(){
     ?(tot>0.0005?`Sem quantidade escrita — ao guardar, este stock fica com <b>${escHtml(fmtQty(rnd(tot,3),editingLote.u))}</b>.`
       :'Entrou sem quantidade escrita — o que alocares passa a ser a quantidade dele.')
     :livre>0
-    ?`Alocado ${escHtml(loteM2Fmt(tot))} de ${escHtml(loteM2Fmt(editingLote.totQ))} — <b>${escHtml(loteM2Both(livre))}</b> (${eur(restoVal)}) fica na bolsa comum.`
-    :livre<0?`⚠️ Alocaste ${escHtml(loteM2Fmt(tot))} — mais do que há em stock (${escHtml(loteM2Fmt(editingLote.totQ))}).`
+    ?`Alocado ${escHtml(loteEqFmt(tot))} de ${escHtml(loteEqFmt(editingLote.totQ))} — <b>${escHtml(loteEqBoth(livre))}</b> (${eur(restoVal)}) fica na bolsa comum.`
+    :livre<0?`⚠️ Alocaste ${escHtml(loteEqFmt(tot))} — mais do que há em stock (${escHtml(loteEqFmt(editingLote.totQ))}).`
     :'Stock totalmente alocado.';
 }
 /* Escolher a marca de uma linha — bottom-sheet igual ao do destino (o <select>
@@ -11816,9 +11816,9 @@ function loteMarcaPicker(i){
    as alocações passassem a poder estar em duas unidades, o resolveUmbrella e o
    custo das refeições ficavam a somar peras com maçãs. */
 function loteAlocQtd(i,v){
-  const m=loteM2();
+  const m=loteEq();
   if(!m)return loteAlocField(i,'qtd',v);
-  loteAlocField(i,'qtd',med2Para(m,parseFloat(String(v).replace(',','.'))||0));
+  loteAlocField(i,'qtd',equivPara(m,parseFloat(String(v).replace(',','.'))||0));
 }
 function loteAlocField(i,f,v){
   const a=editingLote&&editingLote.alocs[i];if(!a)return;
@@ -11949,13 +11949,13 @@ async function saveLote(){
      quantidade dele (o PATCH lá em baixo). Com stock que diz quanto é, o aviso
      é o de sempre. */
   const semQtd=editingLote.lotesFifo.some(l=>!(l.qtd>0.0005));
-  if(!semQtd&&tot-editingLote.totQ>0.0005){toast(`Alocaste ${loteM2Fmt(tot)} — só há ${loteM2Fmt(editingLote.totQ)} em stock`,'bad');return;}
+  if(!semQtd&&tot-editingLote.totQ>0.0005){toast(`Alocaste ${loteEqFmt(tot)} — só há ${loteEqFmt(editingLote.totQ)} em stock`,'bad');return;}
   // Fixaste mais de uma marca do que existe dessa marca? (pela mesma razão, uma
   // marca cujos lotes não têm quantidade escrita não tem tecto que se valide)
   const brandCap={},brandSemQ={};
   editingLote.lotesFifo.forEach(l=>{brandCap[l.artigo]=rnd((brandCap[l.artigo]||0)+l.qtd,3);if(!(l.qtd>0.0005))brandSemQ[l.artigo]=true;});
   const brandUse={};alocs.forEach(a=>{if(a.marca)brandUse[a.marca]=rnd((brandUse[a.marca]||0)+a.qtd,3);});
-  for(const b in brandUse){if(!brandSemQ[b]&&brandUse[b]-(brandCap[b]||0)>0.0005){toast(`Fixaste ${loteM2Fmt(brandUse[b])} de "${b}" — só há ${loteM2Fmt(brandCap[b]||0)}`,'bad');return;}}
+  for(const b in brandUse){if(!brandSemQ[b]&&brandUse[b]-(brandCap[b]||0)>0.0005){toast(`Fixaste ${loteEqFmt(brandUse[b])} de "${b}" — só há ${loteEqFmt(brandCap[b]||0)}`,'bad');return;}}
   // Distribui pelos lotes físicos: marca fixada primeiro, genérico por FIFO.
   // Gravam-se TODOS os lotes do guarda-chuva (mesmo os que ficam a zero, para
   // limpar alocações antigas).
@@ -15654,8 +15654,8 @@ function buildStockReport(sel){
        pesa quilos. É a conversão DO NÚMERO QUE A LINHA MOSTRA (o que há, o que
        falta gastar, o que vai para aquele destino) e não a do lote inteiro —
        senão numa folha de destino dizia-se "9 bifes" a quem leva dois. */
-    const m2=umbMed2(g.lotes);
-    if(m2&&qMost>0.0005)meta.push(escHtml('⇄ '+fmtQty(med2De(m2,qMost),m2.u)));
+    const eq=umbEquiv(g.lotes);
+    if(eq&&qMost>0.0005)meta.push(escHtml('⇄ '+fmtQty(equivDe(eq,qMost),eq.u)));
     /* Onde está arrumado (eixo do custo). Numa folha de um destino não se
        repete — o título já o diz — e no "por alocar" não vem ao caso: ali o que
        interessa é precisamente a parte que ainda não tem destino. */
