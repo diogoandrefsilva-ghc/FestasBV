@@ -1278,21 +1278,15 @@ button.cmp-chip.qt-tap:active{filter:brightness(.93)}
 .cmp-hint.alloc{font-size:11px}
 .msl-hint.alloc:active,.cmp-hint.alloc:active{background:rgba(30,122,77,.16)}
 /* Stock: chips das alocações nos cartões de lote (separador Compras) */
-/* Filtros de estado do Stock. Há cinco opções e os rótulos são a informação
-   principal. No telemóvel, "Tudo" ganha uma linha própria e os quatro estados
-   formam uma grelha 2 × 2: ficam sempre inteiros, sem scroll lateral. */
-.stk-filter{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:5px;margin-bottom:8px}
-.stk-filter .sd-chip{min-width:0;min-height:38px;overflow:visible;gap:.35em;padding:8px 6px;line-height:1;justify-content:center;white-space:nowrap}
+/* Filtros de estado do Stock: uma única faixa compacta. Os rótulos mantêm-se
+   completos; quando não cabem, desliza-se lateralmente em vez de partir a barra
+   em várias linhas ou de cortar palavras. */
+.stk-filter{display:flex;flex-wrap:nowrap;gap:6px;max-width:100%;overflow-x:auto;overflow-y:hidden;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch;scroll-snap-type:x proximity;scrollbar-width:none;margin-bottom:8px;padding:1px 1px 4px;touch-action:pan-x}
+.stk-filter::-webkit-scrollbar{display:none}
+.stk-filter .sd-chip{flex:0 0 auto;min-width:max-content;min-height:36px;overflow:visible;gap:.35em;padding:8px 10px;line-height:1;justify-content:center;white-space:nowrap;scroll-snap-align:start}
 .stk-filter .sd-chip small{font-size:11px;font-weight:700;letter-spacing:0;text-transform:uppercase;color:inherit;white-space:nowrap;overflow:visible;text-overflow:clip}
 .stk-filter .stk-n{flex:0 0 auto;font-size:11px;font-weight:800;opacity:.6}
-.stk-filter .sd-chip.txt{font-size:14px;padding:8px 10px;white-space:nowrap}
-@media (max-width:640px){
-  .stk-filter{grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
-  .stk-filter .sd-chip{min-height:42px;padding:9px 8px}
-  .stk-filter .sd-chip small{font-size:12px}
-  .stk-filter .stk-n{font-size:12px}
-  .stk-filter .sd-chip.txt{grid-column:1/-1;font-size:15px}
-}
+.stk-filter .sd-chip.txt{font-size:14px;padding:8px 12px;white-space:nowrap}
 /* Estado sem artigos: continua lá (o filtro é a chave de leitura) mas apagado */
 .stk-filter .sd-chip.vazio{opacity:.45}
 /* Cartão do Stock: toca-se no artigo para alocar — o chevron é a única pista */
