@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v265 · 2026-08-09 · O stock passa a guardar PARA QUE foi comprado, à parte de quem paga hoje: sobraram 2 bifes dos 9 do jantar de sábado e o cartão da refeição di-lo, com o valor a deduzir. Mais a 2.ª medida (4 kg = 9 bifes)';
+const APP_BUILD = 'v266 · 2026-08-09 · O stock passa a guardar PARA QUE foi comprado, à parte de quem paga hoje: sobraram 2 bifes dos 9 do jantar de sábado e o cartão da refeição di-lo, com o valor a deduzir. Mais a 2.ª medida (4 kg = 9 bifes), agora sem o 6,999';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -641,6 +641,13 @@ function updateYearUI(){
 // da base da quota extra: cada t-shirt é cobrada a quem lhe está imputada.
 const TS_TIPO_DESP='T-shirts';
 function rnd(x,n=2){const f=Math.pow(10,n);return Math.floor(Math.abs(x)*f+0.5)/f*(x>=0?1:-1);}
+/* Casas decimais com que se GUARDA uma quantidade de stock. Três davam o gramo,
+   que é o que se MOSTRA (o fmtQty arredonda sempre a 3) — mas não chegam para
+   guardar: 7 de 9 bifes de 3,95 kg são 3,072222… kg, e a 3 casas voltavam a
+   ler-se como "6,999 bifes". Quem escreve na 2.ª medida tem de encontrar o mesmo
+   número quando volta a olhar, por isso o que se guarda tem de conseguir
+   representar o que ele escreveu; o arredondamento é do ecrã, não da BD. */
+const QD=6;
 function roundup(x,n=0){const f=Math.pow(10,n);return Math.ceil(Math.abs(x)*f-1e-9)/f*(x>=0?1:-1);}
 const sumv=o=>Object.values(o).reduce((a,b)=>a+b,0);
 
@@ -6520,7 +6527,7 @@ function loteDespensa(l){return ehDespensa(loteReqArtigo(l));}
    quem diz que se gastou é a alocação a refeições ou o "dar baixa". */
 function loteConsDerivado(l){
   const hoje=hojeISO();let q=0;
-  ((l&&l.alocacoes)||[]).forEach(a=>{if(alocIsMeal(a)&&a.data<hoje)q=rnd(q+(+a.qtd||0),3);});
+  ((l&&l.alocacoes)||[]).forEach(a=>{if(alocIsMeal(a)&&a.data<hoje)q=rnd(q+(+a.qtd||0),QD);});
   return q;
 }
 // O consumo foi escrito à mão neste lote? (com a coluna por migrar, nunca)
@@ -6538,18 +6545,18 @@ function loteConsumido(l){
 function umbConsumo(lotes,artigo){
   let tot=0,cons=0,pool=0,manual=false;
   (lotes||[]).forEach(l=>{
-    tot=rnd(tot+(+l.qtd||0),3);
-    cons=rnd(cons+loteConsumido(l),3);
+    tot=rnd(tot+(+l.qtd||0),QD);
+    cons=rnd(cons+loteConsumido(l),QD);
     if(loteConsManual(l))manual=true;
     // `pool` = o que está parado num TIPO PURO (Bebidas/Gerais/Cerveja). É o
     // depósito: custo já arrumado, consumo por dizer — e o único caso em que
     // nem os chips nem a passagem dos dias sabem responder se aquilo ainda
     // está na garagem. Sai daqui para quem o quiser assinalar.
-    (l.alocacoes||[]).forEach(a=>{if(!alocIsMeal(a))pool=rnd(pool+(+a.qtd||0),3);});
+    (l.alocacoes||[]).forEach(a=>{if(!alocIsMeal(a))pool=rnd(pool+(+a.qtd||0),QD);});
   });
-  cons=rnd(Math.max(0,Math.min(cons,tot)),3);
+  cons=rnd(Math.max(0,Math.min(cons,tot)),QD);
   const desp=ehDespensa(artigo||((lotes||[])[0]?loteReqArtigo(lotes[0]):''));
-  const resta=rnd(Math.max(0,tot-cons),3);
+  const resta=rnd(Math.max(0,tot-cons),QD);
   /* "Acabou" (a leitura da despensa) é DITO, não deduzido: é o consumo à mão a
      levar o lote todo. Lê-lo só do resto a zero dava um artigo sem quantidade
      escrita por acabado à cabeça — e sem maneira de dizer o contrário, que o
@@ -6565,10 +6572,10 @@ function umbConsumo(lotes,artigo){
 function consumoPlan(lotesFifo,total){
   const out={};
   if(total==null){(lotesFifo||[]).forEach(l=>{out[l._id]=null;});return out;}
-  let resto=rnd(Math.max(0,total),3);
+  let resto=rnd(Math.max(0,total),QD);
   (lotesFifo||[]).forEach(l=>{
-    const take=rnd(Math.max(0,Math.min(+l.qtd||0,resto)),3);
-    out[l._id]=take;resto=rnd(resto-take,3);
+    const take=rnd(Math.max(0,Math.min(+l.qtd||0,resto)),QD);
+    out[l._id]=take;resto=rnd(resto-take,QD);
   });
   return out;
 }
@@ -6725,7 +6732,7 @@ function equivDe(m,q){return m?rnd((+q||0)*m.f,3):0;}
    a 3 casas cada linha podia arredondar até 0,0005 e três linhas somavam 0,0015
    — o suficiente para o "alocaste mais do que há" disparar contra um stock que
    estava exatamente todo alocado. */
-function equivPara(m,v){return m?rnd((+v||0)/m.f,6):0;}
+function equivPara(m,v){return m?rnd((+v||0)/m.f,QD):0;}
 /* Quantidade de UM lote como a lista a escreve: "6 × 2,5 kg". O `tamanho` é a
    embalagem e vive à parte da quantidade — nos pedidos (shopQtyLabel) e agora
    também nos lotes, para os dois lados se lerem da mesma maneira. Como na
@@ -7183,7 +7190,7 @@ function loteAlocOrig(l){
 // Alocações agrupadas por chave de destino, ignorando quantidades a zero
 function alocsPorDest(arr){
   const m={};
-  (arr||[]).forEach(a=>{const q=+a.qtd||0;if(q<=0.0005)return;const k=alocToDestino(a);if(!k&&k!=='')return;m[k]=rnd((m[k]||0)+q,3);});
+  (arr||[]).forEach(a=>{const q=+a.qtd||0;if(q<=0.0005)return;const k=alocToDestino(a);if(!k&&k!=='')return;m[k]=rnd((m[k]||0)+q,QD);});
   return m;
 }
 function alocsQtdDe(arr,k){return alocsPorDest(arr)[k]||0;}
@@ -7206,7 +7213,7 @@ function loteRealoc(l){
   const A=alocsPorDest(o),B=alocsPorDest(l&&l.alocacoes);
   const de={},para={};
   new Set(Object.keys(A).concat(Object.keys(B))).forEach(k=>{
-    const d=rnd((B[k]||0)-(A[k]||0),3);
+    const d=rnd((B[k]||0)-(A[k]||0),QD);
     if(d<-0.0005)de[k]=-d;else if(d>0.0005)para[k]=d;
   });
   if(!Object.keys(de).length&&!Object.keys(para).length)return null;
@@ -7220,15 +7227,15 @@ function realocUnico(m){const ks=Object.keys(m||{});return ks.length===1?ks[0]:n
    ordem dos destinos — a refeição mais tardia perde primeiro, que a mais cedo já
    aconteceu. Devolve {alocs,cortado}. */
 function alocsApara(arr,cap){
-  const lim=rnd(Math.max(0,+cap||0),3);
+  const lim=rnd(Math.max(0,+cap||0),QD);
   const list=(arr||[]).filter(a=>+a.qtd>0.0005)
     .sort((a,b)=>destKeyCmp(alocToDestino(a),alocToDestino(b)));
-  let tot=rnd(list.reduce((s,a)=>s+(+a.qtd||0),0),3);
+  let tot=rnd(list.reduce((s,a)=>s+(+a.qtd||0),0),QD);
   let cortado=0;
   for(let i=list.length-1;i>=0&&tot-lim>0.0005;i--){
-    const q=+list[i].qtd||0,tira=Math.min(q,rnd(tot-lim,3));
-    list[i]=Object.assign({},list[i],{qtd:rnd(q-tira,3)});
-    tot=rnd(tot-tira,3);cortado=rnd(cortado+tira,3);
+    const q=+list[i].qtd||0,tira=Math.min(q,rnd(tot-lim,QD));
+    list[i]=Object.assign({},list[i],{qtd:rnd(q-tira,QD)});
+    tot=rnd(tot-tira,QD);cortado=rnd(cortado+tira,QD);
   }
   return {alocs:list.filter(a=>+a.qtd>0.0005),cortado};
 }
@@ -8122,10 +8129,10 @@ function stockAggAlocs(lotes,u0){
   const dest={};let freeQ=0,freeV=0,totQ=0,totV=0,u=u0||'';
   lotes.forEach(l=>{
     u=u||l.unidade;const unit=l.qtd>0?l.valor/l.qtd:0;
-    totQ=rnd(totQ+l.qtd,3);totV=rnd(totV+(+l.valor||0),2);
+    totQ=rnd(totQ+l.qtd,QD);totV=rnd(totV+(+l.valor||0),2);
     let aloc=0;
-    (l.alocacoes||[]).forEach(a=>{const q=+a.qtd||0;if(q<=0)return;aloc=rnd(aloc+q,3);const k=alocToDestino(a);(dest[k]=dest[k]||{qtd:0,val:0});dest[k].qtd=rnd(dest[k].qtd+q,3);dest[k].val=rnd(dest[k].val+unit*q,2);});
-    const lf=rnd(l.qtd-aloc,3);if(lf>0){freeQ=rnd(freeQ+lf,3);freeV=rnd(freeV+unit*lf,2);}
+    (l.alocacoes||[]).forEach(a=>{const q=+a.qtd||0;if(q<=0)return;aloc=rnd(aloc+q,QD);const k=alocToDestino(a);(dest[k]=dest[k]||{qtd:0,val:0});dest[k].qtd=rnd(dest[k].qtd+q,QD);dest[k].val=rnd(dest[k].val+unit*q,2);});
+    const lf=rnd(l.qtd-aloc,QD);if(lf>0){freeQ=rnd(freeQ+lf,QD);freeV=rnd(freeV+unit*lf,2);}
   });
   return {dest,freeQ,freeV,totQ,totV,u};
 }
@@ -10717,10 +10724,10 @@ function resolveUmbrella(lotesFifo,alocs,lineVal){
   // comida e bebida da mesma refeição são destinos DIFERENTES: não se juntam
   // numa linha só, senão a marca perdia-se ao distribuir pelos lotes físicos
   const put=(l,a,take)=>{const ex=out[l._id].find(x=>x.tipo===a.tipo&&x.data===a.data&&!x.bebida===!a.bebida);
-    if(ex)ex.qtd=rnd(ex.qtd+take,3);
-    else{const o={tipo:a.tipo,data:a.data,qtd:rnd(take,3)};if(a.bebida)o.bebida=true;out[l._id].push(o);}
+    if(ex)ex.qtd=rnd(ex.qtd+take,QD);
+    else{const o={tipo:a.tipo,data:a.data,qtd:rnd(take,QD)};if(a.bebida)o.bebida=true;out[l._id].push(o);}
     if(lineVal&&a._i!=null)lineVal[a._i]=rnd((lineVal[a._i]||0)+unit[l._id]*take,2);};
-  const fill=(a,lots)=>{let rest=a.qtd;for(const l of lots){if(rest<=0.0005)break;const c=cap[l._id];if(c<=0.0005)continue;const take=Math.min(c,rest);put(l,a,take);cap[l._id]=rnd(c-take,3);rest=rnd(rest-take,3);}
+  const fill=(a,lots)=>{let rest=a.qtd;for(const l of lots){if(rest<=0.0005)break;const c=cap[l._id];if(c<=0.0005)continue;const take=Math.min(c,rest);put(l,a,take);cap[l._id]=rnd(c-take,QD);rest=rnd(rest-take,QD);}
     /* O que sobrar vai para um lote SEM QUANTIDADE escrita, havendo-o: esse não
        tem tecto (uma oferta que ninguém pesou), e capá-lo a zero deixava-o
        inalocável — o mesmo que dizer que não está cá. Fica para o FIM de
@@ -10788,14 +10795,14 @@ function openLoteModal(id){
   const reqName=loteReqArtigo(base);
   const u=base.unidade||'';
   const lotes=umbrellaLotes(reqName,u);
-  const totQ=rnd(lotes.reduce((s,l)=>s+(+l.qtd||0),0),3);
+  const totQ=rnd(lotes.reduce((s,l)=>s+(+l.qtd||0),0),QD);
   const totV=rnd(lotes.reduce((s,l)=>s+(+l.valor||0),0),2);
   const brands=[...new Set(lotes.map(l=>l.artigo))];
   const multi=brands.length>1;
   // Alocações existentes → linhas {destino,marca}. Cada alocação física vive num
   // lote de uma marca (round-trip). Com uma só marca, marca='' (genérico).
   const SEP=_ALOC_SEP,by={};
-  lotes.forEach(l=>(l.alocacoes||[]).forEach(a=>{const q=+a.qtd||0;if(q<=0)return;const dk=alocToDestino(a);if(!dk)return;const k=(multi?l.artigo:'')+SEP+dk;by[k]=rnd((by[k]||0)+q,3);}));
+  lotes.forEach(l=>(l.alocacoes||[]).forEach(a=>{const q=+a.qtd||0;if(q<=0)return;const dk=alocToDestino(a);if(!dk)return;const k=(multi?l.artigo:'')+SEP+dk;by[k]=rnd((by[k]||0)+q,QD);}));
   const alocs=Object.keys(by).map(k=>{const p=k.split(SEP);const a=destinoAloc(p[1],by[k]);a.marca=p[0]||'';return a;})
     .sort((a,b)=>destKeyCmp(alocToDestino(a),alocToDestino(b))||(a.marca||'').localeCompare(b.marca||'','pt'));
   // Ligação atual a um pedido da lista (batatas fritas ↔ Lays) — do 1.º lote
@@ -11310,7 +11317,7 @@ async function loteConsDarBaixa(){
   if(v-tot>0.0005){toast(tot>0.0005?`Só há ${loteEqFmt(tot)} — não se pode gastar mais`
     :'Este stock entrou sem quantidade escrita — escreve-a primeiro','bad');return;}
   setSync('load','a guardar…');
-  if(await umbConsSet(lotes,rnd(v,3))){loteConsRefresh();toast('Consumo atualizado ✓','ok');}
+  if(await umbConsSet(lotes,rnd(v,QD))){loteConsRefresh();toast('Consumo atualizado ✓','ok');}
   else setSync('err','erro ao guardar');
 }
 // Volta ao automático: a app torna a deduzir o consumo das refeições passadas
@@ -11768,7 +11775,7 @@ function loteRenderAlocs(){
   document.getElementById('lote-alocs').innerHTML=
     (html?(solo?`<div class="lote-solos">${html}</div>`:html):'<div class="empty sf" style="margin-top:8px">Sem alocações — está tudo na bolsa comum.</div>');
   const tot=editingLote.alocs.reduce((s,a)=>s+(+a.qtd||0),0);
-  const livre=rnd(editingLote.totQ-tot,3);
+  const livre=rnd(editingLote.totQ-tot,QD);
   // O total alocado sobe para o rótulo, na mesma forma dos cabeçalhos de cima
   const lbl=document.getElementById('lote-aloc-lbl');
   // 💶 e não 🍽️: este bloco é o eixo do CUSTO. O 🍽️ passou para o bloco do
@@ -11831,7 +11838,7 @@ function loteAlocField(i,f,v){
        veio poupar. */
     if(a._from){
       const pool=editingLote.alocs.find(x=>x!==a&&alocToDestino(x)===a._from);
-      if(pool)pool.qtd=rnd(Math.max(0,(+pool.qtd||0)-rnd(novo-(+a.qtd||0),3)),3);
+      if(pool)pool.qtd=rnd(Math.max(0,(+pool.qtd||0)-rnd(novo-(+a.qtd||0),QD)),QD);
     }
     a.qtd=novo;
   }
@@ -11861,9 +11868,9 @@ function loteDepositoDar(i){
     const q=rnd(Math.min(disp,pedido>0.0005?pedido:disp),3);
     // Já havia linha nesse destino → soma-se-lhe, em vez de abrir uma segunda
     const ja=editingLote.alocs.find(x=>x!==pool&&alocToDestino(x)===destK);
-    if(ja){ja.qtd=rnd((+ja.qtd||0)+q,3);if(!ja._from)ja._from=fromK;}
+    if(ja){ja.qtd=rnd((+ja.qtd||0)+q,QD);if(!ja._from)ja._from=fromK;}
     else editingLote.alocs.push(Object.assign(destinoAloc(v,q),{marca:pool.marca||'',_from:fromK}));
-    pool.qtd=rnd(Math.max(0,disp-q),3);
+    pool.qtd=rnd(Math.max(0,disp-q),QD);
     const idx=ja?editingLote.alocs.indexOf(ja):editingLote.alocs.length-1;
     loteRenderAlocs();
     const el=document.getElementById('lote-q-'+idx);if(el){el.focus();el.select();}
@@ -11931,7 +11938,7 @@ function loteDelAloc(i){
   // nunca é o que se quer dizer ao desfazer um ⇄.
   if(a&&a._from){
     const pool=editingLote.alocs.find(x=>x!==a&&alocToDestino(x)===a._from);
-    if(pool)pool.qtd=rnd((+pool.qtd||0)+(+a.qtd||0),3);
+    if(pool)pool.qtd=rnd((+pool.qtd||0)+(+a.qtd||0),QD);
   }
   editingLote.alocs.splice(i,1);loteRenderAlocs();
 }
@@ -11941,7 +11948,7 @@ async function saveLote(){
   if(!editingLote)return;
   // Junta duplicados por (marca,destino), ignora qtd 0 e valida
   const by={};
-  editingLote.alocs.forEach(a=>{const q=+a.qtd||0;if(q<=0)return;const dk=alocToDestino(a);if(!dk)return;const k=(a.marca||'')+_ALOC_SEP+dk;by[k]=rnd((by[k]||0)+q,3);});
+  editingLote.alocs.forEach(a=>{const q=+a.qtd||0;if(q<=0)return;const dk=alocToDestino(a);if(!dk)return;const k=(a.marca||'')+_ALOC_SEP+dk;by[k]=rnd((by[k]||0)+q,QD);});
   const alocs=Object.keys(by).map(k=>{const p=k.split(_ALOC_SEP);const a=destinoAloc(p[1],by[k]);a.marca=p[0]||'';return a;});
   const tot=alocs.reduce((s,a)=>s+a.qtd,0);
   /* Um lote sem quantidade escrita não tem total a que comparar: não há "mais do
@@ -11971,7 +11978,7 @@ async function saveLote(){
          pode dar mais do que há, logo quem alocou 900 disse que havia 900. É o
          que mantém a invariante de que o alocado nunca passa o stock — sem ela,
          o "por alocar", o consumo e a folha do 🖨 ficavam a adivinhar. */
-      const novaQ=rnd(nova.reduce((s,a)=>s+(+a.qtd||0),0),3);
+      const novaQ=rnd(nova.reduce((s,a)=>s+(+a.qtd||0),0),QD);
       if(l&&!(+l.qtd>0.0005)&&novaQ>0.0005)patch.qtd=novaQ;
       await queueWrite(()=>sbReq('PATCH',`stock_lotes?id=eq.${id}`,patch));
       if(l){l.alocacoes=nova;if(patch.qtd!=null)l.qtd=patch.qtd;}
