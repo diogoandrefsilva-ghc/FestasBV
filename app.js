@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v269 · 2026-08-09 · Uma falta “dita à mão” passa a dizer que o é — na lista e no cartão da refeição, como já dizia o “coberto” e a folha do 🖨 —, e o bloco “que pedidos é que isto trata?” marca a linha que não é a app a deduzir. Trocar o artigo de um pedido (chouriço de sangue → morcela) deita fora a cobertura declarada sobre o artigo antigo, que ficava a mandar sobre o stock novo';
+const APP_BUILD = 'v270 · 2026-08-09 · As SOBRAS deixam de reabrir o pedido: um lote comprado para uma refeição conta inteiro na cobertura, mesmo com parte por alocar na bolsa comum — compram-se 8 pacotes para o jantar, comem-se 5, e a lista já não pede os outros 3 que estão na despensa. É a mesma leitura que o cartão da refeição já fazia. Mover o stock para outra refeição continua a reabrir o pedido · v269 · Uma falta “dita à mão” passa a dizer que o é — na lista e no cartão da refeição, como já dizia o “coberto” e a folha do 🖨 —, e o bloco “que pedidos é que isto trata?” marca a linha que não é a app a deduzir. Trocar o artigo de um pedido (chouriço de sangue → morcela) deita fora a cobertura declarada sobre o artigo antigo, que ficava a mandar sobre o stock novo';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -6830,6 +6830,40 @@ function mealStockAllocFor(artigo,u,ref,data){
   });
   return q;
 }
+/* Este lote foi comprado PARA esta refeição? Lê-se da alocação de hoje: ela é o
+   ÚNICO destino-refeição do lote — o resto ficou por alocar (a bolsa comum) ou
+   foi para um tipo puro. Um lote repartido de propósito por dois jantares não
+   foi comprado "para" nenhum deles, e aí a parte de cada um é a leitura certa.
+   É o mesmo teste com que o cartão da refeição decompõe a linha ("4 · sobraram
+   2 — na bolsa comum"), partilhado para os dois não poderem discordar. */
+function loteSoParaRef(l,mealK){
+  const refs=Object.keys(alocsPorDest(l&&l.alocacoes)).filter(k=>alocIsMeal(destinoAloc(k,0)));
+  return refs.length===1&&refs[0]===mealK;
+}
+/* O que esta refeição TEM deste artigo — para responder a "ainda é preciso
+   comprar?", que NÃO é a mesma pergunta que "quanto custo lhe está imputado".
+   Um lote comprado para esta refeição conta INTEIRO, mesmo com parte por alocar:
+   compram-se 8 pacotes de batatas para o jantar, comem-se 5, e os 3 que sobram
+   ficam na bolsa comum — que é o correto, não foram comidos ali e não os paga só
+   quem lá esteve. Contando só os 5 alocados, a lista voltava a pedir 3 pacotes
+   para um jantar que já aconteceu, com os 3 na despensa.
+   O cartão da refeição já lê assim ("4 · sobraram 2 — na bolsa comum"): a linha
+   diz que se compraram 4 para ali, a lista não pode dizer que faltam 2.
+   E NÃO sobre-cobre: mover a alocação para outra refeição (ou para um tipo puro)
+   tira o lote deste teste e o pedido volta sozinho ao "Em falta" — o modelo "a
+   lista nunca morre" fica de pé. O que deixa de o reabrir é só a SOBRA. */
+function mealStockParaRef(artigo,u,ref,data){
+  const mealK=ref+'|'+data;
+  let q=0;
+  stockArr().forEach(l=>{
+    if(!stockBacked(l)||!shopSameArtigo(loteReqArtigo(l),artigo)||!sameUnit(l.unidade,u))return;
+    let n=0;
+    (l.alocacoes||[]).forEach(a=>{if(a.tipo===ref&&a.data===data)n=rnd(n+(+a.qtd||0),3);});
+    if(loteSoParaRef(l,mealK))n=Math.max(n,+l.qtd||0);
+    q=rnd(q+n,3);
+  });
+  return q;
+}
 // Há ALGUMA alocação deste artigo à refeição? (qualquer unidade — para a
 // cobertura binária de pedidos sem quantidade numérica)
 function mealStockAllocAnyFor(artigo,ref,data){
@@ -6861,7 +6895,10 @@ function shopItemCoverage(it){
     const xq=qtyParse(x.quantidade);
     if(xq&&sameUnit(xq.u,q.u))need=rnd(need+xq.n,3);
   });
-  const aloc=mealStockAllocFor(it.artigo,q.u,it.tipo,it.dataValor);
+  /* O que a refeição TEM, não o custo que lhe está imputado (mealStockAllocFor,
+     que continua a ser o do dinheiro e o que o ＋alocar usa): a sobra de um lote
+     comprado para aqui não é uma falta a comprar outra vez. */
+  const aloc=mealStockParaRef(it.artigo,q.u,it.tipo,it.dataValor);
   return {need,aloc,falta:Math.max(0,rnd(need-aloc,3)),u:q.u};
 }
 /* Cobertura DITA À MÃO (db/cobertura.sql) — o que está GRAVADO, já interpretado:
@@ -7701,11 +7738,13 @@ function mealShopSection(rd){
        a parte de cada um — é a leitura certa. */
     const porDest=alocsPorDest(l.alocacoes);
     const soRef=k=>alocIsMeal(destinoAloc(k,0));
-    const refs=Object.keys(porDest).filter(soRef);
     const orig=loteAlocOrig(l);
     const oRefs=orig?Object.keys(alocsPorDest(orig)).filter(soRef):[];
+    // O teste da alocação de hoje é o mesmo que decide a COBERTURA do pedido
+    // (loteSoParaRef): esta linha diz "compraram-se 4 para aqui" e a lista não
+    // pode, ao lado, dizer que faltam 2.
     const decompor=(+l.qtd>0.0005)&&(x.foi
-      ||(refs.length===1&&refs[0]===mealK)
+      ||loteSoParaRef(l,mealK)
       ||(oRefs.length===1&&oRefs[0]===mealK));
     let baseQ=x.qtd,baseVal=x.val,sub='';
     if(decompor){
