@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v270 · 2026-08-09 · As SOBRAS deixam de reabrir o pedido: um lote comprado para uma refeição conta inteiro na cobertura, mesmo com parte por alocar na bolsa comum — compram-se 8 pacotes para o jantar, comem-se 5, e a lista já não pede os outros 3 que estão na despensa. É a mesma leitura que o cartão da refeição já fazia. Mover o stock para outra refeição continua a reabrir o pedido · v269 · Uma falta “dita à mão” passa a dizer que o é — na lista e no cartão da refeição, como já dizia o “coberto” e a folha do 🖨 —, e o bloco “que pedidos é que isto trata?” marca a linha que não é a app a deduzir. Trocar o artigo de um pedido (chouriço de sangue → morcela) deita fora a cobertura declarada sobre o artigo antigo, que ficava a mandar sobre o stock novo';
+const APP_BUILD = 'v271 · 2026-08-09 · Nos Saldos, uma compra com peça "só despesa" (saco, depósito) deixa de aparecer duplicada em "Despesas adiantadas" — as linhas da mesma compra juntam-se numa só. E "Despesas adiantadas" separa-se em duas: o que já pagaste (📅) e o que está previsto mas ainda por pagar (📌 provisórias) · v270 · As SOBRAS deixam de reabrir o pedido: um lote comprado para uma refeição conta inteiro na cobertura, mesmo com parte por alocar na bolsa comum — compram-se 8 pacotes para o jantar, comem-se 5, e a lista já não pede os outros 3 que estão na despensa. É a mesma leitura que o cartão da refeição já fazia. Mover o stock para outra refeição continua a reabrir o pedido · v269 · Uma falta “dita à mão” passa a dizer que o é — na lista e no cartão da refeição, como já dizia o “coberto” e a folha do 🖨 —, e o bloco “que pedidos é que isto trata?” marca a linha que não é a app a deduzir. Trocar o artigo de um pedido (chouriço de sangue → morcela) deita fora a cobertura declarada sobre o artigo antigo, que ficava a mandar sobre o stock novo';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -1297,6 +1297,23 @@ const ICON_LATA='<svg viewBox="0 0 24 24" width="1em" height="1em" style="vertic
 const ICON_SACO='<svg viewBox="0 0 24 24" width="1em" height="1em" style="vertical-align:-.125em" aria-hidden="true"><path d="M9 2.5h6c.5 0 .7.5.4.9L13.8 5.5h-3.6L8.6 3.4c-.3-.4-.1-.9.4-.9z" fill="#8a6410"/><path d="M10.2 5.5h3.6c3.7 1.9 6 5.5 6 9.3 0 4.4-3.2 6.7-7.8 6.7s-7.8-2.3-7.8-6.7c0-3.8 2.3-7.4 6-9.3z" fill="#eeb64d"/><path d="M9.4 6.7c-.4-.5-.1-1.2.6-1.2h4c.7 0 1 .7.6 1.2l-.6.7h-4z" fill="#c8951f"/><text x="12" y="17.4" text-anchor="middle" font-size="9.5" font-weight="800" fill="#7a5a0e" font-family="system-ui,sans-serif">€</text></svg>';
 const ICON_MOEDA='<svg viewBox="0 0 24 24" width="1em" height="1em" style="vertical-align:-.125em" aria-hidden="true"><circle cx="12" cy="12" r="9.5" fill="#c8951f"/><circle cx="12" cy="12" r="7.7" fill="#eeb64d"/><circle cx="12" cy="12" r="6.3" fill="none" stroke="#a87b14" stroke-width=".9" stroke-dasharray="1.7 1.7"/><text x="12" y="15.6" text-anchor="middle" font-size="10" font-weight="800" fill="#7a5a0e" font-family="system-ui,sans-serif">€</text></svg>';
 
+/* Uma compra grava-se em VÁRIAS linhas de `despesas` (uma por destino — o
+   stock e, à parte, o que é "só despesa": saco, depósito do vasilhame...).
+   Nas listas de "quanto adiantei" isso duplicava a mesma compra (a mesma loja
+   a aparecer duas vezes, com o valor partido). `quem`/`data_desp` são sempre
+   os mesmos dentro da mesma compra (gravados uma vez só, no registo), por
+   isso juntar por compra_id é seguro — só soma o valor. */
+function agruparDespPorCompra(list){
+  const out=[];const byId={};
+  list.forEach(x=>{
+    if(!x.compraId){out.push(x);return;}
+    let g=byId[x.compraId];
+    if(!g){g=Object.assign({},x,{valor:0});byId[x.compraId]=g;out.push(g);}
+    g.valor=rnd(g.valor+x.valor,2);
+  });
+  return out;
+}
+
 function renderAll(){
   if(!CALC)return;const ms=CALC.membros;
   let nomeLimpo=(DATA.evento.nome||'MEO').replace(/\s*\d{4}\s*/g,'').trim()||'MEO';
@@ -1323,8 +1340,12 @@ function renderAll(){
   const _mvLi=(d,txt,v)=>({k:(d?fmtDiaMes(d)+' — ':'')+txt,v:rnd(v,2)});
   ms.forEach(m=>{
     const isTes=m.nome===DATA.evento.tesoureiro;
-    const despL=DATA.despesas.filter(x=>x.quem===m.nome);
+    const despL=agruparDespPorCompra(DATA.despesas.filter(x=>x.quem===m.nome));
     const totalPagoDesp=despL.reduce((a,x)=>a+x.valor,0);
+    const despEfeL=despL.filter(x=>!despProvisoria(x));
+    const despProvL=despL.filter(despProvisoria);
+    const pagoDespEfe=rnd(despEfeL.reduce((a,x)=>a+x.valor,0),2);
+    const pagoDespProv=rnd(despProvL.reduce((a,x)=>a+x.valor,0),2);
     const rfL=pAll.filter(p=>p.ref&&p.ref.startsWith('Reembolso')&&p.de===m.nome);
     const reembFeitos=rfL.reduce((a,p)=>a+p.valor,0);
     const rrL=pAll.filter(p=>p.ref&&p.ref.startsWith('Reembolso')&&p.para===m.nome);
@@ -1343,7 +1364,9 @@ function renderAll(){
     const paidBy={};
     if(!isTes)(m._creditedBy||[]).filter(c=>c.payer!==m.nome).forEach(c=>{paidBy[c.payer]=rnd((paidBy[c.payer]||0)+c.amount,2);});
     m._mv={isTes,
-      pagoDesp:rnd(totalPagoDesp,2),pagoDespL:despL.map(x=>_mvLi(x.dataDesp,x.desc||x.tipo||'despesa',x.valor)),
+      pagoDesp:rnd(totalPagoDesp,2),
+      pagoDespEfe,pagoDespEfeL:despEfeL.map(x=>_mvLi(x.dataDesp,x.desc||x.tipo||'despesa',x.valor)),
+      pagoDespProv,pagoDespProvL:despProvL.map(x=>_mvLi(x.dataValor,(x.desc||x.tipo||'despesa'),x.valor)),
       reembFeitos:rnd(reembFeitos,2),reembFeitosL:rfL.map(p=>_mvLi(p.data,'para '+p.para,p.valor)),
       reembRecebidos:rnd(reembRecebidos,2),reembRecebidosL:rrL.map(p=>_mvLi(p.data,'de '+p.de,p.valor)),
       receb:rnd(receb,2),recebL:rcL.map(p=>_mvLi(p.data,'de '+p.de,p.valor)),
@@ -16270,15 +16293,17 @@ function saldosMembrosHtml(){
   const mvHtml=m=>{
     if(!m||!m._mv||m._sfEcra==null||!canSee(m.nome))return'';
     const v=m._mv;
-    const line=(icon,lbl,val,cls,list)=>{
+    const line=(icon,lbl,val,cls,list,extraCls)=>{
       if(val<=0.005)return'';
       const vHtml=`<span class="v ${cls}">${cls==='plus'?'+':'−'} ${eur(val)}</span>`;
-      if(!list||!list.length)return`<div class="rs-it"><span class="k">${icon} ${lbl}</span>${vHtml}</div>`;
-      return`<div class="rs-it rs-exp" onclick="toggleRsSub(this,event)"><span class="k">${icon} ${lbl}<span class="sub-arrow">▼</span></span>${vHtml}</div>
+      const rowCls='rs-it'+(extraCls?' '+extraCls:'');
+      if(!list||!list.length)return`<div class="${rowCls}"><span class="k">${icon} ${lbl}</span>${vHtml}</div>`;
+      return`<div class="${rowCls} rs-exp" onclick="toggleRsSub(this,event)"><span class="k">${icon} ${lbl}<span class="sub-arrow">▼</span></span>${vHtml}</div>
         <div class="rs-sub">${list.map(it=>`<div class="rs-sub-it"><span class="k">${it.k}</span><span class="v">${eur(it.v)}</span></div>`).join('')}</div>`;
     };
     let li='';
-    li+=line('🛒','Despesas adiantadas',v.pagoDesp,'plus',v.pagoDespL);
+    li+=line('🛒','Despesas adiantadas',v.pagoDespEfe,'plus',v.pagoDespEfeL);
+    li+=line('📌','Despesas previstas',v.pagoDespProv,'plus',v.pagoDespProvL,'rs-prev');
     if(v.isTes)li+=line('💸','Reembolsos feitos',v.reembFeitos,'plus',v.reembFeitosL);
     else{
       li+=line('🤝','Pagou para saldar',v.ownPortion,'plus');
