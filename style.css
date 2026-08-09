@@ -136,6 +136,10 @@ body::before{content:"";position:fixed;top:0;left:0;right:0;height:env(safe-area
    secundário — ainda não abateu nada, só explica o que está a caminho */
 .rs-it.rs-pend{border-bottom:none;padding-top:2px}
 .rs-it.rs-pend .k,.rs-it.rs-pend .v{color:var(--gold);font-size:11.5px;font-weight:700}
+/* Despesas previstas (📌 provisórias): já contam no saldo — só o pagamento
+   é que falta e o valor ainda pode ser acertado — daí o tom dourado só no
+   rótulo, sem mexer na cor do valor (continua a somar como as efetivas). */
+.rs-it.rs-prev .k{color:var(--gold)}
 .rs-it.rs-exp{cursor:pointer;user-select:none}
 .rs-it.rs-exp:active{opacity:.7}
 .rs-exp .sub-arrow{display:inline-block;color:var(--faint);font-size:8.5px;margin-left:7px;transition:transform .2s;vertical-align:1px}
