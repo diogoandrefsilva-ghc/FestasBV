@@ -1317,7 +1317,10 @@ button.cmp-chip.qt-tap:active{filter:brightness(.93)}
 .lote-cons-num b{color:var(--ink);font-weight:700;font-variant-numeric:tabular-nums}
 /* O depósito (Bebidas/Gerais) é o caso que não se resolve sozinho — a nota diz
    as duas saídas e por isso ganha destaque de aviso, não de erro */
-.lote-cons-num .lcn-man{font-style:normal;font-size:11px;font-weight:700;color:var(--faint)}
+/* A marca do "dito à mão" é a mesma nos dois blocos do modal (consumo e
+   cobertura): é a mesma afirmação — isto não é a app a deduzir — e é ela que
+   explica o ↺ que está ao lado */
+.lote-cons-num .lcn-man,.lote-cob-row .lcn-man{font-style:normal;font-size:11px;font-weight:700;color:var(--faint)}
 .lote-cons-acts{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-top:9px}
 .lote-cons-acts .lca-lbl{font-size:12.5px;font-weight:600;color:var(--muted)}
 .lote-cons-acts .lote-qty-w{flex:0 0 86px}

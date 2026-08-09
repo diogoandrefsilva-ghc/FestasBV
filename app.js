@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v268 · 2026-08-09 · O separador Stock volta a ter o filtro “Alocado”, ao lado do “Por alocar”: os dois eixos ficam com os dois lados — o que já se gastou e o que ainda dá para cozinhar, o custo já arrumado e o que falta arrumar. Os chips perderam o ícone para os quatro rótulos caberem inteiros no telemóvel';
+const APP_BUILD = 'v269 · 2026-08-09 · Uma falta “dita à mão” passa a dizer que o é — na lista e no cartão da refeição, como já dizia o “coberto” e a folha do 🖨 —, e o bloco “que pedidos é que isto trata?” marca a linha que não é a app a deduzir. Trocar o artigo de um pedido (chouriço de sangue → morcela) deita fora a cobertura declarada sobre o artigo antigo, que ficava a mandar sobre o stock novo';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -7047,7 +7047,13 @@ function shopStockHint(it){
   if(shopIsRemoved(it)||shopIsBought(it))return null;
   const dec=shopCobDecl(it);
   if(dec==='ok')return {ok:true,txt:'coberto — dito à mão'};
-  if(dec)return {ok:false,txt:`falta ${dec}`};
+  /* A falta DITA À MÃO tem de se assumir como tal, exatamente como o 'ok' acima
+     e como a folha do 🖨 já fazia ("🧺 falta dito à mão"). Saía daqui um "falta 6"
+     igualzinho ao que a app deduz — e com o stock todo alocado à refeição ao lado,
+     lia-se como avaria: a lista dizia que faltavam 6 morcelas com 8 na garagem, e
+     nada no ecrã dizia que quem mandava ali era uma declaração antiga (que é o que
+     explica o ↺ em 🧺 Stock › este artigo). */
+  if(dec)return {ok:false,txt:`falta ${dec} — dito à mão`};
   if(!STOCK_TABLE)return null;
   const c=shopItemCoverage(it);
   if(!c){
@@ -8652,8 +8658,18 @@ async function saveShopItem(){
       const patch={artigo,quantidade:qtd,tamanho:tam||null,tipo,data_valor:dataValor};
       const local={artigo,quantidade:qtd,tamanho:tam,tipo,dataValor};
       if(SHOP_LOJA_COL){patch.loja=loja||null;local.loja=loja;}
-      // A cobertura NÃO se grava aqui: é escrita do lado do stock (loteCobSet),
-      // que é quem sabe o que está cá. Editar o pedido não lhe toca.
+      /* A cobertura NÃO se escreve aqui: quem a declara é o stock (loteCobSet),
+         que é quem sabe o que está cá. A ÚNICA exceção é TROCAR DE ARTIGO — e é
+         mesmo uma exceção, não um descuido: "este stock cobre 0 do teu pedido"
+         foi dito sobre o chouriço de sangue e não sobrevive a o pedido passar a
+         ser morcela. Sobrevivendo, ficava a MANDAR sobre o que a app deduz
+         (shopCobDecl manda em shopIsCovered) e o pedido dava-se por comprar com
+         as morcelas já compradas, ligadas e alocadas àquela refeição — sem nada
+         no ecrã a dizer porquê. É o mesmo raciocínio dos "irmãos" do claim aqui
+         ao lado: a renomear, a escolha antiga não se referia a este artigo.
+         Compara-se por shopArtKey: acertar acentos ou maiúsculas (o ✨ Normalizar
+         e o shopCapArtigo) é o mesmo artigo e não deita declaração nenhuma fora. */
+      if(COB_COL&&it&&it.cobertura&&!shopSameArtigo(artigo,it.artigo)){patch.cobertura=null;local.cobertura='';}
       /* Admin pode reatribuir quem trata (puxar/largar por outrem). Vale para o
          ARTIGO, como o 👤 da lista: mudar aqui só este pedido deixava o artigo
          repartido por dois carrinhos, que é o estado que a app evita. Os irmãos
@@ -11538,10 +11554,15 @@ function loteCobFill(){
       // obrigava a escrever à mão o número que já está escrito ao lado.
       const tudo=(falta==null||falta>0.0005)
         ?`<button type="button" class="lcr-tudo" title="Cobre o pedido todo" onclick="loteCobSet(${it._id},'cobre:${rnd(q.n,3)}')">✓</button>`:'';
+      /* O automático é o normal e não se anuncia; o que foge a ele leva marca —
+         a mesma do consumo (`lcn-man`), e pela mesma razão: é ela que explica o
+         ↺ ao lado. Sem isto, um "cobre 0" gravado há três dias apresentava-se
+         com a cara do número que a app deduz agora. */
+      const mao=info.modo==='auto'?'':'<i class="lcn-man">dito à mão</i>';
       linha=`<div class="lote-cob-row">
         <span class="lcr-lbl">cobre</span>
         <div class="lote-qty-w${uLbl?'':' nou'}"><input type="number" step="any" min="0" inputmode="decimal" value="${val==null?'':val}" placeholder="0" onchange="loteCobNum(${it._id},this.value)">${uLbl?`<i>${escHtml(uLbl)}</i>`:''}</div>
-        <span class="lcr-de">de ${escHtml(fmtQty(q.n,q.u))}</span>${est}${tudo}${rst}
+        <span class="lcr-de">de ${escHtml(fmtQty(q.n,q.u))}</span>${mao}${est}${tudo}${rst}
       </div>`;
     }else{
       /* Pedido sem quantidade (louro, sal): não há número para repartir — a
