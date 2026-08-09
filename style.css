@@ -1282,10 +1282,10 @@ button.cmp-chip.qt-tap:active{filter:brightness(.93)}
    linha em partes iguais; em ecrãs muito estreitos some apenas o contador para
    as quatro palavras continuarem inteiras, sem scroll. */
 .stk-filter{display:flex;flex-wrap:nowrap;gap:4px;max-width:100%;overflow:visible;margin-bottom:8px;padding:1px 0}
-.stk-filter .sd-chip{flex:1 1 0;min-width:0;min-height:36px;overflow:visible;gap:.25em;padding:8px 3px;line-height:1;justify-content:center;white-space:nowrap}
-.stk-filter .sd-chip small{font-size:clamp(9px,2.55vw,11px);font-weight:700;letter-spacing:-.015em;text-transform:uppercase;color:inherit;white-space:nowrap;overflow:visible;text-overflow:clip}
-.stk-filter .stk-n{flex:0 0 auto;font-size:clamp(9px,2.4vw,11px);font-weight:800;opacity:.6}
-@media(max-width:370px){.stk-filter .stk-n{display:none}.stk-filter .sd-chip{gap:0;padding:8px 2px}}
+.stk-filter .sd-chip{flex:1 1 0;min-width:0;min-height:34px;overflow:visible;gap:.25em;padding:7px 3px;line-height:1;justify-content:center;white-space:nowrap}
+.stk-filter .sd-chip small{font-size:clamp(8.5px,2.35vw,10px);font-weight:700;letter-spacing:-.015em;text-transform:uppercase;color:inherit;white-space:nowrap;overflow:visible;text-overflow:clip}
+.stk-filter .stk-n{flex:0 0 auto;font-size:clamp(8.5px,2.2vw,10px);font-weight:800;opacity:.6}
+@media(max-width:370px){.stk-filter .stk-n{display:none}.stk-filter .sd-chip{gap:0;padding:7px 2px}}
 /* Estado sem artigos: continua lá (o filtro é a chave de leitura) mas apagado */
 .stk-filter .sd-chip.vazio{opacity:.45}
 /* Cartão do Stock: toca-se no artigo para alocar — o chevron é a única pista */
