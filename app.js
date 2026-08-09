@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v267 · 2026-08-09 · O stock passa a guardar PARA QUE foi comprado, à parte de quem paga hoje: sobraram 2 bifes dos 9 do jantar de sábado e o cartão da refeição di-lo, com o valor a deduzir. No cartão da refeição vem primeiro a compra (9 un · 98,67 €) e por baixo o que sobrou ou foi realocado, a deduzir. E a 2.ª medida deixa de dizer 6,999 un onde escreveste 7';
+const APP_BUILD = 'v268 · 2026-08-09 · O separador Stock volta a ter o filtro “Alocado”, ao lado do “Por alocar”: os dois eixos ficam com os dois lados — o que já se gastou e o que ainda dá para cozinhar, o custo já arrumado e o que falta arrumar. Os chips perderam o ícone para os quatro rótulos caberem inteiros no telemóvel';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -8206,11 +8206,12 @@ function stockArticleCard(g){
   const ag=stockAggAlocs(g.lotes,g.u);
   const c=g.cons||umbConsumo(g.lotes,g.artigo);
   const st=STOCK_FILTER;
-  /* Os chips são o eixo do CUSTO (onde é que este artigo está arrumado). O
-     filtro "por alocar" é o único que os corta — aí só interessa a parte sem
-     destino; nos outros dois (consumido / por gastar) o corte não se faz nos
-     destinos, porque consumo e alocação deixaram de ser a mesma coisa: quem os
-     escolhe está a perguntar QUANTO, e isso responde-se no rodapé. */
+  /* Os chips são o eixo do CUSTO (onde é que este artigo está arrumado), e os
+     dois filtros desse eixo cortam-nos ao que perguntaram: "por alocar" deixa
+     só a sobra sem destino, "alocado" deixa só os destinos. Os do CONSUMO
+     (consumido / por gastar) não cortam nada — consumo e alocação deixaram de
+     ser a mesma coisa, e quem escolhe um deles pergunta QUANTO, que se responde
+     no rodapé. */
   const soLivre=st==='poralocar';
   const dests=soLivre?[]:Object.keys(ag.dest).sort(destKeyCmp);
   const chips=dests.map(k=>stockDestChip(k,ag.dest[k].qtd,ag.u,c.desp)).join('')
@@ -8264,15 +8265,23 @@ function stockConsLinha(c,u){
   // maneira de a fazer concordar com o adjetivo ("1 pacote gastos")
   return `<div class="stk-cons">Gasto: <b>${escHtml(fmtQty(c.cons,u))}</b> · Por gastar: <b>${escHtml(fmtQty(c.resta,u))}</b>${mao}</div>`;
 }
-/* Filtro do separador Stock ('all' | 'consumido' | 'porgastar' | 'poralocar').
+/* Filtro do separador Stock
+   ('all' | 'consumido' | 'porgastar' | 'alocado' | 'poralocar').
    Só vive na sessão — ao reabrir a app volta a "Tudo".
-   Os três respondem a três perguntas diferentes, e é por isso que são estes:
-     🍽️ Consumido   o que já se gastou            (eixo do consumo)
-     🧺 Por gastar   o que ainda dá para cozinhar  (eixo do consumo)
-     🗓️ Por alocar   custo por arrumar             (eixo da alocação)
-   Havia aqui um "Alocado" que era o complemento exato do "Por alocar" — a
-   mesma informação lida ao contrário — e faltava a única pergunta que a
-   cozinha faz: quanto é que ainda há. Trocou-se uma pela outra. */
+   Quatro perguntas, DOIS EIXOS — e a ordem dos chips é essa leitura, o eixo do
+   consumo primeiro e o do custo a seguir, cada um com os seus dois lados:
+     Consumido    o que já se gastou            (eixo do consumo)
+     Por gastar   o que ainda dá para cozinhar  (eixo do consumo)
+     Alocado      custo já arrumado             (eixo da alocação)
+     Por alocar   custo por arrumar             (eixo da alocação)
+   "Alocado" e "Por alocar" NÃO são um o complemento do outro: um artigo meio
+   alocado está nos dois (é `Object.keys(dest).length` contra `freeQ>0`, não um
+   booleano). Esteve fora daqui por se lhe ter chamado complemento — e a
+   contagem mostra que não é.
+   Os chips deste separador NÃO levam ícone, ao contrário dos das Compras: com
+   quatro mais o "Tudo", o ícone come a largura dos rótulos e "Por gastar" passa
+   a "POR GA…" em qualquer telemóvel (medido dos 320px aos 430px). Entre o
+   ícone e o rótulo inteiro manda o rótulo — é ele que diz qual é o eixo. */
 let STOCK_FILTER='all';
 // Containers de categoria abertos/fechados (só na sessão; abertos por defeito)
 const STOCK_CAT_OPEN={};
@@ -8286,11 +8295,15 @@ function stockDestEstado(k){
   if(!alocIsMeal(a))return 'pool';
   return a.data<hojeISO()?'consumido':'futuro';
 }
-// Estados em que um artigo toca — dois do consumo, um da alocação
+// Estados em que um artigo toca — dois do consumo, dois da alocação
 function stockGroupEstados(ag,c){
   const s=new Set();
   if(c.cons>0.0005)s.add('consumido');
   if(c.resta>0.0005)s.add('porgastar');
+  /* Alocado = tem ALGUM destino. Um artigo repartido entre uma refeição e a
+     sobra por arrumar entra aqui E no 'poralocar' — os dois eixos medem
+     quantidade, não são estados exclusivos do cartão. */
+  if(Object.keys(ag.dest).length)s.add('alocado');
   if(ag.freeQ>0.0005)s.add('poralocar');
   return s;
 }
@@ -8300,6 +8313,9 @@ function stockGroupEstados(ag,c){
 function stockEstadoVal(ag,st,c){
   if(st==='all')return ag.totV;
   if(st==='poralocar')return ag.freeV;
+  // O alocado é o resto do total, e tira-se por subtração para os dois chips do
+  // eixo do custo somarem exatamente o € do container em "Tudo"
+  if(st==='alocado')return rnd(ag.totV-ag.freeV,2);
   if(!(c.tot>0))return 0;
   return rnd(ag.totV*((st==='consumido'?c.cons:c.resta)/c.tot),2);
 }
@@ -8365,16 +8381,19 @@ function renderStock(){
   // Chips de filtro por estado: os três aparecem SEMPRE (com a contagem de
   // artigos), mesmo a zero — são a chave de leitura do separador, não podem
   // sumir só porque o stock está todo no mesmo estado
-  // Ordem: do que já foi gasto para o que ainda está por gastar, e no fim o que
-  // falta arrumar no custo — que é trabalho de outra natureza
-  const FILTROS=[['consumido','🍽️','Consumido'],['porgastar','🧺','Por gastar'],['poralocar','🗓️','Por alocar']]
+  // Ordem: o eixo do CONSUMO primeiro (o que se gastou → o que ainda dá para
+  // cozinhar) e o do CUSTO a seguir (arrumado → por arrumar) — os pares ficam
+  // lado a lado, que é o que faz ler os dois eixos e não quatro estados soltos
+  const FILTROS=[['consumido','Consumido'],['porgastar','Por gastar'],['alocado','Alocado'],['poralocar','Por alocar']]
     .map(f=>f.concat(arr.filter(g=>g.estados.has(f[0])).length));
   h+=`<div class="cmp-sort stk-filter">
     <span class="sd-chip txt${STOCK_FILTER==='all'?' on':''}" onclick="setStockFilter('all')">Tudo</span>
-    ${FILTROS.map(([s,ic,lbl,n])=>`<span class="sd-chip${STOCK_FILTER===s?' on':''}${n?'':' vazio'}" onclick="setStockFilter('${s}')"><i>${ic}</i><small>${lbl}</small><b class="stk-n">${n}</b></span>`).join('')}
+    ${FILTROS.map(([s,lbl,n])=>`<span class="sd-chip${STOCK_FILTER===s?' on':''}${n?'':' vazio'}" onclick="setStockFilter('${s}')"><small>${lbl}</small><b class="stk-n">${n}</b></span>`).join('')}
   </div>`;
   const vis=STOCK_FILTER==='all'?arr:arr.filter(g=>g.estados.has(STOCK_FILTER));
-  if(!vis.length)h+=`<div class="empty sf">${stkBuscando?`Nenhum artigo com <b>${escHtml(STOCK_Q.trim())}</b>${STOCK_FILTER==='all'?'':' neste estado'}.`:STOCK_FILTER==='poralocar'?'Não há stock por alocar — está tudo com destino.':STOCK_FILTER==='consumido'?'Ainda não se gastou nada.':'Não há stock por gastar — foi tudo consumido.'}</div>`;
+  const VAZIO={consumido:'Ainda não se gastou nada.',porgastar:'Não há stock por gastar — foi tudo consumido.',
+    alocado:'Nada está alocado — o stock todo está por arrumar no custo.',poralocar:'Não há stock por alocar — está tudo com destino.'};
+  if(!vis.length)h+=`<div class="empty sf">${stkBuscando?`Nenhum artigo com <b>${escHtml(STOCK_Q.trim())}</b>${STOCK_FILTER==='all'?'':' neste estado'}.`:(VAZIO[STOCK_FILTER]||'Não há stock neste estado.')}</div>`;
   else if(!CATS_TABLE)h+=vis.map(g=>stockArticleCard(g)).join('');
   else{
     // Containers por categoria de produto (Sumos, Talho, …), colapsáveis; os
