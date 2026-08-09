@@ -10946,7 +10946,7 @@ function openLoteModal(id){
   // o que este stock É, e é a primeira coisa que se quer ler ao abrir o cartão
   const eqSum=editingLote.equiv?` = <b>${escHtml(fmtQty(editingLote.equiv.n,editingLote.equiv.u))}</b>`:'';
   document.getElementById('lote-info').innerHTML=
-    `<div class="lote-sum">Em stock: <b>${escHtml(semQtd0?'sem quantidade':fmtQty(totQ,editingLote.u))}</b>${eqSum} · <b>${semCusto?'sem custo':eur(totV)}</b></div>`+
+    `<div class="lote-stock-hero"><div class="lote-sum">Em stock: <b>${escHtml(semQtd0?'sem quantidade':fmtQty(totQ,editingLote.u))}</b>${eqSum} · <b>${semCusto?'sem custo':eur(totV)}</b></div></div>`+
     outrasHtml+
     `<div class="lote-acc">
       ${loteAccSec('cmp',anyOrg?'📦':'🛒',anyOrg?'Origem':'Compras',semQtd0?null:totQ,cmpSum,comprasRows)}
@@ -11824,10 +11824,25 @@ function loteRenderAlocs(){
   // 💶 e não 🍽️: este bloco é o eixo do CUSTO. O 🍽️ passou para o bloco do
   // Consumo, logo abaixo — ter o prato nos dois era a confusão que os dois
   // eixos vieram desfazer.
-  if(lbl)lbl.innerHTML=`💶 Alocação <span class="lote-acc-q">(${escHtml(loteEqFmt(tot))})</span>`;
+  if(lbl)lbl.innerHTML=`💶 Alocação do custo <span class="lote-acc-q">(${escHtml(loteEqFmt(tot))})</span>`;
   // O que sobra na bolsa comum é o que o alocado não levou (0 € se o que sobra
   // for stock oferecido / do ano anterior)
   const restoVal=Math.max(0,rnd(editingLote.totV-lineVal.reduce((s,v)=>s+(+v||0),0),2));
+  // O resumo fica junto à ação, em vez de escondido numa frase no fim do bloco:
+  // antes de escolher uma refeição vê-se logo o que já tem destino e o que ainda
+  // está livre. É a pergunta que este ecrã responde primeiro.
+  const allocSummary=document.getElementById('lote-alloc-summary');
+  if(allocSummary){
+    if(!(editingLote.totQ>0.0005)){
+      allocSummary.innerHTML='<span class="lote-alloc-chip warn">quantidade por definir</span>';
+    }else if(livre>0.0005){
+      allocSummary.innerHTML=`<span class="lote-alloc-chip done">${escHtml(loteEqFmt(tot))} alocado</span><span class="lote-alloc-chip free">${escHtml(loteEqBoth(livre))} livre</span>`;
+    }else if(livre<-0.0005){
+      allocSummary.innerHTML='<span class="lote-alloc-chip over">rever quantidade</span>';
+    }else{
+      allocSummary.innerHTML=`<span class="lote-alloc-chip done">${escHtml(loteEqFmt(tot))} alocado</span><span class="lote-alloc-chip full">total distribuído</span>`;
+    }
+  }
   /* Um lote que entrou sem quantidade escrita não tem total a que comparar: nada
      sobra para a bolsa comum e não há "a mais" que avisar. Em vez do ⚠️ contra um
      total de 0 (ou do falso "totalmente alocado"), diz-se a regra: o que se lhe

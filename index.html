@@ -368,10 +368,15 @@ setTimeout(function(){ if (window.fbvEsconderSplash) window.fbvEsconderSplash();
     </div>
     <!-- O (quantidade) é escrito pelo loteRenderAlocs() e acompanha o que se
          está a alocar — fecha a leitura de cima: comprado · pedido · alocado -->
-    <label id="lote-aloc-lbl">💶 Alocação</label>
-    <div id="lote-alocs"></div>
-    <button class="btn ghost write-action" id="lote-addline" style="width:100%;margin-top:10px" onclick="loteAddAloc()">＋ Alocar a refeição</button>
-    <div class="note" id="lote-resto" style="margin-top:10px"></div>
+    <section class="lote-alloc-zone" aria-labelledby="lote-aloc-lbl">
+      <div class="lote-alloc-head">
+        <label id="lote-aloc-lbl">💶 Alocação do custo</label>
+        <div class="lote-alloc-summary" id="lote-alloc-summary" aria-live="polite"></div>
+      </div>
+      <div id="lote-alocs"></div>
+      <button class="btn ghost write-action" id="lote-addline" style="width:100%;margin-top:10px" onclick="loteAddAloc()">＋ Alocar a uma refeição</button>
+      <div class="note" id="lote-resto" style="margin-top:10px"></div>
+    </section>
     <!-- 2.º eixo do stock: o que já se GASTOU, à parte de para onde vai o custo
          (db/stock_consumo.sql). Nos artigos de despensa é só ainda há / acabou.
          Escrito pelo loteConsFill() — nada disto entra nas contas. -->
