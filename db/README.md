@@ -64,8 +64,13 @@ Numa BD limpa, correr por esta ordem (há dependências entre eles):
     arredondado para cima, mais um extra e nunca abaixo de um mínimo. Depende
     de `convidados_acompanhantes.sql` (a restrição "linha de bebida é só de
     adultos" precisa da coluna `criancas`)
+19. `stock_medida2.sql` — `stock_lotes.qtd2` / `.unidade2`: a **2.ª medida** de um
+    lote, o mesmo stock contado de outra maneira (os 4,032 kg de acém que são 9
+    bifes). Declarada por quem arrumou as compras — a app **nunca** adivinha uma
+    conversão —, é ela que deixa alocar e dar baixa a contar peças. As alocações
+    continuam a gravar-se na unidade da compra: **não entra em conta nenhuma**
 
-Os passos 4–18 são migrações add-on idempotentes: correr uma vez cada. A app é
+Os passos 4–19 são migrações add-on idempotentes: correr uma vez cada. A app é
 tolerante a qualquer uma delas faltar — sonda a coluna/tabela e esconde o que
 ainda não existe. (Há mais add-ons no diretório que nunca entraram nesta lista —
 `cobertura.sql`, `bebida_refeicao.sql`, `stock_artigo_fatura.sql`,

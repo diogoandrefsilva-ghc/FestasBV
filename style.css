@@ -1434,6 +1434,28 @@ button.cmp-chip.qt-tap:active{filter:brightness(.93)}
 .stk-un{flex:0 0 auto;font-size:10px;font-weight:700;letter-spacing:.03em;color:var(--faint);background:var(--panel2);border:1px solid var(--line);border-radius:7px;padding:2px 6px;white-space:nowrap}
 /* Marcas listadas no cartão de stock (Ruffles · Lays) */
 .stk-marcas{font-size:11.5px;color:var(--muted);margin:1px 0 5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* ── ⇄ 2.ª medida (db/stock_medida2.sql) ──
+   No cartão do stock é uma linha discreta, do peso das marcas: diz que este
+   artigo também se conta em peças, sem competir com os chips dos destinos. */
+.stk-med2{font-size:11.5px;color:var(--muted);margin:0 0 5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.stk-med2 b{color:var(--ink);font-weight:700;font-variant-numeric:tabular-nums}
+/* No modal, um campo por lote: o nome do lote (só com vários), o campo de texto
+   e a equivalência à direita — "= 4,032 kg", que é o que o número quer dizer. */
+.lote-med2-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:6px}
+.lote-med2-row .lm2-nm{flex:1 1 100%;font-size:11.5px;font-weight:600;color:var(--faint);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lote-med2-row .lm2-in{flex:1 1 120px;min-width:0;height:34px;margin:0;padding:0 9px;font-size:13px;font-weight:700;border:1px solid var(--line);border-radius:8px;background:#FFFDF6;color:var(--ink)}
+.lote-med2-row .lm2-eq{flex:0 0 auto;font-size:12px;font-weight:700;color:var(--muted);font-variant-numeric:tabular-nums}
+/* Convite de uma linha (nada declarado): do peso do "＋ adicionar" das marcas —
+   é uma porta, não um campo a pedir resposta */
+.lote-med2-add{display:inline-flex;margin-top:8px;background:transparent;border:1px dashed var(--line);border-radius:20px;color:var(--faint);font-size:11px;font-weight:700;letter-spacing:.02em;padding:4px 11px;cursor:pointer}
+.lote-med2-add:active{transform:scale(.99);background:rgba(120,90,40,.05)}
+/* Em consulta não há campo — fica a constatação */
+.lote-med2-ro{font-size:13px;font-weight:600;color:var(--muted);margin-top:4px}
+.lote-med2-ro b{color:var(--ink);font-weight:700;font-variant-numeric:tabular-nums}
+/* "Contar em": o mesmo segmentado do ainda há / acabou, e por isso reaproveita
+   o .lce-opt — é a mesma coisa (duas respostas a uma pergunta), a outra escala */
+.lote-med2-sw{margin-top:8px}
+.lote-med2-sw .lce-opt{padding:7px 8px;font-size:12.5px}
 /* Ligação "pertence a" no registo da compra (em todos os artigos) */
 /* Linha de legenda, não campo de formulário: é o que menos se toca no cartão e
    uma caixa de 31px por artigo eram três deslizes a mais numa compra de 30.
