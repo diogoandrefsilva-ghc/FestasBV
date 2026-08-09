@@ -1278,30 +1278,20 @@ button.cmp-chip.qt-tap:active{filter:brightness(.93)}
 .cmp-hint.alloc{font-size:11px}
 .msl-hint.alloc:active,.cmp-hint.alloc:active{background:rgba(30,122,77,.16)}
 /* Stock: chips das alocações nos cartões de lote (separador Compras) */
-/* Chips de filtro por estado no topo do Stock — ícone ANTES da palavra, tudo
-   na mesma linha. SEMPRE uma linha só, a ocupar a largura toda: "Tudo" fica
-   do tamanho do seu texto e os três estados repartem o resto em partes iguais
-   (flex:1 1 0 → a soma é exatamente a linha, nunca transborda nem passa para
-   baixo). Fontes fluidas (vw travado ao máximo) para o texto encolher em vez
-   de quebrar em ecrãs estreitos. */
-.stk-filter{flex-wrap:nowrap;gap:4px;margin-bottom:8px}
-.stk-filter .sd-chip{flex:1 1 0;min-width:0;overflow:hidden;gap:.35em;padding:8px 5px;line-height:1;justify-content:center}
-/* Sem ícone, ao contrário dos chips das Compras: são QUATRO mais o "Tudo" e o
-   emoji comia a largura que os rótulos precisam para caber inteiros. */
-.stk-filter .sd-chip small{font-size:min(9.5px,2.05vw);font-weight:700;letter-spacing:0;text-transform:uppercase;color:inherit;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-/* Contador: informação secundária — é o primeiro a sair quando falta espaço */
-.stk-filter .stk-n{flex:0 0 auto;font-size:min(9.5px,2.05vw);font-weight:800;opacity:.6}
-@media (max-width:389px){.stk-filter .stk-n{display:none}}
-.stk-filter .sd-chip.txt{flex:0 1 auto;font-size:min(13px,3vw);padding:8px 10px;white-space:nowrap}
-/* Ecrãs estreitos (iPhone normal e abaixo): a palavra é o que interessa, por
-   isso aperta-se tudo o resto — menos folga interna e gaps mais curtos — para
-   "POR GASTAR" caber inteiro nos cinco chips. As métricas do SF Pro no iOS são
-   maiores que as do motor onde isto se mede, daí a margem generosa.
-   Depois da regra do .txt, senão a folga dela ganhava por vir mais abaixo. */
-@media (max-width:430px){
-  .stk-filter{gap:3px}
-  .stk-filter .sd-chip{gap:.25em;padding:8px 3px}
-  .stk-filter .sd-chip.txt{padding:8px 8px}
+/* Filtros de estado do Stock. Há cinco opções e os rótulos são a informação
+   principal. No telemóvel, "Tudo" ganha uma linha própria e os quatro estados
+   formam uma grelha 2 × 2: ficam sempre inteiros, sem scroll lateral. */
+.stk-filter{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:5px;margin-bottom:8px}
+.stk-filter .sd-chip{min-width:0;min-height:38px;overflow:visible;gap:.35em;padding:8px 6px;line-height:1;justify-content:center;white-space:nowrap}
+.stk-filter .sd-chip small{font-size:11px;font-weight:700;letter-spacing:0;text-transform:uppercase;color:inherit;white-space:nowrap;overflow:visible;text-overflow:clip}
+.stk-filter .stk-n{flex:0 0 auto;font-size:11px;font-weight:800;opacity:.6}
+.stk-filter .sd-chip.txt{font-size:14px;padding:8px 10px;white-space:nowrap}
+@media (max-width:640px){
+  .stk-filter{grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+  .stk-filter .sd-chip{min-height:42px;padding:9px 8px}
+  .stk-filter .sd-chip small{font-size:12px}
+  .stk-filter .stk-n{font-size:12px}
+  .stk-filter .sd-chip.txt{grid-column:1/-1;font-size:15px}
 }
 /* Estado sem artigos: continua lá (o filtro é a chave de leitura) mas apagado */
 .stk-filter .sd-chip.vazio{opacity:.45}
