@@ -51,6 +51,12 @@ Registar um pagamento de dívida continua a ser um ato do admin — o que mudou 
 - O admin é avisado pelo Telegram porque o pedido escreve no `historico` (`tipo:'pagamento'`); as Edge Functions não foram tocadas — a frase vem redigida da app, como todas.
 - Migração: `db/pagamentos_pendentes.sql`. Tolerante: sem ela, `PAGPEND_TABLE=false` e a opção volta a ser só do admin.
 
+### Observações num pagamento livre (`pagamentos.nota`)
+Um acerto de dívida explica-se sozinho pelas dívidas que a `ref` lista; um **pagamento livre / adiantamento** (sem dívidas selecionadas) não — é só um número. A caixa de observações só faz sentido aí, por isso só aparece nesse caso.
+- **A caixa abre/fecha com os chips** (`recalcSdVal`/`recalcEditSdVal`, `#cf-livre-box`/`#ecf-livre-box`): 0 chips selecionados → pagamento livre → caixa visível. Selecionar uma dívida esconde-a — a nota não se grava nesse caso (`p.nota=covParts.length?'':…`), para não ficar pendurada num pagamento que já se explica por si.
+- **É só do caminho do admin** (criar e editar em `pagamentos`, diretamente): o pedido de um não-admin (🕓 pendentes) já tem o seu próprio campo "Como pagaste?" (`pagamentos_pendentes.nota`), sempre visível e com outro propósito (o método de pagamento) — os dois não se confundem, e um não alimenta o outro.
+- Migração: `db/pagamentos_nota.sql`. Tolerante: sem ela, `PAG_NOTA_COL=false` e a caixa fica escondida.
+
 ## Tocar num cash-flow abre uma FICHA, não um formulário
 Tocar num movimento é, quase sempre, ir **ver** o que lá está — não mexer-lhe. Por isso o modal abre numa ficha de leitura (`cfViewRender`, secção *Detalhe de um cash-flow*) e o formulário de sempre só aparece depois do **✏️ Editar** (`cfUnlockEdit`), com o ‹ a voltar atrás. Antes caía-se direito no formulário: caixas de texto, selects e datas para responder a uma pergunta que se lê de relance ("quanto foi, quem pagou, para onde foi") — e a quem não é admin calhava um formulário inteiro **desativado**, campo a campo, que é pior do que não o mostrar.
 - **É só apresentação.** Quem grava continua a ser `editCfEntry`/`saveEditCf`, intactos por baixo; a ficha não escreve nada. Se acrescentares um campo ao formulário, acrescenta-o também à ficha — senão passa a haver informação que só se vê a editar.

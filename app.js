@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v273 · 2026-08-10 · PDF de pessoa (Saldos): as Refeições ordenam-se por dia e mostram o prato; e as Despesas Adiantadas deixam de mostrar "🧺 Stock" como nota e passam a mostrar o destino real (refeição/tipo) em vez de "Gerais" sempre que a compra tem um destino só · v272 · Stock alocado a uma PESSOA (🎒 leva para casa): no separador Stock, uma alocação pode agora apontar a um membro em vez de a uma refeição — é para as sobras que não voltam a ser usadas. O custo sai do rateio e passa a ser cobrado só a essa pessoa (aparece no saldo dela, como as t-shirts) · v271 · Nos Saldos, uma compra com peça "só despesa" (saco, depósito) deixa de aparecer duplicada em "Despesas adiantadas" — as linhas da mesma compra juntam-se numa só. E "Despesas adiantadas" separa-se em duas: o que já pagaste (📅) e o que está previsto mas ainda por pagar (📌 provisórias) · v270 · As SOBRAS deixam de reabrir o pedido: um lote comprado para uma refeição conta inteiro na cobertura, mesmo com parte por alocar na bolsa comum — compram-se 8 pacotes para o jantar, comem-se 5, e a lista já não pede os outros 3 que estão na despensa. É a mesma leitura que o cartão da refeição já fazia. Mover o stock para outra refeição continua a reabrir o pedido · v269 · Uma falta “dita à mão” passa a dizer que o é — na lista e no cartão da refeição, como já dizia o “coberto” e a folha do 🖨 —, e o bloco “que pedidos é que isto trata?” marca a linha que não é a app a deduzir. Trocar o artigo de um pedido (chouriço de sangue → morcela) deita fora a cobertura declarada sobre o artigo antigo, que ficava a mandar sobre o stock novo';
+const APP_BUILD = 'v274 · 2026-08-10 · Pagar Dívida: um pagamento livre / adiantamento (sem dívidas selecionadas) passa a ter uma caixa de observações, para dizer o que é aquele dinheiro · v273 · 2026-08-10 · PDF de pessoa (Saldos): as Refeições ordenam-se por dia e mostram o prato; e as Despesas Adiantadas deixam de mostrar "🧺 Stock" como nota e passam a mostrar o destino real (refeição/tipo) em vez de "Gerais" sempre que a compra tem um destino só · v272 · Stock alocado a uma PESSOA (🎒 leva para casa): no separador Stock, uma alocação pode agora apontar a um membro em vez de a uma refeição — é para as sobras que não voltam a ser usadas. O custo sai do rateio e passa a ser cobrado só a essa pessoa (aparece no saldo dela, como as t-shirts) · v271 · Nos Saldos, uma compra com peça "só despesa" (saco, depósito) deixa de aparecer duplicada em "Despesas adiantadas" — as linhas da mesma compra juntam-se numa só. E "Despesas adiantadas" separa-se em duas: o que já pagaste (📅) e o que está previsto mas ainda por pagar (📌 provisórias) · v270 · As SOBRAS deixam de reabrir o pedido: um lote comprado para uma refeição conta inteiro na cobertura, mesmo com parte por alocar na bolsa comum — compram-se 8 pacotes para o jantar, comem-se 5, e a lista já não pede os outros 3 que estão na despensa. É a mesma leitura que o cartão da refeição já fazia. Mover o stock para outra refeição continua a reabrir o pedido · v269 · Uma falta “dita à mão” passa a dizer que o é — na lista e no cartão da refeição, como já dizia o “coberto” e a folha do 🖨 —, e o bloco “que pedidos é que isto trata?” marca a linha que não é a app a deduzir. Trocar o artigo de um pedido (chouriço de sangue → morcela) deita fora a cobertura declarada sobre o artigo antigo, que ficava a mandar sobre o stock novo';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -190,6 +190,11 @@ let STOCK_EQUIV_COLS=false;
    STOCK_ALOCORIG_COL=false e o editor da compra volta a mexer directamente na
    alocação real, como sempre fez. */
 let STOCK_ALOCORIG_COL=false;
+// pagamentos já tem a coluna 'nota' (db/pagamentos_nota.sql)? É a caixa de
+// observações que se abre quando um "Pagar Dívida" não salda dívida nenhuma
+// (pagamento livre / adiantamento) — só aí faz sentido explicar o que é
+// aquele dinheiro. Sem a migração, PAG_NOTA_COL=false: a caixa não aparece.
+let PAG_NOTA_COL=false;
 /* Artigos de DESPENSA (db/despensa.sql): os que NÃO SE ESGOTAM por alocação —
    o sal, a pimenta, o louro. Um frasco serve o evento todo e ainda sobra para o
    ano seguinte, por isso neles o consumo não se deriva (seria mentira) e vale
@@ -2327,7 +2332,7 @@ async function carregar(){
     const sel='*,membros(*,presencas(*)),refeicoes_def(*),despesas(*),convidados(*),mealheiros(*),pagamentos(*)';
     // shoplist vai numa fetch SEPARADA e tolerante a falha: se a tabela ainda
     // não existir (migração por correr) o resto da app continua a funcionar.
-    const [res,uaRes,cjRes,vlRes,slRes,stRes,ctRes,acRes,npRes,flRes,fpRes,ccRes,sljRes,cobRes,cpRes,stmRes,sfRes,ttRes,tsRes,tiRes,ppRes,dgRes,dbRes,scRes,adRes,cbRes,sm2Res,aoRes]=await Promise.all([
+    const [res,uaRes,cjRes,vlRes,slRes,stRes,ctRes,acRes,npRes,flRes,fpRes,ccRes,sljRes,cobRes,cpRes,stmRes,sfRes,ttRes,tsRes,tiRes,ppRes,dgRes,dbRes,scRes,adRes,cbRes,sm2Res,aoRes,pnRes]=await Promise.all([
       sbFetch(`${SB_URL}/rest/v1/eventos?select=${encodeURIComponent(sel)}&order=ano.asc`,{headers:sbHeaders(),cache:'no-store'}),
       sbFetch(`${SB_URL}/rest/v1/user_amigos?select=email,amigo`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null),
       sbFetch(`${SB_URL}/rest/v1/conjuges?select=amigo_a,amigo_b`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null),
@@ -2386,7 +2391,10 @@ async function carregar(){
       sbFetch(`${SB_URL}/rest/v1/stock_lotes?select=qtd_equiv,unidade_equiv&limit=1`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null),
       // sonda à coluna stock_lotes.aloc_original (db/stock_alocacao_original.sql):
       // para que é que o lote foi comprado, à parte de quem paga o custo hoje
-      sbFetch(`${SB_URL}/rest/v1/stock_lotes?select=aloc_original&limit=1`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null)
+      sbFetch(`${SB_URL}/rest/v1/stock_lotes?select=aloc_original&limit=1`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null),
+      // sonda à coluna pagamentos.nota (db/pagamentos_nota.sql): a observação de
+      // um pagamento livre / adiantamento
+      sbFetch(`${SB_URL}/rest/v1/pagamentos?select=nota&limit=1`,{headers:sbHeaders(),cache:'no-store'}).catch(()=>null)
     ]);
     if(!res.ok)throw new Error('HTTP '+res.status);
     const rows=await res.json();
@@ -2435,6 +2443,8 @@ async function carregar(){
     // Objetivo da compra: sem a coluna, o editor da compra volta a mexer na
     // alocação real (e não há sobras nem realocações para contar)
     STOCK_ALOCORIG_COL=STOCK_TABLE&&!!(aoRes&&aoRes.ok);
+    // Nota de um pagamento livre: sem a coluna, a caixa fica escondida
+    PAG_NOTA_COL=!!(pnRes&&pnRes.ok);
     DESP_TABLE=!!(adRes&&adRes.ok);
     ART_DESP={};
     if(DESP_TABLE)(await adRes.json()).forEach(r=>{ART_DESP[r.artigo_key]={origem:r.origem||'manual'};});
@@ -2486,7 +2496,7 @@ async function carregar(){
       }),
       filhosPres:fpByEv[ev.id]||{},
       mealheiros:(ev.mealheiros||[]).map(m=>({quem:m.quem,data:m.data,valor:N(m.valor),subtipo:m.subtipo,desc:m.descricao})),
-      pagamentos:(ev.pagamentos||[]).map(p=>({de:p.de,para:p.para,valor:N(p.valor),ref:p.ref,data:p.data,extra:N(p.extra)})),
+      pagamentos:(ev.pagamentos||[]).map(p=>({de:p.de,para:p.para,valor:N(p.valor),ref:p.ref,data:p.data,extra:N(p.extra),nota:p.nota||''})),
       shoplist:(shopByEv[ev.id]||[]).map(s=>({_id:s.id,artigo:s.artigo,quantidade:s.quantidade||'',tamanho:s.tamanho||'',loja:s.loja||'',tipo:s.tipo,dataValor:s.data_valor,estado:s.estado||'pendente',tratadoPor:s.tratado_por||null,noCarrinho:!!s.no_carrinho,compraId:s.compra_id||null,cfDesc:s.cf_desc||null,cobertura:s.cobertura||'',valor:s.valor!=null?N(s.valor):null,criadoPor:s.criado_por||'',criadoEm:s.criado_em,compradoEm:s.comprado_em})),
       // `_cons` (stock_lotes.consumido) é NULL de propósito quando ninguém o
       // escreveu: null = derivar das alocações, número = foi dito à mão
@@ -2611,7 +2621,11 @@ async function sbGuardarEvento(y,slot){
     if(y.mealheiros&&y.mealheiros.length)
       await sbReq('POST','mealheiros',y.mealheiros.map(m=>({evento_id:eid,quem:m.quem,data:m.data||null,valor:m.valor,subtipo:m.subtipo||'lata',descricao:m.desc||''})));
     if(y.pagamentos&&y.pagamentos.length)
-      await sbReq('POST','pagamentos',y.pagamentos.map(p=>({evento_id:eid,de:p.de,para:p.para,valor:p.valor,ref:p.ref||'',data:p.data||null,extra:p.extra||0})));
+      await sbReq('POST','pagamentos',y.pagamentos.map(p=>{
+        const row={evento_id:eid,de:p.de,para:p.para,valor:p.valor,ref:p.ref||'',data:p.data||null,extra:p.extra||0};
+        if(PAG_NOTA_COL)row.nota=p.nota||'';
+        return row;
+      }));
     // Propagar ids novos para o estado vivo (o replace recria todas as linhas)
     [ALL_YEARS[slot],(DATA&&DATA.evento&&DATA.evento.ano===ev.ano)?DATA:null].forEach(T=>{
       if(!T)return;
@@ -3182,7 +3196,11 @@ function updateCfForm(){
         </div>
       </details>
       ${pede?`<label>Como pagaste?</label>
-      <input type="text" id="cf-nota" maxlength="60" placeholder="Opcional — ex: MB Way, transferência, em mão">`:''}`;
+      <input type="text" id="cf-nota" maxlength="60" placeholder="Opcional — ex: MB Way, transferência, em mão">`
+      :(PAG_NOTA_COL?`<div id="cf-livre-box" style="display:none">
+      <label>Observações</label>
+      <textarea id="cf-livre-obs" maxlength="120" placeholder="O que é este pagamento? (opcional)" rows="2"></textarea>
+      </div>`:'')}`;
     setTimeout(updateSdChips,10);
   }
 }
@@ -3478,6 +3496,8 @@ function recalcSdVal(){
       if(hint)hint.textContent='Podes ajustar o valor para pagamento parcial';
     }
   } else if(valEl){valEl.readOnly=false;valEl.style.opacity='1';if(hint)hint.textContent='Sem dívidas selecionadas — será registado como pagamento livre / adiantamento.';}
+  const livreBox=document.getElementById('cf-livre-box');
+  if(livreBox)livreBox.style.display=onChips.length?'none':'';
   updateExtraTotal();
 }
 // Atualiza só o aviso "Total a entregar" — NÃO mexe no campo Valor (preserva pagamentos parciais)
@@ -3693,7 +3713,9 @@ async function saveCashFlow(){
       return;
     }
     // p.valor = dinheiro real entregue (dívida + extra). p.extra = fatia que é poupança.
-    DATA.pagamentos.push({de:who,para:tes,valor:rnd(val+extra,2),ref,data:date,extra});
+    // A nota só faz sentido no pagamento livre (sem dívida a explicá-lo por si).
+    const notaLivre=(!covParts.length&&PAG_NOTA_COL)?(document.getElementById('cf-livre-obs')?.value||'').trim():'';
+    DATA.pagamentos.push({de:who,para:tes,valor:rnd(val+extra,2),ref,data:date,extra,nota:notaLivre});
     commitMsg=`Saldar: ${who} → ${tes} ${eur(rnd(val+extra,2))}`+(extra>0?` (poupança +${eur(extra)})`:'');
   }
 
@@ -4278,6 +4300,7 @@ function cfvSaldarHtml(p){
   // ("Adiantamento") e uma caixa "Que dívidas pagou" a responder "nenhuma" é ruído.
   h+=keys.length?cfvBlk('Que dívidas pagou',cfvSdChipsHtml(p.de,keys))
     :'<div class="cfv-note">Pagamento livre — o valor fica como crédito da pessoa e abate a dívida que ela vier a ter.</div>';
+  if(!keys.length&&(p.nota||'').trim())h+=cfvBlk('Observações',`<div class="cfv-note">${escHtml(p.nota.trim())}</div>`);
   return h;
 }
 
@@ -4371,7 +4394,11 @@ function editCfEntry(source,idx){
           <label>Valor extra (€)</label>
           <input type="number" id="ecf-extra" step="0.01" min="0" value="${pExtra||''}" placeholder="0,00" inputmode="decimal">
         </div>
-      </details>`;
+      </details>
+      ${PAG_NOTA_COL?`<div id="ecf-livre-box" style="display:${selectedKeys.length?'none':''}">
+      <label>Observações</label>
+      <textarea id="ecf-livre-obs" maxlength="120" placeholder="O que é este pagamento? (opcional)" rows="2">${escHtml(p.nota||'')}</textarea>
+      </div>`:''}`;
     editingCf.selectedKeys=selectedKeys;
     setTimeout(()=>updateEditSdChips(),10);
   } else if(editType==='despesa'){
@@ -4528,6 +4555,8 @@ function recalcEditSdVal(apply){
     valEl.readOnly=false;valEl.style.opacity='1';
     if(hint)hint.textContent='💡 Pagamento livre / adiantamento — sem dívida associada. O valor fica como crédito da pessoa.';
   }
+  const livreBox=document.getElementById('ecf-livre-box');
+  if(livreBox)livreBox.style.display=onChips.length?'none':'';
 }
 
 function closeEditCf(){
@@ -4564,6 +4593,7 @@ async function saveEditCf(){
       const covParts=[];
       document.querySelectorAll('#esd-chips .sd-chip.on').forEach(chip=>{covParts.push(chip.dataset.key);});
       p.ref=covParts.join(', ');
+      if(PAG_NOTA_COL)p.nota=covParts.length?'':(document.getElementById('ecf-livre-obs')?.value||'').trim();
     }
   } else if(source==='despesas'){
     const d=DATA.despesas[idx];
