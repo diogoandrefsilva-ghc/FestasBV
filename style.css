@@ -1559,6 +1559,7 @@ button.cmp-chip.qt-tap:active{filter:brightness(.93)}
 .lote-orig .lo-chip.saiu{color:var(--red);border-color:rgba(179,64,47,.35);background:rgba(179,64,47,.07)}
 .lote-orig .lo-chip.entrou{color:var(--green);border-color:rgba(30,122,77,.35);background:rgba(30,122,77,.07)}
 .lote-orig .lo-undo{margin-top:8px;padding:6px 11px;font-size:12px}
+.sl-loja-rst{margin-top:6px;padding:6px 11px;font-size:12px}
 /* Bloco recolhível "🛒 Artigos da lista" no registo da compra */
 .pick-det{margin-top:12px;border:1px solid var(--line);border-radius:12px;background:var(--panel);padding:0 12px}
 .pick-det>summary{display:flex;align-items:center;gap:8px;list-style:none;cursor:pointer;padding:11px 0;font-size:13.5px;font-weight:700;color:var(--ink)}

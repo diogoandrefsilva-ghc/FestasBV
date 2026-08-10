@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v274 · 2026-08-10 · Pagar Dívida: um pagamento livre / adiantamento (sem dívidas selecionadas) passa a ter uma caixa de observações, para dizer o que é aquele dinheiro · v273 · 2026-08-10 · PDF de pessoa (Saldos): as Refeições ordenam-se por dia e mostram o prato; e as Despesas Adiantadas deixam de mostrar "🧺 Stock" como nota e passam a mostrar o destino real (refeição/tipo) em vez de "Gerais" sempre que a compra tem um destino só · v272 · Stock alocado a uma PESSOA (🎒 leva para casa): no separador Stock, uma alocação pode agora apontar a um membro em vez de a uma refeição — é para as sobras que não voltam a ser usadas. O custo sai do rateio e passa a ser cobrado só a essa pessoa (aparece no saldo dela, como as t-shirts) · v271 · Nos Saldos, uma compra com peça "só despesa" (saco, depósito) deixa de aparecer duplicada em "Despesas adiantadas" — as linhas da mesma compra juntam-se numa só. E "Despesas adiantadas" separa-se em duas: o que já pagaste (📅) e o que está previsto mas ainda por pagar (📌 provisórias) · v270 · As SOBRAS deixam de reabrir o pedido: um lote comprado para uma refeição conta inteiro na cobertura, mesmo com parte por alocar na bolsa comum — compram-se 8 pacotes para o jantar, comem-se 5, e a lista já não pede os outros 3 que estão na despensa. É a mesma leitura que o cartão da refeição já fazia. Mover o stock para outra refeição continua a reabrir o pedido · v269 · Uma falta “dita à mão” passa a dizer que o é — na lista e no cartão da refeição, como já dizia o “coberto” e a folha do 🖨 —, e o bloco “que pedidos é que isto trata?” marca a linha que não é a app a deduzir. Trocar o artigo de um pedido (chouriço de sangue → morcela) deita fora a cobertura declarada sobre o artigo antigo, que ficava a mandar sobre o stock novo';
+const APP_BUILD = 'v275 · 2026-08-10 · Shop List: um pedido sem loja própria que está a herdar a loja de outro pedido do mesmo artigo agora pode recusar essa herança ("🚫 Não herdar — deixar sem loja"), sem mexer no pedido que a escreveu · v274 · 2026-08-10 · Pagar Dívida: um pagamento livre / adiantamento (sem dívidas selecionadas) passa a ter uma caixa de observações, para dizer o que é aquele dinheiro · v273 · 2026-08-10 · PDF de pessoa (Saldos): as Refeições ordenam-se por dia e mostram o prato; e as Despesas Adiantadas deixam de mostrar "🧺 Stock" como nota e passam a mostrar o destino real (refeição/tipo) em vez de "Gerais" sempre que a compra tem um destino só · v272 · Stock alocado a uma PESSOA (🎒 leva para casa): no separador Stock, uma alocação pode agora apontar a um membro em vez de a uma refeição — é para as sobras que não voltam a ser usadas. O custo sai do rateio e passa a ser cobrado só a essa pessoa (aparece no saldo dela, como as t-shirts) · v271 · Nos Saldos, uma compra com peça "só despesa" (saco, depósito) deixa de aparecer duplicada em "Despesas adiantadas" — as linhas da mesma compra juntam-se numa só. E "Despesas adiantadas" separa-se em duas: o que já pagaste (📅) e o que está previsto mas ainda por pagar (📌 provisórias) · v270 · As SOBRAS deixam de reabrir o pedido: um lote comprado para uma refeição conta inteiro na cobertura, mesmo com parte por alocar na bolsa comum — compram-se 8 pacotes para o jantar, comem-se 5, e a lista já não pede os outros 3 que estão na despensa. É a mesma leitura que o cartão da refeição já fazia. Mover o stock para outra refeição continua a reabrir o pedido · v269 · Uma falta “dita à mão” passa a dizer que o é — na lista e no cartão da refeição, como já dizia o “coberto” e a folha do 🖨 —, e o bloco “que pedidos é que isto trata?” marca a linha que não é a app a deduzir. Trocar o artigo de um pedido (chouriço de sangue → morcela) deita fora a cobertura declarada sobre o artigo antigo, que ficava a mandar sobre o stock novo';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -6441,7 +6441,12 @@ function shopQtyLabel(it){
    loja (ordenação "🏬 Loja") e evitar viagens a mais.
    Coluna opcional: sem a migração (SHOP_LOJA_COL=false) nada disto aparece. */
 const SHOP_SEM_LOJA='Loja não especificada';   // rótulo do grupo dos artigos sem indicação
-function shopLojaTxt(it){return ((it&&it.loja)||'').trim();}
+// Marca "sem loja, à mão" (ver shopLojaEfe): sugerir a de um irmão por defeito
+// está certo, mas quem entra num pedido sem loja própria tem de poder recusar
+// a herança PARA ESSE pedido — sem esta marca, um campo vazio é sempre "ainda
+// não disse" e volta a herdar sozinho, por mais vezes que se limpe.
+const SHOP_LOJA_NONE='∅sem-loja';
+function shopLojaTxt(it){const v=((it&&it.loja)||'').trim();return v===SHOP_LOJA_NONE?'':v;}
 // Chave para juntar grafias ("continente" = "Continente"): maiúsculas sem acentos
 function shopLojaKey(s){return (s||'').trim().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');}
 // Lojas já usadas (todos os anos) — alimenta o datalist de sugestões, para não
@@ -6476,8 +6481,13 @@ function shopArtLojaCalc(){
 }
 /* Loja EFETIVA de um pedido: a dele; e, não tendo indicação, a que os irmãos do
    mesmo artigo indicaram. É esta — e não a `loja` crua — que agrupa e ordena a
-   lista, o cartão da refeição e a folha das compras. */
-function shopLojaEfe(it){return shopLojaTxt(it)||SHOP_ART_LOJA[shopArtKey(it&&it.artigo)]||'';}
+   lista, o cartão da refeição e a folha das compras.
+   SHOP_LOJA_NONE corta a herança para ESTE pedido: quem a recusou no modal não
+   deve voltar a vê-la, por mais irmãos que a tenham. */
+function shopLojaEfe(it){
+  if(it&&it.loja===SHOP_LOJA_NONE)return '';
+  return shopLojaTxt(it)||SHOP_ART_LOJA[shopArtKey(it&&it.artigo)]||'';
+}
 // Ordenação por loja: com loja primeiro (alfabética), "sem loja" no fim
 function shopLojaCmp(a,b){
   const la=shopLojaEfe(a),lb=shopLojaEfe(b);
@@ -8658,6 +8668,7 @@ function openShopItemModal(id,presetTipo,presetData){
     document.getElementById('shop-loja').value=it?shopLojaTxt(it):'';
     const ll=document.getElementById('shop-loja-list');
     if(ll&&SHOP_LOJA_COL)ll.innerHTML=shopLojaNomes().map(n=>`<option value="${escHtml(n)}">`).join('');
+    shopLojaHerdSync(it);
   }
   shopCobFill(it);
   document.getElementById('shop-tipo').value=it?it.tipo:(presetTipo||'Gerais');
@@ -8721,6 +8732,42 @@ function openShopItemModal(id,presetTipo,presetData){
 }
 function deleteShopItemFromModal(){if(editingItemId!=null){const id=editingItemId;closeShopItemModal();deleteShopItem(id);}}
 function closeShopItemModal(){document.getElementById('shop-item-bg').classList.remove('show');unlockScroll();editingItemId=null;shopCtxLock=null;}
+/* Nota de herança da loja: sugerir por defeito está certo (evita duplicar o
+   artigo em dois grupos), mas quem abre um pedido sem loja própria e vê que
+   ele está a herdar "Azeiteiro" de um irmão tem de poder recusar — PARA ESTE
+   pedido, sem mexer no irmão que a escreveu. É por isso que existe
+   SHOP_LOJA_NONE: um campo vazio sozinho nunca chega a dizer "recusei", volta
+   sempre a herdar. */
+let _shopLojaNoneNow=false;
+function shopLojaHerdSync(it){
+  const box=document.getElementById('shop-loja-herd');if(!box)return;
+  _shopLojaNoneNow=!!(it&&it.loja===SHOP_LOJA_NONE);
+  if(_shopLojaNoneNow){
+    box.innerHTML='🚫 Marcado para não herdar a loja de outro pedido deste artigo.<br>'
+      +'<button type="button" class="btn ghost sl-loja-rst" onclick="shopLojaHerdToggle(false)">↺ Voltar a herdar</button>';
+    box.style.display='';
+    return;
+  }
+  const efe=it?shopLojaEfe(it):'';
+  const ownTxt=it?shopLojaTxt(it):'';
+  if(efe&&!ownTxt){
+    box.innerHTML=`🏬 A herdar <b>${escHtml(efe)}</b> de outro pedido deste artigo.<br>`
+      +'<button type="button" class="btn ghost sl-loja-rst" onclick="shopLojaHerdToggle(true)">🚫 Não herdar — deixar sem loja</button>';
+    box.style.display='';
+  }else box.style.display='none';
+}
+function shopLojaHerdToggle(none){
+  document.getElementById('shop-loja').value='';
+  const it=editingItemId!=null?shopArr().find(x=>x._id===editingItemId):null;
+  shopLojaHerdSync(none?{loja:SHOP_LOJA_NONE}:it);
+}
+// Escrever na loja é sempre a escolha mais forte — desfaz o "não herdar" sozinho
+function shopLojaTyping(){
+  if(document.getElementById('shop-loja').value.trim()){
+    _shopLojaNoneNow=false;
+    const box=document.getElementById('shop-loja-herd');if(box)box.style.display='none';
+  }
+}
 function _setEutratoKnob(on){
   const knob=document.getElementById('shop-eutrato-knob');
   const track=knob?.previousElementSibling;
@@ -8823,7 +8870,12 @@ async function saveShopItem(){
       const it=shopArr().find(x=>x._id===editingItemId);
       const patch={artigo,quantidade:qtd,tamanho:tam||null,tipo,data_valor:dataValor};
       const local={artigo,quantidade:qtd,tamanho:tam,tipo,dataValor};
-      if(SHOP_LOJA_COL){patch.loja=loja||null;local.loja=loja;}
+      if(SHOP_LOJA_COL){
+        // Texto escrito manda sempre; vazio + "não herdar" grava a marca que
+        // corta a herança (ver shopLojaHerdSync); vazio sozinho é "sem opinião"
+        const lojaVal=loja||(_shopLojaNoneNow?SHOP_LOJA_NONE:null);
+        patch.loja=lojaVal;local.loja=lojaVal||'';
+      }
       /* A cobertura NÃO se escreve aqui: quem a declara é o stock (loteCobSet),
          que é quem sabe o que está cá. A ÚNICA exceção é TROCAR DE ARTIGO — e é
          mesmo uma exceção, não um descuido: "este stock cobre 0 do teu pedido"
