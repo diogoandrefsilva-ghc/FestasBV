@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v276 · 2026-08-10 · Adicionar Convidado: o campo "Trazido por" deixa de escolher o primeiro membro por ordem alfabética do casal e passa a vir pré-selecionado com o próprio utilizador, como no resto da app · v275 · 2026-08-10 · Shop List: um pedido sem loja própria que está a herdar a loja de outro pedido do mesmo artigo agora pode recusar essa herança ("🚫 Não herdar — deixar sem loja"), sem mexer no pedido que a escreveu · v274 · 2026-08-10 · Pagar Dívida: um pagamento livre / adiantamento (sem dívidas selecionadas) passa a ter uma caixa de observações, para dizer o que é aquele dinheiro · v273 · 2026-08-10 · PDF de pessoa (Saldos): as Refeições ordenam-se por dia e mostram o prato; e as Despesas Adiantadas deixam de mostrar "🧺 Stock" como nota e passam a mostrar o destino real (refeição/tipo) em vez de "Gerais" sempre que a compra tem um destino só · v272 · Stock alocado a uma PESSOA (🎒 leva para casa): no separador Stock, uma alocação pode agora apontar a um membro em vez de a uma refeição — é para as sobras que não voltam a ser usadas. O custo sai do rateio e passa a ser cobrado só a essa pessoa (aparece no saldo dela, como as t-shirts) · v271 · Nos Saldos, uma compra com peça "só despesa" (saco, depósito) deixa de aparecer duplicada em "Despesas adiantadas" — as linhas da mesma compra juntam-se numa só. E "Despesas adiantadas" separa-se em duas: o que já pagaste (📅) e o que está previsto mas ainda por pagar (📌 provisórias) · v270 · As SOBRAS deixam de reabrir o pedido: um lote comprado para uma refeição conta inteiro na cobertura, mesmo com parte por alocar na bolsa comum — compram-se 8 pacotes para o jantar, comem-se 5, e a lista já não pede os outros 3 que estão na despensa. É a mesma leitura que o cartão da refeição já fazia. Mover o stock para outra refeição continua a reabrir o pedido · v269 · Uma falta “dita à mão” passa a dizer que o é — na lista e no cartão da refeição, como já dizia o “coberto” e a folha do 🖨 —, e o bloco “que pedidos é que isto trata?” marca a linha que não é a app a deduzir. Trocar o artigo de um pedido (chouriço de sangue → morcela) deita fora a cobertura declarada sobre o artigo antigo, que ficava a mandar sobre o stock novo';
+const APP_BUILD = 'v277 · 2026-08-10 · Definições › Parametrizações: novo interruptor "Corrigir Presenças" (por ano) que deixa cada um corrigir as suas presenças de dias já passados desse evento — desligado por defeito, e as contas fechadas continuam a trancar tudo mesmo com ele ligado · v276 · 2026-08-10 · Adicionar Convidado: o campo "Trazido por" deixa de escolher o primeiro membro por ordem alfabética do casal e passa a vir pré-selecionado com o próprio utilizador, como no resto da app · v275 · 2026-08-10 · Shop List: um pedido sem loja própria que está a herdar a loja de outro pedido do mesmo artigo agora pode recusar essa herança ("🚫 Não herdar — deixar sem loja"), sem mexer no pedido que a escreveu · v274 · 2026-08-10 · Pagar Dívida: um pagamento livre / adiantamento (sem dívidas selecionadas) passa a ter uma caixa de observações, para dizer o que é aquele dinheiro · v273 · 2026-08-10 · PDF de pessoa (Saldos): as Refeições ordenam-se por dia e mostram o prato; e as Despesas Adiantadas deixam de mostrar "🧺 Stock" como nota e passam a mostrar o destino real (refeição/tipo) em vez de "Gerais" sempre que a compra tem um destino só · v272 · Stock alocado a uma PESSOA (🎒 leva para casa): no separador Stock, uma alocação pode agora apontar a um membro em vez de a uma refeição — é para as sobras que não voltam a ser usadas. O custo sai do rateio e passa a ser cobrado só a essa pessoa (aparece no saldo dela, como as t-shirts) · v271 · Nos Saldos, uma compra com peça "só despesa" (saco, depósito) deixa de aparecer duplicada em "Despesas adiantadas" — as linhas da mesma compra juntam-se numa só. E "Despesas adiantadas" separa-se em duas: o que já pagaste (📅) e o que está previsto mas ainda por pagar (📌 provisórias) · v270 · As SOBRAS deixam de reabrir o pedido: um lote comprado para uma refeição conta inteiro na cobertura, mesmo com parte por alocar na bolsa comum — compram-se 8 pacotes para o jantar, comem-se 5, e a lista já não pede os outros 3 que estão na despensa. É a mesma leitura que o cartão da refeição já fazia. Mover o stock para outra refeição continua a reabrir o pedido · v269 · Uma falta “dita à mão” passa a dizer que o é — na lista e no cartão da refeição, como já dizia o “coberto” e a folha do 🖨 —, e o bloco “que pedidos é que isto trata?” marca a linha que não é a app a deduzir. Trocar o artigo de um pedido (chouriço de sangue → morcela) deita fora a cobertura declarada sobre o artigo antigo, que ficava a mandar sobre o stock novo';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -221,9 +221,14 @@ function computeMyNames(){
   CONJUGES.forEach(c=>{if(c.amigo_a===me.amigo)s.add(c.amigo_b);if(c.amigo_b===me.amigo)s.add(c.amigo_a);});
   MY_NAMES=[...s];
 }
+// Ligado por ano em Definições › Parametrizações (db/presencas_correcao.sql).
+// Só destranca dias passados — as contas fechadas continuam a mandar sempre,
+// porque quem chama diaEditavel (canTouchPresenca/canTouchFilho) já testa
+// contasFechadas() antes de perguntar isto.
+function presCorrecaoAberta(){return !!(DATA&&DATA.evento&&DATA.evento.presCorrecao);}
 function diaEditavel(dia){
   const rd=(DATA&&DATA.refeicoesDef||[]).find(r=>r.dia===dia);
-  return !!rd&&rd.data>=hojeISO();
+  return !!rd&&(rd.data>=hojeISO()||presCorrecaoAberta());
 }
 // Nome do amigo (membro) associado ao utilizador logado — usado como default em "quem paga/recebe"
 function myPrimaryName(){
@@ -2475,7 +2480,7 @@ async function carregar(){
     if(TSHIRTS_TABLE)(await tsRes.json()).forEach(t=>{(tsByEv[t.evento_id]=tsByEv[t.evento_id]||[]).push(t);});
     ALL_YEARS=rows.map(ev=>({
       _sbId: ev.id,
-      evento:{tshirtsTrancadas:!!ev.tshirts_trancadas,tshirtPrecoHomem:N(ev.tshirt_preco_homem),tshirtPrecoMulher:N(ev.tshirt_preco_mulher),tshirtPrecoCrianca:N(ev.tshirt_preco_crianca),tshirtDesconto:N(ev.tshirt_desconto),nome:ev.nome,ano:ev.ano,tesoureiro:ev.tesoureiro,arredondaTotal:!!ev.arredonda_total,missaoPoupanca:N(ev.missao_poupanca),fundoReserva:N(ev.fundo_reserva),fatorModo:ev.fator_modo||'fixo',fatorThreshold:ev.fator_threshold!=null?N(ev.fator_threshold):FATOR_THRESHOLD_DEFAULT,dividasPublicas:!!ev.dividas_publicas,dividasPublicasCol:('dividas_publicas' in ev),contasFechadas:!!ev.contas_fechadas,contasFechadasEm:ev.contas_fechadas_em||null,contasFechadasPor:ev.contas_fechadas_por||null},
+      evento:{tshirtsTrancadas:!!ev.tshirts_trancadas,tshirtPrecoHomem:N(ev.tshirt_preco_homem),tshirtPrecoMulher:N(ev.tshirt_preco_mulher),tshirtPrecoCrianca:N(ev.tshirt_preco_crianca),tshirtDesconto:N(ev.tshirt_desconto),nome:ev.nome,ano:ev.ano,tesoureiro:ev.tesoureiro,arredondaTotal:!!ev.arredonda_total,missaoPoupanca:N(ev.missao_poupanca),fundoReserva:N(ev.fundo_reserva),fatorModo:ev.fator_modo||'fixo',fatorThreshold:ev.fator_threshold!=null?N(ev.fator_threshold):FATOR_THRESHOLD_DEFAULT,dividasPublicas:!!ev.dividas_publicas,dividasPublicasCol:('dividas_publicas' in ev),presCorrecao:!!ev.pres_correcao,presCorrecaoCol:('pres_correcao' in ev),contasFechadas:!!ev.contas_fechadas,contasFechadasEm:ev.contas_fechadas_em||null,contasFechadasPor:ev.contas_fechadas_por||null},
       membros:(ev.membros||[]).sort((a,b)=>a.nome.localeCompare(b.nome,'pt')).map(m=>({
         _id:m.id,nome:m.nome,fator:N(m.fator),sexo:m.sexo==='F'?'F':'M',
         presencas:(m.presencas||[]).map(p=>({k:`${p.dia}|${p.ref}`,modo:p.modo==='bebe'?'bebe':'come'}))
@@ -2569,6 +2574,7 @@ async function sbGuardarEvento(y,slot){
     const evRow={nome:ev.nome,ano:ev.ano,tesoureiro:ev.tesoureiro,arredonda_total:!!ev.arredondaTotal,missao_poupanca:ev.missaoPoupanca||0,fundo_reserva:ev.fundoReserva||0,fator_modo:ev.fatorModo==='variavel'?'variavel':'fixo',fator_threshold:ev.fatorThreshold!=null?ev.fatorThreshold:FATOR_THRESHOLD_DEFAULT};
     // Só grava a flag se a coluna já existir no Supabase (migração: ALTER TABLE eventos ADD dividas_publicas)
     if(ev.dividasPublicasCol)evRow.dividas_publicas=!!ev.dividasPublicas;
+    if(ev.presCorrecaoCol)evRow.pres_correcao=!!ev.presCorrecao;
     let eid=y._sbId;
     if(!eid){
       const ins=await sbReq('POST','eventos',evRow,{Prefer:'return=representation'});
@@ -4714,6 +4720,12 @@ function loadParams(){
     document.getElementById('adm-divpub').checked=!!DATA.evento.dividasPublicas;
     _setDivpubKnob(!!DATA.evento.dividasPublicas);
   }
+  const pcRow=document.getElementById('adm-prescorr-row');
+  if(pcRow){
+    pcRow.style.display=DATA.evento.presCorrecaoCol?'':'none';
+    document.getElementById('adm-prescorr').checked=!!DATA.evento.presCorrecao;
+    _setPrescorrKnob(!!DATA.evento.presCorrecao);
+  }
   document.getElementById('adm-missao').value=missao||'';
   document.getElementById('adm-fundo').value=fundo||'';
   const fmEl=document.getElementById('adm-fator-modo');
@@ -4739,6 +4751,12 @@ function updateToggleKnob(on){
 }
 function _setDivpubKnob(on){
   const knob=document.getElementById('adm-divpub-knob');
+  const track=knob?.previousElementSibling;
+  if(knob)knob.style.left=on?'22px':'2px';
+  if(track)track.style.background=on?'var(--gold)':'var(--line)';
+}
+function _setPrescorrKnob(on){
+  const knob=document.getElementById('adm-prescorr-knob');
   const track=knob?.previousElementSibling;
   if(knob)knob.style.left=on?'22px':'2px';
   if(track)track.style.background=on?'var(--gold)':'var(--line)';
@@ -4923,6 +4941,11 @@ async function saveParams(){
     const dp=document.getElementById('adm-divpub').checked;
     _setDivpubKnob(dp);
     DATA.evento.dividasPublicas=dp;
+  }
+  if(DATA.evento.presCorrecaoCol){
+    const pc=document.getElementById('adm-prescorr').checked;
+    _setPrescorrKnob(pc);
+    DATA.evento.presCorrecao=pc;
   }
   DATA.evento.missaoPoupanca=parseFloat(document.getElementById('adm-missao').value)||0;
   DATA.evento.fundoReserva=parseFloat(document.getElementById('adm-fundo').value)||0;
@@ -12648,7 +12671,7 @@ function renderPresencaGrid(){
   days.forEach(d=>{
     const isToday=d.data===hoje;
     const isPast=d.data<hoje;
-    h+=`<th class="pres-day-hdr sf${isToday?' today':''}${isPast&&!adm?' past':''}" colspan="${d.slots.length}">${d.dia}<div class="pres-date" style="color:${isToday?'var(--gold)':'var(--faint)'}">${isToday?'hoje':fmtDiaMes(d.data)}</div></th>`;
+    h+=`<th class="pres-day-hdr sf${isToday?' today':''}${isPast&&!adm&&!presCorrecaoAberta()?' past':''}" colspan="${d.slots.length}">${d.dia}<div class="pres-date" style="color:${isToday?'var(--gold)':'var(--faint)'}">${isToday?'hoje':fmtDiaMes(d.data)}</div></th>`;
   });
   h+='</tr>';
 
@@ -12748,11 +12771,10 @@ function renderPresencaGrid(){
       if(_hasMine&&!_selfDone&&_r<2){_rowCls.push('pres-row-self');_selfDone=true;}
       if(_hasMine&&!_sepDone&&_r===2){_rowCls.push('pres-row-other1');_sepDone=true;}
       h+=`<tr class="${_rowCls.join(' ')}">`;
-      const meu=MY_NAMES.includes(m.nome);
       h+=`<td class="pres-name"><div class="pres-name-inner"><div class="pres-name-av" style="background:${AVCOL[mi%AVCOL.length]}">${m.nome.split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase()}</div><span class="pres-name-txt sf">${m.nome}</span></div></td>`;
       days.forEach(d=>{
         const isToday=d.data===hoje;
-        const pode=adm||(meu&&d.data>=hoje);
+        const pode=canTouchPresenca(m.nome,d.dia);
         d.slots.forEach(s=>{
           const modo=presModo(m,s.key);
           const cls=modo==='bebe'?' bebe':(modo==='come'?' on':'');
