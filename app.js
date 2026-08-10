@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v272 · 2026-08-10 · Stock alocado a uma PESSOA (🎒 leva para casa): no separador Stock, uma alocação pode agora apontar a um membro em vez de a uma refeição — é para as sobras que não voltam a ser usadas. O custo sai do rateio e passa a ser cobrado só a essa pessoa (aparece no saldo dela, como as t-shirts) · v271 · Nos Saldos, uma compra com peça "só despesa" (saco, depósito) deixa de aparecer duplicada em "Despesas adiantadas" — as linhas da mesma compra juntam-se numa só. E "Despesas adiantadas" separa-se em duas: o que já pagaste (📅) e o que está previsto mas ainda por pagar (📌 provisórias) · v270 · As SOBRAS deixam de reabrir o pedido: um lote comprado para uma refeição conta inteiro na cobertura, mesmo com parte por alocar na bolsa comum — compram-se 8 pacotes para o jantar, comem-se 5, e a lista já não pede os outros 3 que estão na despensa. É a mesma leitura que o cartão da refeição já fazia. Mover o stock para outra refeição continua a reabrir o pedido · v269 · Uma falta “dita à mão” passa a dizer que o é — na lista e no cartão da refeição, como já dizia o “coberto” e a folha do 🖨 —, e o bloco “que pedidos é que isto trata?” marca a linha que não é a app a deduzir. Trocar o artigo de um pedido (chouriço de sangue → morcela) deita fora a cobertura declarada sobre o artigo antigo, que ficava a mandar sobre o stock novo';
+const APP_BUILD = 'v273 · 2026-08-10 · PDF de pessoa (Saldos): as Refeições ordenam-se por dia e mostram o prato; e as Despesas Adiantadas deixam de mostrar "🧺 Stock" como nota e passam a mostrar o destino real (refeição/tipo) em vez de "Gerais" sempre que a compra tem um destino só · v272 · Stock alocado a uma PESSOA (🎒 leva para casa): no separador Stock, uma alocação pode agora apontar a um membro em vez de a uma refeição — é para as sobras que não voltam a ser usadas. O custo sai do rateio e passa a ser cobrado só a essa pessoa (aparece no saldo dela, como as t-shirts) · v271 · Nos Saldos, uma compra com peça "só despesa" (saco, depósito) deixa de aparecer duplicada em "Despesas adiantadas" — as linhas da mesma compra juntam-se numa só. E "Despesas adiantadas" separa-se em duas: o que já pagaste (📅) e o que está previsto mas ainda por pagar (📌 provisórias) · v270 · As SOBRAS deixam de reabrir o pedido: um lote comprado para uma refeição conta inteiro na cobertura, mesmo com parte por alocar na bolsa comum — compram-se 8 pacotes para o jantar, comem-se 5, e a lista já não pede os outros 3 que estão na despensa. É a mesma leitura que o cartão da refeição já fazia. Mover o stock para outra refeição continua a reabrir o pedido · v269 · Uma falta “dita à mão” passa a dizer que o é — na lista e no cartão da refeição, como já dizia o “coberto” e a folha do 🖨 —, e o bloco “que pedidos é que isto trata?” marca a linha que não é a app a deduzir. Trocar o artigo de um pedido (chouriço de sangue → morcela) deita fora a cobertura declarada sobre o artigo antigo, que ficava a mandar sobre o stock novo';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -807,9 +807,9 @@ function calcular(data){
       if(!r)return;
       const refName=ref==='Tarde'?'Lanche':ref;
       if(p.modo==='bebe'){
-        if(r.Pbebe>0)m._refs.push({dia,ref:refName,p:r.Pbebe,modo:'bebe'});
+        if(r.Pbebe>0)m._refs.push({dia,ref:refName,p:r.Pbebe,modo:'bebe',prato:r.prato||''});
       } else {
-        if(r.P>0)m._refs.push({dia,ref:refName,p:r.P,modo:'come'});
+        if(r.P>0)m._refs.push({dia,ref:refName,p:r.P,modo:'come',prato:r.prato||''});
       }
     });
     m.Sown=rnd(m._refs.reduce((a,x)=>a+x.p,0),2);
@@ -16165,6 +16165,21 @@ function buildGeneralReport(){
   return h;
 }
 
+/* Despesas Adiantadas do relatório de pessoa: a linha técnica "🧺 Stock" de uma
+   compra grava-se sempre com tipo 'Gerais' (ver cfCompraLines) — o destino real
+   vive nas alocações do stock, não nesta linha. Com um destino só, mostra-se
+   esse; com vários (compra repartida por refeições/tipos diferentes) o "Gerais"
+   fica mesmo certo, que é a bolsa comum a somar tudo. */
+function pdfDespTipo(d){
+  if((d.obs||'')!==STOCK_OBS||!d.compraId)return d.tipo;
+  const ks=Object.keys(cfStockDestMap(d.compraId,d.valor));
+  if(ks.length!==1)return d.tipo;
+  const a=destinoAloc(ks[0],0);
+  if(alocIsPessoa(a))return DEST_PESSOA_ICON+' '+a.pessoa;
+  if(alocIsMeal(a))return a.tipo+(a.data?' '+fmtDiaMes(a.data):'')+(alocIsBebida(a)?' '+DEST_BEB_ICON:'');
+  return a.tipo;
+}
+
 function buildPersonReport(pessoa){
   const m=CALC.membros.find(x=>x.nome===pessoa);
   if(!m) return '<h1>Membro não encontrado</h1>';
@@ -16183,22 +16198,25 @@ function buildPersonReport(pessoa){
     <div class="hero-box ${cls}"><div class="hb-label">${saldoLabel}</div><div class="hb-val">${eur(sf)}</div></div>
   </div>`;
 
-  // Contribuições (refeições)
+  // Contribuições (refeições) — ordem cronológica dos slots, segundo refeicoesDef
   if(m._refs.length){
-    const comeR=m._refs.filter(r=>r.modo!=='bebe');
-    const bebeR=m._refs.filter(r=>r.modo==='bebe');
+    const ordRef={};(DATA.refeicoesDef||[]).forEach((rd,i)=>{ordRef[rd.dia+'|'+rd.ref]=i;});
+    const nrmRef=r=>r==='Tarde'?'Lanche':r;
+    const oKeyRef=x=>ordRef[x.dia+'|'+nrmRef(x.ref)]!=null?ordRef[x.dia+'|'+nrmRef(x.ref)]:999;
+    const comeR=m._refs.filter(r=>r.modo!=='bebe').sort((a,b)=>oKeyRef(a)-oKeyRef(b));
+    const bebeR=m._refs.filter(r=>r.modo==='bebe').sort((a,b)=>oKeyRef(a)-oKeyRef(b));
     if(comeR.length){
       h+='<h2>Refeições</h2>';
-      h+='<table><tr><th>Dia</th><th>Refeição</th><th class="right">Valor</th></tr>';
-      comeR.forEach(r=>{h+=`<tr><td>${r.dia}</td><td>${r.ref}</td><td class="right">${eur(r.p)}</td></tr>`;});
-      h+=`<tr style="border-top:2px solid #ddd;font-weight:700"><td colspan="2"><b>Total Refeições</b></td><td class="right"><b>${eur(rnd(comeR.reduce((a,x)=>a+x.p,0),2))}</b></td></tr>`;
+      h+='<table><tr><th>Dia</th><th>Refeição</th><th>Prato</th><th class="right">Valor</th></tr>';
+      comeR.forEach(r=>{h+=`<tr><td>${r.dia}</td><td>${r.ref}</td><td>${r.prato?escHtml(r.prato):'—'}</td><td class="right">${eur(r.p)}</td></tr>`;});
+      h+=`<tr style="border-top:2px solid #ddd;font-weight:700"><td colspan="3"><b>Total Refeições</b></td><td class="right"><b>${eur(rnd(comeR.reduce((a,x)=>a+x.p,0),2))}</b></td></tr>`;
       h+='</table>';
     }
     if(bebeR.length){
       h+='<h2>Só bebida</h2>';
-      h+='<table><tr><th>Dia</th><th>Refeição</th><th class="right">Valor</th></tr>';
-      bebeR.forEach(r=>{h+=`<tr><td>${r.dia}</td><td>${r.ref}</td><td class="right">${eur(r.p)}</td></tr>`;});
-      h+=`<tr style="border-top:2px solid #ddd;font-weight:700"><td colspan="2"><b>Total Só bebida</b></td><td class="right"><b>${eur(rnd(bebeR.reduce((a,x)=>a+x.p,0),2))}</b></td></tr>`;
+      h+='<table><tr><th>Dia</th><th>Refeição</th><th>Prato</th><th class="right">Valor</th></tr>';
+      bebeR.forEach(r=>{h+=`<tr><td>${r.dia}</td><td>${r.ref}</td><td>${r.prato?escHtml(r.prato):'—'}</td><td class="right">${eur(r.p)}</td></tr>`;});
+      h+=`<tr style="border-top:2px solid #ddd;font-weight:700"><td colspan="3"><b>Total Só bebida</b></td><td class="right"><b>${eur(rnd(bebeR.reduce((a,x)=>a+x.p,0),2))}</b></td></tr>`;
       h+='</table>';
     }
   }
@@ -16228,7 +16246,10 @@ function buildPersonReport(pessoa){
     h+='<h2>Despesas Adiantadas</h2>';
     h+='<table><tr><th>Data</th><th>Descrição</th><th>Tipo</th><th class="right">Valor</th></tr>';
     DATA.despesas.filter(x=>x.quem===m.nome).forEach(d=>{
-      h+=`<tr><td>${fmtPdfDate(d.dataDesp||d.dataValor||'')}</td><td>${d.desc||'—'}${despProvisoria(d)?' <span class="badge badge-amber">provisória</span>':''}${d.obs?`<br><span style="color:#888;font-size:10px">📝 ${escHtml(d.obs)}</span>`:''}</td><td>${d.tipo}</td><td class="right">${eur(d.valor)}</td></tr>`;
+      // A "🧺 Stock" é a linha técnica da compra, não uma nota — mostrá-la aqui
+      // só atrapalhava a descrição (que já é o nome da loja).
+      const nota=(d.obs&&d.obs!==STOCK_OBS)?`<br><span style="color:#888;font-size:10px">📝 ${escHtml(d.obs)}</span>`:'';
+      h+=`<tr><td>${fmtPdfDate(d.dataDesp||d.dataValor||'')}</td><td>${d.desc||'—'}${despProvisoria(d)?' <span class="badge badge-amber">provisória</span>':''}${nota}</td><td>${pdfDespTipo(d)}</td><td class="right">${eur(d.valor)}</td></tr>`;
     });
     h+=`<tr style="border-top:2px solid #ddd;font-weight:700"><td colspan="3"><b>Total</b></td><td class="right pos"><b>${eur(rnd(totalPagoDesp,2))}</b></td></tr>`;
     h+='</table>';
