@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v271 · 2026-08-09 · Nos Saldos, uma compra com peça "só despesa" (saco, depósito) deixa de aparecer duplicada em "Despesas adiantadas" — as linhas da mesma compra juntam-se numa só. E "Despesas adiantadas" separa-se em duas: o que já pagaste (📅) e o que está previsto mas ainda por pagar (📌 provisórias) · v270 · As SOBRAS deixam de reabrir o pedido: um lote comprado para uma refeição conta inteiro na cobertura, mesmo com parte por alocar na bolsa comum — compram-se 8 pacotes para o jantar, comem-se 5, e a lista já não pede os outros 3 que estão na despensa. É a mesma leitura que o cartão da refeição já fazia. Mover o stock para outra refeição continua a reabrir o pedido · v269 · Uma falta “dita à mão” passa a dizer que o é — na lista e no cartão da refeição, como já dizia o “coberto” e a folha do 🖨 —, e o bloco “que pedidos é que isto trata?” marca a linha que não é a app a deduzir. Trocar o artigo de um pedido (chouriço de sangue → morcela) deita fora a cobertura declarada sobre o artigo antigo, que ficava a mandar sobre o stock novo';
+const APP_BUILD = 'v272 · 2026-08-10 · Stock alocado a uma PESSOA (🎒 leva para casa): no separador Stock, uma alocação pode agora apontar a um membro em vez de a uma refeição — é para as sobras que não voltam a ser usadas. O custo sai do rateio e passa a ser cobrado só a essa pessoa (aparece no saldo dela, como as t-shirts) · v271 · Nos Saldos, uma compra com peça "só despesa" (saco, depósito) deixa de aparecer duplicada em "Despesas adiantadas" — as linhas da mesma compra juntam-se numa só. E "Despesas adiantadas" separa-se em duas: o que já pagaste (📅) e o que está previsto mas ainda por pagar (📌 provisórias) · v270 · As SOBRAS deixam de reabrir o pedido: um lote comprado para uma refeição conta inteiro na cobertura, mesmo com parte por alocar na bolsa comum — compram-se 8 pacotes para o jantar, comem-se 5, e a lista já não pede os outros 3 que estão na despensa. É a mesma leitura que o cartão da refeição já fazia. Mover o stock para outra refeição continua a reabrir o pedido · v269 · Uma falta “dita à mão” passa a dizer que o é — na lista e no cartão da refeição, como já dizia o “coberto” e a folha do 🖨 —, e o bloco “que pedidos é que isto trata?” marca a linha que não é a app a deduzir. Trocar o artigo de um pedido (chouriço de sangue → morcela) deita fora a cobertura declarada sobre o artigo antigo, que ficava a mandar sobre o stock novo';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -640,6 +640,11 @@ function updateYearUI(){
 // Tipo de despesa da fatura das t-shirts. Fica fora do rateio das refeições e
 // da base da quota extra: cada t-shirt é cobrada a quem lhe está imputada.
 const TS_TIPO_DESP='T-shirts';
+/* Tipo de despesa sintético do stock alocado a uma PESSOA (🎒 leva para casa).
+   Como o T-shirts: fica fora do rateio indireto e é cobrado a quem levou —
+   nunca é escrito na BD, só existe na cópia que o calcular() usa (ver
+   aplicarStock, secção "Stock alocado a uma pessoa"). */
+const STOCK_SOBRA_TIPO='Stock Sobrante';
 function rnd(x,n=2){const f=Math.pow(10,n);return Math.floor(Math.abs(x)*f+0.5)/f*(x>=0?1:-1);}
 /* Casas decimais com que se GUARDA uma quantidade de stock. Três davam o gramo,
    que é o que se MOSTRA (o fmtQty arredonda sempre a 3) — mas não chegam para
@@ -708,12 +713,16 @@ function calcular(data){
      Por isso sai da bolsa indireta (senão inflacionava o custo das refeições)
      e, mais abaixo, sai também da base da quota extra. */
   const totTSdesp=rnd(despesas.filter(x=>x.tipo===TS_TIPO_DESP).reduce((a,x)=>a+x.valor,0),2);
-  const F20=rnd((totalDesp-allocDireta-totTSdesp)*0.5,2);
+  /* Stock "🎒 leva para casa": a mesma lógica das t-shirts — sai da bolsa
+     indireta (senão o custo espalhava-se por toda a gente) e é cobrado direto
+     a quem levou, mais abaixo (m.SS). */
+  const totSSdesp=rnd(despesas.filter(x=>x.tipo===STOCK_SOBRA_TIPO).reduce((a,x)=>a+x.valor,0),2);
+  const F20=rnd((totalDesp-allocDireta-totTSdesp-totSSdesp)*0.5,2);
 
   // Repartição do indireto entre "bebidas", "cerveja" e "gerais" (só apresentação na lista).
   // A bolsa indireta = tudo o que não é despesa direta de refeição. A soma das 3 parcelas é
   // SEMPRE igual ao indireto I, por isso L/P/Q e os saldos não mudam.
-  const baseIndireta=rnd(totalDesp-allocDireta-totTSdesp,2);
+  const baseIndireta=rnd(totalDesp-allocDireta-totTSdesp-totSSdesp,2);
   const baseBebidas=rnd(despesas.filter(x=>x.tipo==='Bebidas').reduce((a,x)=>a+x.valor,0),2);
   const baseCerveja=rnd(despesas.filter(x=>x.tipo==='Cerveja').reduce((a,x)=>a+x.valor,0),2);
   const fracBebidas=baseIndireta>0?baseBebidas/baseIndireta:0;
@@ -838,13 +847,28 @@ function calcular(data){
   for(const m of membros)m.TS=rnd(m.TS,2);
   const tsTot=rnd(membros.reduce((a,m)=>a+m.TS,0),2);
 
+  /* Stock "🎒 leva para casa": cada linha sintética (aplicarStock) diz quem
+     levou (`_ssPara`). Nome fora do plantel deste ano não gera cobrança — como
+     nas t-shirts, o total cobrado é a soma do que caiu nos membros, não a soma
+     das linhas, para as contas do grupo fecharem sempre (o resto vira perda do
+     grupo, absorvida no saldoGrupo, exatamente como um nome de t-shirt órfão). */
+  for(const m of membros){m._stockSobra=[];m.SS=0;}
+  for(const x of despesas){
+    if(x.tipo!==STOCK_SOBRA_TIPO)continue;
+    const m=nomesM[x._ssPara];if(!m)continue;
+    m._stockSobra.push({artigo:x.desc,v:x.valor});
+    m.SS+=x.valor;
+  }
+  for(const m of membros)m.SS=rnd(m.SS,2);
+  const ssTot=rnd(membros.reduce((a,m)=>a+m.SS,0),2);
+
   const totRefMembros=rnd(membros.reduce((a,m)=>a+m.Sown,0),2);
   const totGuestPayments=rnd(membros.reduce((a,m)=>a+m.AA,0),2);
   const sobrasTot=0; // migrado para mealheiros
   const descontoTot=0; // migrado para mealheiros
   const mealTot=mealheiros.reduce((a,x)=>a+x.valor,0);
 
-  const baseQuota=totalDesp-(totRefMembros+totGuestPayments+sobrasTot+descontoTot+mealTot+tsTot);
+  const baseQuota=totalDesp-(totRefMembros+totGuestPayments+sobrasTot+descontoTot+mealTot+tsTot+ssTot);
   const fundoReserva=evento.fundoReserva||0;
   const missaoPoupanca=evento.missaoPoupanca||0;
   const arredondaTotal=evento.arredondaTotal!==undefined?evento.arredondaTotal:false;
@@ -873,10 +897,10 @@ function calcular(data){
     } else {
       m.U=rnd(missaoPoupanca+m.T,2);
     }
-    // As t-shirts entram no total a pagar, mas ficam DE FORA do arredondamento
-    // (m.U, acima): a fatura é um valor exato a recuperar e arredondá-lo
-    // cobrava ao grupo mais do que as t-shirts custaram.
-    m.V=rnd(m.Sown+m.R+m.U+(m.TS||0),2);
+    // As t-shirts e o stock sobrante entram no total a pagar, mas ficam DE
+    // FORA do arredondamento (m.U, acima): são valores exatos a recuperar e
+    // arredondá-los cobrava ao grupo mais do que custaram.
+    m.V=rnd(m.Sown+m.R+m.U+(m.TS||0)+(m.SS||0),2);
     m.W=mealBy[m.nome]||0;
     m.X=0; // sobras e outros migrados para mealheiros
     const totalPago=despesas.filter(x=>x.quem===m.nome).reduce((a,x)=>a+x.valor,0);
@@ -890,7 +914,7 @@ function calcular(data){
   const missaoTot=rnd(membros.reduce((a,m)=>a+m.U,0),2);
   const quotaTot=rnd(membros.reduce((a,m)=>a+m.R,0),2);
   const totRefAll=rnd(membros.reduce((a,m)=>a+m.Sown,0),2);
-  const totReceitas=rnd(quotaTot+totRefAll+totGuestPayments+sobrasTot+descontoTot+mealTot+missaoTot+tsTot,2);
+  const totReceitas=rnd(quotaTot+totRefAll+totGuestPayments+sobrasTot+descontoTot+mealTot+missaoTot+tsTot+ssTot,2);
   const saldoGrupo=rnd(totReceitas-totalDesp,2);
 
   const pagNonReemb=pag.filter(p=>!p.ref||!p.ref.startsWith('Reembolso'));
@@ -977,7 +1001,7 @@ function calcular(data){
     m._payerOthersPortion=payerOthersPortion[m.nome]||0;
   }
 
-  return{refeicoes,membros,BN3,F20,saldoGrupo,totRefMembros,tot,totReceitas,totDespesas:totalDesp,sumF,pagamentos:pag,sobrasTot,descontoTot,mealTot,quotaTot,missaoTot,tsTot,totTSdesp};
+  return{refeicoes,membros,BN3,F20,saldoGrupo,totRefMembros,tot,totReceitas,totDespesas:totalDesp,sumF,pagamentos:pag,sobrasTot,descontoTot,mealTot,quotaTot,missaoTot,tsTot,totTSdesp,ssTot};
 }
 
 /* RENDER */
@@ -1354,7 +1378,7 @@ function renderAll(){
     const receb=rcL.reduce((a,p)=>a+p.valor,0);
     const mealL=DATA.mealheiros.filter(x=>x.quem===m.nome);
     const mealT=rnd((m.W||0)+(m.X||0),2);
-    const contribT=rnd(m.Sown+m.AA+(m.TS||0),2);
+    const contribT=rnd(m.Sown+m.AA+(m.TS||0)+(m.SS||0),2);
     const quotaE=rnd((m.R||0)+(m.U||0),2);
     let cred=totalPagoDesp;
     if(isTes) cred+=reembFeitos;
@@ -2036,6 +2060,9 @@ const CF_STOCK_MAX_ITENS=8;   // acima disto o cartão vira lista de supermercad
 function cfStockSplit(compraId,total){
   const m=cfStockDestMap(compraId,total);
   const dest=k=>{const d=destinoAloc(k,0);
+    // 🎒 leva para casa: o "sub" tem de ser o NOME (não "Pessoa") — é o que se
+    // lê na sub-linha do cartão do movimento
+    if(alocIsPessoa(d))return{key:k,sub:d.pessoa,dia:'',ic:DEST_PESSOA_ICON};
     return{key:k,sub:d.tipo,dia:d.data?`${dataToDia(d.data)} ${fmtDiaMes(d.data)}`:'',
       // bebida da refeição: ícone composto, senão liam-se duas linhas "Jantar"
       // iguais quando a mesma refeição leva comida e bebida
@@ -2114,7 +2141,7 @@ function openMember(nome){
   // ═══════════════════════════════════════
   // As t-shirts são contribuição como as refeições e os convidados: dinheiro
   // que o membro deve. Sem isto o saldo do ecrã ficava a divergir do detalhe.
-  const contribTotal=rnd(m.Sown+m.AA+(m.TS||0),2);
+  const contribTotal=rnd(m.Sown+m.AA+(m.TS||0)+(m.SS||0),2);
   if(contribTotal>0){
     h+='<div class="bd-title sf">Contribuições</div>';
     if(m._refs.length){
@@ -2159,6 +2186,17 @@ function openMember(nome){
       </div>`;
       h+='<div class="collapse-body"><div class="meals">';
       (m._tshirts||[]).forEach(x=>h+=`<div class="meal"><span class="d">${escHtml(x.nome)} · ${escHtml(x.tipo)} ${escHtml(x.tamanho)}${x.partes>1?` (1/${x.partes})`:''}</span><span class="p">${eur(rnd(x.v,2))}</span></div>`);
+      h+='</div></div>';
+    }
+    // Stock que este membro levou para casa (🎒) — sobras que não voltam a
+    // entrar em nenhuma refeição, cobradas diretamente a ele
+    if((m.SS||0)>0.005){
+      h+=`<div class="collapse-toggle" onclick="this.classList.toggle('open');this.nextElementSibling.classList.toggle('open')" style="margin-top:6px">
+        <span class="ct-label">🎒 Stock Sobrante (${(m._stockSobra||[]).length})</span>
+        <span><span class="ct-val minus">${eur(m.SS)}</span><span class="ct-arrow">▼</span></span>
+      </div>`;
+      h+='<div class="collapse-body"><div class="meals">';
+      (m._stockSobra||[]).forEach(x=>h+=`<div class="meal"><span class="d">${escHtml(x.artigo)}</span><span class="p">${eur(rnd(x.v,2))}</span></div>`);
       h+='</div></div>';
     }
   }
@@ -6544,13 +6582,15 @@ function hojeISO(){return new Date().toISOString().slice(0,10);}
 function ehDespensa(artigo){return DESP_TABLE&&!!ART_DESP[shopArtKey(artigo||'')];}
 function loteDespensa(l){return ehDespensa(loteReqArtigo(l));}
 /* O consumo que a app deduz sozinha: o que está alocado a refeições cujo dia
-   JÁ PASSOU. É a regra de sempre ("no dia seguinte à refeição passa a
-   consumido") — o que mudou é ter nome e poder ser contrariada. Um tipo puro
-   (Bebidas/Gerais) não tem data, logo nunca se deriva dele: é um depósito, e
-   quem diz que se gastou é a alocação a refeições ou o "dar baixa". */
+   JÁ PASSOU, mais o que foi dado a uma PESSOA (🎒 leva para casa — esse não
+   tem "dia por passar": deu-se, já não está cá). É a regra de sempre ("no dia
+   seguinte à refeição passa a consumido") — o que mudou é ter nome e poder
+   ser contrariada. Um tipo puro (Bebidas/Gerais) não tem data, logo nunca se
+   deriva dele: é um depósito, e quem diz que se gastou é a alocação a
+   refeições/pessoas ou o "dar baixa". */
 function loteConsDerivado(l){
   const hoje=hojeISO();let q=0;
-  ((l&&l.alocacoes)||[]).forEach(a=>{if(alocIsMeal(a)&&a.data<hoje)q=rnd(q+(+a.qtd||0),QD);});
+  ((l&&l.alocacoes)||[]).forEach(a=>{if((alocIsMeal(a)&&a.data<hoje)||alocIsPessoa(a))q=rnd(q+(+a.qtd||0),QD);});
   return q;
 }
 // O consumo foi escrito à mão neste lote? (com a coluna por migrar, nunca)
@@ -6575,7 +6615,7 @@ function umbConsumo(lotes,artigo){
     // depósito: custo já arrumado, consumo por dizer — e o único caso em que
     // nem os chips nem a passagem dos dias sabem responder se aquilo ainda
     // está na garagem. Sai daqui para quem o quiser assinalar.
-    (l.alocacoes||[]).forEach(a=>{if(!alocIsMeal(a))pool=rnd(pool+(+a.qtd||0),QD);});
+    (l.alocacoes||[]).forEach(a=>{if(!alocIsMeal(a)&&!alocIsPessoa(a))pool=rnd(pool+(+a.qtd||0),QD);});
   });
   cons=rnd(Math.max(0,Math.min(cons,tot)),QD);
   const desp=ehDespensa(artigo||((lotes||[])[0]?loteReqArtigo(lotes[0]):''));
@@ -7238,6 +7278,10 @@ function fifoAlocar(artigo,qtd,u,skipLotId,preferKeys){
    exatamente na forma em que foram gravadas. */
 function destinoAloc(destino,qtd){
   if(!destino)return null;
+  // 'pessoa|Nome' = 🎒 leva para casa — o custo vai para o saldo dela, não
+  // para nenhuma refeição/bolsa comum. Testa-se ANTES do '|' genérico: o nome
+  // de uma pessoa também pode conter '|' nenhum, mas o prefixo é inequívoco.
+  if(String(destino).startsWith('pessoa|'))return{tipo:'Pessoa',pessoa:String(destino).slice(7),data:null,qtd:rnd(qtd,3)};
   if(String(destino).includes('|')){
     const p=String(destino).split('|');
     const a={tipo:p[0],data:p[1],qtd:rnd(qtd,3)};
@@ -7328,14 +7372,29 @@ function alocIsMeal(a){return shopIsMeal(a&&a.tipo)&&!!(a&&a.data);}
 // Sufixo do destino "bebida da refeição" (ver destinoAloc) e o ícone que a marca
 const DEST_BEB='b';
 const DEST_BEB_ICON='🍻';
+// Ícone do destino "🎒 leva para casa" (ver alocIsPessoa)
+const DEST_PESSOA_ICON='🎒';
 // A alocação é bebida da refeição? (custo direto, mas dividido também por quem só bebe)
 function alocIsBebida(a){return alocIsMeal(a)&&!!(a&&a.bebida);}
-// Alocação gravada → chave de destino usada na UI ('' | 'Tipo' | 'Ref|data' | 'Ref|data|b')
-function alocToDestino(a){return alocIsMeal(a)?a.tipo+'|'+a.data+(a.bebida?'|'+DEST_BEB:''):(a&&a.tipo)||'';}
+/* A alocação é de uma PESSOA (🎒 leva para casa — sobras que ela leva)? Não é
+   refeição nem tipo puro: o custo vai direto para o saldo dela (m.SS no
+   calcular()), fora do rateio indireto. */
+function alocIsPessoa(a){return !!(a&&a.pessoa);}
+// Alocação gravada → chave de destino usada na UI ('' | 'Tipo' | 'Ref|data' | 'Ref|data|b' | 'pessoa|Nome')
+function alocToDestino(a){
+  if(a&&a.pessoa)return 'pessoa|'+a.pessoa;
+  return alocIsMeal(a)?a.tipo+'|'+a.data+(a.bebida?'|'+DEST_BEB:''):(a&&a.tipo)||'';
+}
 // Ordenação de destinos para mostrar: refeições primeiro, por ordem do
-// calendário; depois os tipos puros por ordem alfabética
+// calendário; tipos puros a seguir, por ordem alfabética; pessoas sempre no
+// fim (é um destino de outra natureza — não é pool nem refeição), por nome
 function destKeyCmp(a,b){
   const A=destinoAloc(a,0),B=destinoAloc(b,0);
+  const ap=alocIsPessoa(A),bp=alocIsPessoa(B);
+  if(ap||bp){
+    if(ap!==bp)return ap?1:-1;
+    return (A.pessoa||'').localeCompare(B.pessoa||'','pt');
+  }
   const am=alocIsMeal(A),bm=alocIsMeal(B);
   // mesma refeição: a comida primeiro, a bebida logo a seguir
   if(am&&bm)return (A.data||'').localeCompare(B.data||'')||A.tipo.localeCompare(B.tipo,'pt')||((A.bebida?1:0)-(B.bebida?1:0));
@@ -7362,13 +7421,21 @@ function aplicarStock(data){
       const unit=l.valor/l.qtd;
       (l.alocacoes||[]).forEach(a=>{
         const meal=alocIsMeal(a);
+        const pessoa=alocIsPessoa(a);
         // refeição apagada → volta à bolsa comum; tipo puro entra sempre.
         // dataValor só importa para refeições (o calcular ignora-a nos tipos).
         if(meal&&!refOk[a.tipo+'|'+a.data])return;
         const v=Math.min(rnd(unit*(+a.qtd||0),2),resto);
         if(v<=0)return;
-        // bebida só faz sentido numa refeição (num tipo puro já cai no pool certo)
-        data.despesas.push({quem:linha.quem,dataDesp:linha.dataDesp,dataValor:meal?a.data:linha.dataDesp,desc:l.artigo,tipo:a.tipo,valor:v,obs:STOCK_OBS,compraId:null,bebida:!!(meal&&a.bebida),_stock:true});
+        /* Stock alocado a uma PESSOA (🎒 leva para casa): não é custo de
+           nenhuma refeição nem da bolsa comum — é dinheiro que só ela deve.
+           Entra como despesa sintética de tipo próprio (STOCK_SOBRA_TIPO,
+           nunca gravado na BD) marcada com quem levou (`_ssPara`); o
+           calcular() exclui-a do rateio indireto e cobra-a só a essa pessoa. */
+        data.despesas.push(pessoa
+          ?{quem:linha.quem,dataDesp:linha.dataDesp,dataValor:linha.dataDesp,desc:l.artigo,tipo:STOCK_SOBRA_TIPO,valor:v,obs:STOCK_OBS,compraId:null,_stock:true,_ssPara:a.pessoa}
+          // bebida só faz sentido numa refeição (num tipo puro já cai no pool certo)
+          :{quem:linha.quem,dataDesp:linha.dataDesp,dataValor:meal?a.data:linha.dataDesp,desc:l.artigo,tipo:a.tipo,valor:v,obs:STOCK_OBS,compraId:null,bebida:!!(meal&&a.bebida),_stock:true});
         resto=rnd(resto-v,2);
       });
     });
@@ -8254,6 +8321,9 @@ function diaAbrev(ds){const s=diaCurto(ds);return s?s.slice(0,3):'';}
    🖨 têm de chamar a mesma coisa ao mesmo destino. */
 function stockDestTxt(k){
   const a=destinoAloc(k,0);if(!a)return '';
+  // 🎒 leva para casa: o rótulo é o NOME, não "Pessoa" — é o que se lê tanto
+  // no chip do cartão como na folha do 🖨 e no "onde entra" de um cash-flow
+  if(alocIsPessoa(a))return `${DEST_PESSOA_ICON} ${escHtml(a.pessoa)}`;
   // Bebida: ícone composto (🍻 + o da refeição) — o 🍻 sozinho não dizia se era
   // do almoço ou do jantar, e pode haver os dois no mesmo dia
   const ic=alocIsBebida(a)?DEST_BEB_ICON+shopTipoIcon(a.tipo):shopTipoIcon(a.tipo);
@@ -8263,8 +8333,11 @@ function stockDestChip(k,qtd,u,desp){
   const a=destinoAloc(k,qtd);if(!a)return '';
   // Num artigo de DESPENSA a refeição ter passado não gasta nada — o frasco de
   // pimenta continua na prateleira. Pintá-lo de "usado" era a mesma mentira que
-  // a derivação do consumo, dita a outra cor.
-  const cls=(!desp&&stockDestEstado(k)==='consumido')?' usado':'';
+  // a derivação do consumo, dita a outra cor. Dado a uma pessoa é o oposto: já
+  // saiu, sempre — não há "ainda não passou o dia" que valha para um destino
+  // sem dia nenhum.
+  const est=stockDestEstado(k);
+  const cls=(est==='consumido'||est==='pessoa')&&!desp?' usado':'';
   return `<span class="stk-chip${cls}">${stockDestTxt(k)} · ${escHtml(fmtQty(qtd,u))}</span>`;
 }
 // Cartão minimal: nome + chips (refeições por ordem do calendário, com a qtd
@@ -8359,6 +8432,7 @@ function setStockFilter(f){STOCK_FILTER=STOCK_FILTER===f?'':f;renderStock();}
 function stockDestEstado(k){
   const a=destinoAloc(k,0);
   if(!a)return 'livre';
+  if(alocIsPessoa(a))return 'pessoa';   // já saiu, sempre — não é pool nem refeição
   if(!alocIsMeal(a))return 'pool';
   return a.data<hojeISO()?'consumido':'futuro';
 }
@@ -9489,7 +9563,15 @@ function compraRefreshLotes(){
    (compraProporDestino), nunca uma opção que o utilizador escolhe. */
 // Dia da semana sem o "-feira" (Sexta, Sábado, Domingo) — para rótulos curtos
 function diaCurto(ds){const s=diaExtenso(ds);return s?s.replace(/-feira$/i,''):'';}
-function destPickList(){
+/* `pessoas`: inclui o grupo "🎒 Leva para casa" — só quando quem chama sabe
+   que o valor escolhido vai parar a `stock_lotes.alocacoes` (aplicarStock lê
+   um `pessoa` ali e cobra-o ao membro, ver STOCK_SOBRA_TIPO). Nos outros
+   caminhos que usam este picker — "🧾 só despesa" e a despesa direta de uma
+   provisória sem stock — o valor escolhido vira `tipo`/`data_valor` de uma
+   despesa REAL, gravada tal e qual; 'pessoa|Nome' ali dava uma linha com
+   tipo inexistente e o nome da pessoa a fazer de data. Por isso o grupo fica
+   de fora por omissão, e só os pickers do separador Stock o pedem. */
+function destPickList(pessoas){
   const out=[];
   ['Gerais','Bebidas','Cerveja'].forEach(t=>out.push({value:t,icon:shopTipoIcon(t),label:t,group:'Tipo'}));
   // Rótulo com o dia da semana (mais útil que o prato); o prato fica como
@@ -9502,6 +9584,7 @@ function destPickList(){
      ícone passa a ser o da bebida, deixa de dizer se é almoço ou jantar, e pode
      haver os dois no mesmo dia. */
   (DATA.refeicoesDef||[]).filter(r=>shopIsMeal(r.ref)).forEach(r=>out.push({value:r.ref+'|'+r.data+'|'+DEST_BEB,icon:DEST_BEB_ICON,label:`Bebida · ${r.ref} ${diaCurto(r.data)}, ${fmtDiaMes(r.data)}`,short:`${r.ref} ${diaCurto(r.data)}, ${fmtDiaMes(r.data)}`,sub:'divide por quem come + quem só bebe',group:'Bebida'}));
+  if(pessoas)(DATA.membros||[]).forEach(m=>out.push({value:'pessoa|'+m.nome,icon:DEST_PESSOA_ICON,label:m.nome,sub:'sobras que leva para casa — o custo vai para o saldo dela',group:'Pessoa'}));
   return out;
 }
 // Rótulo (ícone + texto) de um valor de destino, para o botão do seletor
@@ -9509,6 +9592,7 @@ function destLabel(value){
   const it=value?destPickList().find(x=>x.value===value):null;
   if(it)return{icon:it.icon,label:it.label,short:it.short||it.label};
   const a=value?destinoAloc(value,0):null;
+  if(a&&alocIsPessoa(a))return{icon:DEST_PESSOA_ICON,label:a.pessoa,short:a.pessoa};
   if(a&&alocIsBebida(a))return{icon:DEST_BEB_ICON,label:`Bebida · ${a.tipo} ${diaCurto(a.data)}, ${fmtDiaMes(a.data)}`,short:`${a.tipo} ${diaCurto(a.data)}, ${fmtDiaMes(a.data)}`};
   if(a)return alocIsMeal(a)
     ?{icon:shopTipoIcon(a.tipo),label:`${a.tipo} ${diaCurto(a.data)}, ${fmtDiaMes(a.data)}`,short:`${diaCurto(a.data)}, ${fmtDiaMes(a.data)}`}
@@ -9522,13 +9606,13 @@ function destBtnHtml(value,onclick,dis){
     <span class="dest-ic">${d.icon}</span><span class="dest-lbl" title="${escHtml(d.label)}">${escHtml(d.short)}</span>${dis?'':'<span class="dest-chev">▾</span>'}</button>`;
 }
 let _dpick=null;   // {items, cb}
-function openDestPicker(current,cb,title){
-  const items=destPickList();
+function openDestPicker(current,cb,title,pessoas){
+  const items=destPickList(pessoas);
   _dpick={items,cb};
   document.getElementById('dpick-title').textContent=title||'Alocar a…';
   let last=null,h='';
   items.forEach((it,idx)=>{
-    if(it.group!==last){h+=`<div class="dsheet-grp">${it.group==='Tipo'?'Tipos de despesa':it.group==='Bebida'?'Bebida da refeição':'Refeições'}</div>`;last=it.group;}
+    if(it.group!==last){h+=`<div class="dsheet-grp">${it.group==='Tipo'?'Tipos de despesa':it.group==='Bebida'?'Bebida da refeição':it.group==='Pessoa'?'🎒 Leva para casa':'Refeições'}</div>`;last=it.group;}
     h+=`<button type="button" class="dsheet-opt${it.value===current?' on':''}" onclick="pickDest(${idx})">
       <span class="dsheet-ic">${it.icon}</span><span class="dsheet-lbl">${escHtml(it.label)}${it.sub?`<small class="dsheet-sub">${escHtml(it.sub)}</small>`:''}</span>${it.value===current?'<span class="dsheet-chk">✓</span>':''}</button>`;
   });
@@ -10860,10 +10944,12 @@ function resolveUmbrella(lotesFifo,alocs,lineVal){
   const cap={},out={},unit={};
   lotesFifo.forEach(l=>{cap[l._id]=l.qtd;out[l._id]=[];unit[l._id]=l.qtd>0?(+l.valor||0)/l.qtd:0;});
   // comida e bebida da mesma refeição são destinos DIFERENTES: não se juntam
-  // numa linha só, senão a marca perdia-se ao distribuir pelos lotes físicos
-  const put=(l,a,take)=>{const ex=out[l._id].find(x=>x.tipo===a.tipo&&x.data===a.data&&!x.bebida===!a.bebida);
+  // numa linha só, senão a marca perdia-se ao distribuir pelos lotes físicos.
+  // Duas pessoas diferentes têm o mesmo tipo/data ('Pessoa'/null) — sem
+  // desempatar por `pessoa` a alocação do João e a da Maria fundiam-se numa só.
+  const put=(l,a,take)=>{const ex=out[l._id].find(x=>x.tipo===a.tipo&&x.data===a.data&&!x.bebida===!a.bebida&&(x.pessoa||'')===(a.pessoa||''));
     if(ex)ex.qtd=rnd(ex.qtd+take,QD);
-    else{const o={tipo:a.tipo,data:a.data,qtd:rnd(take,QD)};if(a.bebida)o.bebida=true;out[l._id].push(o);}
+    else{const o={tipo:a.tipo,data:a.data,qtd:rnd(take,QD)};if(a.bebida)o.bebida=true;if(a.pessoa)o.pessoa=a.pessoa;out[l._id].push(o);}
     if(lineVal&&a._i!=null)lineVal[a._i]=rnd((lineVal[a._i]||0)+unit[l._id]*take,2);};
   const fill=(a,lots)=>{let rest=a.qtd;for(const l of lots){if(rest<=0.0005)break;const c=cap[l._id];if(c<=0.0005)continue;const take=Math.min(c,rest);put(l,a,take);cap[l._id]=rnd(c-take,QD);rest=rnd(rest-take,QD);}
     /* O que sobrar vai para um lote SEM QUANTIDADE escrita, havendo-o: esse não
@@ -11853,7 +11939,7 @@ function loteRenderAlocs(){
   // vê é o que vai para as contas (uma alocação servida por stock oferecido
   // aparece a 0 €, não ao preço médio do artigo)
   const lineVal=[];
-  resolveUmbrella(editingLote.lotesFifo,editingLote.alocs.map((a,i)=>({tipo:a.tipo,data:a.data,qtd:+a.qtd||0,marca:a.marca||'',bebida:!!a.bebida,_i:i})),lineVal);
+  resolveUmbrella(editingLote.lotesFifo,editingLote.alocs.map((a,i)=>({tipo:a.tipo,data:a.data,qtd:+a.qtd||0,marca:a.marca||'',bebida:!!a.bebida,pessoa:a.pessoa||'',_i:i})),lineVal);
   const lv=i=>rnd(lineVal[i]||0,2);
   // Sufixo da unidade dentro do campo da qtd ("0,5 kg") — sem ele não se
   // percebe se o 0,5 são quilos, litros ou unidades. Vazio = à unidade.
@@ -11880,8 +11966,8 @@ function loteRenderAlocs(){
      um par de edições com a subtração feita de cabeça (baixar o depósito, criar
      a linha da refeição), e quem falhasse uma delas ficava com o total fora do
      que há em stock. */
-  const daBtn=(i,a)=>(canEdit&&!alocIsMeal(a)&&(+a.qtd||0)>0.0005)
-    ?`<button class="lote-da" title="Dar parte deste depósito a uma refeição" onclick="loteDepositoDar(${i})">⇄</button>`:'';
+  const daBtn=(i,a)=>(canEdit&&!alocIsMeal(a)&&!alocIsPessoa(a)&&(+a.qtd||0)>0.0005)
+    ?`<button class="lote-da" title="Dar parte deste depósito a uma refeição ou a alguém" onclick="loteDepositoDar(${i})">⇄</button>`:'';
   const endCells=(i,a)=>qtyCell(i,a)+`<span class="lote-val">${eur(lv(i))}</span>`+daBtn(i,a)+
     (canEdit?`<button class="cmp-ln-del" title="Remover" onclick="loteDelAloc(${i})">✕</button>`:'');
   // Botão-texto que abre um bottom-sheet (o mesmo padrão do destino): ao
@@ -11896,11 +11982,12 @@ function loteRenderAlocs(){
     &&new Set(idx.map(i=>(editingLote.alocs[i]||{}).marca).filter(Boolean)).size<nBrands;
   const html=order.map(k=>{
     const idx=groups[k].idx;
-    const a0=destinoAloc(k,0);const meal=alocIsMeal(a0);
+    const a0=destinoAloc(k,0);const meal=alocIsMeal(a0);const pessoa=alocIsPessoa(a0);
     // Bebida: ícone composto e a refeição por extenso — o dia sozinho não
-    // chegava para a distinguir da comida do mesmo dia
-    const dIc=alocIsBebida(a0)?DEST_BEB_ICON+shopTipoIcon(a0.tipo):shopTipoIcon(a0.tipo);
-    const lbl=meal?(alocIsBebida(a0)?`${a0.tipo} ${diaAbrev(a0.data)} ${fmtDiaMes(a0.data)}`:`${diaAbrev(a0.data)} ${fmtDiaMes(a0.data)}`):a0.tipo;
+    // chegava para a distinguir da comida do mesmo dia. Pessoa: ícone próprio
+    // (🎒), o rótulo é o NOME — "Pessoa" não dizia quem.
+    const dIc=pessoa?DEST_PESSOA_ICON:alocIsBebida(a0)?DEST_BEB_ICON+shopTipoIcon(a0.tipo):shopTipoIcon(a0.tipo);
+    const lbl=pessoa?a0.pessoa:meal?(alocIsBebida(a0)?`${a0.tipo} ${diaAbrev(a0.data)} ${fmtDiaMes(a0.data)}`:`${diaAbrev(a0.data)} ${fmtDiaMes(a0.data)}`):a0.tipo;
     // Sem selo "precisa" nas linhas simples: não cabe ao lado da qtd em ecrãs
     // estreitos e o painel "Pedidos na lista" (acima) já diz o mesmo.
     if(solo)return idx.map(i=>`<div class="lote-al">
@@ -12001,7 +12088,8 @@ function loteAlocField(i,f,v){
     a.qtd=novo;
   }
   else{const d=destinoAloc(v,0);a.tipo=d?d.tipo:v;a.data=d?d.data:null;
-    if(d&&d.bebida)a.bebida=true;else delete a.bebida;}
+    if(d&&d.bebida)a.bebida=true;else delete a.bebida;
+    if(d&&d.pessoa)a.pessoa=d.pessoa;else delete a.pessoa;}
   loteRenderAlocs();
 }
 /* Passa parte de um depósito (tipo puro) para uma refeição, num gesto só.
@@ -12032,12 +12120,12 @@ function loteDepositoDar(i){
     const idx=ja?editingLote.alocs.indexOf(ja):editingLote.alocs.length-1;
     loteRenderAlocs();
     const el=document.getElementById('lote-q-'+idx);if(el){el.focus();el.select();}
-  },'Dar a');
+  },'Dar a',true);
 }
 function loteDestPick(i){
   if(!isAdmin())return;
   const a=editingLote&&editingLote.alocs[i];if(!a)return;
-  openDestPicker(alocToDestino(a),v=>loteAlocField(i,'ref',v),'Alocar a');
+  openDestPicker(alocToDestino(a),v=>loteAlocField(i,'ref',v),'Alocar a',true);
 }
 // Muda a refeição de TODO o container (todas as linhas com o mesmo destino)
 function loteGroupDest(i){
@@ -12047,9 +12135,10 @@ function loteGroupDest(i){
   openDestPicker(oldK,v=>{
     const d=destinoAloc(v,0);
     editingLote.alocs.forEach(x=>{if(alocToDestino(x)===oldK){x.tipo=d?d.tipo:v;x.data=d?d.data:null;
-      if(d&&d.bebida)x.bebida=true;else delete x.bebida;}});
+      if(d&&d.bebida)x.bebida=true;else delete x.bebida;
+      if(d&&d.pessoa)x.pessoa=d.pessoa;else delete x.pessoa;}});
     loteRenderAlocs();
-  },'Alocar a');
+  },'Alocar a',true);
 }
 // Acrescenta uma linha (outra marca) ao mesmo destino do container
 function loteAddToGroup(i){
@@ -12057,6 +12146,7 @@ function loteAddToGroup(i){
   const a=editingLote.alocs[i];if(!a)return;
   const nova={tipo:a.tipo,data:a.data,qtd:0,marca:''};
   if(a.bebida)nova.bebida=true;   // mesma linha do container: se ele é bebida, ela também
+  if(a.pessoa)nova.pessoa=a.pessoa;
   editingLote.alocs.push(nova);
   loteRenderAlocs();
 }
@@ -14173,6 +14263,7 @@ function renderHeroSubtotals(){
   if(guestPay>0) recItems.push({label:'Convidados',val:guestPay});
   if(CALC.mealTot>0) recItems.push({label:'Mealheiro',val:CALC.mealTot});
   if(CALC.tsTot>0) recItems.push({label:'T-shirts',val:CALC.tsTot});
+  if(CALC.ssTot>0) recItems.push({label:'Stock Sobrante',val:CALC.ssTot});
   if(CALC.quotaTot>0) recItems.push({label:'Quota Extra',val:CALC.quotaTot});
   if(CALC.missaoTot>0) recItems.push({label:'Missão Poupança',val:CALC.missaoTot});
 
@@ -15999,6 +16090,7 @@ function buildGeneralReport(){
   if(gp>0) h+=`<tr><td>Convidados</td><td class="right">${eur(gp)}</td></tr>`;
   if(CALC.mealTot>0) h+=`<tr><td>Mealheiro</td><td class="right">${eur(CALC.mealTot)}</td></tr>`;
   if(CALC.tsTot>0) h+=`<tr><td>T-shirts (cobradas aos membros)</td><td class="right">${eur(CALC.tsTot)}</td></tr>`;
+  if(CALC.ssTot>0) h+=`<tr><td>Stock Sobrante (cobrado a quem levou)</td><td class="right">${eur(CALC.ssTot)}</td></tr>`;
   if(CALC.missaoTot>0) h+=`<tr><td>Missão Poupança</td><td class="right">${eur(CALC.missaoTot)}</td></tr>`;
   h+=`<tr style="border-top:2px solid #ddd;font-weight:700"><td><b>Total Receitas</b></td><td class="right pos"><b>${eur(CALC.totReceitas)}</b></td></tr>`;
   h+='</table>';
@@ -16218,6 +16310,7 @@ function saldosMembrosHtml(){
   const cConv=rnd((CALC.membros||[]).reduce((a,m)=>a+(m.AA||0),0),2);
   const cMeal=rnd(CALC.mealTot||0,2);
   const cTs=rnd(CALC.tsTot||0,2);
+  const cSs=rnd(CALC.ssTot||0,2);
   // ordem cronológica dos slots (segundo refeicoesDef)
   const ord={};(DATA.refeicoesDef||[]).forEach((rd,i)=>{ord[rd.dia+'|'+rd.ref]=i;});
   const nrm=r=>r==='Tarde'?'Lanche':r;
@@ -16235,14 +16328,17 @@ function saldosMembrosHtml(){
     // T-shirts imputadas: uma dividida aparece com a fração ao lado
     const tshirts=rnd(m.TS||0,2);
     const tshirtsList=(m._tshirts||[]).map(x=>({k:`${x.nome} — ${x.tipo} ${x.tamanho}${x.partes>1?` (1/${x.partes})`:''}`,v:rnd(x.v,2)}));
-    return{nome:m.nome,i:ms.indexOf(m),_m:m,refeCome,refeBebe,amigos,poup,quota,tshirts,tshirtsList,fator:(m.fatorEf!=null?m.fatorEf:m.fator)||0,outras:rnd(m.T||0,2),refsCome,refsBebe,convsList,tot:rnd(refeCome+refeBebe+amigos+poup+quota+tshirts,2)};
+    // Stock levado para casa (🎒) — cada linha é um artigo
+    const stockSobra=rnd(m.SS||0,2);
+    const stockSobraList=(m._stockSobra||[]).map(x=>({k:x.artigo,v:rnd(x.v,2)}));
+    return{nome:m.nome,i:ms.indexOf(m),_m:m,refeCome,refeBebe,amigos,poup,quota,tshirts,tshirtsList,stockSobra,stockSobraList,fator:(m.fatorEf!=null?m.fatorEf:m.fator)||0,outras:rnd(m.T||0,2),refsCome,refsBebe,convsList,tot:rnd(refeCome+refeBebe+amigos+poup+quota+tshirts+stockSobra,2)};
   });
   // Ordem: próprio → cônjuge → restantes (ordem alfabética)
   const _meuR=meuNomePrincipal();
   const _conjR=MY_NAMES.filter(n=>n!==_meuR);
   const _rankR=n=>n===_meuR?0:(_conjR.includes(n)?1:2);
   rows.sort((a,b)=>{const ra=_rankR(a.nome),rb=_rankR(b.nome);if(ra!==rb)return ra-rb;return a.nome.localeCompare(b.nome,'pt');});
-  const T=rows.reduce((a,g)=>({refeCome:a.refeCome+g.refeCome,refeBebe:a.refeBebe+g.refeBebe,amigos:a.amigos+g.amigos,poup:a.poup+g.poup,quota:a.quota+g.quota,tshirts:a.tshirts+g.tshirts,tot:a.tot+g.tot}),{refeCome:0,refeBebe:0,amigos:0,poup:0,quota:0,tshirts:0,tot:0});
+  const T=rows.reduce((a,g)=>({refeCome:a.refeCome+g.refeCome,refeBebe:a.refeBebe+g.refeBebe,amigos:a.amigos+g.amigos,poup:a.poup+g.poup,quota:a.quota+g.quota,tshirts:a.tshirts+g.tshirts,stockSobra:a.stockSobra+g.stockSobra,tot:a.tot+g.tot}),{refeCome:0,refeBebe:0,amigos:0,poup:0,quota:0,tshirts:0,stockSobra:0,tot:0});
   // agregado do grupo por dia/refeição
   const aggRCome={},aggRBebe={},aggC={};
   ms.forEach(m=>{
@@ -16259,6 +16355,10 @@ function saldosMembrosHtml(){
   ms.forEach(m=>(m._tshirts||[]).forEach(x=>{(aggTS[x.tipo]=aggTS[x.tipo]||{tipo:x.tipo,n:0,v:0});aggTS[x.tipo].n+=1/x.partes;aggTS[x.tipo].v+=x.v;}));
   T.tshirtsList=Object.values(aggTS).sort((a,b)=>tsTipoIdx(a.tipo)-tsTipoIdx(b.tipo))
     .map(a=>({k:`${tsIcon(a.tipo)} ${a.tipo} — ${Number(rnd(a.n,2)).toLocaleString('pt-PT',{maximumFractionDigits:2})}`,v:rnd(a.v,2)}));
+  // Stock sobrante do grupo: por artigo, com quem levou cada linha
+  const aggSS={};
+  ms.forEach(m=>(m._stockSobra||[]).forEach(x=>{(aggSS[x.artigo]=aggSS[x.artigo]||{artigo:x.artigo,v:0});aggSS[x.artigo].v+=x.v;}));
+  T.stockSobraList=Object.values(aggSS).sort((a,b)=>a.artigo.localeCompare(b.artigo,'pt')).map(a=>({k:a.artigo,v:rnd(a.v,2)}));
 
   const expIt=(icon,lbl,total,list)=>{
     if(!list||!list.length||total<=0.005)
@@ -16329,6 +16429,7 @@ function saldosMembrosHtml(){
       ${g.refeBebe>0.005?expIt('🍺','Só bebida',g.refeBebe,g.refsBebe):''}
       ${expIt('👥','Amigos',g.amigos,g.convsList)}
       ${g.tshirts>0.005?expIt('👕','T-shirts',g.tshirts,g.tshirtsList):''}
+      ${g.stockSobra>0.005?expIt('🎒','Stock Sobrante',g.stockSobra,g.stockSobraList):''}
       ${grupo?expIt('➕','Quota Extra',g.quota,g.quotaList):quotaDet(g)}
       ${grupo?expIt('🐖','Poupança',g.poup,g.poupList):poupDet(g)}
       ${grupo?'':mvHtml(g._m)}
@@ -16342,7 +16443,7 @@ function saldosMembrosHtml(){
         <li><b>Homens</b> — ≥ limiar de presença <b>1.00</b>; veio &gt;1× <b>0.50</b>; veio 1× <b>0.25</b>; nunca <b>0</b>.</li>
         <li><b>Mulheres</b> — ≥ limiar <b>0.25</b>; veio &gt;1× <b>0.20</b>; veio 1× <b>0.10</b>; nunca <b>0</b>.</li>
       </ul>
-      <p style="font-variant-numeric:tabular-nums">Total a repartir = <b>${eur(cDesp)}</b> <i style="color:var(--faint)">(despesas)</i> − <b>${eur(cRef)}</b> <i style="color:var(--faint)">(receita de refeições dos membros)</i> − <b>${eur(cConv)}</b> <i style="color:var(--faint)">(receita convidados)</i> − <b>${eur(cMeal)}</b> <i style="color:var(--faint)">(receita mealheiros)</i>${cTs>0.005?` − <b>${eur(cTs)}</b> <i style="color:var(--faint)">(t-shirts cobradas)</i>`:''} + <b>${eur(fundo)}</b> <i style="color:var(--faint)">(fundo de reserva)</i> = <b>${eur(BN3)}</b>.</p>
+      <p style="font-variant-numeric:tabular-nums">Total a repartir = <b>${eur(cDesp)}</b> <i style="color:var(--faint)">(despesas)</i> − <b>${eur(cRef)}</b> <i style="color:var(--faint)">(receita de refeições dos membros)</i> − <b>${eur(cConv)}</b> <i style="color:var(--faint)">(receita convidados)</i> − <b>${eur(cMeal)}</b> <i style="color:var(--faint)">(receita mealheiros)</i>${cTs>0.005?` − <b>${eur(cTs)}</b> <i style="color:var(--faint)">(t-shirts cobradas)</i>`:''}${cSs>0.005?` − <b>${eur(cSs)}</b> <i style="color:var(--faint)">(stock sobrante cobrado)</i>`:''} + <b>${eur(fundo)}</b> <i style="color:var(--faint)">(fundo de reserva)</i> = <b>${eur(BN3)}</b>.</p>
       <p style="font-variant-numeric:tabular-nums">Quota do membro = <b>${eur(BN3)}</b> × fator ÷ soma dos fatores.</p>
       <p style="border-top:1px solid var(--line);padding-top:9px"><b>Poupança</b> — sobre o valor final de cada membro (já depois da quota extra) acrescem dois valores:</p>
       <ul style="margin:6px 0 0;padding-left:18px;line-height:1.55">
@@ -16380,7 +16481,7 @@ function saldosMembrosHtml(){
         <div class="av" style="background:var(--gold)">Σ</div>
         <div class="nm">Total do Grupo<small>${rows.length} membros</small></div>
         <div class="amt">${eur(rnd(T.tot,2))}</div><span class="rs-arrow">▼</span>
-      </div>${det({refeCome:rnd(T.refeCome,2),refeBebe:rnd(T.refeBebe,2),amigos:rnd(T.amigos,2),poup:rnd(T.poup,2),quota:rnd(T.quota,2),tshirts:rnd(T.tshirts,2),tshirtsList:T.tshirtsList,refsCome:T.refsCome,refsBebe:T.refsBebe,convsList:T.convsList,quotaList,poupList},true)}</div>`;
+      </div>${det({refeCome:rnd(T.refeCome,2),refeBebe:rnd(T.refeBebe,2),amigos:rnd(T.amigos,2),poup:rnd(T.poup,2),quota:rnd(T.quota,2),tshirts:rnd(T.tshirts,2),tshirtsList:T.tshirtsList,stockSobra:rnd(T.stockSobra,2),stockSobraList:T.stockSobraList,refsCome:T.refsCome,refsBebe:T.refsBebe,convsList:T.convsList,quotaList,poupList},true)}</div>`;
   }
   h+='</div>';
   return h;
