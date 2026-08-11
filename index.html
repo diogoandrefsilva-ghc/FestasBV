@@ -115,6 +115,11 @@ setTimeout(function(){ if (window.fbvEsconderSplash) window.fbvEsconderSplash();
   <div class="hero" id="hero-card">
     <div class="lbl sf">Saldo do Grupo</div>
     <div class="big" id="saldo-grupo">—</div>
+    <div class="hero-saving"><span>🐖 Poupança acumulada</span><b id="poupanca-acumulada">—</b><small id="poupanca-acumulada-nota"></small></div>
+    <div class="hero-view-switch sf" role="group" aria-label="Vista do resumo de saldos">
+      <button type="button" id="hero-view-parcelas" class="on" onclick="setSaldosVisao('parcelas')">Por parcelas</button>
+      <button type="button" id="hero-view-refeicoes" onclick="setSaldosVisao('refeicoes')">Por refeição</button>
+    </div>
     <div class="row">
       <div class="cell"><div class="k sf">Receitas</div><div class="v rc" id="tot-rec">—</div><div id="hero-rec-detail"></div></div>
       <div class="cell"><div class="k sf">Despesas</div><div class="v dp" id="tot-desp">—</div><div id="hero-desp-detail"></div></div>
@@ -727,6 +732,18 @@ setTimeout(function(){ if (window.fbvEsconderSplash) window.fbvEsconderSplash();
           </label>
         </div>
 
+        <div id="adm-sobras-row" style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;margin-top:10px">
+          <div style="flex:1;min-width:0">
+            <div style="font-size:13px;font-weight:600">Usar poupança acumulada</div>
+            <div id="adm-sobras-hint" style="font-size:11px;color:var(--faint);line-height:1.35;margin-top:2px">Disponível: —</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;flex:0 0 auto">
+            <input type="number" id="adm-sobras" step="0.01" min="0" placeholder="0" onchange="saveParams()" style="width:72px;font-size:14px;padding:8px 7px;text-align:right" inputmode="decimal" aria-label="Valor da poupança acumulada a usar">
+            <span style="font-size:12px;font-weight:700;color:var(--muted)">€</span>
+            <button type="button" class="btn ghost" onclick="usarPoupancaToda()" style="padding:7px 8px;font-size:11px;white-space:nowrap">Tudo</button>
+          </div>
+        </div>
+
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px">
           <div style="background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px 12px">
             <div style="font-size:13px;font-weight:600">Missão Poupança</div>
@@ -774,7 +791,7 @@ setTimeout(function(){ if (window.fbvEsconderSplash) window.fbvEsconderSplash();
           <button class="btn danger sf" id="btn-limpar-presencas" onclick="limparPresencas()" style="width:100%">🗑 Reset presenças</button>
           <p class="sf" style="font-size:11px;color:var(--faint);margin:-2px 0 4px">Apaga presenças e convidados deste ano. Mantém membros, fator e sexo.</p>
           <button class="btn danger sf" id="btn-limpar-cashflows" onclick="limparCashflows()" style="width:100%">🗑 Reset cash-flows</button>
-          <p class="sf" style="font-size:11px;color:var(--faint);margin:-2px 0 4px">Apaga despesas, mealheiros, reembolsos e pagamentos de dívida deste ano. Garante sempre a entrada de sobras do ano anterior (transitadas, nunca se apagam).</p>
+          <p class="sf" style="font-size:11px;color:var(--faint);margin:-2px 0 4px">Apaga despesas, mealheiros, reembolsos e pagamentos de dívida deste ano. Mantém apenas a parte da poupança acumulada que escolheste usar.</p>
           <button class="btn danger sf" id="btn-limpar-compras" onclick="limparCompras()" style="width:100%">🗑 Reset listas de compras</button>
           <p class="sf" style="font-size:11px;color:var(--faint);margin:-2px 0 0">Esvazia a lista de compras deste ano. As despesas de artigos já comprados mantêm-se.</p>
         </div>

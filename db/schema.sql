@@ -65,6 +65,7 @@ CREATE TABLE festasbv.eventos (
   arredonda_total     boolean NOT NULL DEFAULT true,
   missao_poupanca     numeric(10,2) NOT NULL DEFAULT 0,
   fundo_reserva       numeric(10,2) NOT NULL DEFAULT 0,
+  sobras_aplicadas    numeric(10,2) NOT NULL DEFAULT 0,
   contas_fechadas     boolean NOT NULL DEFAULT false,
   contas_fechadas_em  timestamptz,
   contas_fechadas_por text,

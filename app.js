@@ -87,6 +87,7 @@ let DATA=null,CALC=null,TAB='saldos',GH_SHA=null;
 // Persistência do estado de navegação (sobrevive ao reload do PWA quando o iOS o descarrega)
 function lsSet(k,v){try{localStorage.setItem(k,v);}catch(_){}}
 function lsGet(k){try{return localStorage.getItem(k);}catch(_){return null;}}
+let SALDOS_VISAO=lsGet('fbv_saldos_visao')==='refeicoes'?'refeicoes':'parcelas';
 
 /* ── Travar o scroll do fundo enquanto há um modal aberto ──
    O `.no-scroll` põe o body em `position:fixed`, e isso faz o browser esquecer
@@ -1017,6 +1018,41 @@ function calcular(data){
   return{refeicoes,membros,BN3,F20,saldoGrupo,totRefMembros,tot,totReceitas,totDespesas:totalDesp,sumF,pagamentos:pag,sobrasTot,descontoTot,mealTot,quotaTot,missaoTot,tsTot,totTSdesp,ssTot};
 }
 
+/* ── Poupança acumulada / sobras aplicadas ───────────────────────────
+   Cada ano pode usar uma PARTE da reserva que ficou em anos anteriores. O
+   montante usado continua a ser um mealheiro, porque é dinheiro que entrou na
+   conta do tesoureiro; esta camada só calcula quanto permanece reservado. */
+function sobrasAplicadasDoAno(y){
+  const ev=(y&&y.evento)||{};
+  if(ev.sobrasAplicadasCol)return Math.max(0,+ev.sobrasAplicadas||0);
+  return rnd(((y&&y.mealheiros)||[]).filter(m=>m.subtipo==='sobras_ano_anterior').reduce((s,m)=>s+(+m.valor||0),0),2);
+}
+function saldoDoAno(y){return rnd(calcular(JSON.parse(JSON.stringify(y))).saldoGrupo||0,2);}
+function poupancaAcumuladaAte(ano){
+  let reserva=0;
+  ALL_YEARS.filter(y=>(y.evento.ano||0)<=ano).sort((a,b)=>a.evento.ano-b.evento.ano).forEach(y=>{
+    const usada=Math.min(reserva,sobrasAplicadasDoAno(y));
+    reserva=rnd(Math.max(0,reserva-usada)+Math.max(0,saldoDoAno(y)),2);
+  });
+  return reserva;
+}
+function poupancaDisponivelAntes(ano){
+  let reserva=0;
+  ALL_YEARS.filter(y=>(y.evento.ano||0)<ano).sort((a,b)=>a.evento.ano-b.evento.ano).forEach(y=>{
+    const usada=Math.min(reserva,sobrasAplicadasDoAno(y));
+    reserva=rnd(Math.max(0,reserva-usada)+Math.max(0,saldoDoAno(y)),2);
+  });
+  return reserva;
+}
+function sobrasMealheiro(ano,tesoureiro,valor){
+  return{quem:tesoureiro,data:ano+'-01-01',valor:rnd(valor,2),subtipo:'sobras_ano_anterior',desc:'Poupança acumulada usada'};
+}
+function syncSobrasAplicadas(valor){
+  const v=rnd(Math.max(0,+valor||0),2);
+  DATA.mealheiros=(DATA.mealheiros||[]).filter(m=>m.subtipo!=='sobras_ano_anterior');
+  if(v>0.005)DATA.mealheiros.push(sobrasMealheiro(DATA.evento.ano,DATA.evento.tesoureiro,v));
+}
+
 /* RENDER */
 const eur=x=>new Intl.NumberFormat('pt-PT',{style:'currency',currency:'EUR'}).format(x);
 // Ícone "só bebe" — caneca de cerveja com espuma, uma cor (currentColor)
@@ -1358,6 +1394,11 @@ function renderAll(){
   document.getElementById('ev-sub').textContent=DATA.evento.datas||DATA.evento.local||'';
   const sg=CALC.saldoGrupo;const sgEl=document.getElementById('saldo-grupo');
   sgEl.textContent=eur(sg);sgEl.className='big '+(sg>=0?'pos':'neg');
+  const poupEl=document.getElementById('poupanca-acumulada');
+  const poupNota=document.getElementById('poupanca-acumulada-nota');
+  const usada=sobrasAplicadasDoAno(DATA);
+  if(poupEl)poupEl.textContent=eur(poupancaAcumuladaAte(DATA.evento.ano));
+  if(poupNota)poupNota.textContent=usada>0.005?`Usados ${eur(usada)} da reserva neste ano.`:'Nenhuma sobra anterior foi usada neste ano.';
   document.getElementById('tot-rec').textContent=eur(CALC.totReceitas);
   document.getElementById('tot-desp').textContent=eur(CALC.totDespesas);
 
@@ -2483,7 +2524,7 @@ async function carregar(){
     if(TSHIRTS_TABLE)(await tsRes.json()).forEach(t=>{(tsByEv[t.evento_id]=tsByEv[t.evento_id]||[]).push(t);});
     ALL_YEARS=rows.map(ev=>({
       _sbId: ev.id,
-      evento:{tshirtsTrancadas:!!ev.tshirts_trancadas,tshirtPrecoHomem:N(ev.tshirt_preco_homem),tshirtPrecoMulher:N(ev.tshirt_preco_mulher),tshirtPrecoCrianca:N(ev.tshirt_preco_crianca),tshirtDesconto:N(ev.tshirt_desconto),nome:ev.nome,ano:ev.ano,tesoureiro:ev.tesoureiro,arredondaTotal:!!ev.arredonda_total,missaoPoupanca:N(ev.missao_poupanca),fundoReserva:N(ev.fundo_reserva),fatorModo:ev.fator_modo||'fixo',fatorThreshold:ev.fator_threshold!=null?N(ev.fator_threshold):FATOR_THRESHOLD_DEFAULT,dividasPublicas:!!ev.dividas_publicas,dividasPublicasCol:('dividas_publicas' in ev),presCorrecao:!!ev.pres_correcao,presCorrecaoCol:('pres_correcao' in ev),contasFechadas:!!ev.contas_fechadas,contasFechadasEm:ev.contas_fechadas_em||null,contasFechadasPor:ev.contas_fechadas_por||null},
+      evento:{tshirtsTrancadas:!!ev.tshirts_trancadas,tshirtPrecoHomem:N(ev.tshirt_preco_homem),tshirtPrecoMulher:N(ev.tshirt_preco_mulher),tshirtPrecoCrianca:N(ev.tshirt_preco_crianca),tshirtDesconto:N(ev.tshirt_desconto),nome:ev.nome,ano:ev.ano,tesoureiro:ev.tesoureiro,arredondaTotal:!!ev.arredonda_total,missaoPoupanca:N(ev.missao_poupanca),fundoReserva:N(ev.fundo_reserva),sobrasAplicadas:N(ev.sobras_aplicadas),sobrasAplicadasCol:('sobras_aplicadas' in ev),fatorModo:ev.fator_modo||'fixo',fatorThreshold:ev.fator_threshold!=null?N(ev.fator_threshold):FATOR_THRESHOLD_DEFAULT,dividasPublicas:!!ev.dividas_publicas,dividasPublicasCol:('dividas_publicas' in ev),presCorrecao:!!ev.pres_correcao,presCorrecaoCol:('pres_correcao' in ev),contasFechadas:!!ev.contas_fechadas,contasFechadasEm:ev.contas_fechadas_em||null,contasFechadasPor:ev.contas_fechadas_por||null},
       membros:(ev.membros||[]).sort((a,b)=>a.nome.localeCompare(b.nome,'pt')).map(m=>({
         _id:m.id,nome:m.nome,fator:N(m.fator),sexo:m.sexo==='F'?'F':'M',
         presencas:(m.presencas||[]).map(p=>({k:`${p.dia}|${p.ref}`,modo:p.modo==='bebe'?'bebe':'come'}))
@@ -2575,6 +2616,7 @@ async function sbGuardarEvento(y,slot){
     setSync('load','a guardar…');
     const ev=y.evento;
     const evRow={nome:ev.nome,ano:ev.ano,tesoureiro:ev.tesoureiro,arredonda_total:!!ev.arredondaTotal,missao_poupanca:ev.missaoPoupanca||0,fundo_reserva:ev.fundoReserva||0,fator_modo:ev.fatorModo==='variavel'?'variavel':'fixo',fator_threshold:ev.fatorThreshold!=null?ev.fatorThreshold:FATOR_THRESHOLD_DEFAULT};
+    if(ev.sobrasAplicadasCol)evRow.sobras_aplicadas=ev.sobrasAplicadas||0;
     // Só grava a flag se a coluna já existir no Supabase (migração: ALTER TABLE eventos ADD dividas_publicas)
     if(ev.dividasPublicasCol)evRow.dividas_publicas=!!ev.dividasPublicas;
     if(ev.presCorrecaoCol)evRow.pres_correcao=!!ev.presCorrecao;
@@ -4729,6 +4771,18 @@ function loadParams(){
     document.getElementById('adm-prescorr').checked=!!DATA.evento.presCorrecao;
     _setPrescorrKnob(!!DATA.evento.presCorrecao);
   }
+  const sobRow=document.getElementById('adm-sobras-row');
+  if(sobRow){
+    const temCol=!!DATA.evento.sobrasAplicadasCol;
+    sobRow.style.display=temCol?'':'none';
+    if(temCol){
+      const disponivel=poupancaDisponivelAntes(DATA.evento.ano);
+      const inp=document.getElementById('adm-sobras');
+      inp.max=disponivel.toFixed(2);
+      inp.value=(DATA.evento.sobrasAplicadas||0)||'';
+      document.getElementById('adm-sobras-hint').textContent=`Disponível da reserva de anos anteriores: ${eur(disponivel)}.`;
+    }
+  }
   document.getElementById('adm-missao').value=missao||'';
   document.getElementById('adm-fundo').value=fundo||'';
   const fmEl=document.getElementById('adm-fator-modo');
@@ -4763,6 +4817,13 @@ function _setPrescorrKnob(on){
   const track=knob?.previousElementSibling;
   if(knob)knob.style.left=on?'22px':'2px';
   if(track)track.style.background=on?'var(--gold)':'var(--line)';
+}
+function usarPoupancaToda(){
+  if(!DATA||!DATA.evento.sobrasAplicadasCol)return;
+  const v=poupancaDisponivelAntes(DATA.evento.ano);
+  const inp=document.getElementById('adm-sobras');if(!inp)return;
+  inp.value=v?v.toFixed(2):'';
+  saveParams();
 }
 /* ── Notificações Telegram (só admin · flag global em festasbv.config) ── */
 function _setNotifKnob(on){
@@ -4950,6 +5011,14 @@ async function saveParams(){
     _setPrescorrKnob(pc);
     DATA.evento.presCorrecao=pc;
   }
+  if(DATA.evento.sobrasAplicadasCol){
+    const disponivel=poupancaDisponivelAntes(DATA.evento.ano);
+    let usar=parseFloat(document.getElementById('adm-sobras').value)||0;
+    usar=rnd(Math.max(0,usar),2);
+    if(usar>disponivel+0.005){toast(`Só tens ${eur(disponivel)} de poupança acumulada disponível`,'bad');loadParams();return;}
+    DATA.evento.sobrasAplicadas=usar;
+    syncSobrasAplicadas(usar);
+  }
   DATA.evento.missaoPoupanca=parseFloat(document.getElementById('adm-missao').value)||0;
   DATA.evento.fundoReserva=parseFloat(document.getElementById('adm-fundo').value)||0;
   const fmEl=document.getElementById('adm-fator-modo');
@@ -5026,10 +5095,16 @@ async function limparCashflows(){
   const isSobras=m=>m&&m.subtipo==='sobras_ano_anterior';
   const mealDel=(DATA.mealheiros||[]).filter(m=>!isSobras(m));
   let mealKeep=(DATA.mealheiros||[]).filter(isSobras);
-  // Validar sempre o trânsito das sobras do ano anterior. Se não houver nenhuma registada
-  // (ex.: apagada por um reset feito antes desta automação), regenera-a do saldo do ano anterior.
+  // Mantém a parte da reserva que este ano escolheu usar. Em anos anteriores à
+  // migração conserva-se a regra antiga de regenerar a sobra automática.
   const tinhaSobras=mealKeep.length>0;
-  if(!tinhaSobras){const s=_sobrasAnoAnterior(ano,DATA.evento.tesoureiro);if(s)mealKeep=[s];}
+  if(!tinhaSobras){
+    const v=DATA.evento.sobrasAplicadasCol?(+DATA.evento.sobrasAplicadas||0):0;
+    const s=DATA.evento.sobrasAplicadasCol
+      ?(v>0.005?sobrasMealheiro(ano,DATA.evento.tesoureiro,v):null)
+      :_sobrasAnoAnterior(ano,DATA.evento.tesoureiro);
+    if(s)mealKeep=[s];
+  }
   const regenerou=!tinhaSobras&&mealKeep.length>0;
   const nDesp=(DATA.despesas||[]).length,nMeal=mealDel.length,nPag=(DATA.pagamentos||[]).length;
   const temParaLimpar=nDesp||nMeal||nPag;
@@ -5162,13 +5237,12 @@ async function addNewYear(){
 
   const membros=NY_MEMBROS.map(m=>({nome:m.nome,fator:m.fator,presencas:[],sexo:m.sexo||'M'}));
 
-  // Sobras do ano anterior → entram automaticamente como mealheiro (sobras_ano_anterior).
+  // O novo ano começa com a reserva intacta. O admin escolhe depois quanto quer
+  // aplicar — tudo, uma parte, ou 0 € — nas parametrizações desse ano.
   const mealheiros=[];
-  const sobra=_sobrasAnoAnterior(yearVal,tesVal);
-  if(sobra)mealheiros.push(sobra);
 
   const newYear={
-    evento:{nome:'MEO '+yearVal,ano:yearVal,tesoureiro:tesVal,arredondaTotal:false,missaoPoupanca:0,fundoReserva:0,fatorModo:'fixo',fatorThreshold:FATOR_THRESHOLD_DEFAULT},
+    evento:{nome:'MEO '+yearVal,ano:yearVal,tesoureiro:tesVal,arredondaTotal:false,missaoPoupanca:0,fundoReserva:0,sobrasAplicadas:0,sobrasAplicadasCol:!!DATA.evento.sobrasAplicadasCol,fatorModo:'fixo',fatorThreshold:FATOR_THRESHOLD_DEFAULT},
     membros,
     despesas:[],
     convidados:[],
@@ -5187,8 +5261,7 @@ async function addNewYear(){
 
   const ok=await pushToGitHub('Criar ano '+yearVal);
   if(ok){
-    const sobra=mealheiros.find(m=>m.subtipo==='sobras_ano_anterior');
-    toast('Ano '+yearVal+' criado ✓'+(sobra?' · sobras '+eur(sobra.valor)+' transitadas':''),'ok');
+    toast('Ano '+yearVal+' criado ✓ · a poupança acumulada ficou reservada');
     document.getElementById('adm-new-year').value='';
     document.getElementById('adm-new-tes').value='';
     NY_MEMBROS=[];
@@ -14361,8 +14434,47 @@ function shareCartaz(){
 }
 
 /* ═══ HERO SUB-TOTALS ═══ */
+function setSaldosVisao(visao){
+  SALDOS_VISAO=visao==='refeicoes'?'refeicoes':'parcelas';
+  lsSet('fbv_saldos_visao',SALDOS_VISAO);
+  renderHeroSubtotals();
+}
+function heroDetalheHtml(items){
+  if(!items.length)return '';
+  let h=`<div class="hero-expand sf" onclick="toggleHeroDetail()"><span>ver detalhe</span><span class="he-arrow">▼</span></div>`;
+  h+='<div class="hero-detail sf">';
+  items.forEach(it=>{h+=`<div class="hero-detail-item"><span class="hd-lbl">${it.label}</span><span class="hd-val">${eur(it.val)}</span></div>`;});
+  return h+'</div>';
+}
 function renderHeroSubtotals(){
   if(!CALC)return;
+  const parcelasBtn=document.getElementById('hero-view-parcelas');
+  const refeicoesBtn=document.getElementById('hero-view-refeicoes');
+  if(parcelasBtn)parcelasBtn.classList.toggle('on',SALDOS_VISAO==='parcelas');
+  if(refeicoesBtn)refeicoesBtn.classList.toggle('on',SALDOS_VISAO==='refeicoes');
+  if(SALDOS_VISAO==='refeicoes'){
+    const receitaPorRefeicao={};
+    CALC.membros.forEach(m=>{
+      (m._refs||[]).forEach(x=>{const k=x.dia+'|'+x.ref;receitaPorRefeicao[k]=rnd((receitaPorRefeicao[k]||0)+(+x.p||0),2);});
+      (m._convs||[]).forEach(x=>{const k=x.dia+'|'+x.ref;receitaPorRefeicao[k]=rnd((receitaPorRefeicao[k]||0)+(+x.q||0),2);});
+    });
+    const custos=[],receitas=[];
+    let totalCustoRefeicoes=0,totalReceitaRefeicoes=0;
+    CALC.refeicoes.forEach(r=>{
+      const k=r.dia+'|'+r.ref;
+      const custo=rnd(r.dirRef||0,2); // apenas o que foi destinado à refeição
+      const receita=rnd(receitaPorRefeicao[k]||0,2);
+      totalCustoRefeicoes=rnd(totalCustoRefeicoes+custo,2);
+      totalReceitaRefeicoes=rnd(totalReceitaRefeicoes+receita,2);
+      const nome=`${fmtDiaMes(r.data)} · ${r.ref}`;
+      custos.push({label:nome,val:custo});receitas.push({label:nome,val:receita});
+    });
+    custos.push({label:'Outros custos',val:rnd(CALC.totDespesas-totalCustoRefeicoes,2)});
+    receitas.push({label:'Outras receitas',val:rnd(CALC.totReceitas-totalReceitaRefeicoes,2)});
+    document.getElementById('hero-rec-detail').innerHTML=heroDetalheHtml(receitas);
+    document.getElementById('hero-desp-detail').innerHTML=heroDetalheHtml(custos);
+    return;
+  }
   // Receitas breakdown
   const recItems=[];
   if(CALC.totRefMembros>0) recItems.push({label:'Refeições',val:CALC.totRefMembros});
@@ -14374,14 +14486,7 @@ function renderHeroSubtotals(){
   if(CALC.quotaTot>0) recItems.push({label:'Quota Extra',val:CALC.quotaTot});
   if(CALC.missaoTot>0) recItems.push({label:'Missão Poupança',val:CALC.missaoTot});
 
-  let rh='';
-  if(recItems.length>1){
-    rh+=`<div class="hero-expand sf" onclick="toggleHeroDetail()"><span>ver detalhe</span><span class="he-arrow">▼</span></div>`;
-    rh+='<div class="hero-detail sf">';
-    recItems.forEach(it=>{rh+=`<div class="hero-detail-item"><span class="hd-lbl">${it.label}</span><span class="hd-val">${eur(it.val)}</span></div>`;});
-    rh+='</div>';
-  }
-  document.getElementById('hero-rec-detail').innerHTML=rh;
+  document.getElementById('hero-rec-detail').innerHTML=heroDetalheHtml(recItems);
 
   // Despesas breakdown
   const despItems=[];
@@ -14390,14 +14495,7 @@ function renderHeroSubtotals(){
   const allTipos=Object.keys(tot).sort((a,b)=>{const ia=tipoOrder.indexOf(a),ib=tipoOrder.indexOf(b);return(ia<0?99:ia)-(ib<0?99:ib);});
   allTipos.forEach(tipo=>{if(tot[tipo]>0) despItems.push({label:tipo,val:tot[tipo]});});
 
-  let dh='';
-  if(despItems.length>1){
-    dh+=`<div class="hero-expand sf" onclick="toggleHeroDetail()"><span>ver detalhe</span><span class="he-arrow">▼</span></div>`;
-    dh+='<div class="hero-detail sf">';
-    despItems.forEach(it=>{dh+=`<div class="hero-detail-item"><span class="hd-lbl">${it.label}</span><span class="hd-val">${eur(it.val)}</span></div>`;});
-    dh+='</div>';
-  }
-  document.getElementById('hero-desp-detail').innerHTML=dh;
+  document.getElementById('hero-desp-detail').innerHTML=heroDetalheHtml(despItems);
 }
 // Abre/fecha em conjunto os detalhes de Receitas e Despesas
 function toggleHeroDetail(){
@@ -15257,6 +15355,7 @@ function generatePDF(type,escopo){
     th{background:#f4f5f7;padding:6px 8px;text-align:left;font-weight:700;font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:#555;border-bottom:2px solid #ddd}
     td{padding:5px 8px;border-bottom:1px solid #eee}
     tr:last-child td{border-bottom:none}
+    .balance-view{break-inside:avoid;page-break-inside:avoid}
     .pos{color:#2a9d6a;font-weight:700}.neg{color:#e04545;font-weight:700}.zero{color:#999}
     .right{text-align:right}
     table.ts-fix{table-layout:fixed}
@@ -16215,6 +16314,34 @@ function buildGeneralReport(){
     if(tot[tipo]>0) h+=`<tr><td>${tipo}</td><td class="right">${eur(tot[tipo])}</td></tr>`;
   });
   h+=`<tr style="border-top:2px solid #ddd;font-weight:700"><td><b>Total Despesas</b></td><td class="right neg"><b>${eur(CALC.totDespesas)}</b></td></tr>`;
+  h+='</table>';
+
+  // A mesma leitura do seletor dos Saldos, agora lado a lado para ficar clara
+  // no papel: custo destinado a cada refeição contra o que ela gerou.
+  const receitaPorRefeicao={};
+  ms.forEach(m=>{
+    (m._refs||[]).forEach(x=>{
+      const k=x.dia+'|'+x.ref;
+      receitaPorRefeicao[k]=rnd((receitaPorRefeicao[k]||0)+(+x.p||0),2);
+    });
+    (m._convs||[]).forEach(x=>{
+      const k=x.dia+'|'+x.ref;
+      receitaPorRefeicao[k]=rnd((receitaPorRefeicao[k]||0)+(+x.q||0),2);
+    });
+  });
+  let custoDasRefeicoes=0,receitaDasRefeicoes=0;
+  h+='<h2>Visão por Refeição</h2><table class="balance-view"><tr><th>Refeição</th><th class="right">Custo</th><th class="right">Receitas</th></tr>';
+  CALC.refeicoes.forEach(r=>{
+    const custo=rnd(r.dirRef||0,2);
+    const receita=rnd(receitaPorRefeicao[r.dia+'|'+r.ref]||0,2);
+    custoDasRefeicoes=rnd(custoDasRefeicoes+custo,2);
+    receitaDasRefeicoes=rnd(receitaDasRefeicoes+receita,2);
+    h+=`<tr><td>${fmtPdfDate(r.data)} · ${escHtml(r.ref)}</td><td class="right neg">${eur(custo)}</td><td class="right pos">${eur(receita)}</td></tr>`;
+  });
+  const outrosCustos=rnd(CALC.totDespesas-custoDasRefeicoes,2);
+  const outrasReceitas=rnd(CALC.totReceitas-receitaDasRefeicoes,2);
+  h+=`<tr><td><b>Outros custos / receitas</b><br><span style="font-size:9px;color:#888">Gerais, bebidas não alocadas, quota, poupança e mealheiros.</span></td><td class="right neg">${eur(outrosCustos)}</td><td class="right pos">${eur(outrasReceitas)}</td></tr>`;
+  h+=`<tr style="border-top:2px solid #ddd;font-weight:700"><td><b>Total</b></td><td class="right neg"><b>${eur(CALC.totDespesas)}</b></td><td class="right pos"><b>${eur(CALC.totReceitas)}</b></td></tr>`;
   h+='</table>';
 
   // Cash-flows list — apenas despesas e mealheiros (sem pagamentos de dívidas nem reembolsos)
