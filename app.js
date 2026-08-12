@@ -4826,12 +4826,8 @@ function _setPrescorrKnob(on){
 function _setSobrasKnob(on){
   const knob=document.getElementById('adm-sobras-knob');
   const track=knob?.previousElementSibling;
-  const off=document.getElementById('adm-sobras-off-label');
-  const yes=document.getElementById('adm-sobras-on-label');
   if(knob)knob.style.left=on?'22px':'2px';
   if(track)track.style.background=on?'var(--gold)':'var(--line)';
-  if(off)off.classList.toggle('on',!on);
-  if(yes)yes.classList.toggle('on',on);
 }
 function toggleSobrasUso(guardar){
   if(!DATA||!DATA.evento.sobrasAplicadasCol)return;
