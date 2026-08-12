@@ -759,7 +759,7 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .rdc-costs-hdr{cursor:pointer;user-select:none}
 .rdc-costs-hdr .rdc-fold-arrow{align-self:center;transition:transform .2s}
 .rdc-costs-hdr.open .rdc-fold-arrow{transform:rotate(90deg)}
-.rdc-costs-body{margin-top:2px}
+.rdc-costs-body{margin-top:9px}
 .rdc-costs-body>.rdc{background:var(--panel);border-color:rgba(110,75,25,.18)}
 /* ═══ Swipe entre painéis (.sw-deck: refeições · convidados) ═══
    Durante o gesto os dois painéis (o que sai e o que entra) saem do fluxo e
@@ -883,10 +883,16 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
    as declara ("7 un ≈ 3,136 kg"), como no bloco 🧺 Comprado. Não parte a meio
    nem se confunde com o descritivo/quem pagou, que ficam no <small> a seguir. */
 .rdc-det-it .k small.rdc-det-q{color:var(--muted);white-space:nowrap;font-variant-numeric:tabular-nums}
-/* Convite explícito ao detalhe, no fim do cartão de custos: o cabeçalho tem
-   uma seta pequena e lê-se como título, não como botão. */
-.rdc-costs-foot{display:block;width:100%;margin-top:10px;padding:8px 0 0;background:none;border:none;border-top:1px solid rgba(110,75,25,.14);font-family:var(--display);font-size:12.5px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--green);text-align:center;cursor:pointer}
-.rdc-costs-foot:active{opacity:.6}
+/* Convite explícito ao detalhe (custos · lista de compras de uma refeição
+   passada): o cabeçalho do cartão tem uma seta pequena e lê-se como título, não
+   como botão. É o MESMO componente nos dois sítios — o gesto é o mesmo.
+   Fica sempre ANTES do corpo que abre, para não mudar de sítio ao expandir
+   (ver foldToggle); fechado, não há nada por baixo e é o fim do cartão. */
+.det-toggle{display:block;width:100%;margin-top:10px;padding:8px 0 0;background:none;border:none;border-top:1px solid rgba(110,75,25,.14);font-family:var(--display);font-size:12.5px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--green);text-align:center;cursor:pointer}
+.det-toggle:active{opacity:.6}
+/* Sozinho à cabeça do cartão (a lista de compras de uma refeição passada) não
+   há nada em cima para a risca separar. */
+.det-toggle:first-child{margin-top:0;padding-top:0;border-top:none}
 .refdef-actions{display:flex;gap:4px;flex-shrink:0}
 .refdef-del{width:26px;height:26px;border-radius:7px;border:1px solid var(--line);background:transparent;color:var(--red);font-size:13px;display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:.5;transition:.12s}
 .refdef-del:active{opacity:1;background:rgba(179,64,47,.1);transform:scale(.9)}
@@ -1231,13 +1237,9 @@ button.cmp-chip.qt-tap:active{filter:brightness(.93)}
 .msl-det+.msl-det{margin-top:12px;border-top:1.5px dashed rgba(110,75,25,.3);padding-top:11px}
 .msl-det>summary{gap:8px}
 .msl-det>summary .rdc-lbl{font-size:14.5px;letter-spacing:.13em}
-/* Refeição já passada: um colapsável só, e lá dentro os dois blocos sem
-   colapsável próprio — o cabeçalho de cada um é só um rótulo (ver
-   mealShopSection). O convite por extenso é mais discreto que os títulos dos
-   blocos: é arquivo, não a lista de trabalho. */
-.msl-past>summary .rdc-lbl{font-size:12.5px;letter-spacing:.1em;color:var(--muted)}
-.msl-past-sec+.msl-past-sec{margin-top:12px;border-top:1.5px dashed rgba(110,75,25,.3);padding-top:11px}
-.msl-past-t{display:flex;align-items:center;gap:8px;margin-bottom:2px}
+/* Refeição já passada: os dois blocos (com o colapsável de cada um) vivem
+   dentro do corpo que o .det-toggle abre — ver mealShopSection. */
+.msl-past-body{margin-top:12px}
 /* Contagem carimbada, como no separador Compras */
 .msl-count{background:transparent;border:1.5px solid rgba(133,41,26,.5);border-radius:20px;padding:0 8px;font-size:10.5px;font-weight:800;color:var(--campino-tinta);margin-left:auto;transform:rotate(-4deg);font-variant-numeric:tabular-nums}
 /* Linha do talão: nome · pontinhos · quantidade · quem trata. A dica de stock
