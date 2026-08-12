@@ -365,6 +365,21 @@ Duas entradas: **quem** (faixa `Membros` · `Convidados`) × **o quê** (colunas
 - O 🍻 é **desenhado** (`BEER_SVG_SM`), não emoji: a 9,5px o emoji sai maior que o texto e com a cor do sistema.
 - **Os filhos e as crianças de convidados contam-se num sítio só** (`criancasNoSlotNomes`, com `origem`) — não voltes a contá-los à parte para a grelha.
 
+### O detalhe do custo abre de uma vez, e diz que existe
+Duas regras que andam juntas no cartão do custo, e que se desfazem sozinhas se alguém mexer num sítio só:
+- **Não há detalhe do detalhe.** Abrir "Custos diretos", "Bebida" ou "Outros custos indiretos" mostra **já** as linhas lá dentro — o `<details>` das despesas (`chipsRow`) e o do "Por categoria" (`catDetHtml`) nascem `open`. Eram dois toques para chegar à mesma informação, e o segundo não tinha rótulo nenhum a prometer o que abria (é um chip com um €). Fecham-se na mesma, mas **o estado não se guarda**: cada re-render volta a abrir, de propósito — o defeito é ver.
+- **O cabeçalho não convida.** "Custo da refeição · 412,50 €" lê-se como um título e a seta é pequena; por isso o cartão fecha com uma frase por extenso — **"Ver detalhe do custo"** (`.rdc-costs-foot`), que expande o mesmo bloco. **Tem de acompanhar o estado** ("Esconder detalhe do custo"): é o `toggleCosts` que lhe troca o texto, venha o toque de cima ou de baixo (`toggleCostsFrom` só reencaminha). Se acrescentares outro caminho para abrir os custos, passa por lá.
+
+### A quantidade no detalhe dos custos traz as DUAS medidas
+As linhas de stock do detalhe de "Custos diretos"/"Bebida" põem a quantidade em **elemento próprio** (`it.qtd` → `.rdc-det-q`), com o mesmo `loteQtdLabel` do bloco 🧺 Comprado — logo trazem a 2.ª medida do lote quando ela existe (`7 un ≈ 3,136 kg`). Entalada entre parênteses no fim do nome, a medida que quem cozinha lê ficava a disputar a linha com o descritivo e o nome de quem pagou.
+- **É a quantidade ALOCADA a esta refeição, e só ela.** O que se comprou e foi parar a outro lado é conversa do 🧺 Comprado (que decompõe a compra em parcelas); esta é a conta do **dinheiro que esta refeição paga**, e uma sub-linha de sobras aqui punha a somar-se ao que o `calcular()` cobra.
+
+## Cartão da refeição PASSADA: as compras fecham-se numa linha
+Antes do dia, a lista de compras e o 🧺 Comprado são a ferramenta de trabalho e cada um abre por si. Passado o dia não há nada a tratar — é arquivo —, e dois blocos abertos empurravam para baixo o que ainda interessa (a ementa, quem foi, o custo).
+- **Um colapsável só, com o convite por extenso**: `Ver detalhe da lista de compras` (`.msl-past`, estado em `MEAL_SHOP_OPEN[key+'|p']`). Lá dentro os dois blocos ficam **sem colapsável próprio** (`.msl-past-sec`, só um rótulo) — quem abriu já disse que quer ver, e mais dois toques eram o detalhe do detalhe.
+- **O bloco chama-se "🛒 Lista de compras" venha o dia de onde vier.** Chamou-se "📝 Não comprado" no passado e era uma etiqueta a responder à pergunta errada: o que ali está é a lista **com o tratado riscado** (`msl-riscado`), logo o título contradizia as próprias linhas.
+- O **cartaz das ementas** vive logo a seguir aos chips dos dias (`refnav`), não no fim do separador: é do **ano** inteiro, não da refeição aberta, e lá em baixo — depois de um cartão que se percorre todo — parecia pertencer-lhe.
+
 ## Convidado que SÓ BEBE (🍺) — e não paga o que o membro paga
 Um membro já podia vir só ao copo (`modo:'bebe'` nas presenças). Um convidado não: ou comia, ou não existia. Passa a existir o mesmo eixo na linha do convidado (`convidados.modo`), e com ele a pergunta que estava por responder — **quanto custa o copo a quem não é do grupo**.
 - **`Qbebe` NÃO é `Pbebe`, e é esse o ponto.** O membro que só bebe paga o **custo** (bebida + indiretos da refeição, sem mínimo). O convidado paga esse custo **arredondado para cima, mais um extra, nunca abaixo de um mínimo** — exatamente a forma da quota do convidado que come (`minConv`/`extraConv`), com parâmetros **próprios por refeição** (`min_conv_bebe`/`extra_conv_bebe`, em Refeições › toca na refeição). Cobrar-lhe o `Pbebe` era não ter feito nada: o preço tem de poder ser outro.
