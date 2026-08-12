@@ -81,7 +81,8 @@ Os passos 4–20 são migrações add-on idempotentes: correr uma vez cada. A ap
 tolerante a qualquer uma delas faltar — sonda a coluna/tabela e esconde o que
 ainda não existe. (Há mais add-ons no diretório que nunca entraram nesta lista —
 `cobertura.sql`, `bebida_refeicao.sql`, `stock_artigo_fatura.sql`,
-`admin_pass_temp.sql` — e valem a mesma regra: idempotentes e opcionais.)
+`admin_pass_temp.sql`, `frac_indireta_ref.sql` — e valem a mesma regra:
+idempotentes e opcionais.)
 
 ## Conteúdo
 

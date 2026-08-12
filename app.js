@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v280 · 2026-08-12 · Shop List: um pedido de refeição (Almoço/Jantar) cujo dia já passou e continua por comprar passa a avisar "⚠️ refeição já passou" no cartão de "Em falta" — não se esconde nem se cancela sozinho, só se diz que já ninguém está à espera daquilo · v279 · 2026-08-11 · T-shirts: editar um pedido cujo "Encomendado por" já saiu do plantel deste ano deixa de esconder o campo (o select ficava vazio e o Guardar recusava sempre) — o nome antigo aparece marcado "fora do plantel" e dá para reatribuir a t-shirt a outra pessoa · v278 · 2026-08-11 · Quota Extra: o Fundo de Reserva deixa de ser ignorado nos anos em que as fontes diretas (refeições, convidados, mealheiros, t-shirts, stock sobrante) já cobrem a despesa — passa a somar-se sempre à conta antes de se cortar a zero, para o valor "a guardar" ser mesmo cobrado · v277 · 2026-08-10 · Definições › Parametrizações: novo interruptor "Corrigir Presenças" (por ano) que deixa cada um corrigir as suas presenças de dias já passados desse evento — desligado por defeito, e as contas fechadas continuam a trancar tudo mesmo com ele ligado · v276 · 2026-08-10 · Adicionar Convidado: o campo "Trazido por" deixa de escolher o primeiro membro por ordem alfabética do casal e passa a vir pré-selecionado com o próprio utilizador, como no resto da app · v275 · 2026-08-10 · Shop List: um pedido sem loja própria que está a herdar a loja de outro pedido do mesmo artigo agora pode recusar essa herança ("🚫 Não herdar — deixar sem loja"), sem mexer no pedido que a escreveu · v274 · 2026-08-10 · Pagar Dívida: um pagamento livre / adiantamento (sem dívidas selecionadas) passa a ter uma caixa de observações, para dizer o que é aquele dinheiro · v273 · 2026-08-10 · PDF de pessoa (Saldos): as Refeições ordenam-se por dia e mostram o prato; e as Despesas Adiantadas deixam de mostrar "🧺 Stock" como nota e passam a mostrar o destino real (refeição/tipo) em vez de "Gerais" sempre que a compra tem um destino só · v272 · Stock alocado a uma PESSOA (🎒 leva para casa): no separador Stock, uma alocação pode agora apontar a um membro em vez de a uma refeição — é para as sobras que não voltam a ser usadas. O custo sai do rateio e passa a ser cobrado só a essa pessoa (aparece no saldo dela, como as t-shirts) · v271 · Nos Saldos, uma compra com peça "só despesa" (saco, depósito) deixa de aparecer duplicada em "Despesas adiantadas" — as linhas da mesma compra juntam-se numa só. E "Despesas adiantadas" separa-se em duas: o que já pagaste (📅) e o que está previsto mas ainda por pagar (📌 provisórias) · v270 · As SOBRAS deixam de reabrir o pedido: um lote comprado para uma refeição conta inteiro na cobertura, mesmo com parte por alocar na bolsa comum — compram-se 8 pacotes para o jantar, comem-se 5, e a lista já não pede os outros 3 que estão na despensa. É a mesma leitura que o cartão da refeição já fazia. Mover o stock para outra refeição continua a reabrir o pedido · v269 · Uma falta “dita à mão” passa a dizer que o é — na lista e no cartão da refeição, como já dizia o “coberto” e a folha do 🖨 —, e o bloco “que pedidos é que isto trata?” marca a linha que não é a app a deduzir. Trocar o artigo de um pedido (chouriço de sangue → morcela) deita fora a cobertura declarada sobre o artigo antigo, que ficava a mandar sobre o stock novo';
+const APP_BUILD = 'v283 · 2026-08-12 · Definições › Parametrizações: a fração da bolsa indireta (Gerais/Bebidas/Cerveja) que entra no preço das refeições deixa de estar fixa em 50% — passa a ser ajustável por ano, só em anos abertos. T-shirts e Stock Sobrante continuam sempre de fora dessa bolsa · v282 · 2026-08-12 · Saldos: a vista "Por refeição" passa a ser a principal, e o seletor "Por parcelas"/"Por refeição" desce para debaixo de Receitas/Despesas, só à vista com o detalhe aberto (ali é que faz diferença — os totais não mudam com a vista) · v281 · 2026-08-12 · Saldos › vista "Por refeição": o custo de cada refeição passa a incluir os indiretos (Gerais/Bebidas/Cerveja) que lhe cabem, como no cartão da refeição — antes só contava os diretos e o custo ficava sempre abaixo da receita. "Outros custos"/"Outras receitas" ganham detalhe por baixo (T-shirts, Stock Sobrante, Quota Extra, Mealheiro, Missão Poupança…), no ecrã e no PDF · v280 · 2026-08-12 · Shop List: um pedido de refeição (Almoço/Jantar) cujo dia já passou e continua por comprar passa a avisar "⚠️ refeição já passou" no cartão de "Em falta" — não se esconde nem se cancela sozinho, só se diz que já ninguém está à espera daquilo · v279 · 2026-08-11 · T-shirts: editar um pedido cujo "Encomendado por" já saiu do plantel deste ano deixa de esconder o campo (o select ficava vazio e o Guardar recusava sempre) — o nome antigo aparece marcado "fora do plantel" e dá para reatribuir a t-shirt a outra pessoa · v278 · 2026-08-11 · Quota Extra: o Fundo de Reserva deixa de ser ignorado nos anos em que as fontes diretas (refeições, convidados, mealheiros, t-shirts, stock sobrante) já cobrem a despesa — passa a somar-se sempre à conta antes de se cortar a zero, para o valor "a guardar" ser mesmo cobrado · v277 · 2026-08-10 · Definições › Parametrizações: novo interruptor "Corrigir Presenças" (por ano) que deixa cada um corrigir as suas presenças de dias já passados desse evento — desligado por defeito, e as contas fechadas continuam a trancar tudo mesmo com ele ligado · v276 · 2026-08-10 · Adicionar Convidado: o campo "Trazido por" deixa de escolher o primeiro membro por ordem alfabética do casal e passa a vir pré-selecionado com o próprio utilizador, como no resto da app · v275 · 2026-08-10 · Shop List: um pedido sem loja própria que está a herdar a loja de outro pedido do mesmo artigo agora pode recusar essa herança ("🚫 Não herdar — deixar sem loja"), sem mexer no pedido que a escreveu · v274 · 2026-08-10 · Pagar Dívida: um pagamento livre / adiantamento (sem dívidas selecionadas) passa a ter uma caixa de observações, para dizer o que é aquele dinheiro · v273 · 2026-08-10 · PDF de pessoa (Saldos): as Refeições ordenam-se por dia e mostram o prato; e as Despesas Adiantadas deixam de mostrar "🧺 Stock" como nota e passam a mostrar o destino real (refeição/tipo) em vez de "Gerais" sempre que a compra tem um destino só · v272 · Stock alocado a uma PESSOA (🎒 leva para casa): no separador Stock, uma alocação pode agora apontar a um membro em vez de a uma refeição — é para as sobras que não voltam a ser usadas. O custo sai do rateio e passa a ser cobrado só a essa pessoa (aparece no saldo dela, como as t-shirts) · v271 · Nos Saldos, uma compra com peça "só despesa" (saco, depósito) deixa de aparecer duplicada em "Despesas adiantadas" — as linhas da mesma compra juntam-se numa só. E "Despesas adiantadas" separa-se em duas: o que já pagaste (📅) e o que está previsto mas ainda por pagar (📌 provisórias) · v270 · As SOBRAS deixam de reabrir o pedido: um lote comprado para uma refeição conta inteiro na cobertura, mesmo com parte por alocar na bolsa comum — compram-se 8 pacotes para o jantar, comem-se 5, e a lista já não pede os outros 3 que estão na despensa. É a mesma leitura que o cartão da refeição já fazia. Mover o stock para outra refeição continua a reabrir o pedido · v269 · Uma falta “dita à mão” passa a dizer que o é — na lista e no cartão da refeição, como já dizia o “coberto” e a folha do 🖨 —, e o bloco “que pedidos é que isto trata?” marca a linha que não é a app a deduzir. Trocar o artigo de um pedido (chouriço de sangue → morcela) deita fora a cobertura declarada sobre o artigo antigo, que ficava a mandar sobre o stock novo';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -87,7 +87,8 @@ let DATA=null,CALC=null,TAB='saldos',GH_SHA=null;
 // Persistência do estado de navegação (sobrevive ao reload do PWA quando o iOS o descarrega)
 function lsSet(k,v){try{localStorage.setItem(k,v);}catch(_){}}
 function lsGet(k){try{return localStorage.getItem(k);}catch(_){return null;}}
-let SALDOS_VISAO=lsGet('fbv_saldos_visao')==='refeicoes'?'refeicoes':'parcelas';
+let SALDOS_VISAO=lsGet('fbv_saldos_visao')==='parcelas'?'parcelas':'refeicoes';
+let HERO_DETAIL_OPEN=false;   // sobrevive a um re-render (heroDetalheHtml nunca marca 'open' sozinho)
 
 /* ── Travar o scroll do fundo enquanto há um modal aberto ──
    O `.no-scroll` põe o body em `position:fixed`, e isso faz o browser esquecer
@@ -728,7 +729,11 @@ function calcular(data){
      indireta (senão o custo espalhava-se por toda a gente) e é cobrado direto
      a quem levou, mais abaixo (m.SS). */
   const totSSdesp=rnd(despesas.filter(x=>x.tipo===STOCK_SOBRA_TIPO).reduce((a,x)=>a+x.valor,0),2);
-  const F20=rnd((totalDesp-allocDireta-totTSdesp-totSSdesp)*0.5,2);
+  // Fração da bolsa indireta que entra no preço das refeições — o resto é
+  // recuperado pela Quota Extra. Parametrizável por ano (Definições ›
+  // Parametrizações, só em anos abertos); sem a coluna, o defeito de sempre é 50%.
+  const fracIndiretaRef=evento.fracIndiretaRefCol?rnd(Math.min(1,Math.max(0,evento.fracIndiretaRef!=null?+evento.fracIndiretaRef:0.5)),4):0.5;
+  const F20=rnd((totalDesp-allocDireta-totTSdesp-totSSdesp)*fracIndiretaRef,2);
 
   // Repartição do indireto entre "bebidas", "cerveja" e "gerais" (só apresentação na lista).
   // A bolsa indireta = tudo o que não é despesa direta de refeição. A soma das 3 parcelas é
@@ -1015,7 +1020,7 @@ function calcular(data){
     m._payerOthersPortion=payerOthersPortion[m.nome]||0;
   }
 
-  return{refeicoes,membros,BN3,F20,saldoGrupo,totRefMembros,tot,totReceitas,totDespesas:totalDesp,sumF,pagamentos:pag,sobrasTot,descontoTot,mealTot,quotaTot,missaoTot,tsTot,totTSdesp,ssTot};
+  return{refeicoes,membros,BN3,F20,saldoGrupo,totRefMembros,tot,totReceitas,totDespesas:totalDesp,sumF,pagamentos:pag,sobrasTot,descontoTot,mealTot,quotaTot,missaoTot,tsTot,totTSdesp,ssTot,totSSdesp};
 }
 
 /* ── Poupança acumulada / sobras aplicadas ───────────────────────────
@@ -2524,7 +2529,7 @@ async function carregar(){
     if(TSHIRTS_TABLE)(await tsRes.json()).forEach(t=>{(tsByEv[t.evento_id]=tsByEv[t.evento_id]||[]).push(t);});
     ALL_YEARS=rows.map(ev=>({
       _sbId: ev.id,
-      evento:{tshirtsTrancadas:!!ev.tshirts_trancadas,tshirtPrecoHomem:N(ev.tshirt_preco_homem),tshirtPrecoMulher:N(ev.tshirt_preco_mulher),tshirtPrecoCrianca:N(ev.tshirt_preco_crianca),tshirtDesconto:N(ev.tshirt_desconto),nome:ev.nome,ano:ev.ano,tesoureiro:ev.tesoureiro,arredondaTotal:!!ev.arredonda_total,missaoPoupanca:N(ev.missao_poupanca),fundoReserva:N(ev.fundo_reserva),sobrasAplicadas:N(ev.sobras_aplicadas),sobrasAplicadasCol:('sobras_aplicadas' in ev),fatorModo:ev.fator_modo||'fixo',fatorThreshold:ev.fator_threshold!=null?N(ev.fator_threshold):FATOR_THRESHOLD_DEFAULT,dividasPublicas:!!ev.dividas_publicas,dividasPublicasCol:('dividas_publicas' in ev),presCorrecao:!!ev.pres_correcao,presCorrecaoCol:('pres_correcao' in ev),contasFechadas:!!ev.contas_fechadas,contasFechadasEm:ev.contas_fechadas_em||null,contasFechadasPor:ev.contas_fechadas_por||null},
+      evento:{tshirtsTrancadas:!!ev.tshirts_trancadas,tshirtPrecoHomem:N(ev.tshirt_preco_homem),tshirtPrecoMulher:N(ev.tshirt_preco_mulher),tshirtPrecoCrianca:N(ev.tshirt_preco_crianca),tshirtDesconto:N(ev.tshirt_desconto),nome:ev.nome,ano:ev.ano,tesoureiro:ev.tesoureiro,arredondaTotal:!!ev.arredonda_total,missaoPoupanca:N(ev.missao_poupanca),fundoReserva:N(ev.fundo_reserva),sobrasAplicadas:N(ev.sobras_aplicadas),sobrasAplicadasCol:('sobras_aplicadas' in ev),fatorModo:ev.fator_modo||'fixo',fatorThreshold:ev.fator_threshold!=null?N(ev.fator_threshold):FATOR_THRESHOLD_DEFAULT,dividasPublicas:!!ev.dividas_publicas,dividasPublicasCol:('dividas_publicas' in ev),presCorrecao:!!ev.pres_correcao,presCorrecaoCol:('pres_correcao' in ev),fracIndiretaRef:ev.frac_indireta_ref!=null?N(ev.frac_indireta_ref):0.5,fracIndiretaRefCol:('frac_indireta_ref' in ev),contasFechadas:!!ev.contas_fechadas,contasFechadasEm:ev.contas_fechadas_em||null,contasFechadasPor:ev.contas_fechadas_por||null},
       membros:(ev.membros||[]).sort((a,b)=>a.nome.localeCompare(b.nome,'pt')).map(m=>({
         _id:m.id,nome:m.nome,fator:N(m.fator),sexo:m.sexo==='F'?'F':'M',
         presencas:(m.presencas||[]).map(p=>({k:`${p.dia}|${p.ref}`,modo:p.modo==='bebe'?'bebe':'come'}))
@@ -2620,6 +2625,7 @@ async function sbGuardarEvento(y,slot){
     // Só grava a flag se a coluna já existir no Supabase (migração: ALTER TABLE eventos ADD dividas_publicas)
     if(ev.dividasPublicasCol)evRow.dividas_publicas=!!ev.dividasPublicas;
     if(ev.presCorrecaoCol)evRow.pres_correcao=!!ev.presCorrecao;
+    if(ev.fracIndiretaRefCol)evRow.frac_indireta_ref=ev.fracIndiretaRef!=null?ev.fracIndiretaRef:0.5;
     let eid=y._sbId;
     if(!eid){
       const ins=await sbReq('POST','eventos',evRow,{Prefer:'return=representation'});
@@ -4788,6 +4794,22 @@ function loadParams(){
       document.getElementById('adm-sobras-hint').textContent=`Disponível da reserva de anos anteriores: ${eur(disponivel)}.`;
     }
   }
+  const fiRow=document.getElementById('adm-fracind-row');
+  if(fiRow){
+    const temCol=!!DATA.evento.fracIndiretaRefCol;
+    fiRow.style.display=temCol?'':'none';
+    if(temCol){
+      const inp=document.getElementById('adm-fracind');
+      const fechadas=contasFechadas();
+      inp.value=Math.round((DATA.evento.fracIndiretaRef!=null?DATA.evento.fracIndiretaRef:0.5)*100);
+      inp.disabled=fechadas;
+      inp.style.opacity=fechadas?'.45':'';
+      inp.style.cursor=fechadas?'not-allowed':'';
+      document.getElementById('adm-fracind-hint').textContent=fechadas
+        ?'🔒 Contas fechadas — só se ajusta em anos abertos.'
+        :'Fração de Gerais/Bebidas/Cerveja que entra no preço de cada refeição; o resto é recuperado pela Quota Extra. T-shirts e Stock Sobrante ficam sempre de fora.';
+    }
+  }
   document.getElementById('adm-missao').value=missao||'';
   document.getElementById('adm-fundo').value=fundo||'';
   const fmEl=document.getElementById('adm-fator-modo');
@@ -5046,6 +5068,15 @@ async function saveParams(){
     DATA.evento.sobrasAplicadas=usar;
     syncSobrasAplicadas(usar);
   }
+  // Só se ajusta em anos abertos — com as contas fechadas o campo já vem
+  // desativado (loadParams); aqui é a trava de fundo, contra um saveParams()
+  // disparado por outro campo enquanto este ficou com um valor por gravar.
+  if(DATA.evento.fracIndiretaRefCol&&!contasFechadas()){
+    let p=parseFloat(document.getElementById('adm-fracind').value);
+    if(isNaN(p))p=50;
+    p=Math.min(100,Math.max(0,p));
+    DATA.evento.fracIndiretaRef=rnd(p/100,4);
+  }
   DATA.evento.missaoPoupanca=parseFloat(document.getElementById('adm-missao').value)||0;
   DATA.evento.fundoReserva=parseFloat(document.getElementById('adm-fundo').value)||0;
   const fmEl=document.getElementById('adm-fator-modo');
@@ -5269,7 +5300,7 @@ async function addNewYear(){
   const mealheiros=[];
 
   const newYear={
-    evento:{nome:'MEO '+yearVal,ano:yearVal,tesoureiro:tesVal,arredondaTotal:false,missaoPoupanca:0,fundoReserva:0,sobrasAplicadas:0,sobrasAplicadasCol:!!DATA.evento.sobrasAplicadasCol,fatorModo:'fixo',fatorThreshold:FATOR_THRESHOLD_DEFAULT},
+    evento:{nome:'MEO '+yearVal,ano:yearVal,tesoureiro:tesVal,arredondaTotal:false,missaoPoupanca:0,fundoReserva:0,sobrasAplicadas:0,sobrasAplicadasCol:!!DATA.evento.sobrasAplicadasCol,fracIndiretaRef:0.5,fracIndiretaRefCol:!!DATA.evento.fracIndiretaRefCol,fatorModo:'fixo',fatorThreshold:FATOR_THRESHOLD_DEFAULT},
     membros,
     despesas:[],
     convidados:[],
@@ -14479,8 +14510,47 @@ function heroDetalheHtml(items){
   if(!items.length)return '';
   let h=`<div class="hero-expand sf" onclick="toggleHeroDetail()"><span>ver detalhe</span><span class="he-arrow">▼</span></div>`;
   h+='<div class="hero-detail sf">';
-  items.forEach(it=>{h+=`<div class="hero-detail-item"><span class="hd-lbl">${it.label}</span><span class="hd-val">${eur(it.val)}</span></div>`;});
+  items.forEach(it=>{
+    h+=`<div class="hero-detail-item"><span class="hd-lbl">${it.label}</span><span class="hd-val">${eur(it.val)}</span></div>`;
+    if(it.sub&&it.sub.length)h+=`<div class="hero-detail-sub">${it.sub.map(s=>`<div class="hero-detail-subitem"><span class="hd-lbl">${s.label}</span><span class="hd-val">${eur(s.val)}</span></div>`).join('')}</div>`;
+  });
   return h+'</div>';
+}
+/* Vista "por refeição": custo e receita de cada refeição, e o detalhe do que
+   sobra fora delas — partilhado pelo hero (Saldos) e pelo PDF (buildGeneralReport),
+   para as duas leituras nunca poderem discordar. */
+function refeicoesCustoReceitaBreakdown(){
+  if(!CALC)return null;
+  const receitaPorRefeicao={};
+  CALC.membros.forEach(m=>{
+    (m._refs||[]).forEach(x=>{const k=x.dia+'|'+x.ref;receitaPorRefeicao[k]=rnd((receitaPorRefeicao[k]||0)+(+x.p||0),2);});
+    (m._convs||[]).forEach(x=>{const k=x.dia+'|'+x.ref;receitaPorRefeicao[k]=rnd((receitaPorRefeicao[k]||0)+(+x.q||0),2);});
+  });
+  const linhas=[];let totalCusto=0,totalReceita=0;
+  CALC.refeicoes.forEach(r=>{
+    // custoTotal = diretos + indiretos (Gerais/Bebidas/Cerveja) alocados a esta
+    // refeição — o mesmo total que o cartão da refeição mostra em "Custo da
+    // refeição". O dirRef antigo ficava só pelos diretos e escondia os indiretos.
+    const custo=rnd(r.custoTotal||0,2);
+    const receita=rnd(receitaPorRefeicao[r.dia+'|'+r.ref]||0,2);
+    totalCusto=rnd(totalCusto+custo,2);totalReceita=rnd(totalReceita+receita,2);
+    linhas.push({dia:r.dia,ref:r.ref,data:r.data,custo,receita});
+  });
+  const outrosCustos=rnd(CALC.totDespesas-totalCusto,2);
+  const outrasReceitas=rnd(CALC.totReceitas-totalReceita,2);
+  const custoSub=[
+    {label:'T-shirts',val:rnd(CALC.totTSdesp||0,2)},
+    {label:'Stock Sobrante',val:rnd(CALC.totSSdesp||0,2)},
+    {label:'Indiretos não atribuídos a uma refeição',val:rnd(outrosCustos-(CALC.totTSdesp||0)-(CALC.totSSdesp||0),2)}
+  ].filter(x=>x.val>0.005);
+  const receitaSub=[
+    {label:'Quota Extra',val:rnd(CALC.quotaTot||0,2)},
+    {label:'Mealheiro',val:rnd(CALC.mealTot||0,2)},
+    {label:'Missão Poupança',val:rnd(CALC.missaoTot||0,2)},
+    {label:'T-shirts',val:rnd(CALC.tsTot||0,2)},
+    {label:'Stock Sobrante',val:rnd(CALC.ssTot||0,2)}
+  ].filter(x=>x.val>0.005);
+  return{linhas,outrosCustos,outrasReceitas,custoSub,receitaSub};
 }
 function renderHeroSubtotals(){
   if(!CALC)return;
@@ -14489,57 +14559,54 @@ function renderHeroSubtotals(){
   if(parcelasBtn)parcelasBtn.classList.toggle('on',SALDOS_VISAO==='parcelas');
   if(refeicoesBtn)refeicoesBtn.classList.toggle('on',SALDOS_VISAO==='refeicoes');
   if(SALDOS_VISAO==='refeicoes'){
-    const receitaPorRefeicao={};
-    CALC.membros.forEach(m=>{
-      (m._refs||[]).forEach(x=>{const k=x.dia+'|'+x.ref;receitaPorRefeicao[k]=rnd((receitaPorRefeicao[k]||0)+(+x.p||0),2);});
-      (m._convs||[]).forEach(x=>{const k=x.dia+'|'+x.ref;receitaPorRefeicao[k]=rnd((receitaPorRefeicao[k]||0)+(+x.q||0),2);});
-    });
-    const custos=[],receitas=[];
-    let totalCustoRefeicoes=0,totalReceitaRefeicoes=0;
-    CALC.refeicoes.forEach(r=>{
-      const k=r.dia+'|'+r.ref;
-      const custo=rnd(r.dirRef||0,2); // apenas o que foi destinado à refeição
-      const receita=rnd(receitaPorRefeicao[k]||0,2);
-      totalCustoRefeicoes=rnd(totalCustoRefeicoes+custo,2);
-      totalReceitaRefeicoes=rnd(totalReceitaRefeicoes+receita,2);
-      const nome=`${fmtDiaMes(r.data)} · ${r.ref}`;
-      custos.push({label:nome,val:custo});receitas.push({label:nome,val:receita});
-    });
-    custos.push({label:'Outros custos',val:rnd(CALC.totDespesas-totalCustoRefeicoes,2)});
-    receitas.push({label:'Outras receitas',val:rnd(CALC.totReceitas-totalReceitaRefeicoes,2)});
+    const bd=refeicoesCustoReceitaBreakdown();
+    const custos=bd.linhas.map(r=>({label:`${fmtDiaMes(r.data)} · ${r.ref}`,val:r.custo}));
+    const receitas=bd.linhas.map(r=>({label:`${fmtDiaMes(r.data)} · ${r.ref}`,val:r.receita}));
+    custos.push({label:'Outros custos',val:bd.outrosCustos,sub:bd.custoSub});
+    receitas.push({label:'Outras receitas',val:bd.outrasReceitas,sub:bd.receitaSub});
     document.getElementById('hero-rec-detail').innerHTML=heroDetalheHtml(receitas);
     document.getElementById('hero-desp-detail').innerHTML=heroDetalheHtml(custos);
-    return;
+  } else {
+    // Receitas breakdown
+    const recItems=[];
+    if(CALC.totRefMembros>0) recItems.push({label:'Refeições',val:CALC.totRefMembros});
+    const guestPay=rnd(CALC.membros.reduce((a,m)=>a+m.AA,0),2);
+    if(guestPay>0) recItems.push({label:'Convidados',val:guestPay});
+    if(CALC.mealTot>0) recItems.push({label:'Mealheiro',val:CALC.mealTot});
+    if(CALC.tsTot>0) recItems.push({label:'T-shirts',val:CALC.tsTot});
+    if(CALC.ssTot>0) recItems.push({label:'Stock Sobrante',val:CALC.ssTot});
+    if(CALC.quotaTot>0) recItems.push({label:'Quota Extra',val:CALC.quotaTot});
+    if(CALC.missaoTot>0) recItems.push({label:'Missão Poupança',val:CALC.missaoTot});
+    document.getElementById('hero-rec-detail').innerHTML=heroDetalheHtml(recItems);
+
+    // Despesas breakdown
+    const despItems=[];
+    const tot=CALC.tot;
+    const tipoOrder=['Gerais','Bebidas','Almoço','Jantar','Renda','Cerveja'];
+    const allTipos=Object.keys(tot).sort((a,b)=>{const ia=tipoOrder.indexOf(a),ib=tipoOrder.indexOf(b);return(ia<0?99:ia)-(ib<0?99:ib);});
+    allTipos.forEach(tipo=>{if(tot[tipo]>0) despItems.push({label:tipo,val:tot[tipo]});});
+    document.getElementById('hero-desp-detail').innerHTML=heroDetalheHtml(despItems);
   }
-  // Receitas breakdown
-  const recItems=[];
-  if(CALC.totRefMembros>0) recItems.push({label:'Refeições',val:CALC.totRefMembros});
-  const guestPay=rnd(CALC.membros.reduce((a,m)=>a+m.AA,0),2);
-  if(guestPay>0) recItems.push({label:'Convidados',val:guestPay});
-  if(CALC.mealTot>0) recItems.push({label:'Mealheiro',val:CALC.mealTot});
-  if(CALC.tsTot>0) recItems.push({label:'T-shirts',val:CALC.tsTot});
-  if(CALC.ssTot>0) recItems.push({label:'Stock Sobrante',val:CALC.ssTot});
-  if(CALC.quotaTot>0) recItems.push({label:'Quota Extra',val:CALC.quotaTot});
-  if(CALC.missaoTot>0) recItems.push({label:'Missão Poupança',val:CALC.missaoTot});
-
-  document.getElementById('hero-rec-detail').innerHTML=heroDetalheHtml(recItems);
-
-  // Despesas breakdown
-  const despItems=[];
-  const tot=CALC.tot;
-  const tipoOrder=['Gerais','Bebidas','Almoço','Jantar','Renda','Cerveja'];
-  const allTipos=Object.keys(tot).sort((a,b)=>{const ia=tipoOrder.indexOf(a),ib=tipoOrder.indexOf(b);return(ia<0?99:ia)-(ib<0?99:ib);});
-  allTipos.forEach(tipo=>{if(tot[tipo]>0) despItems.push({label:tipo,val:tot[tipo]});});
-
-  document.getElementById('hero-desp-detail').innerHTML=heroDetalheHtml(despItems);
+  // heroDetalheHtml recria os blocos sempre fechados — repõe o estado aberto
+  // (e com ele o seletor de vista, que só faz sentido com o detalhe aberto)
+  // se era isso que lá estava, para trocar de vista não fechar o que se veio ver.
+  if(HERO_DETAIL_OPEN){
+    document.querySelectorAll('#hero-rec-detail .hero-expand, #hero-desp-detail .hero-expand').forEach(e=>e.classList.add('open'));
+    document.querySelectorAll('#hero-rec-detail .hero-detail, #hero-desp-detail .hero-detail').forEach(d=>d.classList.add('open'));
+  }
+  const heroCard=document.getElementById('hero-card');
+  if(heroCard)heroCard.classList.toggle('detail-open',HERO_DETAIL_OPEN);
 }
 // Abre/fecha em conjunto os detalhes de Receitas e Despesas
 function toggleHeroDetail(){
   const exps=document.querySelectorAll('#hero-rec-detail .hero-expand, #hero-desp-detail .hero-expand');
   const dets=document.querySelectorAll('#hero-rec-detail .hero-detail, #hero-desp-detail .hero-detail');
   const abrir=[...dets].some(d=>!d.classList.contains('open'));
+  HERO_DETAIL_OPEN=abrir;
   exps.forEach(e=>e.classList.toggle('open',abrir));
   dets.forEach(d=>d.classList.toggle('open',abrir));
+  const heroCard=document.getElementById('hero-card');
+  if(heroCard)heroCard.classList.toggle('detail-open',abrir);
 }
 
 /* ═══ T-SHIRTS ═══
@@ -16353,30 +16420,23 @@ function buildGeneralReport(){
   h+='</table>';
 
   // A mesma leitura do seletor dos Saldos, agora lado a lado para ficar clara
-  // no papel: custo destinado a cada refeição contra o que ela gerou.
-  const receitaPorRefeicao={};
-  ms.forEach(m=>{
-    (m._refs||[]).forEach(x=>{
-      const k=x.dia+'|'+x.ref;
-      receitaPorRefeicao[k]=rnd((receitaPorRefeicao[k]||0)+(+x.p||0),2);
-    });
-    (m._convs||[]).forEach(x=>{
-      const k=x.dia+'|'+x.ref;
-      receitaPorRefeicao[k]=rnd((receitaPorRefeicao[k]||0)+(+x.q||0),2);
-    });
-  });
-  let custoDasRefeicoes=0,receitaDasRefeicoes=0;
+  // no papel: custo destinado a cada refeição (diretos + indiretos alocados,
+  // o mesmo total do cartão da refeição) contra o que ela gerou.
+  const rcBd=refeicoesCustoReceitaBreakdown();
   h+='<h2>Visão por Refeição</h2><table class="balance-view"><tr><th>Refeição</th><th class="right">Custo</th><th class="right">Receitas</th></tr>';
-  CALC.refeicoes.forEach(r=>{
-    const custo=rnd(r.dirRef||0,2);
-    const receita=rnd(receitaPorRefeicao[r.dia+'|'+r.ref]||0,2);
-    custoDasRefeicoes=rnd(custoDasRefeicoes+custo,2);
-    receitaDasRefeicoes=rnd(receitaDasRefeicoes+receita,2);
-    h+=`<tr><td>${fmtPdfDate(r.data)} · ${escHtml(r.ref)}</td><td class="right neg">${eur(custo)}</td><td class="right pos">${eur(receita)}</td></tr>`;
+  rcBd.linhas.forEach(r=>{
+    h+=`<tr><td>${fmtPdfDate(r.data)} · ${escHtml(r.ref)}</td><td class="right neg">${eur(r.custo)}</td><td class="right pos">${eur(r.receita)}</td></tr>`;
   });
-  const outrosCustos=rnd(CALC.totDespesas-custoDasRefeicoes,2);
-  const outrasReceitas=rnd(CALC.totReceitas-receitaDasRefeicoes,2);
-  h+=`<tr><td><b>Outros custos / receitas</b><br><span style="font-size:9px;color:#888">Gerais, bebidas não alocadas, quota, poupança e mealheiros.</span></td><td class="right neg">${eur(outrosCustos)}</td><td class="right pos">${eur(outrasReceitas)}</td></tr>`;
+  h+=`<tr><td><b>Outros custos / receitas</b></td><td class="right neg"><b>${eur(rcBd.outrosCustos)}</b></td><td class="right pos"><b>${eur(rcBd.outrasReceitas)}</b></td></tr>`;
+  if(rcBd.custoSub.length||rcBd.receitaSub.length){
+    const subCol=list=>list.map(s=>`<div style="display:flex;justify-content:space-between;gap:8px;padding:1px 0"><span>${escHtml(s.label)}</span><span>${eur(s.val)}</span></div>`).join('');
+    h+=`<tr><td colspan="3" style="padding:2px 8px 8px;font-size:9px;color:#888;border-bottom:1px solid #eee">
+      <div style="display:flex;gap:24px">
+        <div style="flex:1">${subCol(rcBd.custoSub)}</div>
+        <div style="flex:1">${subCol(rcBd.receitaSub)}</div>
+      </div>
+    </td></tr>`;
+  }
   h+=`<tr style="border-top:2px solid #ddd;font-weight:700"><td><b>Total</b></td><td class="right neg"><b>${eur(CALC.totDespesas)}</b></td><td class="right pos"><b>${eur(CALC.totReceitas)}</b></td></tr>`;
   h+='</table>';
 

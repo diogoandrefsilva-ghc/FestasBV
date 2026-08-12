@@ -116,13 +116,13 @@ setTimeout(function(){ if (window.fbvEsconderSplash) window.fbvEsconderSplash();
     <div class="lbl sf">Saldo do Grupo</div>
     <div class="big" id="saldo-grupo">—</div>
     <div class="hero-saving"><span>🐖 Poupança acumulada</span><b id="poupanca-acumulada">—</b><small id="poupanca-acumulada-nota"></small></div>
-    <div class="hero-view-switch sf" role="group" aria-label="Vista do resumo de saldos">
-      <button type="button" id="hero-view-parcelas" class="on" onclick="setSaldosVisao('parcelas')">Por parcelas</button>
-      <button type="button" id="hero-view-refeicoes" onclick="setSaldosVisao('refeicoes')">Por refeição</button>
-    </div>
     <div class="row">
       <div class="cell"><div class="k sf">Receitas</div><div class="v rc" id="tot-rec">—</div><div id="hero-rec-detail"></div></div>
       <div class="cell"><div class="k sf">Despesas</div><div class="v dp" id="tot-desp">—</div><div id="hero-desp-detail"></div></div>
+    </div>
+    <div class="hero-view-switch sf" role="group" aria-label="Vista do resumo de saldos">
+      <button type="button" id="hero-view-parcelas" onclick="setSaldosVisao('parcelas')">Por parcelas</button>
+      <button type="button" id="hero-view-refeicoes" class="on" onclick="setSaldosVisao('refeicoes')">Por refeição</button>
     </div>
   </div>
   <div id="view-saldos"></div>
@@ -747,6 +747,17 @@ setTimeout(function(){ if (window.fbvEsconderSplash) window.fbvEsconderSplash();
               <input type="number" id="adm-sobras" step="0.01" min="0" placeholder="0" onchange="saveParams()" style="width:82px;font-size:14px;padding:8px 7px;text-align:right" inputmode="decimal" aria-label="Valor da poupança acumulada a usar">
               <span style="font-size:12px;font-weight:700;color:var(--muted)">€</span>
             </div>
+          </div>
+        </div>
+
+        <div id="adm-fracind-row" style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;margin-top:10px">
+          <div style="flex:1;min-width:0">
+            <div style="font-size:13px;font-weight:600">% Indiretos no Custo das Refeições</div>
+            <div id="adm-fracind-hint" style="font-size:11px;color:var(--faint);line-height:1.35;margin-top:2px">—</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;flex:0 0 auto">
+            <input type="number" id="adm-fracind" step="5" min="0" max="100" placeholder="50" onchange="saveParams()" style="width:64px;font-size:14px;padding:8px 7px;text-align:right" inputmode="numeric" aria-label="Percentagem dos indiretos alocada às refeições">
+            <span style="font-size:12px;font-weight:700;color:var(--muted)">%</span>
           </div>
         </div>
 
