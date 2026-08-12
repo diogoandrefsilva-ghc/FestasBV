@@ -734,13 +734,20 @@ setTimeout(function(){ if (window.fbvEsconderSplash) window.fbvEsconderSplash();
 
         <div id="adm-sobras-row" style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;margin-top:10px">
           <div style="flex:1;min-width:0">
-            <div style="font-size:13px;font-weight:600">Usar poupança acumulada</div>
+            <div style="font-size:13px;font-weight:600">Usar Poupança de Anos Anteriores</div>
             <div id="adm-sobras-hint" style="font-size:11px;color:var(--faint);line-height:1.35;margin-top:2px">Disponível: —</div>
           </div>
-          <div style="display:flex;align-items:center;gap:6px;flex:0 0 auto">
-            <input type="number" id="adm-sobras" step="0.01" min="0" placeholder="0" onchange="saveParams()" style="width:72px;font-size:14px;padding:8px 7px;text-align:right" inputmode="decimal" aria-label="Valor da poupança acumulada a usar">
-            <span style="font-size:12px;font-weight:700;color:var(--muted)">€</span>
-            <button type="button" class="btn ghost" onclick="usarPoupancaToda()" style="padding:7px 8px;font-size:11px;white-space:nowrap">Tudo</button>
+          <div style="display:flex;align-items:center;gap:9px;flex:0 0 auto">
+            <div class="adm-bool-labels"><span id="adm-sobras-off-label">Não</span><span id="adm-sobras-on-label">Sim</span></div>
+            <label style="position:relative;width:44px;height:24px;margin:0;flex-shrink:0">
+              <input type="checkbox" id="adm-sobras-on" onchange="toggleSobrasUso(true)" style="opacity:0;width:0;height:0;position:absolute">
+              <span style="position:absolute;inset:0;background:var(--line);border-radius:12px;cursor:pointer;transition:.2s"></span>
+              <span id="adm-sobras-knob" style="position:absolute;top:2px;left:2px;width:20px;height:20px;background:var(--ink);border-radius:50%;transition:.2s"></span>
+            </label>
+            <div style="display:flex;align-items:center;gap:6px">
+              <input type="number" id="adm-sobras" step="0.01" min="0" placeholder="0" onchange="saveParams()" style="width:82px;font-size:14px;padding:8px 7px;text-align:right" inputmode="decimal" aria-label="Valor da poupança acumulada a usar">
+              <span style="font-size:12px;font-weight:700;color:var(--muted)">€</span>
+            </div>
           </div>
         </div>
 

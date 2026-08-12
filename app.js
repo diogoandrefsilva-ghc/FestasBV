@@ -4778,8 +4778,13 @@ function loadParams(){
     if(temCol){
       const disponivel=poupancaDisponivelAntes(DATA.evento.ano);
       const inp=document.getElementById('adm-sobras');
+      const ativo=(DATA.evento.sobrasAplicadas||0)>0.005;
+      const cb=document.getElementById('adm-sobras-on');
+      if(cb)cb.checked=ativo;
       inp.max=disponivel.toFixed(2);
-      inp.value=(DATA.evento.sobrasAplicadas||0)||'';
+      inp.disabled=!ativo;
+      inp.value=ativo?(DATA.evento.sobrasAplicadas||0)||disponivel.toFixed(2):'';
+      _setSobrasKnob(ativo);
       document.getElementById('adm-sobras-hint').textContent=`Disponível da reserva de anos anteriores: ${eur(disponivel)}.`;
     }
   }
@@ -4817,6 +4822,31 @@ function _setPrescorrKnob(on){
   const track=knob?.previousElementSibling;
   if(knob)knob.style.left=on?'22px':'2px';
   if(track)track.style.background=on?'var(--gold)':'var(--line)';
+}
+function _setSobrasKnob(on){
+  const knob=document.getElementById('adm-sobras-knob');
+  const track=knob?.previousElementSibling;
+  const off=document.getElementById('adm-sobras-off-label');
+  const yes=document.getElementById('adm-sobras-on-label');
+  if(knob)knob.style.left=on?'22px':'2px';
+  if(track)track.style.background=on?'var(--gold)':'var(--line)';
+  if(off)off.classList.toggle('on',!on);
+  if(yes)yes.classList.toggle('on',on);
+}
+function toggleSobrasUso(guardar){
+  if(!DATA||!DATA.evento.sobrasAplicadasCol)return;
+  const cb=document.getElementById('adm-sobras-on');
+  const inp=document.getElementById('adm-sobras');
+  const on=!!cb?.checked;
+  const disponivel=poupancaDisponivelAntes(DATA.evento.ano);
+  if(inp){
+    inp.disabled=!on;
+    inp.max=disponivel.toFixed(2);
+    if(on&&!parseFloat(inp.value))inp.value=disponivel?disponivel.toFixed(2):'';
+    if(!on)inp.value='';
+  }
+  _setSobrasKnob(on);
+  if(guardar)saveParams();
 }
 function usarPoupancaToda(){
   if(!DATA||!DATA.evento.sobrasAplicadasCol)return;
@@ -5013,7 +5043,8 @@ async function saveParams(){
   }
   if(DATA.evento.sobrasAplicadasCol){
     const disponivel=poupancaDisponivelAntes(DATA.evento.ano);
-    let usar=parseFloat(document.getElementById('adm-sobras').value)||0;
+    const ativo=!!document.getElementById('adm-sobras-on')?.checked;
+    let usar=ativo?(parseFloat(document.getElementById('adm-sobras').value)||0):0;
     usar=rnd(Math.max(0,usar),2);
     if(usar>disponivel+0.005){toast(`Só tens ${eur(disponivel)} de poupança acumulada disponível`,'bad');loadParams();return;}
     DATA.evento.sobrasAplicadas=usar;
