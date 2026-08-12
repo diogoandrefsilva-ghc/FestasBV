@@ -65,10 +65,13 @@ header .sub{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:#
 .hero-expand .he-arrow{transition:transform .2s;font-size:9px}
 .hero-expand.open .he-arrow{transform:rotate(180deg)}
 .hero-detail{max-height:0;overflow:hidden;transition:max-height .3s ease}
-.hero-detail.open{max-height:400px}
+.hero-detail.open{max-height:900px}
 .hero-detail-item{display:flex;justify-content:space-between;padding:4px 0;font-size:11px;border-bottom:1px solid rgba(110,75,25,.10)}
 .hero-detail-item:last-child{border-bottom:none}
 .hero-detail-item .hd-lbl{color:var(--muted)}.hero-detail-item .hd-val{font-weight:700;color:var(--ink)}
+.hero-detail-sub{padding:0 0 4px 12px}
+.hero-detail-subitem{display:flex;justify-content:space-between;padding:2px 0;font-size:10px;color:var(--faint)}
+.hero-detail-subitem .hd-val{font-weight:600}
 
 /* ═══ Tabs — banda campino com separadores tipo "pasta" (estilo SplitBill) ═══ */
 .tabs{display:flex;gap:4px;background:repeating-linear-gradient(0deg,rgba(255,255,255,.05) 0 7px,transparent 7px 14px),var(--campino-escuro);border:none;border-radius:0;padding:10px max(14px,calc((100% - 532px)/2)) 0;margin:0;position:sticky;top:env(safe-area-inset-top,0px);z-index:20}

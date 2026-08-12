@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v280 · 2026-08-12 · Shop List: um pedido de refeição (Almoço/Jantar) cujo dia já passou e continua por comprar passa a avisar "⚠️ refeição já passou" no cartão de "Em falta" — não se esconde nem se cancela sozinho, só se diz que já ninguém está à espera daquilo · v279 · 2026-08-11 · T-shirts: editar um pedido cujo "Encomendado por" já saiu do plantel deste ano deixa de esconder o campo (o select ficava vazio e o Guardar recusava sempre) — o nome antigo aparece marcado "fora do plantel" e dá para reatribuir a t-shirt a outra pessoa · v278 · 2026-08-11 · Quota Extra: o Fundo de Reserva deixa de ser ignorado nos anos em que as fontes diretas (refeições, convidados, mealheiros, t-shirts, stock sobrante) já cobrem a despesa — passa a somar-se sempre à conta antes de se cortar a zero, para o valor "a guardar" ser mesmo cobrado · v277 · 2026-08-10 · Definições › Parametrizações: novo interruptor "Corrigir Presenças" (por ano) que deixa cada um corrigir as suas presenças de dias já passados desse evento — desligado por defeito, e as contas fechadas continuam a trancar tudo mesmo com ele ligado · v276 · 2026-08-10 · Adicionar Convidado: o campo "Trazido por" deixa de escolher o primeiro membro por ordem alfabética do casal e passa a vir pré-selecionado com o próprio utilizador, como no resto da app · v275 · 2026-08-10 · Shop List: um pedido sem loja própria que está a herdar a loja de outro pedido do mesmo artigo agora pode recusar essa herança ("🚫 Não herdar — deixar sem loja"), sem mexer no pedido que a escreveu · v274 · 2026-08-10 · Pagar Dívida: um pagamento livre / adiantamento (sem dívidas selecionadas) passa a ter uma caixa de observações, para dizer o que é aquele dinheiro · v273 · 2026-08-10 · PDF de pessoa (Saldos): as Refeições ordenam-se por dia e mostram o prato; e as Despesas Adiantadas deixam de mostrar "🧺 Stock" como nota e passam a mostrar o destino real (refeição/tipo) em vez de "Gerais" sempre que a compra tem um destino só · v272 · Stock alocado a uma PESSOA (🎒 leva para casa): no separador Stock, uma alocação pode agora apontar a um membro em vez de a uma refeição — é para as sobras que não voltam a ser usadas. O custo sai do rateio e passa a ser cobrado só a essa pessoa (aparece no saldo dela, como as t-shirts) · v271 · Nos Saldos, uma compra com peça "só despesa" (saco, depósito) deixa de aparecer duplicada em "Despesas adiantadas" — as linhas da mesma compra juntam-se numa só. E "Despesas adiantadas" separa-se em duas: o que já pagaste (📅) e o que está previsto mas ainda por pagar (📌 provisórias) · v270 · As SOBRAS deixam de reabrir o pedido: um lote comprado para uma refeição conta inteiro na cobertura, mesmo com parte por alocar na bolsa comum — compram-se 8 pacotes para o jantar, comem-se 5, e a lista já não pede os outros 3 que estão na despensa. É a mesma leitura que o cartão da refeição já fazia. Mover o stock para outra refeição continua a reabrir o pedido · v269 · Uma falta “dita à mão” passa a dizer que o é — na lista e no cartão da refeição, como já dizia o “coberto” e a folha do 🖨 —, e o bloco “que pedidos é que isto trata?” marca a linha que não é a app a deduzir. Trocar o artigo de um pedido (chouriço de sangue → morcela) deita fora a cobertura declarada sobre o artigo antigo, que ficava a mandar sobre o stock novo';
+const APP_BUILD = 'v281 · 2026-08-12 · Saldos › vista "Por refeição": o custo de cada refeição passa a incluir os indiretos (Gerais/Bebidas/Cerveja) que lhe cabem, como no cartão da refeição — antes só contava os diretos e o custo ficava sempre abaixo da receita. "Outros custos"/"Outras receitas" ganham detalhe por baixo (T-shirts, Stock Sobrante, Quota Extra, Mealheiro, Missão Poupança…), no ecrã e no PDF · v280 · 2026-08-12 · Shop List: um pedido de refeição (Almoço/Jantar) cujo dia já passou e continua por comprar passa a avisar "⚠️ refeição já passou" no cartão de "Em falta" — não se esconde nem se cancela sozinho, só se diz que já ninguém está à espera daquilo · v279 · 2026-08-11 · T-shirts: editar um pedido cujo "Encomendado por" já saiu do plantel deste ano deixa de esconder o campo (o select ficava vazio e o Guardar recusava sempre) — o nome antigo aparece marcado "fora do plantel" e dá para reatribuir a t-shirt a outra pessoa · v278 · 2026-08-11 · Quota Extra: o Fundo de Reserva deixa de ser ignorado nos anos em que as fontes diretas (refeições, convidados, mealheiros, t-shirts, stock sobrante) já cobrem a despesa — passa a somar-se sempre à conta antes de se cortar a zero, para o valor "a guardar" ser mesmo cobrado · v277 · 2026-08-10 · Definições › Parametrizações: novo interruptor "Corrigir Presenças" (por ano) que deixa cada um corrigir as suas presenças de dias já passados desse evento — desligado por defeito, e as contas fechadas continuam a trancar tudo mesmo com ele ligado · v276 · 2026-08-10 · Adicionar Convidado: o campo "Trazido por" deixa de escolher o primeiro membro por ordem alfabética do casal e passa a vir pré-selecionado com o próprio utilizador, como no resto da app · v275 · 2026-08-10 · Shop List: um pedido sem loja própria que está a herdar a loja de outro pedido do mesmo artigo agora pode recusar essa herança ("🚫 Não herdar — deixar sem loja"), sem mexer no pedido que a escreveu · v274 · 2026-08-10 · Pagar Dívida: um pagamento livre / adiantamento (sem dívidas selecionadas) passa a ter uma caixa de observações, para dizer o que é aquele dinheiro · v273 · 2026-08-10 · PDF de pessoa (Saldos): as Refeições ordenam-se por dia e mostram o prato; e as Despesas Adiantadas deixam de mostrar "🧺 Stock" como nota e passam a mostrar o destino real (refeição/tipo) em vez de "Gerais" sempre que a compra tem um destino só · v272 · Stock alocado a uma PESSOA (🎒 leva para casa): no separador Stock, uma alocação pode agora apontar a um membro em vez de a uma refeição — é para as sobras que não voltam a ser usadas. O custo sai do rateio e passa a ser cobrado só a essa pessoa (aparece no saldo dela, como as t-shirts) · v271 · Nos Saldos, uma compra com peça "só despesa" (saco, depósito) deixa de aparecer duplicada em "Despesas adiantadas" — as linhas da mesma compra juntam-se numa só. E "Despesas adiantadas" separa-se em duas: o que já pagaste (📅) e o que está previsto mas ainda por pagar (📌 provisórias) · v270 · As SOBRAS deixam de reabrir o pedido: um lote comprado para uma refeição conta inteiro na cobertura, mesmo com parte por alocar na bolsa comum — compram-se 8 pacotes para o jantar, comem-se 5, e a lista já não pede os outros 3 que estão na despensa. É a mesma leitura que o cartão da refeição já fazia. Mover o stock para outra refeição continua a reabrir o pedido · v269 · Uma falta “dita à mão” passa a dizer que o é — na lista e no cartão da refeição, como já dizia o “coberto” e a folha do 🖨 —, e o bloco “que pedidos é que isto trata?” marca a linha que não é a app a deduzir. Trocar o artigo de um pedido (chouriço de sangue → morcela) deita fora a cobertura declarada sobre o artigo antigo, que ficava a mandar sobre o stock novo';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -1015,7 +1015,7 @@ function calcular(data){
     m._payerOthersPortion=payerOthersPortion[m.nome]||0;
   }
 
-  return{refeicoes,membros,BN3,F20,saldoGrupo,totRefMembros,tot,totReceitas,totDespesas:totalDesp,sumF,pagamentos:pag,sobrasTot,descontoTot,mealTot,quotaTot,missaoTot,tsTot,totTSdesp,ssTot};
+  return{refeicoes,membros,BN3,F20,saldoGrupo,totRefMembros,tot,totReceitas,totDespesas:totalDesp,sumF,pagamentos:pag,sobrasTot,descontoTot,mealTot,quotaTot,missaoTot,tsTot,totTSdesp,ssTot,totSSdesp};
 }
 
 /* ── Poupança acumulada / sobras aplicadas ───────────────────────────
@@ -14479,8 +14479,47 @@ function heroDetalheHtml(items){
   if(!items.length)return '';
   let h=`<div class="hero-expand sf" onclick="toggleHeroDetail()"><span>ver detalhe</span><span class="he-arrow">▼</span></div>`;
   h+='<div class="hero-detail sf">';
-  items.forEach(it=>{h+=`<div class="hero-detail-item"><span class="hd-lbl">${it.label}</span><span class="hd-val">${eur(it.val)}</span></div>`;});
+  items.forEach(it=>{
+    h+=`<div class="hero-detail-item"><span class="hd-lbl">${it.label}</span><span class="hd-val">${eur(it.val)}</span></div>`;
+    if(it.sub&&it.sub.length)h+=`<div class="hero-detail-sub">${it.sub.map(s=>`<div class="hero-detail-subitem"><span class="hd-lbl">${s.label}</span><span class="hd-val">${eur(s.val)}</span></div>`).join('')}</div>`;
+  });
   return h+'</div>';
+}
+/* Vista "por refeição": custo e receita de cada refeição, e o detalhe do que
+   sobra fora delas — partilhado pelo hero (Saldos) e pelo PDF (buildGeneralReport),
+   para as duas leituras nunca poderem discordar. */
+function refeicoesCustoReceitaBreakdown(){
+  if(!CALC)return null;
+  const receitaPorRefeicao={};
+  CALC.membros.forEach(m=>{
+    (m._refs||[]).forEach(x=>{const k=x.dia+'|'+x.ref;receitaPorRefeicao[k]=rnd((receitaPorRefeicao[k]||0)+(+x.p||0),2);});
+    (m._convs||[]).forEach(x=>{const k=x.dia+'|'+x.ref;receitaPorRefeicao[k]=rnd((receitaPorRefeicao[k]||0)+(+x.q||0),2);});
+  });
+  const linhas=[];let totalCusto=0,totalReceita=0;
+  CALC.refeicoes.forEach(r=>{
+    // custoTotal = diretos + indiretos (Gerais/Bebidas/Cerveja) alocados a esta
+    // refeição — o mesmo total que o cartão da refeição mostra em "Custo da
+    // refeição". O dirRef antigo ficava só pelos diretos e escondia os indiretos.
+    const custo=rnd(r.custoTotal||0,2);
+    const receita=rnd(receitaPorRefeicao[r.dia+'|'+r.ref]||0,2);
+    totalCusto=rnd(totalCusto+custo,2);totalReceita=rnd(totalReceita+receita,2);
+    linhas.push({dia:r.dia,ref:r.ref,data:r.data,custo,receita});
+  });
+  const outrosCustos=rnd(CALC.totDespesas-totalCusto,2);
+  const outrasReceitas=rnd(CALC.totReceitas-totalReceita,2);
+  const custoSub=[
+    {label:'T-shirts',val:rnd(CALC.totTSdesp||0,2)},
+    {label:'Stock Sobrante',val:rnd(CALC.totSSdesp||0,2)},
+    {label:'Indiretos não atribuídos a uma refeição',val:rnd(outrosCustos-(CALC.totTSdesp||0)-(CALC.totSSdesp||0),2)}
+  ].filter(x=>x.val>0.005);
+  const receitaSub=[
+    {label:'Quota Extra',val:rnd(CALC.quotaTot||0,2)},
+    {label:'Mealheiro',val:rnd(CALC.mealTot||0,2)},
+    {label:'Missão Poupança',val:rnd(CALC.missaoTot||0,2)},
+    {label:'T-shirts',val:rnd(CALC.tsTot||0,2)},
+    {label:'Stock Sobrante',val:rnd(CALC.ssTot||0,2)}
+  ].filter(x=>x.val>0.005);
+  return{linhas,outrosCustos,outrasReceitas,custoSub,receitaSub};
 }
 function renderHeroSubtotals(){
   if(!CALC)return;
@@ -14489,24 +14528,11 @@ function renderHeroSubtotals(){
   if(parcelasBtn)parcelasBtn.classList.toggle('on',SALDOS_VISAO==='parcelas');
   if(refeicoesBtn)refeicoesBtn.classList.toggle('on',SALDOS_VISAO==='refeicoes');
   if(SALDOS_VISAO==='refeicoes'){
-    const receitaPorRefeicao={};
-    CALC.membros.forEach(m=>{
-      (m._refs||[]).forEach(x=>{const k=x.dia+'|'+x.ref;receitaPorRefeicao[k]=rnd((receitaPorRefeicao[k]||0)+(+x.p||0),2);});
-      (m._convs||[]).forEach(x=>{const k=x.dia+'|'+x.ref;receitaPorRefeicao[k]=rnd((receitaPorRefeicao[k]||0)+(+x.q||0),2);});
-    });
-    const custos=[],receitas=[];
-    let totalCustoRefeicoes=0,totalReceitaRefeicoes=0;
-    CALC.refeicoes.forEach(r=>{
-      const k=r.dia+'|'+r.ref;
-      const custo=rnd(r.dirRef||0,2); // apenas o que foi destinado à refeição
-      const receita=rnd(receitaPorRefeicao[k]||0,2);
-      totalCustoRefeicoes=rnd(totalCustoRefeicoes+custo,2);
-      totalReceitaRefeicoes=rnd(totalReceitaRefeicoes+receita,2);
-      const nome=`${fmtDiaMes(r.data)} · ${r.ref}`;
-      custos.push({label:nome,val:custo});receitas.push({label:nome,val:receita});
-    });
-    custos.push({label:'Outros custos',val:rnd(CALC.totDespesas-totalCustoRefeicoes,2)});
-    receitas.push({label:'Outras receitas',val:rnd(CALC.totReceitas-totalReceitaRefeicoes,2)});
+    const bd=refeicoesCustoReceitaBreakdown();
+    const custos=bd.linhas.map(r=>({label:`${fmtDiaMes(r.data)} · ${r.ref}`,val:r.custo}));
+    const receitas=bd.linhas.map(r=>({label:`${fmtDiaMes(r.data)} · ${r.ref}`,val:r.receita}));
+    custos.push({label:'Outros custos',val:bd.outrosCustos,sub:bd.custoSub});
+    receitas.push({label:'Outras receitas',val:bd.outrasReceitas,sub:bd.receitaSub});
     document.getElementById('hero-rec-detail').innerHTML=heroDetalheHtml(receitas);
     document.getElementById('hero-desp-detail').innerHTML=heroDetalheHtml(custos);
     return;
@@ -16353,30 +16379,23 @@ function buildGeneralReport(){
   h+='</table>';
 
   // A mesma leitura do seletor dos Saldos, agora lado a lado para ficar clara
-  // no papel: custo destinado a cada refeição contra o que ela gerou.
-  const receitaPorRefeicao={};
-  ms.forEach(m=>{
-    (m._refs||[]).forEach(x=>{
-      const k=x.dia+'|'+x.ref;
-      receitaPorRefeicao[k]=rnd((receitaPorRefeicao[k]||0)+(+x.p||0),2);
-    });
-    (m._convs||[]).forEach(x=>{
-      const k=x.dia+'|'+x.ref;
-      receitaPorRefeicao[k]=rnd((receitaPorRefeicao[k]||0)+(+x.q||0),2);
-    });
-  });
-  let custoDasRefeicoes=0,receitaDasRefeicoes=0;
+  // no papel: custo destinado a cada refeição (diretos + indiretos alocados,
+  // o mesmo total do cartão da refeição) contra o que ela gerou.
+  const rcBd=refeicoesCustoReceitaBreakdown();
   h+='<h2>Visão por Refeição</h2><table class="balance-view"><tr><th>Refeição</th><th class="right">Custo</th><th class="right">Receitas</th></tr>';
-  CALC.refeicoes.forEach(r=>{
-    const custo=rnd(r.dirRef||0,2);
-    const receita=rnd(receitaPorRefeicao[r.dia+'|'+r.ref]||0,2);
-    custoDasRefeicoes=rnd(custoDasRefeicoes+custo,2);
-    receitaDasRefeicoes=rnd(receitaDasRefeicoes+receita,2);
-    h+=`<tr><td>${fmtPdfDate(r.data)} · ${escHtml(r.ref)}</td><td class="right neg">${eur(custo)}</td><td class="right pos">${eur(receita)}</td></tr>`;
+  rcBd.linhas.forEach(r=>{
+    h+=`<tr><td>${fmtPdfDate(r.data)} · ${escHtml(r.ref)}</td><td class="right neg">${eur(r.custo)}</td><td class="right pos">${eur(r.receita)}</td></tr>`;
   });
-  const outrosCustos=rnd(CALC.totDespesas-custoDasRefeicoes,2);
-  const outrasReceitas=rnd(CALC.totReceitas-receitaDasRefeicoes,2);
-  h+=`<tr><td><b>Outros custos / receitas</b><br><span style="font-size:9px;color:#888">Gerais, bebidas não alocadas, quota, poupança e mealheiros.</span></td><td class="right neg">${eur(outrosCustos)}</td><td class="right pos">${eur(outrasReceitas)}</td></tr>`;
+  h+=`<tr><td><b>Outros custos / receitas</b></td><td class="right neg"><b>${eur(rcBd.outrosCustos)}</b></td><td class="right pos"><b>${eur(rcBd.outrasReceitas)}</b></td></tr>`;
+  if(rcBd.custoSub.length||rcBd.receitaSub.length){
+    const subCol=list=>list.map(s=>`<div style="display:flex;justify-content:space-between;gap:8px;padding:1px 0"><span>${escHtml(s.label)}</span><span>${eur(s.val)}</span></div>`).join('');
+    h+=`<tr><td colspan="3" style="padding:2px 8px 8px;font-size:9px;color:#888;border-bottom:1px solid #eee">
+      <div style="display:flex;gap:24px">
+        <div style="flex:1">${subCol(rcBd.custoSub)}</div>
+        <div style="flex:1">${subCol(rcBd.receitaSub)}</div>
+      </div>
+    </td></tr>`;
+  }
   h+=`<tr style="border-top:2px solid #ddd;font-weight:700"><td><b>Total</b></td><td class="right neg"><b>${eur(CALC.totDespesas)}</b></td><td class="right pos"><b>${eur(CALC.totReceitas)}</b></td></tr>`;
   h+='</table>';
 
