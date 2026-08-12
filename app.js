@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v299 · 2026-08-12 · Cash Flows: o "Por detalhar" deixa de ser um chip à parte e passa para dentro do seletor de refeições/tipos, no fim ("📝 Por detalhar · N") — o ecrã já tinha filtros a mais por cima da lista. Deixa de se poder cruzar com uma refeição · v298 · 2026-08-12 · Cash Flows › filtro por refeição/tipo: o dia passa a três letras ("Jantar Sáb, 8/ago" em vez de "Jantar Sábado, 8/ago") — o dropdown do iOS não deixa encolher a letra das opções, e por extenso partia cada refeição em duas linhas · v297 · 2026-08-12 · Cash Flows › filtro por refeição/tipo: a 🍻 bebida de uma refeição deixa de ter entrada própria (funde-se na refeição, que é como se procura) e as entradas passam a dizer a refeição por extenso ("Almoço Segunda, 10/ago"); o 🎒 "leva para casa" sai do filtro — é alocação feita no Stock, não o objetivo da compra. E um chip novo "🧾 Por detalhar" mostra as despesas soltas, sem artigos item a item · v296 · 2026-08-12 · Cash Flows: a lista passa a ordenar-se sempre por ordem descendente (também dentro do mesmo dia, pelo mais recente a entrar) — antes ficava ascendente dentro do dia, o que baralhava. E uma despesa avulsa (sem compra) ganha "🧾 Detalhar por artigo" no editor, para quem a pode editar (admin, ou quem a registou) a transformar numa compra com itens e preços · v295 · 2026-08-12 · Detalhe "Por categoria": o stock ainda POR ALOCAR deixa de cair no balde "Sacos/Depósitos/Similares" — o dinheiro continua a repartir-se pelas refeições na mesma (é bolsa comum), mas cada parcela passa a aparecer na categoria do seu artigo (Conservas, Legumes…), como o stock já alocado. Não estar entregue a uma refeição não o torna menos Conservas. O balde fica só com os sacos/taxas · v294 · 2026-08-12 · Relatório geral (PDF): nova secção "Custos Indiretos por Categoria" — o mesmo detalhe que cada cartão de refeição abre, mas somado por todas elas. Sai da MESMA função do ecrã (catIndirRows), para as duas leituras não poderem discordar · v293 · 2026-08-12 · CORRIGE a v291, que fez as categorias desaparecer do detalhe "Por categoria" (Utensílios, Bebidas, Fruta… iam todas parar a "Sacos/Depósitos/Similares"): o marcador "🧺 Stock" está em CADA artigo que o stock reparte pelas refeições, não só na linha do resto por alocar — o que as separa é a linha do resto ser uma despesa real da compra · v292 · 2026-08-12 · Custo da refeição › detalhe "Por categoria": as linhas "🧾 só despesa" (sacos, depósitos, taxas) voltam a agrupar-se sempre em "Sacos/Depósitos/Similares", mesmo tendo descritivo próprio — reconhecem-se pelo nome (o mesmo dicionário do "🧾 Extras da fatura"), que agora também apanha "Depósito" sozinho · v291 · 2026-08-12 · Custo da refeição › detalhe "Por categoria": a linha 🧺 Stock (o resto por alocar) deixa de cair no nome da loja da compra — vai direto para o catch-all "Sacos/Depósitos/Similares", sem tentar mais nenhum descritivo · v290 · 2026-08-12 · Custo da refeição › detalhe "Por categoria": uma despesa de uma COMPRA (sacos/depósitos, provisória antiga) passa a mostrar-se pelas OBSERVAÇÕES (o artigo) em vez do "Descritivo" da compra (normalmente o nome da loja, partilhado por todas as despesas dela) — a loja aparecia a repetir-se em vez do saco/depósito. E o resto por alocar da linha "🧺 Stock" deixa de se disfarçar atrás do nome da loja: volta a cair no catch-all, que agora aparece mesmo quando há stock por alocar · v289 · 2026-08-12 · Revertida a v288 (categorizar o stock por alocar por lote) — os números de "Sacos/Depósitos/Similares" estavam a inflacionar em vez de encolher, sinal de que a reconstrução não estava a bater certo com o resto real da compra. Volta-se à v287 enquanto se investiga com dados reais · v287 · 2026-08-12 · Custo da refeição › detalhe "Por categoria": uma despesa sem categoria deixa de se amontoar em "Sacos/Depósitos/Similares" — passa a mostrar-se pelo seu próprio descritivo (o artigo do stock, ou o texto escrito na despesa), como se fosse um artigo. O catch-all fica reservado para o que não tem descritivo nenhum (o stock ainda por alocar) · v286 · 2026-08-12 · Quem inseriu uma despesa passa a poder editá-la/apagá-la: sem compra associada é sempre sua (própria/cônjuge); vindo de uma compra com stock só enquanto o admin não tiver ido ao separador Stock realocar os artigos — a partir daí a compra fecha-se para ela, com aviso, e só o admin a edita (requer correr db/despesas_self_edit.sql) · v285 · 2026-08-12 · Custo da refeição: o detalhe de "Custos diretos" passa a ordenar as despesas por valor descendente. Com bebida concreta alocada, a ordem dos blocos passa a ser diretos → bebida (sem o ícone 🍻) → indiretos, e "Custos indiretos" chama-se agora "Outros custos indiretos", com o chip "Bebidas" lá dentro a passar a "Outras bebidas" nesse caso · v284 · 2026-08-12 · Custo da refeição: os custos indiretos ganham um detalhe expansível "Por categoria" — o mesmo € de Bebidas/Cerveja/Gerais, mas repartido pela categoria do artigo (a mesma das Compras/Stock), maior primeiro; o que não é stock nenhum (sacos, depósitos, taxas) ou ainda não tem categoria cai em "Sacos/Depósitos/Similares", sempre por último · v283 · 2026-08-12 · Definições › Parametrizações: a fração da bolsa indireta (Gerais/Bebidas/Cerveja) que entra no preço das refeições deixa de estar fixa em 50% — passa a ser ajustável por ano, só em anos abertos. T-shirts e Stock Sobrante continuam sempre de fora dessa bolsa · v282 · 2026-08-12 · Saldos: a vista "Por refeição" passa a ser a principal, e o seletor "Por parcelas"/"Por refeição" desce para debaixo de Receitas/Despesas, só à vista com o detalhe aberto (ali é que faz diferença — os totais não mudam com a vista) · v281 · 2026-08-12 · Saldos › vista "Por refeição": o custo de cada refeição passa a incluir os indiretos (Gerais/Bebidas/Cerveja) que lhe cabem, como no cartão da refeição — antes só contava os diretos e o custo ficava sempre abaixo da receita. "Outros custos"/"Outras receitas" ganham detalhe por baixo (T-shirts, Stock Sobrante, Quota Extra, Mealheiro, Missão Poupança…), no ecrã e no PDF · v280 · 2026-08-12 · Shop List: um pedido de refeição (Almoço/Jantar) cujo dia já passou e continua por comprar passa a avisar "⚠️ refeição já passou" no cartão de "Em falta" — não se esconde nem se cancela sozinho, só se diz que já ninguém está à espera daquilo · v279 · 2026-08-11 · T-shirts: editar um pedido cujo "Encomendado por" já saiu do plantel deste ano deixa de esconder o campo (o select ficava vazio e o Guardar recusava sempre) — o nome antigo aparece marcado "fora do plantel" e dá para reatribuir a t-shirt a outra pessoa · v278 · 2026-08-11 · Quota Extra: o Fundo de Reserva deixa de ser ignorado nos anos em que as fontes diretas (refeições, convidados, mealheiros, t-shirts, stock sobrante) já cobrem a despesa — passa a somar-se sempre à conta antes de se cortar a zero, para o valor "a guardar" ser mesmo cobrado · v277 · 2026-08-10 · Definições › Parametrizações: novo interruptor "Corrigir Presenças" (por ano) que deixa cada um corrigir as suas presenças de dias já passados desse evento — desligado por defeito, e as contas fechadas continuam a trancar tudo mesmo com ele ligado · v276 · 2026-08-10 · Adicionar Convidado: o campo "Trazido por" deixa de escolher o primeiro membro por ordem alfabética do casal e passa a vir pré-selecionado com o próprio utilizador, como no resto da app · v275 · 2026-08-10 · Shop List: um pedido sem loja própria que está a herdar a loja de outro pedido do mesmo artigo agora pode recusar essa herança ("🚫 Não herdar — deixar sem loja"), sem mexer no pedido que a escreveu · v274 · 2026-08-10 · Pagar Dívida: um pagamento livre / adiantamento (sem dívidas selecionadas) passa a ter uma caixa de observações, para dizer o que é aquele dinheiro · v273 · 2026-08-10 · PDF de pessoa (Saldos): as Refeições ordenam-se por dia e mostram o prato; e as Despesas Adiantadas deixam de mostrar "🧺 Stock" como nota e passam a mostrar o destino real (refeição/tipo) em vez de "Gerais" sempre que a compra tem um destino só · v272 · Stock alocado a uma PESSOA (🎒 leva para casa): no separador Stock, uma alocação pode agora apontar a um membro em vez de a uma refeição — é para as sobras que não voltam a ser usadas. O custo sai do rateio e passa a ser cobrado só a essa pessoa (aparece no saldo dela, como as t-shirts) · v271 · Nos Saldos, uma compra com peça "só despesa" (saco, depósito) deixa de aparecer duplicada em "Despesas adiantadas" — as linhas da mesma compra juntam-se numa só. E "Despesas adiantadas" separa-se em duas: o que já pagaste (📅) e o que está previsto mas ainda por pagar (📌 provisórias) · v270 · As SOBRAS deixam de reabrir o pedido: um lote comprado para uma refeição conta inteiro na cobertura, mesmo com parte por alocar na bolsa comum — compram-se 8 pacotes para o jantar, comem-se 5, e a lista já não pede os outros 3 que estão na despensa. É a mesma leitura que o cartão da refeição já fazia. Mover o stock para outra refeição continua a reabrir o pedido · v269 · Uma falta “dita à mão” passa a dizer que o é — na lista e no cartão da refeição, como já dizia o “coberto” e a folha do 🖨 —, e o bloco “que pedidos é que isto trata?” marca a linha que não é a app a deduzir. Trocar o artigo de um pedido (chouriço de sangue → morcela) deita fora a cobertura declarada sobre o artigo antigo, que ficava a mandar sobre o stock novo';
+const APP_BUILD = 'v300 · 2026-08-12 · Stock: os quatro chips de estado passam a uma combobox (consumido/por gastar · alocado/por alocar, com a contagem em cada opção) e ao lado nasce uma SEGUNDA combobox para a alocação — ver só o que está em Gerais, em Bebidas, no jantar de 7/ago ou no 🎒 de alguém. Escolhido um destino, os chips do cartão e o € da categoria passam a ser os desse destino. A 🍻 bebida de uma refeição vem com ela. E corrige o chip "🧺 por alocar", que desde a v268 (quando o chip "Tudo" saiu) só aparecia a filtrar precisamente por "Por alocar" · v299 · 2026-08-12 · Cash Flows: o "Por detalhar" deixa de ser um chip à parte e passa para dentro do seletor de refeições/tipos, no fim ("📝 Por detalhar · N") — o ecrã já tinha filtros a mais por cima da lista. Deixa de se poder cruzar com uma refeição · v298 · 2026-08-12 · Cash Flows › filtro por refeição/tipo: o dia passa a três letras ("Jantar Sáb, 8/ago" em vez de "Jantar Sábado, 8/ago") — o dropdown do iOS não deixa encolher a letra das opções, e por extenso partia cada refeição em duas linhas · v297 · 2026-08-12 · Cash Flows › filtro por refeição/tipo: a 🍻 bebida de uma refeição deixa de ter entrada própria (funde-se na refeição, que é como se procura) e as entradas passam a dizer a refeição por extenso ("Almoço Segunda, 10/ago"); o 🎒 "leva para casa" sai do filtro — é alocação feita no Stock, não o objetivo da compra. E um chip novo "🧾 Por detalhar" mostra as despesas soltas, sem artigos item a item · v296 · 2026-08-12 · Cash Flows: a lista passa a ordenar-se sempre por ordem descendente (também dentro do mesmo dia, pelo mais recente a entrar) — antes ficava ascendente dentro do dia, o que baralhava. E uma despesa avulsa (sem compra) ganha "🧾 Detalhar por artigo" no editor, para quem a pode editar (admin, ou quem a registou) a transformar numa compra com itens e preços · v295 · 2026-08-12 · Detalhe "Por categoria": o stock ainda POR ALOCAR deixa de cair no balde "Sacos/Depósitos/Similares" — o dinheiro continua a repartir-se pelas refeições na mesma (é bolsa comum), mas cada parcela passa a aparecer na categoria do seu artigo (Conservas, Legumes…), como o stock já alocado. Não estar entregue a uma refeição não o torna menos Conservas. O balde fica só com os sacos/taxas · v294 · 2026-08-12 · Relatório geral (PDF): nova secção "Custos Indiretos por Categoria" — o mesmo detalhe que cada cartão de refeição abre, mas somado por todas elas. Sai da MESMA função do ecrã (catIndirRows), para as duas leituras não poderem discordar · v293 · 2026-08-12 · CORRIGE a v291, que fez as categorias desaparecer do detalhe "Por categoria" (Utensílios, Bebidas, Fruta… iam todas parar a "Sacos/Depósitos/Similares"): o marcador "🧺 Stock" está em CADA artigo que o stock reparte pelas refeições, não só na linha do resto por alocar — o que as separa é a linha do resto ser uma despesa real da compra · v292 · 2026-08-12 · Custo da refeição › detalhe "Por categoria": as linhas "🧾 só despesa" (sacos, depósitos, taxas) voltam a agrupar-se sempre em "Sacos/Depósitos/Similares", mesmo tendo descritivo próprio — reconhecem-se pelo nome (o mesmo dicionário do "🧾 Extras da fatura"), que agora também apanha "Depósito" sozinho · v291 · 2026-08-12 · Custo da refeição › detalhe "Por categoria": a linha 🧺 Stock (o resto por alocar) deixa de cair no nome da loja da compra — vai direto para o catch-all "Sacos/Depósitos/Similares", sem tentar mais nenhum descritivo · v290 · 2026-08-12 · Custo da refeição › detalhe "Por categoria": uma despesa de uma COMPRA (sacos/depósitos, provisória antiga) passa a mostrar-se pelas OBSERVAÇÕES (o artigo) em vez do "Descritivo" da compra (normalmente o nome da loja, partilhado por todas as despesas dela) — a loja aparecia a repetir-se em vez do saco/depósito. E o resto por alocar da linha "🧺 Stock" deixa de se disfarçar atrás do nome da loja: volta a cair no catch-all, que agora aparece mesmo quando há stock por alocar · v289 · 2026-08-12 · Revertida a v288 (categorizar o stock por alocar por lote) — os números de "Sacos/Depósitos/Similares" estavam a inflacionar em vez de encolher, sinal de que a reconstrução não estava a bater certo com o resto real da compra. Volta-se à v287 enquanto se investiga com dados reais · v287 · 2026-08-12 · Custo da refeição › detalhe "Por categoria": uma despesa sem categoria deixa de se amontoar em "Sacos/Depósitos/Similares" — passa a mostrar-se pelo seu próprio descritivo (o artigo do stock, ou o texto escrito na despesa), como se fosse um artigo. O catch-all fica reservado para o que não tem descritivo nenhum (o stock ainda por alocar) · v286 · 2026-08-12 · Quem inseriu uma despesa passa a poder editá-la/apagá-la: sem compra associada é sempre sua (própria/cônjuge); vindo de uma compra com stock só enquanto o admin não tiver ido ao separador Stock realocar os artigos — a partir daí a compra fecha-se para ela, com aviso, e só o admin a edita (requer correr db/despesas_self_edit.sql) · v285 · 2026-08-12 · Custo da refeição: o detalhe de "Custos diretos" passa a ordenar as despesas por valor descendente. Com bebida concreta alocada, a ordem dos blocos passa a ser diretos → bebida (sem o ícone 🍻) → indiretos, e "Custos indiretos" chama-se agora "Outros custos indiretos", com o chip "Bebidas" lá dentro a passar a "Outras bebidas" nesse caso · v284 · 2026-08-12 · Custo da refeição: os custos indiretos ganham um detalhe expansível "Por categoria" — o mesmo € de Bebidas/Cerveja/Gerais, mas repartido pela categoria do artigo (a mesma das Compras/Stock), maior primeiro; o que não é stock nenhum (sacos, depósitos, taxas) ou ainda não tem categoria cai em "Sacos/Depósitos/Similares", sempre por último · v283 · 2026-08-12 · Definições › Parametrizações: a fração da bolsa indireta (Gerais/Bebidas/Cerveja) que entra no preço das refeições deixa de estar fixa em 50% — passa a ser ajustável por ano, só em anos abertos. T-shirts e Stock Sobrante continuam sempre de fora dessa bolsa · v282 · 2026-08-12 · Saldos: a vista "Por refeição" passa a ser a principal, e o seletor "Por parcelas"/"Por refeição" desce para debaixo de Receitas/Despesas, só à vista com o detalhe aberto (ali é que faz diferença — os totais não mudam com a vista) · v281 · 2026-08-12 · Saldos › vista "Por refeição": o custo de cada refeição passa a incluir os indiretos (Gerais/Bebidas/Cerveja) que lhe cabem, como no cartão da refeição — antes só contava os diretos e o custo ficava sempre abaixo da receita. "Outros custos"/"Outras receitas" ganham detalhe por baixo (T-shirts, Stock Sobrante, Quota Extra, Mealheiro, Missão Poupança…), no ecrã e no PDF · v280 · 2026-08-12 · Shop List: um pedido de refeição (Almoço/Jantar) cujo dia já passou e continua por comprar passa a avisar "⚠️ refeição já passou" no cartão de "Em falta" — não se esconde nem se cancela sozinho, só se diz que já ninguém está à espera daquilo · v279 · 2026-08-11 · T-shirts: editar um pedido cujo "Encomendado por" já saiu do plantel deste ano deixa de esconder o campo (o select ficava vazio e o Guardar recusava sempre) — o nome antigo aparece marcado "fora do plantel" e dá para reatribuir a t-shirt a outra pessoa · v278 · 2026-08-11 · Quota Extra: o Fundo de Reserva deixa de ser ignorado nos anos em que as fontes diretas (refeições, convidados, mealheiros, t-shirts, stock sobrante) já cobrem a despesa — passa a somar-se sempre à conta antes de se cortar a zero, para o valor "a guardar" ser mesmo cobrado · v277 · 2026-08-10 · Definições › Parametrizações: novo interruptor "Corrigir Presenças" (por ano) que deixa cada um corrigir as suas presenças de dias já passados desse evento — desligado por defeito, e as contas fechadas continuam a trancar tudo mesmo com ele ligado · v276 · 2026-08-10 · Adicionar Convidado: o campo "Trazido por" deixa de escolher o primeiro membro por ordem alfabética do casal e passa a vir pré-selecionado com o próprio utilizador, como no resto da app · v275 · 2026-08-10 · Shop List: um pedido sem loja própria que está a herdar a loja de outro pedido do mesmo artigo agora pode recusar essa herança ("🚫 Não herdar — deixar sem loja"), sem mexer no pedido que a escreveu · v274 · 2026-08-10 · Pagar Dívida: um pagamento livre / adiantamento (sem dívidas selecionadas) passa a ter uma caixa de observações, para dizer o que é aquele dinheiro · v273 · 2026-08-10 · PDF de pessoa (Saldos): as Refeições ordenam-se por dia e mostram o prato; e as Despesas Adiantadas deixam de mostrar "🧺 Stock" como nota e passam a mostrar o destino real (refeição/tipo) em vez de "Gerais" sempre que a compra tem um destino só · v272 · Stock alocado a uma PESSOA (🎒 leva para casa): no separador Stock, uma alocação pode agora apontar a um membro em vez de a uma refeição — é para as sobras que não voltam a ser usadas. O custo sai do rateio e passa a ser cobrado só a essa pessoa (aparece no saldo dela, como as t-shirts) · v271 · Nos Saldos, uma compra com peça "só despesa" (saco, depósito) deixa de aparecer duplicada em "Despesas adiantadas" — as linhas da mesma compra juntam-se numa só. E "Despesas adiantadas" separa-se em duas: o que já pagaste (📅) e o que está previsto mas ainda por pagar (📌 provisórias) · v270 · As SOBRAS deixam de reabrir o pedido: um lote comprado para uma refeição conta inteiro na cobertura, mesmo com parte por alocar na bolsa comum — compram-se 8 pacotes para o jantar, comem-se 5, e a lista já não pede os outros 3 que estão na despensa. É a mesma leitura que o cartão da refeição já fazia. Mover o stock para outra refeição continua a reabrir o pedido · v269 · Uma falta “dita à mão” passa a dizer que o é — na lista e no cartão da refeição, como já dizia o “coberto” e a folha do 🖨 —, e o bloco “que pedidos é que isto trata?” marca a linha que não é a app a deduzir. Trocar o artigo de um pedido (chouriço de sangue → morcela) deita fora a cobertura declarada sobre o artigo antigo, que ficava a mandar sobre o stock novo';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -8837,15 +8837,22 @@ function stockDestChip(k,qtd,u,desp){
 function stockArticleCard(g){
   const ag=stockAggAlocs(g.lotes,g.u);
   const c=g.cons||umbConsumo(g.lotes,g.artigo);
-  const st=STOCK_FILTER;
+  // '' (nada escolhido) é o mesmo que "tudo" — o sentinela 'all' desapareceu do
+  // STOCK_FILTER quando o chip "Tudo" saiu, e sem esta linha o chip do que está
+  // por alocar só se via a filtrar precisamente por "Por alocar"
+  const st=STOCK_FILTER||'all';
   /* Os chips são o eixo do CUSTO (onde é que este artigo está arrumado), e os
-     dois filtros desse eixo cortam-nos ao que perguntaram: "por alocar" deixa
-     só a sobra sem destino, "alocado" deixa só os destinos. Os do CONSUMO
-     (consumido / por gastar) não cortam nada — consumo e alocação deixaram de
-     ser a mesma coisa, e quem escolhe um deles pergunta QUANTO, que se responde
-     no rodapé. */
-  const soLivre=st==='poralocar';
-  const dests=soLivre?[]:Object.keys(ag.dest).sort(destKeyCmp);
+     filtros desse eixo cortam-nos ao que perguntaram: "por alocar" deixa só a
+     sobra sem destino, "alocado" deixa só os destinos, e um DESTINO escolhido
+     deixa só ele (com a bebida da refeição, que o filtro funde nela). Os do
+     CONSUMO (consumido / por gastar) não cortam nada — consumo e alocação
+     deixaram de ser a mesma coisa, e quem escolhe um deles pergunta QUANTO, que
+     se responde no rodapé.
+     Escolhido um destino, é ele que manda nos chips de destino mesmo com o
+     estado em "Por alocar": é a pergunta mais específica das duas, e a sobra
+     continua a ver-se no chip 🧺 logo a seguir. */
+  const soLivre=st==='poralocar'&&!STOCK_DEST;
+  const dests=soLivre?[]:(STOCK_DEST?stockDestKeys(ag,STOCK_DEST):Object.keys(ag.dest).sort(destKeyCmp));
   const chips=dests.map(k=>stockDestChip(k,ag.dest[k].qtd,ag.u,c.desp)).join('')
     +((ag.freeQ>0.0005&&(st==='all'||st==='poralocar'))?`<span class="stk-chip livre">🧺 por alocar · ${escHtml(fmtQty(ag.freeQ,ag.u))}</span>`:'');
   /* Sem quantidade escrita não há chips (nada alocado, nada por alocar) nem
@@ -8897,10 +8904,10 @@ function stockConsLinha(c,u){
   // maneira de a fazer concordar com o adjetivo ("1 pacote gastos")
   return `<div class="stk-cons">Gasto: <b>${escHtml(fmtQty(c.cons,u))}</b> · Por gastar: <b>${escHtml(fmtQty(c.resta,u))}</b>${mao}</div>`;
 }
-/* Filtro do separador Stock
-   ('all' | 'consumido' | 'porgastar' | 'alocado' | 'poralocar').
+/* Filtro de ESTADO do separador Stock
+   ('' = tudo | 'consumido' | 'porgastar' | 'alocado' | 'poralocar').
    Só vive na sessão — ao reabrir a app volta a "Tudo".
-   Quatro perguntas, DOIS EIXOS — e a ordem dos chips é essa leitura, o eixo do
+   Quatro perguntas, DOIS EIXOS — e a ordem das opções é essa leitura, o eixo do
    consumo primeiro e o do custo a seguir, cada um com os seus dois lados:
      Consumido    o que já se gastou            (eixo do consumo)
      Por gastar   o que ainda dá para cozinhar  (eixo do consumo)
@@ -8910,13 +8917,44 @@ function stockConsLinha(c,u){
    alocado está nos dois (é `Object.keys(dest).length` contra `freeQ>0`, não um
    booleano). Esteve fora daqui por se lhe ter chamado complemento — e a
    contagem mostra que não é.
-   Os chips deste separador NÃO levam ícone, ao contrário dos das Compras: são
-   quatro rótulos completos, e entre o ícone e a palavra manda a palavra — é
-   ela que diz qual é o eixo. Sem chip ativo vê-se todo o stock. */
+   Foram chips (quatro, mais o "Tudo") e passaram a <select>: os rótulos são a
+   chave de leitura do separador — é a palavra que diz de que eixo se fala —, e
+   em chips só cabiam a clamp(8.5px) e sem ícone. Num <select> cabem por
+   extenso, e os dois <optgroup> ("Consumo" / "Alocação") dizem o eixo melhor
+   do que a ordem dos chips dizia. */
 let STOCK_FILTER='';
+/* Filtro de DESTINO ('' = tudo, senão uma chave de destino normalizada — ver
+   stockDestFiltro). O outro eixo do custo: não "está alocado?" mas "alocado a
+   ONDE" — Gerais, Bebidas, o jantar de 7/ago. Também só na sessão. */
+let STOCK_DEST='';
 // Containers de categoria abertos/fechados (só na sessão; abertos por defeito)
 const STOCK_CAT_OPEN={};
-function setStockFilter(f){STOCK_FILTER=STOCK_FILTER===f?'':f;renderStock();}
+function setStockFilter(f){STOCK_FILTER=f;renderStock();}
+function setStockDest(d){STOCK_DEST=d;renderStock();}
+/* Chave de destino normalizada PARA O FILTRO. A 🍻 bebida de uma refeição
+   funde-se nela: quem procura o jantar de sábado quer as cervejas dele também,
+   e eram duas entradas quase iguais no <select>. O 🎒 "leva para casa" fica —
+   aqui, ao contrário do filtro dos Cash Flows (cfDestFiltro), é destino a
+   sério: é uma alocação feita neste separador. Normaliza SÓ o filtro; as
+   chaves gravadas em `alocacoes` ficam intactas, e os chips do cartão
+   continuam a separar a bebida, que aí é a informação certa. */
+function stockDestFiltro(k){const p=String(k||'').split('|');return p[2]===DEST_BEB?p[0]+'|'+p[1]:k;}
+/* Os destinos de um cartão que caem no destino escolhido — mais do que um
+   quando a refeição traz a bebida atrás. */
+function stockDestKeys(ag,f){return Object.keys(ag.dest).filter(k=>ag.dest[k].qtd>0.0005&&stockDestFiltro(k)===f).sort(destKeyCmp);}
+/* Rótulo de um destino nas opções do <select>: leva o NOME da refeição
+   ("☀️ Almoço Sáb, 8/ago"), que o chip do cartão não tem — no chip o dia basta
+   (o cartão inteiro fala de um artigo), mas numa lista de opções um dia com
+   almoço E jantar dava duas entradas separadas só pelo ícone. O dia vai a três
+   letras porque o dropdown de um <select> é desenhado pelo sistema e o iOS
+   ignora o font-size das <option>: não há como encolher a letra, só como
+   escrever menos. */
+function stockDestFiltroTxt(k){
+  const a=destinoAloc(k,0);if(!a)return '';
+  if(alocIsPessoa(a))return `${DEST_PESSOA_ICON} ${escHtml(a.pessoa)}`;
+  if(alocIsMeal(a))return `${shopTipoIcon(a.tipo)} ${escHtml(a.tipo)} ${diaAbrev(a.data)}, ${fmtDiaMes(a.data)}`;
+  return `${shopTipoIcon(a.tipo)} ${escHtml(a.tipo)}`;
+}
 /* Um DESTINO de alocação já passou? Serve só para pintar o chip do que ficou
    para trás. É eixo do custo — não confundir com o consumo (umbConsumo), que
    é o que responde a "isto ainda cá está". */
@@ -8950,6 +8988,14 @@ function stockEstadoVal(ag,st,c){
   if(st==='alocado')return rnd(ag.totV-ag.freeV,2);
   if(!(c.tot>0))return 0;
   return rnd(ag.totV*((st==='consumido'?c.cons:c.resta)/c.tot),2);
+}
+/* € de um cartão para os totais dos containers de categoria. Com um DESTINO
+   escolhido é o € que está nesse destino — a pergunta passou a ser "quanto é que
+   esta categoria põe no jantar de sábado", e é também o que os chips do cartão
+   mostram. Sem destino, a parte que está no estado escolhido. */
+function stockCardVal(ag,st,dest,c){
+  if(dest)return rnd(stockDestKeys(ag,dest).reduce((a,k)=>a+ag.dest[k].val,0),2);
+  return stockEstadoVal(ag,st,c);
 }
 /* Os cartões do separador, já prontos: um por ARTIGO + UNIDADE (o
    guarda-chuva), com o consumo, os estados, as marcas e a sugestão de despensa
@@ -9010,21 +9056,62 @@ function renderStock(){
   h+=`<div class="note" style="margin-top:2px;margin-bottom:8px">${canEdit?'Toca num artigo para o alocar às refeições e categorias — as contas recalculam sozinhas.':'Toca num artigo para ver como está alocado às refeições e categorias.'}</div>`;
   if(!arrTodos.length){el.innerHTML=h+`<div class="empty sf">Ainda não há stock. Regista uma compra itemizada, importa uma fatura${canEdit?' ou usa <b>＋ Stock</b> para o que não foi comprado (ofertas, sobras do ano anterior)':''}.</div>`;return;}
   if(STOCK_BUSCA)h+=buscaCaixa('stk-busca',STOCK_Q,'Procurar artigo, marca ou categoria…','setStockQ');
-  // Chips de filtro por estado: os três aparecem SEMPRE (com a contagem de
-  // artigos), mesmo a zero — são a chave de leitura do separador, não podem
-  // sumir só porque o stock está todo no mesmo estado
-  // Ordem: o eixo do CONSUMO primeiro (o que se gastou → o que ainda dá para
-  // cozinhar) e o do CUSTO a seguir (arrumado → por arrumar) — os pares ficam
-  // lado a lado, que é o que faz ler os dois eixos e não quatro estados soltos
+  /* Dois filtros lado a lado, um por PERGUNTA, os dois em <select> — o mesmo par
+     de comboboxes dos Cash Flows, e por isso as mesmas classes (.cf-filters): é
+     o mesmo componente, o nome é que ficou do sítio onde nasceu.
+       1) ESTADO — em que ponto está (consumido/por gastar · alocado/por alocar)
+       2) DESTINO — alocado a ONDE (Gerais, Bebidas, o jantar de 7/ago, 🎒 alguém)
+     O destino não caberia em chips (são as refeições todas do ano mais os tipos)
+     e o estado já ocupava a fila inteira com quatro. */
+  const AG=new Map();const agDe=g=>{let a=AG.get(g);if(!a){a=stockAggAlocs(g.lotes,g.u);AG.set(g,a);}return a;};
+  const estadoOk=g=>!STOCK_FILTER||g.estados.has(STOCK_FILTER);
+  /* Destinos com stock alocado, e quantos artigos é que cada um leva. As opções
+     saem de TODO o stock à vista (não cortado pelo estado): o estado muda as
+     contagens, não pode fazer desaparecer a opção que está escolhida. As
+     contagens, sim, são cruzadas — o número diz o que se vai ver ao escolher. */
+  const destAll={},destN={};
+  arr.forEach(g=>{
+    const ag=agDe(g),ok=estadoOk(g);
+    [...new Set(Object.keys(ag.dest).filter(k=>ag.dest[k].qtd>0.0005).map(k=>stockDestFiltro(k)))]
+      .forEach(f=>{destAll[f]=1;if(ok)destN[f]=(destN[f]||0)+1;});
+  });
+  // Filtro-fantasma: um destino que já não existe (mudou o ano, ou a pesquisa
+  // cortou-o) trancava a lista vazia sem nada a dizer porquê
+  if(STOCK_DEST&&!destAll[STOCK_DEST])STOCK_DEST='';
+  const destList=Object.keys(destAll).sort(destKeyCmp);
+  const destOk=g=>!STOCK_DEST||stockDestKeys(agDe(g),STOCK_DEST).length>0;
+  // As quatro opções de estado aparecem SEMPRE (com a contagem de artigos),
+  // mesmo a zero — são a chave de leitura do separador, não podem sumir só
+  // porque o stock está todo no mesmo estado
   const FILTROS=[['consumido','Consumido'],['porgastar','Por gastar'],['alocado','Alocado'],['poralocar','Por alocar']]
-    .map(f=>f.concat(arr.filter(g=>g.estados.has(f[0])).length));
-  h+=`<div class="cmp-sort stk-filter">
-    ${FILTROS.map(([s,lbl,n])=>`<span class="sd-chip${STOCK_FILTER===s?' on':''}${n?'':' vazio'}" onclick="setStockFilter('${s}')"><small>${lbl}</small><b class="stk-n">${n}</b></span>`).join('')}
+    .map(f=>f.concat(arr.filter(g=>destOk(g)&&g.estados.has(f[0])).length));
+  const estOpt=([s,lbl,n])=>`<option value="${s}"${STOCK_FILTER===s?' selected':''}>${lbl} · ${n}</option>`;
+  // Grupos do destino pela mesma ordem por que os chips do cartão os mostram
+  // (refeições pelo calendário · tipos puros · 🎒 pessoas), que é o destKeyCmp
+  const dGrp={ref:[],tipo:[],pess:[]};
+  destList.forEach(k=>{const a=destinoAloc(k,0);dGrp[alocIsPessoa(a)?'pess':alocIsMeal(a)?'ref':'tipo'].push(k);});
+  const destOpt=k=>`<option value="${escHtml(k)}"${STOCK_DEST===k?' selected':''}>${stockDestFiltroTxt(k)} · ${destN[k]||0}</option>`;
+  const dGrpHtml=(lbl,ks)=>ks.length?`<optgroup label="${lbl}">${ks.map(destOpt).join('')}</optgroup>`:'';
+  h+=`<div class="cf-filters stk-filters">
+    <div class="cf-filter"><select onchange="setStockFilter(this.value)">
+      <option value=""${STOCK_FILTER?'':' selected'}>Tudo · estado</option>
+      <optgroup label="Consumo">${FILTROS.slice(0,2).map(estOpt).join('')}</optgroup>
+      <optgroup label="Alocação (custo)">${FILTROS.slice(2).map(estOpt).join('')}</optgroup>
+    </select></div>
+    ${destList.length?`<div class="cf-filter"><select onchange="setStockDest(this.value)">
+      <option value=""${STOCK_DEST?'':' selected'}>Tudo · refeições/tipos</option>
+      ${dGrpHtml('Refeições',dGrp.ref)}${dGrpHtml('Tipos de despesa',dGrp.tipo)}${dGrpHtml('🎒 Leva para casa',dGrp.pess)}
+    </select></div>`:''}
   </div>`;
-  const vis=!STOCK_FILTER?arr:arr.filter(g=>g.estados.has(STOCK_FILTER));
+  const vis=arr.filter(g=>estadoOk(g)&&destOk(g));
   const VAZIO={consumido:'Ainda não se gastou nada.',porgastar:'Não há stock por gastar — foi tudo consumido.',
     alocado:'Nada está alocado — o stock todo está por arrumar no custo.',poralocar:'Não há stock por alocar — está tudo com destino.'};
-  if(!vis.length)h+=`<div class="empty sf">${stkBuscando?`Nenhum artigo com <b>${escHtml(STOCK_Q.trim())}</b>${STOCK_FILTER?' neste estado':''}.`:(VAZIO[STOCK_FILTER]||'Não há stock neste estado.')}</div>`;
+  if(!vis.length){
+    const nada=STOCK_DEST
+      ? `Nada está alocado a ${stockDestFiltroTxt(STOCK_DEST)}${STOCK_FILTER?' neste estado':''}.`
+      : (VAZIO[STOCK_FILTER]||'Não há stock neste estado.');
+    h+=`<div class="empty sf">${stkBuscando?`Nenhum artigo com <b>${escHtml(STOCK_Q.trim())}</b>${STOCK_FILTER||STOCK_DEST?' nesta escolha':''}.`:nada}</div>`;
+  }
   else if(!CATS_TABLE)h+=vis.map(g=>stockArticleCard(g)).join('');
   else{
     // Containers por categoria de produto (Sumos, Talho, …), colapsáveis; os
@@ -9046,8 +9133,9 @@ function renderStock(){
     h+=order.map(k=>{
       const s=secs[k];
       const nome=s.cat?s.cat.nome:'Outros';
-      // € do container: com filtro de estado, só a parte que está nesse estado
-      const totV=rnd(s.groups.reduce((a,g)=>a+stockEstadoVal(stockAggAlocs(g.lotes,g.u),STOCK_FILTER,g.cons),0),2);
+      // € do container: com um destino escolhido, só o que está nele; senão, com
+      // filtro de estado, só a parte que está nesse estado
+      const totV=rnd(s.groups.reduce((a,g)=>a+stockCardVal(agDe(g),STOCK_FILTER,STOCK_DEST,g.cons),0),2);
       // Aberto por defeito; o fecho é da sessão. A pesquisar, abrem-se todos —
       // um container fechado escondia precisamente o artigo que se procura.
       const open=stkBuscando||STOCK_CAT_OPEN[k]!==false;

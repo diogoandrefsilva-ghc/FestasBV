@@ -1292,16 +1292,12 @@ button.cmp-chip.qt-tap:active{filter:brightness(.93)}
 .cmp-hint.alloc{font-size:11px}
 .msl-hint.alloc:active,.cmp-hint.alloc:active{background:rgba(30,122,77,.16)}
 /* Stock: chips das alocações nos cartões de lote (separador Compras) */
-/* Quatro filtros, sem "Tudo": sem nenhum ativo vê-se tudo. Repartem uma única
-   linha em partes iguais; em ecrãs muito estreitos some apenas o contador para
-   as quatro palavras continuarem inteiras, sem scroll. */
-.stk-filter{display:flex;flex-wrap:nowrap;gap:4px;max-width:100%;overflow:visible;margin-bottom:8px;padding:1px 0}
-.stk-filter .sd-chip{flex:1 1 0;min-width:0;min-height:34px;overflow:visible;gap:.25em;padding:7px 3px;line-height:1;justify-content:center;white-space:nowrap}
-.stk-filter .sd-chip small{font-size:clamp(8.5px,2.35vw,10px);font-weight:700;letter-spacing:-.015em;text-transform:uppercase;color:inherit;white-space:nowrap;overflow:visible;text-overflow:clip}
-.stk-filter .stk-n{flex:0 0 auto;font-size:clamp(8.5px,2.2vw,10px);font-weight:800;opacity:.6}
-@media(max-width:370px){.stk-filter .stk-n{display:none}.stk-filter .sd-chip{gap:0;padding:7px 2px}}
-/* Estado sem artigos: continua lá (o filtro é a chave de leitura) mas apagado */
-.stk-filter .sd-chip.vazio{opacity:.45}
+/* Os dois filtros do separador (estado · destino) são o par de <select> dos
+   Cash Flows (.cf-filters/.cf-filter) — o mesmo componente, o nome é que ficou
+   do sítio onde nasceu. Foram quatro chips a repartir uma linha, à 8,5px e sem
+   ícone: em <select> os rótulos cabem por extenso e o destino (as refeições
+   todas do ano) passa a ter onde caber. */
+.stk-filters{margin-bottom:8px}
 /* Cartão do Stock: toca-se no artigo para alocar — o chevron é a única pista */
 .stk-card.stk-tap{cursor:pointer}
 .stk-card.stk-tap:active{background:var(--panel2)}
@@ -2099,14 +2095,14 @@ button.cmp-chip.qt-tap:active{filter:brightness(.93)}
 #view-compras .cmp-divider{height:3px;border-radius:2px;margin:0 10px 20px 2px;background:linear-gradient(90deg,rgba(168,123,20,.4) 0%,rgba(168,123,20,.18) 55%,rgba(168,123,20,.03) 100%);transform:skewX(-18deg)}
 
 /* ── Chips de ordenação/filtro: etiquetas kraft ── */
-#view-compras .cmp-sort .sd-chip,#view-stock .stk-filter .sd-chip{background:#F3EAD2;border-radius:5px 14px 14px 5px;position:relative}
+#view-compras .cmp-sort .sd-chip{background:#F3EAD2;border-radius:5px 14px 14px 5px;position:relative}
 /* Ícone de ordenação (setas ↑↓) no início de cada chip — substitui o antigo
    "furinho". Inline (auto-centra com o texto), escala com a fonte fluida (em)
    e herda a cor da chip (currentColor: esbatido quando inativa, tinta/ink
    quando ativa). SVG em mask para poder ser colorido por currentColor. */
 #view-compras .cmp-sort .sd-chip::before{content:"";flex:0 0 auto;width:.95em;height:.95em;background:currentColor;opacity:.55;-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M7 5v14M4 8l3-3 3 3M17 19V5M14 16l3 3 3-3'/%3E%3C/svg%3E") center/contain no-repeat;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M7 5v14M4 8l3-3 3 3M17 19V5M14 16l3 3 3-3'/%3E%3C/svg%3E") center/contain no-repeat}
 #view-compras .cmp-sort .sd-chip.on::before{opacity:.8}
-#view-compras .cmp-sort .sd-chip.on,#view-stock .stk-filter .sd-chip.on{background:rgba(30,122,77,.12)}
+#view-compras .cmp-sort .sd-chip.on{background:rgba(30,122,77,.12)}
 /* As chips de ordenação em PARTES IGUAIS com fonte FLUIDA
    (escala com a largura do ecrã, travada a 13px). Assim cabem SEMPRE numa
    linha, todas no ecrã, sem scroll horizontal, sem quebra de texto e sem
@@ -2122,10 +2118,6 @@ button.cmp-chip.qt-tap:active{filter:brightness(.93)}
 #view-compras .cmp-sort.n4{gap:4px}
 #view-compras .cmp-sort.n4 .sd-chip{flex:1 1 auto;font-size:min(12.5px,2.35vw);gap:.25em;padding:.5em .5em;white-space:nowrap;text-overflow:ellipsis}
 #view-compras .cmp-sort.n4 .sd-chip::before{width:.85em;height:.85em}
-/* Nos filtros do Stock (chips ao alto) o furo caía em cima do emoji —
-   ficam etiquetas kraft lisas, sem furo e com canto simétrico */
-#view-stock .stk-filter .sd-chip{border-radius:11px}
-#view-stock .stk-filter .sd-chip::before{display:none}
 
 /* ── A lista é UM talão: papel contínuo com perfuração no topo ── */
 #view-compras .cmp-list{position:relative;background:var(--sal);border:1px solid var(--line);border-top:none;border-radius:0 0 13px 13px;padding:4px 13px 9px;gap:0;box-shadow:0 10px 24px rgba(80,55,20,.14);margin-top:15px}
