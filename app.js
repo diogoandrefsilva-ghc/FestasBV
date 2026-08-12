@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v295 · 2026-08-12 · Detalhe "Por categoria": o stock ainda POR ALOCAR deixa de cair no balde "Sacos/Depósitos/Similares" — o dinheiro continua a repartir-se pelas refeições na mesma (é bolsa comum), mas cada parcela passa a aparecer na categoria do seu artigo (Conservas, Legumes…), como o stock já alocado. Não estar entregue a uma refeição não o torna menos Conservas. O balde fica só com os sacos/taxas · v294 · 2026-08-12 · Relatório geral (PDF): nova secção "Custos Indiretos por Categoria" — o mesmo detalhe que cada cartão de refeição abre, mas somado por todas elas. Sai da MESMA função do ecrã (catIndirRows), para as duas leituras não poderem discordar · v293 · 2026-08-12 · CORRIGE a v291, que fez as categorias desaparecer do detalhe "Por categoria" (Utensílios, Bebidas, Fruta… iam todas parar a "Sacos/Depósitos/Similares"): o marcador "🧺 Stock" está em CADA artigo que o stock reparte pelas refeições, não só na linha do resto por alocar — o que as separa é a linha do resto ser uma despesa real da compra · v292 · 2026-08-12 · Custo da refeição › detalhe "Por categoria": as linhas "🧾 só despesa" (sacos, depósitos, taxas) voltam a agrupar-se sempre em "Sacos/Depósitos/Similares", mesmo tendo descritivo próprio — reconhecem-se pelo nome (o mesmo dicionário do "🧾 Extras da fatura"), que agora também apanha "Depósito" sozinho · v291 · 2026-08-12 · Custo da refeição › detalhe "Por categoria": a linha 🧺 Stock (o resto por alocar) deixa de cair no nome da loja da compra — vai direto para o catch-all "Sacos/Depósitos/Similares", sem tentar mais nenhum descritivo · v290 · 2026-08-12 · Custo da refeição › detalhe "Por categoria": uma despesa de uma COMPRA (sacos/depósitos, provisória antiga) passa a mostrar-se pelas OBSERVAÇÕES (o artigo) em vez do "Descritivo" da compra (normalmente o nome da loja, partilhado por todas as despesas dela) — a loja aparecia a repetir-se em vez do saco/depósito. E o resto por alocar da linha "🧺 Stock" deixa de se disfarçar atrás do nome da loja: volta a cair no catch-all, que agora aparece mesmo quando há stock por alocar · v289 · 2026-08-12 · Revertida a v288 (categorizar o stock por alocar por lote) — os números de "Sacos/Depósitos/Similares" estavam a inflacionar em vez de encolher, sinal de que a reconstrução não estava a bater certo com o resto real da compra. Volta-se à v287 enquanto se investiga com dados reais · v287 · 2026-08-12 · Custo da refeição › detalhe "Por categoria": uma despesa sem categoria deixa de se amontoar em "Sacos/Depósitos/Similares" — passa a mostrar-se pelo seu próprio descritivo (o artigo do stock, ou o texto escrito na despesa), como se fosse um artigo. O catch-all fica reservado para o que não tem descritivo nenhum (o stock ainda por alocar) · v286 · 2026-08-12 · Quem inseriu uma despesa passa a poder editá-la/apagá-la: sem compra associada é sempre sua (própria/cônjuge); vindo de uma compra com stock só enquanto o admin não tiver ido ao separador Stock realocar os artigos — a partir daí a compra fecha-se para ela, com aviso, e só o admin a edita (requer correr db/despesas_self_edit.sql) · v285 · 2026-08-12 · Custo da refeição: o detalhe de "Custos diretos" passa a ordenar as despesas por valor descendente. Com bebida concreta alocada, a ordem dos blocos passa a ser diretos → bebida (sem o ícone 🍻) → indiretos, e "Custos indiretos" chama-se agora "Outros custos indiretos", com o chip "Bebidas" lá dentro a passar a "Outras bebidas" nesse caso · v284 · 2026-08-12 · Custo da refeição: os custos indiretos ganham um detalhe expansível "Por categoria" — o mesmo € de Bebidas/Cerveja/Gerais, mas repartido pela categoria do artigo (a mesma das Compras/Stock), maior primeiro; o que não é stock nenhum (sacos, depósitos, taxas) ou ainda não tem categoria cai em "Sacos/Depósitos/Similares", sempre por último · v283 · 2026-08-12 · Definições › Parametrizações: a fração da bolsa indireta (Gerais/Bebidas/Cerveja) que entra no preço das refeições deixa de estar fixa em 50% — passa a ser ajustável por ano, só em anos abertos. T-shirts e Stock Sobrante continuam sempre de fora dessa bolsa · v282 · 2026-08-12 · Saldos: a vista "Por refeição" passa a ser a principal, e o seletor "Por parcelas"/"Por refeição" desce para debaixo de Receitas/Despesas, só à vista com o detalhe aberto (ali é que faz diferença — os totais não mudam com a vista) · v281 · 2026-08-12 · Saldos › vista "Por refeição": o custo de cada refeição passa a incluir os indiretos (Gerais/Bebidas/Cerveja) que lhe cabem, como no cartão da refeição — antes só contava os diretos e o custo ficava sempre abaixo da receita. "Outros custos"/"Outras receitas" ganham detalhe por baixo (T-shirts, Stock Sobrante, Quota Extra, Mealheiro, Missão Poupança…), no ecrã e no PDF · v280 · 2026-08-12 · Shop List: um pedido de refeição (Almoço/Jantar) cujo dia já passou e continua por comprar passa a avisar "⚠️ refeição já passou" no cartão de "Em falta" — não se esconde nem se cancela sozinho, só se diz que já ninguém está à espera daquilo · v279 · 2026-08-11 · T-shirts: editar um pedido cujo "Encomendado por" já saiu do plantel deste ano deixa de esconder o campo (o select ficava vazio e o Guardar recusava sempre) — o nome antigo aparece marcado "fora do plantel" e dá para reatribuir a t-shirt a outra pessoa · v278 · 2026-08-11 · Quota Extra: o Fundo de Reserva deixa de ser ignorado nos anos em que as fontes diretas (refeições, convidados, mealheiros, t-shirts, stock sobrante) já cobrem a despesa — passa a somar-se sempre à conta antes de se cortar a zero, para o valor "a guardar" ser mesmo cobrado · v277 · 2026-08-10 · Definições › Parametrizações: novo interruptor "Corrigir Presenças" (por ano) que deixa cada um corrigir as suas presenças de dias já passados desse evento — desligado por defeito, e as contas fechadas continuam a trancar tudo mesmo com ele ligado · v276 · 2026-08-10 · Adicionar Convidado: o campo "Trazido por" deixa de escolher o primeiro membro por ordem alfabética do casal e passa a vir pré-selecionado com o próprio utilizador, como no resto da app · v275 · 2026-08-10 · Shop List: um pedido sem loja própria que está a herdar a loja de outro pedido do mesmo artigo agora pode recusar essa herança ("🚫 Não herdar — deixar sem loja"), sem mexer no pedido que a escreveu · v274 · 2026-08-10 · Pagar Dívida: um pagamento livre / adiantamento (sem dívidas selecionadas) passa a ter uma caixa de observações, para dizer o que é aquele dinheiro · v273 · 2026-08-10 · PDF de pessoa (Saldos): as Refeições ordenam-se por dia e mostram o prato; e as Despesas Adiantadas deixam de mostrar "🧺 Stock" como nota e passam a mostrar o destino real (refeição/tipo) em vez de "Gerais" sempre que a compra tem um destino só · v272 · Stock alocado a uma PESSOA (🎒 leva para casa): no separador Stock, uma alocação pode agora apontar a um membro em vez de a uma refeição — é para as sobras que não voltam a ser usadas. O custo sai do rateio e passa a ser cobrado só a essa pessoa (aparece no saldo dela, como as t-shirts) · v271 · Nos Saldos, uma compra com peça "só despesa" (saco, depósito) deixa de aparecer duplicada em "Despesas adiantadas" — as linhas da mesma compra juntam-se numa só. E "Despesas adiantadas" separa-se em duas: o que já pagaste (📅) e o que está previsto mas ainda por pagar (📌 provisórias) · v270 · As SOBRAS deixam de reabrir o pedido: um lote comprado para uma refeição conta inteiro na cobertura, mesmo com parte por alocar na bolsa comum — compram-se 8 pacotes para o jantar, comem-se 5, e a lista já não pede os outros 3 que estão na despensa. É a mesma leitura que o cartão da refeição já fazia. Mover o stock para outra refeição continua a reabrir o pedido · v269 · Uma falta “dita à mão” passa a dizer que o é — na lista e no cartão da refeição, como já dizia o “coberto” e a folha do 🖨 —, e o bloco “que pedidos é que isto trata?” marca a linha que não é a app a deduzir. Trocar o artigo de um pedido (chouriço de sangue → morcela) deita fora a cobertura declarada sobre o artigo antigo, que ficava a mandar sobre o stock novo';
+const APP_BUILD = 'v296 · 2026-08-12 · Cash Flows: a lista passa a ordenar-se sempre por ordem descendente (também dentro do mesmo dia, pelo mais recente a entrar) — antes ficava ascendente dentro do dia, o que baralhava. E uma despesa avulsa (sem compra) ganha "🧾 Detalhar por artigo" no editor, para quem a pode editar (admin, ou quem a registou) a transformar numa compra com itens e preços · v295 · 2026-08-12 · Detalhe "Por categoria": o stock ainda POR ALOCAR deixa de cair no balde "Sacos/Depósitos/Similares" — o dinheiro continua a repartir-se pelas refeições na mesma (é bolsa comum), mas cada parcela passa a aparecer na categoria do seu artigo (Conservas, Legumes…), como o stock já alocado. Não estar entregue a uma refeição não o torna menos Conservas. O balde fica só com os sacos/taxas · v294 · 2026-08-12 · Relatório geral (PDF): nova secção "Custos Indiretos por Categoria" — o mesmo detalhe que cada cartão de refeição abre, mas somado por todas elas. Sai da MESMA função do ecrã (catIndirRows), para as duas leituras não poderem discordar · v293 · 2026-08-12 · CORRIGE a v291, que fez as categorias desaparecer do detalhe "Por categoria" (Utensílios, Bebidas, Fruta… iam todas parar a "Sacos/Depósitos/Similares"): o marcador "🧺 Stock" está em CADA artigo que o stock reparte pelas refeições, não só na linha do resto por alocar — o que as separa é a linha do resto ser uma despesa real da compra · v292 · 2026-08-12 · Custo da refeição › detalhe "Por categoria": as linhas "🧾 só despesa" (sacos, depósitos, taxas) voltam a agrupar-se sempre em "Sacos/Depósitos/Similares", mesmo tendo descritivo próprio — reconhecem-se pelo nome (o mesmo dicionário do "🧾 Extras da fatura"), que agora também apanha "Depósito" sozinho · v291 · 2026-08-12 · Custo da refeição › detalhe "Por categoria": a linha 🧺 Stock (o resto por alocar) deixa de cair no nome da loja da compra — vai direto para o catch-all "Sacos/Depósitos/Similares", sem tentar mais nenhum descritivo · v290 · 2026-08-12 · Custo da refeição › detalhe "Por categoria": uma despesa de uma COMPRA (sacos/depósitos, provisória antiga) passa a mostrar-se pelas OBSERVAÇÕES (o artigo) em vez do "Descritivo" da compra (normalmente o nome da loja, partilhado por todas as despesas dela) — a loja aparecia a repetir-se em vez do saco/depósito. E o resto por alocar da linha "🧺 Stock" deixa de se disfarçar atrás do nome da loja: volta a cair no catch-all, que agora aparece mesmo quando há stock por alocar · v289 · 2026-08-12 · Revertida a v288 (categorizar o stock por alocar por lote) — os números de "Sacos/Depósitos/Similares" estavam a inflacionar em vez de encolher, sinal de que a reconstrução não estava a bater certo com o resto real da compra. Volta-se à v287 enquanto se investiga com dados reais · v287 · 2026-08-12 · Custo da refeição › detalhe "Por categoria": uma despesa sem categoria deixa de se amontoar em "Sacos/Depósitos/Similares" — passa a mostrar-se pelo seu próprio descritivo (o artigo do stock, ou o texto escrito na despesa), como se fosse um artigo. O catch-all fica reservado para o que não tem descritivo nenhum (o stock ainda por alocar) · v286 · 2026-08-12 · Quem inseriu uma despesa passa a poder editá-la/apagá-la: sem compra associada é sempre sua (própria/cônjuge); vindo de uma compra com stock só enquanto o admin não tiver ido ao separador Stock realocar os artigos — a partir daí a compra fecha-se para ela, com aviso, e só o admin a edita (requer correr db/despesas_self_edit.sql) · v285 · 2026-08-12 · Custo da refeição: o detalhe de "Custos diretos" passa a ordenar as despesas por valor descendente. Com bebida concreta alocada, a ordem dos blocos passa a ser diretos → bebida (sem o ícone 🍻) → indiretos, e "Custos indiretos" chama-se agora "Outros custos indiretos", com o chip "Bebidas" lá dentro a passar a "Outras bebidas" nesse caso · v284 · 2026-08-12 · Custo da refeição: os custos indiretos ganham um detalhe expansível "Por categoria" — o mesmo € de Bebidas/Cerveja/Gerais, mas repartido pela categoria do artigo (a mesma das Compras/Stock), maior primeiro; o que não é stock nenhum (sacos, depósitos, taxas) ou ainda não tem categoria cai em "Sacos/Depósitos/Similares", sempre por último · v283 · 2026-08-12 · Definições › Parametrizações: a fração da bolsa indireta (Gerais/Bebidas/Cerveja) que entra no preço das refeições deixa de estar fixa em 50% — passa a ser ajustável por ano, só em anos abertos. T-shirts e Stock Sobrante continuam sempre de fora dessa bolsa · v282 · 2026-08-12 · Saldos: a vista "Por refeição" passa a ser a principal, e o seletor "Por parcelas"/"Por refeição" desce para debaixo de Receitas/Despesas, só à vista com o detalhe aberto (ali é que faz diferença — os totais não mudam com a vista) · v281 · 2026-08-12 · Saldos › vista "Por refeição": o custo de cada refeição passa a incluir os indiretos (Gerais/Bebidas/Cerveja) que lhe cabem, como no cartão da refeição — antes só contava os diretos e o custo ficava sempre abaixo da receita. "Outros custos"/"Outras receitas" ganham detalhe por baixo (T-shirts, Stock Sobrante, Quota Extra, Mealheiro, Missão Poupança…), no ecrã e no PDF · v280 · 2026-08-12 · Shop List: um pedido de refeição (Almoço/Jantar) cujo dia já passou e continua por comprar passa a avisar "⚠️ refeição já passou" no cartão de "Em falta" — não se esconde nem se cancela sozinho, só se diz que já ninguém está à espera daquilo · v279 · 2026-08-11 · T-shirts: editar um pedido cujo "Encomendado por" já saiu do plantel deste ano deixa de esconder o campo (o select ficava vazio e o Guardar recusava sempre) — o nome antigo aparece marcado "fora do plantel" e dá para reatribuir a t-shirt a outra pessoa · v278 · 2026-08-11 · Quota Extra: o Fundo de Reserva deixa de ser ignorado nos anos em que as fontes diretas (refeições, convidados, mealheiros, t-shirts, stock sobrante) já cobrem a despesa — passa a somar-se sempre à conta antes de se cortar a zero, para o valor "a guardar" ser mesmo cobrado · v277 · 2026-08-10 · Definições › Parametrizações: novo interruptor "Corrigir Presenças" (por ano) que deixa cada um corrigir as suas presenças de dias já passados desse evento — desligado por defeito, e as contas fechadas continuam a trancar tudo mesmo com ele ligado · v276 · 2026-08-10 · Adicionar Convidado: o campo "Trazido por" deixa de escolher o primeiro membro por ordem alfabética do casal e passa a vir pré-selecionado com o próprio utilizador, como no resto da app · v275 · 2026-08-10 · Shop List: um pedido sem loja própria que está a herdar a loja de outro pedido do mesmo artigo agora pode recusar essa herança ("🚫 Não herdar — deixar sem loja"), sem mexer no pedido que a escreveu · v274 · 2026-08-10 · Pagar Dívida: um pagamento livre / adiantamento (sem dívidas selecionadas) passa a ter uma caixa de observações, para dizer o que é aquele dinheiro · v273 · 2026-08-10 · PDF de pessoa (Saldos): as Refeições ordenam-se por dia e mostram o prato; e as Despesas Adiantadas deixam de mostrar "🧺 Stock" como nota e passam a mostrar o destino real (refeição/tipo) em vez de "Gerais" sempre que a compra tem um destino só · v272 · Stock alocado a uma PESSOA (🎒 leva para casa): no separador Stock, uma alocação pode agora apontar a um membro em vez de a uma refeição — é para as sobras que não voltam a ser usadas. O custo sai do rateio e passa a ser cobrado só a essa pessoa (aparece no saldo dela, como as t-shirts) · v271 · Nos Saldos, uma compra com peça "só despesa" (saco, depósito) deixa de aparecer duplicada em "Despesas adiantadas" — as linhas da mesma compra juntam-se numa só. E "Despesas adiantadas" separa-se em duas: o que já pagaste (📅) e o que está previsto mas ainda por pagar (📌 provisórias) · v270 · As SOBRAS deixam de reabrir o pedido: um lote comprado para uma refeição conta inteiro na cobertura, mesmo com parte por alocar na bolsa comum — compram-se 8 pacotes para o jantar, comem-se 5, e a lista já não pede os outros 3 que estão na despensa. É a mesma leitura que o cartão da refeição já fazia. Mover o stock para outra refeição continua a reabrir o pedido · v269 · Uma falta “dita à mão” passa a dizer que o é — na lista e no cartão da refeição, como já dizia o “coberto” e a folha do 🖨 —, e o bloco “que pedidos é que isto trata?” marca a linha que não é a app a deduzir. Trocar o artigo de um pedido (chouriço de sangue → morcela) deita fora a cobertura declarada sobre o artigo antigo, que ficava a mandar sobre o stock novo';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -1911,7 +1911,7 @@ function renderCashFlows(){
   (DATA.pagamentos||[]).forEach((p,i)=>{
     const t=cfType(p);
     const l2=t==='reembolso'?(p.ref||'').replace(/^Reembolso:?\s*/,''):(t==='saldar'&&p.ref?'De: ':'')+sdRefLabel(p.ref);
-    allCf.push({type:t,date:p.data||'',label:cfLabel(t),icon:cfIcon(t),
+    allCf.push({type:t,date:p.data||'',id:p._id,label:cfLabel(t),icon:cfIcon(t),
       line1:`${p.de} → ${p.para}`,line2:l2,valor:p.valor,
       sign:t==='reembolso'?'mov':'set',source:'pagamentos',idx:i,people:[p.de,p.para].filter(Boolean)});
   });
@@ -1925,7 +1925,7 @@ function renderCashFlows(){
     }
     const prov=despProvisoria(d);
     const dests=cfDespDests(d);
-    allCf.push({type:'despesa',date:d.dataDesp||d.dataValor||'',label:'Despesa',icon:'🛒',sub:d.tipo||'Gerais',dia,prov,obs:d.obs||'',fromList:!!d.compraId,compraId:d.compraId||null,grupoPag:d.grupoPag||null,quem:d.quem,
+    allCf.push({type:'despesa',date:d.dataDesp||d.dataValor||'',id:d._id,label:'Despesa',icon:'🛒',sub:d.tipo||'Gerais',dia,prov,obs:d.obs||'',fromList:!!d.compraId,compraId:d.compraId||null,grupoPag:d.grupoPag||null,quem:d.quem,
       dests,destKey:dests.length===1?dests[0]:null,
       line1:d.desc||'(sem descrição)',line2:`${prov?'pagará':'pagou'} ${d.quem}`,valor:d.valor,
       sign:'neg',source:'despesas',idx:i,people:[d.quem]});
@@ -1934,12 +1934,16 @@ function renderCashFlows(){
   (DATA.mealheiros||[]).forEach((m,i)=>{
     const subIcons={'sobras_ano_anterior':[ICON_SACO,'Sobras Ano Anterior'],'outros':[ICON_MOEDA,'Outros']};
     const [mIcon,mLabel]=subIcons[m.subtipo]||[ICON_LATA,'Lata'];
-    allCf.push({type:'mealheiro',date:m.data||'',label:mLabel,icon:mIcon,sub:mLabel,
+    allCf.push({type:'mealheiro',date:m.data||'',id:m._id,label:mLabel,icon:mIcon,sub:mLabel,
       line1:`${m.quem} recebeu`,line2:m.desc||'',valor:m.valor,
       sign:'pos',source:'mealheiros',idx:i,people:[m.quem]});
   });
 
-  allCf.sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  // Descendente sempre: por dia, e dentro do mesmo dia pelo mais recente a
+  // entrar (o id da BD, crescente por inserção) — sem o 2.º critério a
+  // ordenação caía para a ordem em que o array foi montado (mais antigo
+  // primeiro), que dentro do mesmo dia lia-se ascendente e baralhava.
+  allCf.sort((a,b)=>(b.date||'').localeCompare(a.date||'')||(b.id||0)-(a.id||0));
 
   // Visibilidade por utilizador (reembolsos/saldar restritos a não-admins)
   const visCf=allCf.filter(cfVisivel);
@@ -2676,8 +2680,8 @@ async function carregar(){
         return row;
       }),
       filhosPres:fpByEv[ev.id]||{},
-      mealheiros:(ev.mealheiros||[]).map(m=>({quem:m.quem,data:m.data,valor:N(m.valor),subtipo:m.subtipo,desc:m.descricao})),
-      pagamentos:(ev.pagamentos||[]).map(p=>({de:p.de,para:p.para,valor:N(p.valor),ref:p.ref,data:p.data,extra:N(p.extra),nota:p.nota||''})),
+      mealheiros:(ev.mealheiros||[]).map(m=>({_id:m.id,quem:m.quem,data:m.data,valor:N(m.valor),subtipo:m.subtipo,desc:m.descricao})),
+      pagamentos:(ev.pagamentos||[]).map(p=>({_id:p.id,de:p.de,para:p.para,valor:N(p.valor),ref:p.ref,data:p.data,extra:N(p.extra),nota:p.nota||''})),
       shoplist:(shopByEv[ev.id]||[]).map(s=>({_id:s.id,artigo:s.artigo,quantidade:s.quantidade||'',tamanho:s.tamanho||'',loja:s.loja||'',tipo:s.tipo,dataValor:s.data_valor,estado:s.estado||'pendente',tratadoPor:s.tratado_por||null,noCarrinho:!!s.no_carrinho,compraId:s.compra_id||null,cfDesc:s.cf_desc||null,cobertura:s.cobertura||'',valor:s.valor!=null?N(s.valor):null,criadoPor:s.criado_por||'',criadoEm:s.criado_em,compradoEm:s.comprado_em})),
       // `_cons` (stock_lotes.consumido) é NULL de propósito quando ninguém o
       // escreveu: null = derivar das alocações, número = foi dito à mão
@@ -2802,19 +2806,27 @@ async function sbGuardarEvento(y,slot){
       }),{Prefer:'return=representation'});
       if(Array.isArray(cres))cres.forEach((r,i)=>{if(y.convidados[i])y.convidados[i]._id=r.id;});
     }
-    if(y.mealheiros&&y.mealheiros.length)
-      await sbReq('POST','mealheiros',y.mealheiros.map(m=>({evento_id:eid,quem:m.quem,data:m.data||null,valor:m.valor,subtipo:m.subtipo||'lata',descricao:m.desc||''})));
-    if(y.pagamentos&&y.pagamentos.length)
-      await sbReq('POST','pagamentos',y.pagamentos.map(p=>{
+    if(y.mealheiros&&y.mealheiros.length){
+      // return=representation: sem isto o `_id` local ficava a apontar para a
+      // linha apagada acima — só usado hoje como desempate de ordenação dos
+      // cash-flows, mas ao ficar preso ao id velho baralhava-a sem ninguém dar
+      // por isso até recarregar a página.
+      const mres=await sbReq('POST','mealheiros',y.mealheiros.map(m=>({evento_id:eid,quem:m.quem,data:m.data||null,valor:m.valor,subtipo:m.subtipo||'lata',descricao:m.desc||''})),{Prefer:'return=representation'});
+      if(Array.isArray(mres))mres.forEach((r,i)=>{if(y.mealheiros[i])y.mealheiros[i]._id=r.id;});
+    }
+    if(y.pagamentos&&y.pagamentos.length){
+      const pres=await sbReq('POST','pagamentos',y.pagamentos.map(p=>{
         const row={evento_id:eid,de:p.de,para:p.para,valor:p.valor,ref:p.ref||'',data:p.data||null,extra:p.extra||0};
         if(PAG_NOTA_COL)row.nota=p.nota||'';
         return row;
-      }));
+      }),{Prefer:'return=representation'});
+      if(Array.isArray(pres))pres.forEach((r,i)=>{if(y.pagamentos[i])y.pagamentos[i]._id=r.id;});
+    }
     // Propagar ids novos para o estado vivo (o replace recria todas as linhas)
     [ALL_YEARS[slot],(DATA&&DATA.evento&&DATA.evento.ano===ev.ano)?DATA:null].forEach(T=>{
       if(!T)return;
       if(idByNome&&T.membros)T.membros.forEach(m=>{if(idByNome[m.nome])m._id=idByNome[m.nome];});
-      ['convidados','despesas'].forEach(k=>{
+      ['convidados','despesas','mealheiros','pagamentos'].forEach(k=>{
         if(T[k]&&y[k]&&T[k].length===y[k].length)T[k].forEach((row,i)=>{row._id=y[k][i]._id;});
       });
     });
@@ -4684,7 +4696,8 @@ function editCfEntry(source,idx){
       <input type="text" id="ecf-desc" maxlength="30" value="${escHtml((d.desc||'').slice(0,30))}" oninput="updDescCount('ecf')">
       ${(!cfPodeEditar('despesa',idx)&&!String(d.obs||'').trim())?''   /* consulta: caixa vazia que não se pode preencher não acrescenta nada */
         :`<label>Observações</label>
-      <textarea id="ecf-obs" rows="2" placeholder="Detalhe adicional (opcional)">${escHtml(d.obs||'')}</textarea>`}`;
+      <textarea id="ecf-obs" rows="2" placeholder="Detalhe adicional (opcional)">${escHtml(d.obs||'')}</textarea>`}
+      ${(STOCK_TABLE&&!d.compraId&&d.tipo!==TS_TIPO_DESP&&cfPodeEditar('despesa',idx))?`<button class="btn ghost" id="ecf-detalhe-btn" style="width:100%;margin-top:14px" onclick="ecfAbrirDetalhe()">🧾 Detalhar por artigo →<span style="display:block;font-size:11px;font-weight:400;color:var(--muted);margin-top:2px;text-transform:none;letter-spacing:0">transforma esta despesa numa compra com itens e preços</span></button>`:''}`;
     // Já — e não no setTimeout: o cfEditorDireto desativa os campos logo a seguir,
     // e o que nascesse depois disso ficava editável em modo consulta.
     if(grupo.length)pagAbrir('ecf',grupo.map(i=>({quem:DATA.despesas[i].quem,valor:DATA.despesas[i].valor})));
@@ -9573,7 +9586,11 @@ function openCompra(compraId,opts){
     tipoProv:(dProv?dProv.tipo:o.tipo)||'Gerais',
     // A nota escrita à mão só vive nas observações no formato antigo (colada ao
     // artigo). No normal as observações são o STOCK_OBS, que não é nota nenhuma.
-    dataValorProv:(dProv?dProv.dataValor:o.dataValor)||'',obsProv:provAntiga?provNotaTxt(dProv):(o.obs||'')};
+    dataValorProv:(dProv?dProv.dataValor:o.dataValor)||'',obsProv:provAntiga?provNotaTxt(dProv):(o.obs||''),
+    // Conversão de uma despesa AVULSA já gravada (ver ecfAbrirDetalhe): o id
+    // dela só se apaga quando ESTA compra gravar com sucesso — cancelar aqui
+    // não pode perder a despesa original.
+    convertFrom:o.convertFrom||null};
   const linked=isEdit?shopArr().filter(x=>x.compraId===compraId):[];
   // Linhas: (edição) reconstruídas das despesas da compra; (nova) semeadas dos meus artigos
   if(isEdit&&provAntiga){
@@ -10716,6 +10733,33 @@ function cfAbrirDetalhe(){
   const e=document.getElementById('shop-buy-desc');if(desc&&e){e.value=desc.slice(0,30);shopBuyDescCount();}
   compraSetMode(true);   // itemização = modo "preço por artigo"
 }
+/* Mesma itemização, mas a partir do EDITOR de uma despesa já gravada (sem
+   compra_id) — quem a lançou (ou o admin) pode transformá-la numa compra a
+   sério. Ao contrário do cfAbrirDetalhe, aqui há dinheiro já na BD: fecha-se
+   este editor e abre-se uma compra NOVA pré-preenchida; a despesa antiga só se
+   apaga quando essa compra gravar com sucesso (ver saveCompra/convertFrom) —
+   cancelar a compra nova não perde a despesa original. */
+function ecfAbrirDetalhe(){
+  if(!editingCf||editingCf.editType!=='despesa')return;
+  const idx=editingCf.idx;
+  const d=(DATA.despesas||[])[idx];
+  if(!d||d.compraId||!cfPodeEditar('despesa',idx))return;
+  const who=(document.getElementById('ecf-who')||{}).value||d.quem||'';
+  const date=(document.getElementById('ecf-date')||{}).value||d.dataDesp||'';
+  const desc=((document.getElementById('ecf-desc')||{}).value||'').trim();
+  const obs=((document.getElementById('ecf-obs')||{}).value||'').trim();
+  const tipo=(document.getElementById('ecf-tipo')||{}).value||d.tipo||'Gerais';
+  const dataValor=(document.getElementById('ecf-date2')||{}).value||d.dataValor||'';
+  const prov=isCfProv('ecf');
+  const convertFrom={id:d._id};
+  closeEditCf();
+  openCompra(null,{detalhe:true,prov,tipo,dataValor,obs,convertFrom});
+  const w=document.getElementById('shop-buy-who');
+  if(who&&w&&[...w.options].some(o=>o.value===who))w.value=who;
+  const dEl=document.getElementById('shop-buy-date');if(date&&dEl)dEl.value=date;
+  const e=document.getElementById('shop-buy-desc');if(desc&&e){e.value=desc.slice(0,30);shopBuyDescCount();}
+  compraSetMode(true);
+}
 function faturaPick(){const i=document.getElementById('fatura-file');if(i)i.click();}
 async function faturaChosen(inp){
   const f=inp.files&&inp.files[0];inp.value='';
@@ -11377,6 +11421,18 @@ async function saveCompra(){
     if(toRelease.length){
       await queueWrite(()=>sbReq('PATCH',`shoplist?id=in.(${toRelease.join(',')})`,{estado:'pendente',compra_id:null,cf_desc:null,comprado_em:null}));
       shopArr().forEach(it=>{if(toRelease.includes(it._id))Object.assign(it,{estado:'pendente',compraId:null,cfDesc:null,compradoEm:null});});
+    }
+    /* Conversão de uma despesa avulsa (ecfAbrirDetalhe): só se apaga a antiga
+       AGORA que a compra nova já está gravada — falhar isto não desfaz a
+       compra (é dinheiro a mais na conta, não a menos), só avisa para se
+       apagar a antiga à mão. */
+    if(compraEdit.convertFrom&&compraEdit.convertFrom.id!=null){
+      try{
+        await queueWrite(()=>sbReq('DELETE',`despesas?id=eq.${compraEdit.convertFrom.id}`));
+        DATA.despesas=(DATA.despesas||[]).filter(d=>d._id!==compraEdit.convertFrom.id);
+      }catch(_){
+        toast('Compra registada, mas não consegui apagar a despesa antiga — apaga-a à mão nos Cash Flows','bad');
+      }
     }
     syncMirror();marcaGuardado();
     btn.disabled=false;closeShopBuyModal();
