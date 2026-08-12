@@ -1237,9 +1237,11 @@ button.cmp-chip.qt-tap:active{filter:brightness(.93)}
 .msl-det+.msl-det{margin-top:12px;border-top:1.5px dashed rgba(110,75,25,.3);padding-top:11px}
 .msl-det>summary{gap:8px}
 .msl-det>summary .rdc-lbl{font-size:14.5px;letter-spacing:.13em}
-/* Refeição já passada: os dois blocos (com o colapsável de cada um) vivem
-   dentro do corpo que o .det-toggle abre — ver mealShopSection. */
-.msl-past-body{margin-top:12px}
+/* Refeição já passada: o .det-toggle fica solto no cartão da refeição (só risca
+   + frase) e o cartão da lista só existe dentro do corpo que ele abre — ver
+   mealShopSection. Largura toda, que o .refdef-row é flex. */
+.msl-past-body{width:100%}
+.msl-past-body>.msl{margin-top:0}
 /* Contagem carimbada, como no separador Compras */
 .msl-count{background:transparent;border:1.5px solid rgba(133,41,26,.5);border-radius:20px;padding:0 8px;font-size:10.5px;font-weight:800;color:var(--campino-tinta);margin-left:auto;transform:rotate(-4deg);font-variant-numeric:tabular-nums}
 /* Linha do talão: nome · pontinhos · quantidade · quem trata. A dica de stock
