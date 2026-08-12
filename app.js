@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v285 · 2026-08-12 · Custo da refeição: o detalhe de "Custos diretos" passa a ordenar as despesas por valor descendente. Com bebida concreta alocada, a ordem dos blocos passa a ser diretos → bebida (sem o ícone 🍻) → indiretos, e "Custos indiretos" chama-se agora "Outros custos indiretos", com o chip "Bebidas" lá dentro a passar a "Outras bebidas" nesse caso · v284 · 2026-08-12 · Custo da refeição: os custos indiretos ganham um detalhe expansível "Por categoria" — o mesmo € de Bebidas/Cerveja/Gerais, mas repartido pela categoria do artigo (a mesma das Compras/Stock), maior primeiro; o que não é stock nenhum (sacos, depósitos, taxas) ou ainda não tem categoria cai em "Sacos/Depósitos/Similares", sempre por último · v283 · 2026-08-12 · Definições › Parametrizações: a fração da bolsa indireta (Gerais/Bebidas/Cerveja) que entra no preço das refeições deixa de estar fixa em 50% — passa a ser ajustável por ano, só em anos abertos. T-shirts e Stock Sobrante continuam sempre de fora dessa bolsa · v282 · 2026-08-12 · Saldos: a vista "Por refeição" passa a ser a principal, e o seletor "Por parcelas"/"Por refeição" desce para debaixo de Receitas/Despesas, só à vista com o detalhe aberto (ali é que faz diferença — os totais não mudam com a vista) · v281 · 2026-08-12 · Saldos › vista "Por refeição": o custo de cada refeição passa a incluir os indiretos (Gerais/Bebidas/Cerveja) que lhe cabem, como no cartão da refeição — antes só contava os diretos e o custo ficava sempre abaixo da receita. "Outros custos"/"Outras receitas" ganham detalhe por baixo (T-shirts, Stock Sobrante, Quota Extra, Mealheiro, Missão Poupança…), no ecrã e no PDF · v280 · 2026-08-12 · Shop List: um pedido de refeição (Almoço/Jantar) cujo dia já passou e continua por comprar passa a avisar "⚠️ refeição já passou" no cartão de "Em falta" — não se esconde nem se cancela sozinho, só se diz que já ninguém está à espera daquilo · v279 · 2026-08-11 · T-shirts: editar um pedido cujo "Encomendado por" já saiu do plantel deste ano deixa de esconder o campo (o select ficava vazio e o Guardar recusava sempre) — o nome antigo aparece marcado "fora do plantel" e dá para reatribuir a t-shirt a outra pessoa · v278 · 2026-08-11 · Quota Extra: o Fundo de Reserva deixa de ser ignorado nos anos em que as fontes diretas (refeições, convidados, mealheiros, t-shirts, stock sobrante) já cobrem a despesa — passa a somar-se sempre à conta antes de se cortar a zero, para o valor "a guardar" ser mesmo cobrado · v277 · 2026-08-10 · Definições › Parametrizações: novo interruptor "Corrigir Presenças" (por ano) que deixa cada um corrigir as suas presenças de dias já passados desse evento — desligado por defeito, e as contas fechadas continuam a trancar tudo mesmo com ele ligado · v276 · 2026-08-10 · Adicionar Convidado: o campo "Trazido por" deixa de escolher o primeiro membro por ordem alfabética do casal e passa a vir pré-selecionado com o próprio utilizador, como no resto da app · v275 · 2026-08-10 · Shop List: um pedido sem loja própria que está a herdar a loja de outro pedido do mesmo artigo agora pode recusar essa herança ("🚫 Não herdar — deixar sem loja"), sem mexer no pedido que a escreveu · v274 · 2026-08-10 · Pagar Dívida: um pagamento livre / adiantamento (sem dívidas selecionadas) passa a ter uma caixa de observações, para dizer o que é aquele dinheiro · v273 · 2026-08-10 · PDF de pessoa (Saldos): as Refeições ordenam-se por dia e mostram o prato; e as Despesas Adiantadas deixam de mostrar "🧺 Stock" como nota e passam a mostrar o destino real (refeição/tipo) em vez de "Gerais" sempre que a compra tem um destino só · v272 · Stock alocado a uma PESSOA (🎒 leva para casa): no separador Stock, uma alocação pode agora apontar a um membro em vez de a uma refeição — é para as sobras que não voltam a ser usadas. O custo sai do rateio e passa a ser cobrado só a essa pessoa (aparece no saldo dela, como as t-shirts) · v271 · Nos Saldos, uma compra com peça "só despesa" (saco, depósito) deixa de aparecer duplicada em "Despesas adiantadas" — as linhas da mesma compra juntam-se numa só. E "Despesas adiantadas" separa-se em duas: o que já pagaste (📅) e o que está previsto mas ainda por pagar (📌 provisórias) · v270 · As SOBRAS deixam de reabrir o pedido: um lote comprado para uma refeição conta inteiro na cobertura, mesmo com parte por alocar na bolsa comum — compram-se 8 pacotes para o jantar, comem-se 5, e a lista já não pede os outros 3 que estão na despensa. É a mesma leitura que o cartão da refeição já fazia. Mover o stock para outra refeição continua a reabrir o pedido · v269 · Uma falta “dita à mão” passa a dizer que o é — na lista e no cartão da refeição, como já dizia o “coberto” e a folha do 🖨 —, e o bloco “que pedidos é que isto trata?” marca a linha que não é a app a deduzir. Trocar o artigo de um pedido (chouriço de sangue → morcela) deita fora a cobertura declarada sobre o artigo antigo, que ficava a mandar sobre o stock novo';
+const APP_BUILD = 'v286 · 2026-08-12 · Quem inseriu uma despesa passa a poder editá-la/apagá-la: sem compra associada é sempre sua (própria/cônjuge); vindo de uma compra com stock só enquanto o admin não tiver ido ao separador Stock realocar os artigos — a partir daí a compra fecha-se para ela, com aviso, e só o admin a edita (requer correr db/despesas_self_edit.sql) · v285 · 2026-08-12 · Custo da refeição: o detalhe de "Custos diretos" passa a ordenar as despesas por valor descendente. Com bebida concreta alocada, a ordem dos blocos passa a ser diretos → bebida (sem o ícone 🍻) → indiretos, e "Custos indiretos" chama-se agora "Outros custos indiretos", com o chip "Bebidas" lá dentro a passar a "Outras bebidas" nesse caso · v284 · 2026-08-12 · Custo da refeição: os custos indiretos ganham um detalhe expansível "Por categoria" — o mesmo € de Bebidas/Cerveja/Gerais, mas repartido pela categoria do artigo (a mesma das Compras/Stock), maior primeiro; o que não é stock nenhum (sacos, depósitos, taxas) ou ainda não tem categoria cai em "Sacos/Depósitos/Similares", sempre por último · v283 · 2026-08-12 · Definições › Parametrizações: a fração da bolsa indireta (Gerais/Bebidas/Cerveja) que entra no preço das refeições deixa de estar fixa em 50% — passa a ser ajustável por ano, só em anos abertos. T-shirts e Stock Sobrante continuam sempre de fora dessa bolsa · v282 · 2026-08-12 · Saldos: a vista "Por refeição" passa a ser a principal, e o seletor "Por parcelas"/"Por refeição" desce para debaixo de Receitas/Despesas, só à vista com o detalhe aberto (ali é que faz diferença — os totais não mudam com a vista) · v281 · 2026-08-12 · Saldos › vista "Por refeição": o custo de cada refeição passa a incluir os indiretos (Gerais/Bebidas/Cerveja) que lhe cabem, como no cartão da refeição — antes só contava os diretos e o custo ficava sempre abaixo da receita. "Outros custos"/"Outras receitas" ganham detalhe por baixo (T-shirts, Stock Sobrante, Quota Extra, Mealheiro, Missão Poupança…), no ecrã e no PDF · v280 · 2026-08-12 · Shop List: um pedido de refeição (Almoço/Jantar) cujo dia já passou e continua por comprar passa a avisar "⚠️ refeição já passou" no cartão de "Em falta" — não se esconde nem se cancela sozinho, só se diz que já ninguém está à espera daquilo · v279 · 2026-08-11 · T-shirts: editar um pedido cujo "Encomendado por" já saiu do plantel deste ano deixa de esconder o campo (o select ficava vazio e o Guardar recusava sempre) — o nome antigo aparece marcado "fora do plantel" e dá para reatribuir a t-shirt a outra pessoa · v278 · 2026-08-11 · Quota Extra: o Fundo de Reserva deixa de ser ignorado nos anos em que as fontes diretas (refeições, convidados, mealheiros, t-shirts, stock sobrante) já cobrem a despesa — passa a somar-se sempre à conta antes de se cortar a zero, para o valor "a guardar" ser mesmo cobrado · v277 · 2026-08-10 · Definições › Parametrizações: novo interruptor "Corrigir Presenças" (por ano) que deixa cada um corrigir as suas presenças de dias já passados desse evento — desligado por defeito, e as contas fechadas continuam a trancar tudo mesmo com ele ligado · v276 · 2026-08-10 · Adicionar Convidado: o campo "Trazido por" deixa de escolher o primeiro membro por ordem alfabética do casal e passa a vir pré-selecionado com o próprio utilizador, como no resto da app · v275 · 2026-08-10 · Shop List: um pedido sem loja própria que está a herdar a loja de outro pedido do mesmo artigo agora pode recusar essa herança ("🚫 Não herdar — deixar sem loja"), sem mexer no pedido que a escreveu · v274 · 2026-08-10 · Pagar Dívida: um pagamento livre / adiantamento (sem dívidas selecionadas) passa a ter uma caixa de observações, para dizer o que é aquele dinheiro · v273 · 2026-08-10 · PDF de pessoa (Saldos): as Refeições ordenam-se por dia e mostram o prato; e as Despesas Adiantadas deixam de mostrar "🧺 Stock" como nota e passam a mostrar o destino real (refeição/tipo) em vez de "Gerais" sempre que a compra tem um destino só · v272 · Stock alocado a uma PESSOA (🎒 leva para casa): no separador Stock, uma alocação pode agora apontar a um membro em vez de a uma refeição — é para as sobras que não voltam a ser usadas. O custo sai do rateio e passa a ser cobrado só a essa pessoa (aparece no saldo dela, como as t-shirts) · v271 · Nos Saldos, uma compra com peça "só despesa" (saco, depósito) deixa de aparecer duplicada em "Despesas adiantadas" — as linhas da mesma compra juntam-se numa só. E "Despesas adiantadas" separa-se em duas: o que já pagaste (📅) e o que está previsto mas ainda por pagar (📌 provisórias) · v270 · As SOBRAS deixam de reabrir o pedido: um lote comprado para uma refeição conta inteiro na cobertura, mesmo com parte por alocar na bolsa comum — compram-se 8 pacotes para o jantar, comem-se 5, e a lista já não pede os outros 3 que estão na despensa. É a mesma leitura que o cartão da refeição já fazia. Mover o stock para outra refeição continua a reabrir o pedido · v269 · Uma falta “dita à mão” passa a dizer que o é — na lista e no cartão da refeição, como já dizia o “coberto” e a folha do 🖨 —, e o bloco “que pedidos é que isto trata?” marca a linha que não é a app a deduzir. Trocar o artigo de um pedido (chouriço de sangue → morcela) deita fora a cobertura declarada sobre o artigo antigo, que ficava a mandar sobre o stock novo';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -4063,8 +4063,8 @@ function cfEditorDireto(source,idx){
   editCfEntry(source,idx);
   const t=editingCf&&editingCf.editType;
   const btns=document.querySelector('#edit-cf-modal .mbtns');
-  if(btns)btns.style.display=cfPodeEditar(t)?'':'none';
-  if(!cfPodeEditar(t)){
+  if(btns)btns.style.display=cfPodeEditar(t,idx)?'':'none';
+  if(!cfPodeEditar(t,idx)){
     const f=document.getElementById('edit-cf-form');
     f.querySelectorAll('input,select,textarea').forEach(el=>{el.disabled=true;el.style.opacity='.75';});
     f.querySelectorAll('.sd-chip,.cf-opt,.cfp-toggle,.cfp-btn,.cfp-del').forEach(el=>{el.style.pointerEvents='none';});
@@ -4079,16 +4079,48 @@ function cfViewTipoOf(source,idx){
   const p=(DATA.pagamentos||[])[idx];
   return p?cfType(p):'';
 }
-/* Editar continua a ser do admin — e, com as contas fechadas, despesas e
-   mealheiros (as entradas do apuramento) deixam de se mexer. Os pagamentos
-   continuam editáveis depois do fecho, como sempre.
+/* Quem inseriu uma despesa/compra também a pode editar/apagar — mas só quando
+   isso não desfaz trabalho de outro. Uma despesa SOLTA (sem compra_id) é
+   sempre dela, próprio ou cônjuge (`despesaEditavelSelf`). Uma COMPRA (que
+   pode ter gerado stock) só continua a ser dela enquanto ninguém tiver ido ao
+   separador Stock realocar os artigos — `compraStockIntacto`, o mesmo
+   "divergiu" que o editor da compra já mostra (ver "Objetivo da compra vs
+   alocação de hoje"): mexer lá é trabalho do admin, e reescrever a compra por
+   baixo (`saveCompra` apaga e reinsere tudo) estragava-o. Mealheiro,
+   reembolso e pagar dívida continuam só do admin — não são "a despesa de
+   alguém", são o apuramento do grupo.
+   Com as contas fechadas, despesas e mealheiros (entradas do apuramento)
+   deixam de se mexer — para admin e para o próprio por igual.
    A compra fica de fora do fecho de propósito: quem manda nela é o `openCompra`,
    que sempre a deixou editar depois de fechadas as contas — a ficha não é sítio
    para mudar essa regra às escondidas. */
-function cfPodeEditar(t){
-  if(!isAdmin())return false;
-  if(t==='compra')return true;
-  return !(contasFechadas()&&(t==='despesa'||t==='mealheiro'));
+function cfPodeEditar(t,idx){
+  if(t==='compra')return isAdmin()||compraEditavelSelf(idx);
+  if(isAdmin())return !(contasFechadas()&&(t==='despesa'||t==='mealheiro'));
+  return t==='despesa'&&!contasFechadas()&&despesaEditavelSelf((DATA.despesas||[])[idx]);
+}
+/* Uma despesa é minha (ou do cônjuge) em TODAS as linhas — um pagamento por
+   vários só é meu se nenhuma linha for de outra pessoa, a mesma regra que o
+   `pagValidar` já impõe para a criar. Com compra_id não entra aqui: essa vai
+   pela ficha da compra (`compraEditavelSelf`), nunca por esta. */
+function despesaEditavelSelf(d){
+  if(!d||d.compraId)return false;
+  const grupo=cfGrupoIdxs(d);
+  const linhas=grupo.length?grupo.map(i=>DATA.despesas[i]):[d];
+  return linhas.every(x=>MY_NAMES.includes(x.quem));
+}
+function compraMinha(compraId){
+  const linhas=(DATA.despesas||[]).filter(d=>d.compraId===compraId);
+  return linhas.length>0&&linhas.every(d=>MY_NAMES.includes(d.quem));
+}
+/* Stock por mexer desde a compra: nenhum lote dela diverge do que ela
+   declarou (`loteDivergiu`). Sem lotes (compra sem stock, ou provisória do
+   formato antigo) não há nada para divergir — passa sempre. */
+function compraStockIntacto(compraId){
+  return !stockArr().some(l=>l.compraId===compraId&&loteDivergiu(l));
+}
+function compraEditavelSelf(compraId){
+  return !!compraId&&compraMinha(compraId)&&compraStockIntacto(compraId);
 }
 /* Troca a ficha pelo formulário e vice-versa (o modal é o mesmo). */
 function cfSetMode(m){
@@ -4107,7 +4139,7 @@ function cfUnlockEdit(){
   if(!cfView)return;
   const{source,idx}=cfView;
   // A UI já esconde o botão; a guarda é para o esconder não ser a única proteção
-  if(!cfPodeEditar(cfViewTipoOf(source,idx)))return;
+  if(!cfPodeEditar(cfViewTipoOf(source,idx),idx))return;
   // A compra tem editor próprio (é onde se mexe nos artigos e nos lotes) — o ✏️
   // leva lá, em vez de trazer para aqui um formulário que não é deste modal.
   if(source==='compra'){closeEditCf();openCompra(idx);return;}
@@ -4171,14 +4203,18 @@ function cfViewRender(){
     :t==='reembolso'?cfvReembolsoHtml((DATA.pagamentos||[])[idx])
     :t==='saldar'?cfvSaldarHtml((DATA.pagamentos||[])[idx]):'';
   const btn=document.getElementById('cf-view-edit');
-  if(btn)btn.style.display=cfPodeEditar(t)?'':'none';
+  if(btn)btn.style.display=cfPodeEditar(t,idx)?'':'none';
   // Só se explica o que tem explicação: contas fechadas trancam o movimento a
-  // toda a gente. Não ser admin não precisa de aviso — é a regra de sempre.
+  // toda a gente (não ser admin/dono não precisa de aviso — é a regra de
+  // sempre). A compra tem uma segunda razão para travar, e essa avisa-se: é
+  // minha, mas o admin já foi ao stock realocar os artigos por baixo.
   const nota=document.getElementById('cf-view-nota');
   const fechadas=contasFechadas()&&(t==='despesa'||t==='mealheiro');
+  const stockMexido=t==='compra'&&!isAdmin()&&compraMinha(idx)&&!compraStockIntacto(idx);
   if(nota){
-    nota.textContent=fechadas?'🔒 Contas fechadas — este movimento já não se edita.':'';
-    nota.style.display=fechadas?'':'none';
+    nota.textContent=fechadas?'🔒 Contas fechadas — este movimento já não se edita.'
+      :stockMexido?'🔒 Já foi alterada a alocação desta compra no stock — só o admin a pode editar.':'';
+    nota.style.display=(fechadas||stockMexido)?'':'none';
   }
 }
 
@@ -4429,13 +4465,32 @@ function cfvSdChipsHtml(payer,keys){
 }
 
 /* ═══ EDIT / DELETE CASH FLOW ═══ */
-function deleteCfFromDetail(){
+async function deleteCfFromDetail(){
   if(!editingCf)return;
-  const{source,idx}=editingCf;
+  const{source,idx,editType}=editingCf;
+  // A UI já esconde o botão; a guarda é para o esconder não ser a única proteção
+  if(!cfPodeEditar(editType,idx))return;
   // Paga por vários = uma despesa só, em várias linhas: apaga-se inteira.
   const grupo=source==='despesas'?cfGrupoIdxs(DATA.despesas[idx]):[];
   if(!confirm(grupo.length?`Esta despesa foi paga por ${grupo.length} pessoas. Apagar a despesa inteira?`
                           :'Tens a certeza que queres apagar este movimento?'))return;
+  /* Despesa própria: apaga-se só ela pelo REST direto — a policy da BD só
+     deixa mexer nas minhas, e o caminho do admin ao fundo (`pushToGitHub`)
+     reescreve o evento inteiro, que a sessão de quem não é admin não pode
+     fazer (as despesas dos outros não são dela). */
+  if(source==='despesas'&&!isAdmin()){
+    const alvo=(grupo.length?grupo:[idx]).slice().sort((a,b)=>a-b);
+    const ids=alvo.map(i=>DATA.despesas[i]._id).filter(id=>id!=null);
+    setSync('load','a guardar…');
+    try{
+      if(ids.length)await queueWrite(()=>sbReq('DELETE',`despesas?id=in.(${ids.join(',')})`));
+      for(let k=alvo.length-1;k>=0;k--)DATA.despesas.splice(alvo[k],1);
+      syncMirror();marcaGuardado();
+      closeEditCf();CALC=calcular(JSON.parse(JSON.stringify(DATA)));renderAll();
+      toast('Apagado ✓','ok');
+    }catch(e){setSync('err','erro ao guardar');toast('Não foi possível apagar: '+permErrorMsg(e),'bad');}
+    return;
+  }
   if(source==='pagamentos')DATA.pagamentos.splice(idx,1);
   else if(source==='despesas'){
     if(grupo.length)grupo.slice().sort((a,b)=>b-a).forEach(i=>DATA.despesas.splice(i,1));
@@ -4517,7 +4572,7 @@ function editCfEntry(source,idx){
     f.innerHTML=`
       <div id="ecf-who-cell">
         <label>Quem pagou?</label>
-        <select id="ecf-who">${memberOptions(d.quem)}</select>
+        <select id="ecf-who">${isAdmin()?memberOptions(d.quem):myMemberOptions(d.quem)}</select>
       </div>
       <div class="cfp-box" id="ecf-pag-box" style="display:none"></div>
       ${pagBtnHtml('ecf',false)}
@@ -4549,7 +4604,7 @@ function editCfEntry(source,idx){
       ${bebRowHtml('ecf')}
       <label>Descritivo <span class="cf-desc-count" id="ecf-desc-count"></span></label>
       <input type="text" id="ecf-desc" maxlength="30" value="${escHtml((d.desc||'').slice(0,30))}" oninput="updDescCount('ecf')">
-      ${(!isAdmin()&&!String(d.obs||'').trim())?''   /* consulta: caixa vazia que não se pode preencher não acrescenta nada */
+      ${(!cfPodeEditar('despesa',idx)&&!String(d.obs||'').trim())?''   /* consulta: caixa vazia que não se pode preencher não acrescenta nada */
         :`<label>Observações</label>
       <textarea id="ecf-obs" rows="2" placeholder="Detalhe adicional (opcional)">${escHtml(d.obs||'')}</textarea>`}`;
     // Já — e não no setTimeout: o cfEditorDireto desativa os campos logo a seguir,
@@ -4577,7 +4632,7 @@ function editCfEntry(source,idx){
       </div>`;
   }
 
-  applyRoFields(document.getElementById('edit-cf-modal'),!isAdmin());
+  applyRoFields(document.getElementById('edit-cf-modal'),!cfPodeEditar(editType,idx));
   document.getElementById('edit-cf-bg').classList.add('show');
   lockScroll();
 }
@@ -4739,6 +4794,43 @@ async function saveEditCf(){
       quem:l.quem,valor:rnd(l.valor,2),grupoPag:grupoId,
       _id:antigas[k]?antigas[k]._id:null   // o guardar reescreve as despesas todas
     }));
+    /* Despesa própria: grava-se só ela pelo REST direto — o caminho do admin
+       ao fundo (`pushToGitHub`) reescreve o evento inteiro (apaga e reinsere
+       TODAS as despesas), e a sessão de quem não é admin só tem policy para
+       mexer nas suas. É o mesmo caminho que já regista uma despesa nova. */
+    if(!isAdmin()){
+      // A UI já esconde o ✏️ e já só oferece nomes próprios no "Quem pagou?";
+      // a guarda é para isso não ser a única proteção.
+      if(!cfPodeEditar('despesa',idx)){document.getElementById('edit-cf-save').disabled=false;return;}
+      if(!novas.every(r=>MY_NAMES.includes(r.quem))){
+        toast('Só podes editar despesas tuas ou do teu cônjuge','bad');
+        document.getElementById('edit-cf-save').disabled=false;return;
+      }
+      const idsAntigos=antigas.map(x=>x._id).filter(id=>id!=null);
+      setSync('load','a guardar…');
+      try{
+        if(idsAntigos.length)await queueWrite(()=>sbReq('DELETE',`despesas?id=in.(${idsAntigos.join(',')})`));
+        const payload=novas.map(r=>{
+          const row={evento_id:DATA._sbId,quem:r.quem,data_desp:r.dataDesp||null,data_valor:r.dataValor||null,descricao:r.desc||'(sem descrição)',tipo:r.tipo,valor:r.valor,observacoes:r.obs||null};
+          if(DESP_GRUPO_COL)row.grupo_pag=r.grupoPag;
+          if(DESP_BEBIDA_COL)row.bebida=!!r.bebida;
+          return row;
+        });
+        const ins=await queueWrite(()=>sbReq('POST','despesas',payload,{Prefer:'return=representation'}));
+        novas.forEach((r,i)=>{r._id=ins&&ins[i]?ins[i].id:null;});
+        for(let k=alvo.length-1;k>=0;k--)DATA.despesas.splice(alvo[k],1);
+        DATA.despesas.splice(alvo[0],0,...novas);
+        syncMirror();marcaGuardado();
+        document.getElementById('edit-cf-save').disabled=false;
+        closeEditCf();CALC=calcular(JSON.parse(JSON.stringify(DATA)));renderAll();
+        toast('Editado ✓','ok');
+      }catch(e){
+        setSync('err','erro ao guardar');
+        document.getElementById('edit-cf-save').disabled=false;
+        toast('A despesa NÃO foi editada: '+permErrorMsg(e),'bad');
+      }
+      return;
+    }
     // Substituir em bloco: o nº de pagadores pode ter mudado
     const at=alvo[0];
     for(let k=alvo.length-1;k>=0;k--)DATA.despesas.splice(alvo[k],1);
@@ -9473,14 +9565,26 @@ function openCompra(compraId,opts){
   if(isEdit&&!provAntiga&&!compraEdit.lines.length)compraEdit.lines.push({tipo:'Gerais',dataValor:null,valor:'',obs:''});
 
   // Cabeçalho
-  // Editar/apagar uma compra já registada mexe em despesas → só admin (as despesas
-  // não têm policy de self-update/delete). Criar uma compra nova é permitido a membros.
-  const ro=isEdit&&!isAdmin();
+  // Editar/apagar uma compra já registada é do admin — OU de quem a registou
+  // (própria/cônjuge em todas as linhas), enquanto ninguém tiver ido ao stock
+  // realocar os artigos (`compraEditavelSelf`, ver "Objetivo da compra vs
+  // alocação de hoje"): guardar reescreve a compra toda e estragava isso.
+  // Criar uma compra nova continua permitido a qualquer membro.
+  const minha=isEdit&&!isAdmin()&&compraMinha(compraId);
+  const ro=isEdit&&!isAdmin()&&!(minha&&compraStockIntacto(compraId));
   // Em consulta o título não promete edição: é só "Detalhe Compra".
   document.getElementById('shop-buy-title').textContent=isEdit?(ro?'Detalhe Compra':'Editar Compra'):(o.detalhe?'Detalhar Despesa':'Registar Compra');
   document.getElementById('shop-buy-save').textContent=isEdit?'Guardar':(o.detalhe?'Registar despesa':'Registar compra');
-  document.getElementById('shop-buy-del').style.display=(isEdit&&isAdmin())?'':'none';
+  document.getElementById('shop-buy-del').style.display=(isEdit&&!ro)?'':'none';
   document.getElementById('shop-buy-save').style.display=ro?'none':'';
+  // Só se explica o que tem explicação: é minha, mas o admin já foi ao stock
+  // realocar por baixo — di-lo, em vez de deixar a compra fechada em silêncio.
+  const roNota=document.getElementById('shop-buy-ro-nota');
+  if(roNota){
+    const stockMexido=isEdit&&minha&&!compraStockIntacto(compraId);
+    roNota.textContent=stockMexido?'🔒 Já foi alterada a alocação desta compra no stock — só o admin a pode editar a partir daqui.':'';
+    roNota.style.display=stockMexido?'':'none';
+  }
   /* Numa compra NOVA o "quem pagou" segue por quem se está a agir: se o admin
      está no carrinho do João a registar a fatura dele, o defeito tem de ser o
      João — pôr o admin lá era o engano que este modo existe para evitar. Numa
@@ -10893,6 +10997,9 @@ async function saveCompra(){
   if(!DATA._sbId){toast('Sem ligação — recarrega a página','bad');return;}
   if(contasFechadas()){toast('Contas fechadas','bad');return;}
   const isEdit=!!compraEdit.id;
+  // A UI já esconde o Guardar; a guarda é para o esconder não ser a única
+  // proteção (o mesmo raciocínio do cfPodeEditar/cfUnlockEdit).
+  if(isEdit&&!isAdmin()&&!compraEditavelSelf(compraEdit.id)){toast('Já não podes editar esta compra','bad');return;}
   const who=document.getElementById('shop-buy-who').value;
   const date=document.getElementById('shop-buy-date').value;
   const desc=(document.getElementById('shop-buy-desc').value||'').trim().slice(0,30);
@@ -12802,6 +12909,8 @@ async function stkDelLote(id){
 
 async function deleteCompra(){
   const compraId=compraEdit.id;if(!compraId)return;
+  // A UI já esconde o Apagar; a guarda é para o esconder não ser a única proteção
+  if(!isAdmin()&&!compraEditavelSelf(compraId)){toast('Já não podes apagar esta compra','bad');return;}
   if(!confirm('Apagar esta compra? As despesas são removidas e os artigos voltam à lista.'))return;
   const btn=document.getElementById('shop-buy-del');btn.disabled=true;
   setSync('load','a guardar…');

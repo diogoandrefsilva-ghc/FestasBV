@@ -197,7 +197,7 @@ setTimeout(function(){ if (window.fbvEsconderSplash) window.fbvEsconderSplash();
     <div id="cf-edit-wrap" style="display:none">
       <div class="cf-wheel" id="ecf-wheel"></div>
       <div id="edit-cf-form"></div>
-      <div class="mbtns admin-only write-action">
+      <div class="mbtns write-action">
         <button class="btn danger" id="edit-cf-del" onclick="deleteCfFromDetail()">Apagar</button>
         <button class="btn prim" id="edit-cf-save" onclick="saveEditCf()">Guardar</button>
       </div>
@@ -285,6 +285,7 @@ setTimeout(function(){ if (window.fbvEsconderSplash) window.fbvEsconderSplash();
       <h3 style="margin-bottom:0" id="shop-buy-title">Registar Compra</h3>
       <button onclick="closeShopBuyModal()" style="background:var(--panel2);border:1px solid var(--line);color:var(--muted);border-radius:9px;width:32px;height:32px;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0">✕</button>
     </div>
+    <div class="note" id="shop-buy-ro-nota" style="display:none;margin-bottom:10px"></div>
     <div class="cf-quando" id="sb-quando" style="display:none">
       <div class="cfq on" data-q="efet" onclick="setShopBuyQuando('efet')">📅 Efetiva</div>
       <div class="cfq" data-q="prov" onclick="setShopBuyQuando('prov')">📌 Provisória</div>
