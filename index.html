@@ -116,13 +116,13 @@ setTimeout(function(){ if (window.fbvEsconderSplash) window.fbvEsconderSplash();
     <div class="lbl sf">Saldo do Grupo</div>
     <div class="big" id="saldo-grupo">—</div>
     <div class="hero-saving"><span>🐖 Poupança acumulada</span><b id="poupanca-acumulada">—</b><small id="poupanca-acumulada-nota"></small></div>
-    <div class="hero-view-switch sf" role="group" aria-label="Vista do resumo de saldos">
-      <button type="button" id="hero-view-parcelas" class="on" onclick="setSaldosVisao('parcelas')">Por parcelas</button>
-      <button type="button" id="hero-view-refeicoes" onclick="setSaldosVisao('refeicoes')">Por refeição</button>
-    </div>
     <div class="row">
       <div class="cell"><div class="k sf">Receitas</div><div class="v rc" id="tot-rec">—</div><div id="hero-rec-detail"></div></div>
       <div class="cell"><div class="k sf">Despesas</div><div class="v dp" id="tot-desp">—</div><div id="hero-desp-detail"></div></div>
+    </div>
+    <div class="hero-view-switch sf" role="group" aria-label="Vista do resumo de saldos">
+      <button type="button" id="hero-view-parcelas" onclick="setSaldosVisao('parcelas')">Por parcelas</button>
+      <button type="button" id="hero-view-refeicoes" class="on" onclick="setSaldosVisao('refeicoes')">Por refeição</button>
     </div>
   </div>
   <div id="view-saldos"></div>

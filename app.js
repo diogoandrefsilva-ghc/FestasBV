@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v281 · 2026-08-12 · Saldos › vista "Por refeição": o custo de cada refeição passa a incluir os indiretos (Gerais/Bebidas/Cerveja) que lhe cabem, como no cartão da refeição — antes só contava os diretos e o custo ficava sempre abaixo da receita. "Outros custos"/"Outras receitas" ganham detalhe por baixo (T-shirts, Stock Sobrante, Quota Extra, Mealheiro, Missão Poupança…), no ecrã e no PDF · v280 · 2026-08-12 · Shop List: um pedido de refeição (Almoço/Jantar) cujo dia já passou e continua por comprar passa a avisar "⚠️ refeição já passou" no cartão de "Em falta" — não se esconde nem se cancela sozinho, só se diz que já ninguém está à espera daquilo · v279 · 2026-08-11 · T-shirts: editar um pedido cujo "Encomendado por" já saiu do plantel deste ano deixa de esconder o campo (o select ficava vazio e o Guardar recusava sempre) — o nome antigo aparece marcado "fora do plantel" e dá para reatribuir a t-shirt a outra pessoa · v278 · 2026-08-11 · Quota Extra: o Fundo de Reserva deixa de ser ignorado nos anos em que as fontes diretas (refeições, convidados, mealheiros, t-shirts, stock sobrante) já cobrem a despesa — passa a somar-se sempre à conta antes de se cortar a zero, para o valor "a guardar" ser mesmo cobrado · v277 · 2026-08-10 · Definições › Parametrizações: novo interruptor "Corrigir Presenças" (por ano) que deixa cada um corrigir as suas presenças de dias já passados desse evento — desligado por defeito, e as contas fechadas continuam a trancar tudo mesmo com ele ligado · v276 · 2026-08-10 · Adicionar Convidado: o campo "Trazido por" deixa de escolher o primeiro membro por ordem alfabética do casal e passa a vir pré-selecionado com o próprio utilizador, como no resto da app · v275 · 2026-08-10 · Shop List: um pedido sem loja própria que está a herdar a loja de outro pedido do mesmo artigo agora pode recusar essa herança ("🚫 Não herdar — deixar sem loja"), sem mexer no pedido que a escreveu · v274 · 2026-08-10 · Pagar Dívida: um pagamento livre / adiantamento (sem dívidas selecionadas) passa a ter uma caixa de observações, para dizer o que é aquele dinheiro · v273 · 2026-08-10 · PDF de pessoa (Saldos): as Refeições ordenam-se por dia e mostram o prato; e as Despesas Adiantadas deixam de mostrar "🧺 Stock" como nota e passam a mostrar o destino real (refeição/tipo) em vez de "Gerais" sempre que a compra tem um destino só · v272 · Stock alocado a uma PESSOA (🎒 leva para casa): no separador Stock, uma alocação pode agora apontar a um membro em vez de a uma refeição — é para as sobras que não voltam a ser usadas. O custo sai do rateio e passa a ser cobrado só a essa pessoa (aparece no saldo dela, como as t-shirts) · v271 · Nos Saldos, uma compra com peça "só despesa" (saco, depósito) deixa de aparecer duplicada em "Despesas adiantadas" — as linhas da mesma compra juntam-se numa só. E "Despesas adiantadas" separa-se em duas: o que já pagaste (📅) e o que está previsto mas ainda por pagar (📌 provisórias) · v270 · As SOBRAS deixam de reabrir o pedido: um lote comprado para uma refeição conta inteiro na cobertura, mesmo com parte por alocar na bolsa comum — compram-se 8 pacotes para o jantar, comem-se 5, e a lista já não pede os outros 3 que estão na despensa. É a mesma leitura que o cartão da refeição já fazia. Mover o stock para outra refeição continua a reabrir o pedido · v269 · Uma falta “dita à mão” passa a dizer que o é — na lista e no cartão da refeição, como já dizia o “coberto” e a folha do 🖨 —, e o bloco “que pedidos é que isto trata?” marca a linha que não é a app a deduzir. Trocar o artigo de um pedido (chouriço de sangue → morcela) deita fora a cobertura declarada sobre o artigo antigo, que ficava a mandar sobre o stock novo';
+const APP_BUILD = 'v282 · 2026-08-12 · Saldos: a vista "Por refeição" passa a ser a principal, e o seletor "Por parcelas"/"Por refeição" desce para debaixo de Receitas/Despesas, só à vista com o detalhe aberto (ali é que faz diferença — os totais não mudam com a vista) · v281 · 2026-08-12 · Saldos › vista "Por refeição": o custo de cada refeição passa a incluir os indiretos (Gerais/Bebidas/Cerveja) que lhe cabem, como no cartão da refeição — antes só contava os diretos e o custo ficava sempre abaixo da receita. "Outros custos"/"Outras receitas" ganham detalhe por baixo (T-shirts, Stock Sobrante, Quota Extra, Mealheiro, Missão Poupança…), no ecrã e no PDF · v280 · 2026-08-12 · Shop List: um pedido de refeição (Almoço/Jantar) cujo dia já passou e continua por comprar passa a avisar "⚠️ refeição já passou" no cartão de "Em falta" — não se esconde nem se cancela sozinho, só se diz que já ninguém está à espera daquilo · v279 · 2026-08-11 · T-shirts: editar um pedido cujo "Encomendado por" já saiu do plantel deste ano deixa de esconder o campo (o select ficava vazio e o Guardar recusava sempre) — o nome antigo aparece marcado "fora do plantel" e dá para reatribuir a t-shirt a outra pessoa · v278 · 2026-08-11 · Quota Extra: o Fundo de Reserva deixa de ser ignorado nos anos em que as fontes diretas (refeições, convidados, mealheiros, t-shirts, stock sobrante) já cobrem a despesa — passa a somar-se sempre à conta antes de se cortar a zero, para o valor "a guardar" ser mesmo cobrado · v277 · 2026-08-10 · Definições › Parametrizações: novo interruptor "Corrigir Presenças" (por ano) que deixa cada um corrigir as suas presenças de dias já passados desse evento — desligado por defeito, e as contas fechadas continuam a trancar tudo mesmo com ele ligado · v276 · 2026-08-10 · Adicionar Convidado: o campo "Trazido por" deixa de escolher o primeiro membro por ordem alfabética do casal e passa a vir pré-selecionado com o próprio utilizador, como no resto da app · v275 · 2026-08-10 · Shop List: um pedido sem loja própria que está a herdar a loja de outro pedido do mesmo artigo agora pode recusar essa herança ("🚫 Não herdar — deixar sem loja"), sem mexer no pedido que a escreveu · v274 · 2026-08-10 · Pagar Dívida: um pagamento livre / adiantamento (sem dívidas selecionadas) passa a ter uma caixa de observações, para dizer o que é aquele dinheiro · v273 · 2026-08-10 · PDF de pessoa (Saldos): as Refeições ordenam-se por dia e mostram o prato; e as Despesas Adiantadas deixam de mostrar "🧺 Stock" como nota e passam a mostrar o destino real (refeição/tipo) em vez de "Gerais" sempre que a compra tem um destino só · v272 · Stock alocado a uma PESSOA (🎒 leva para casa): no separador Stock, uma alocação pode agora apontar a um membro em vez de a uma refeição — é para as sobras que não voltam a ser usadas. O custo sai do rateio e passa a ser cobrado só a essa pessoa (aparece no saldo dela, como as t-shirts) · v271 · Nos Saldos, uma compra com peça "só despesa" (saco, depósito) deixa de aparecer duplicada em "Despesas adiantadas" — as linhas da mesma compra juntam-se numa só. E "Despesas adiantadas" separa-se em duas: o que já pagaste (📅) e o que está previsto mas ainda por pagar (📌 provisórias) · v270 · As SOBRAS deixam de reabrir o pedido: um lote comprado para uma refeição conta inteiro na cobertura, mesmo com parte por alocar na bolsa comum — compram-se 8 pacotes para o jantar, comem-se 5, e a lista já não pede os outros 3 que estão na despensa. É a mesma leitura que o cartão da refeição já fazia. Mover o stock para outra refeição continua a reabrir o pedido · v269 · Uma falta “dita à mão” passa a dizer que o é — na lista e no cartão da refeição, como já dizia o “coberto” e a folha do 🖨 —, e o bloco “que pedidos é que isto trata?” marca a linha que não é a app a deduzir. Trocar o artigo de um pedido (chouriço de sangue → morcela) deita fora a cobertura declarada sobre o artigo antigo, que ficava a mandar sobre o stock novo';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -87,7 +87,8 @@ let DATA=null,CALC=null,TAB='saldos',GH_SHA=null;
 // Persistência do estado de navegação (sobrevive ao reload do PWA quando o iOS o descarrega)
 function lsSet(k,v){try{localStorage.setItem(k,v);}catch(_){}}
 function lsGet(k){try{return localStorage.getItem(k);}catch(_){return null;}}
-let SALDOS_VISAO=lsGet('fbv_saldos_visao')==='refeicoes'?'refeicoes':'parcelas';
+let SALDOS_VISAO=lsGet('fbv_saldos_visao')==='parcelas'?'parcelas':'refeicoes';
+let HERO_DETAIL_OPEN=false;   // sobrevive a um re-render (heroDetalheHtml nunca marca 'open' sozinho)
 
 /* ── Travar o scroll do fundo enquanto há um modal aberto ──
    O `.no-scroll` põe o body em `position:fixed`, e isso faz o browser esquecer
@@ -14535,37 +14536,47 @@ function renderHeroSubtotals(){
     receitas.push({label:'Outras receitas',val:bd.outrasReceitas,sub:bd.receitaSub});
     document.getElementById('hero-rec-detail').innerHTML=heroDetalheHtml(receitas);
     document.getElementById('hero-desp-detail').innerHTML=heroDetalheHtml(custos);
-    return;
+  } else {
+    // Receitas breakdown
+    const recItems=[];
+    if(CALC.totRefMembros>0) recItems.push({label:'Refeições',val:CALC.totRefMembros});
+    const guestPay=rnd(CALC.membros.reduce((a,m)=>a+m.AA,0),2);
+    if(guestPay>0) recItems.push({label:'Convidados',val:guestPay});
+    if(CALC.mealTot>0) recItems.push({label:'Mealheiro',val:CALC.mealTot});
+    if(CALC.tsTot>0) recItems.push({label:'T-shirts',val:CALC.tsTot});
+    if(CALC.ssTot>0) recItems.push({label:'Stock Sobrante',val:CALC.ssTot});
+    if(CALC.quotaTot>0) recItems.push({label:'Quota Extra',val:CALC.quotaTot});
+    if(CALC.missaoTot>0) recItems.push({label:'Missão Poupança',val:CALC.missaoTot});
+    document.getElementById('hero-rec-detail').innerHTML=heroDetalheHtml(recItems);
+
+    // Despesas breakdown
+    const despItems=[];
+    const tot=CALC.tot;
+    const tipoOrder=['Gerais','Bebidas','Almoço','Jantar','Renda','Cerveja'];
+    const allTipos=Object.keys(tot).sort((a,b)=>{const ia=tipoOrder.indexOf(a),ib=tipoOrder.indexOf(b);return(ia<0?99:ia)-(ib<0?99:ib);});
+    allTipos.forEach(tipo=>{if(tot[tipo]>0) despItems.push({label:tipo,val:tot[tipo]});});
+    document.getElementById('hero-desp-detail').innerHTML=heroDetalheHtml(despItems);
   }
-  // Receitas breakdown
-  const recItems=[];
-  if(CALC.totRefMembros>0) recItems.push({label:'Refeições',val:CALC.totRefMembros});
-  const guestPay=rnd(CALC.membros.reduce((a,m)=>a+m.AA,0),2);
-  if(guestPay>0) recItems.push({label:'Convidados',val:guestPay});
-  if(CALC.mealTot>0) recItems.push({label:'Mealheiro',val:CALC.mealTot});
-  if(CALC.tsTot>0) recItems.push({label:'T-shirts',val:CALC.tsTot});
-  if(CALC.ssTot>0) recItems.push({label:'Stock Sobrante',val:CALC.ssTot});
-  if(CALC.quotaTot>0) recItems.push({label:'Quota Extra',val:CALC.quotaTot});
-  if(CALC.missaoTot>0) recItems.push({label:'Missão Poupança',val:CALC.missaoTot});
-
-  document.getElementById('hero-rec-detail').innerHTML=heroDetalheHtml(recItems);
-
-  // Despesas breakdown
-  const despItems=[];
-  const tot=CALC.tot;
-  const tipoOrder=['Gerais','Bebidas','Almoço','Jantar','Renda','Cerveja'];
-  const allTipos=Object.keys(tot).sort((a,b)=>{const ia=tipoOrder.indexOf(a),ib=tipoOrder.indexOf(b);return(ia<0?99:ia)-(ib<0?99:ib);});
-  allTipos.forEach(tipo=>{if(tot[tipo]>0) despItems.push({label:tipo,val:tot[tipo]});});
-
-  document.getElementById('hero-desp-detail').innerHTML=heroDetalheHtml(despItems);
+  // heroDetalheHtml recria os blocos sempre fechados — repõe o estado aberto
+  // (e com ele o seletor de vista, que só faz sentido com o detalhe aberto)
+  // se era isso que lá estava, para trocar de vista não fechar o que se veio ver.
+  if(HERO_DETAIL_OPEN){
+    document.querySelectorAll('#hero-rec-detail .hero-expand, #hero-desp-detail .hero-expand').forEach(e=>e.classList.add('open'));
+    document.querySelectorAll('#hero-rec-detail .hero-detail, #hero-desp-detail .hero-detail').forEach(d=>d.classList.add('open'));
+  }
+  const heroCard=document.getElementById('hero-card');
+  if(heroCard)heroCard.classList.toggle('detail-open',HERO_DETAIL_OPEN);
 }
 // Abre/fecha em conjunto os detalhes de Receitas e Despesas
 function toggleHeroDetail(){
   const exps=document.querySelectorAll('#hero-rec-detail .hero-expand, #hero-desp-detail .hero-expand');
   const dets=document.querySelectorAll('#hero-rec-detail .hero-detail, #hero-desp-detail .hero-detail');
   const abrir=[...dets].some(d=>!d.classList.contains('open'));
+  HERO_DETAIL_OPEN=abrir;
   exps.forEach(e=>e.classList.toggle('open',abrir));
   dets.forEach(d=>d.classList.toggle('open',abrir));
+  const heroCard=document.getElementById('hero-card');
+  if(heroCard)heroCard.classList.toggle('detail-open',abrir);
 }
 
 /* ═══ T-SHIRTS ═══
