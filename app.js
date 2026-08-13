@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v306 · 2026-08-13 · Relatório geral (PDF): sai a lista de cash-flows (detalhe a mais para uma folha de resumo) e a indicação do tesoureiro; o "Despesas — Detalhe" passa a ser por CATEGORIA do artigo — o evento inteiro, diretos das refeições incluídos —, em vez do tipo (Gerais/Bebidas/Cerveja); a "Visão por Refeição" ganha coluna de Saldo, fecha um subtotal das refeições e mostra por baixo, uma a uma, as parcelas que mexem no saldo (t-shirts, mealheiro, quota extra, bolsa comum não atribuída) até ao saldo do grupo; nova secção "Distribuição por Dia", com o custo de cada dia repartido pela categoria do artigo; e o resumo por membro passa a dois quadros — o consumo do próprio (refeições + quota) e, a seguir, o total com convidados, t-shirts e sobras · v305 · 2026-08-12 · Refeições: o "Ver detalhe da lista de compras" perde a moldura à volta e fica igual ao "Ver detalhe do custo" — só a risca divisória e a frase. O cartão da lista só aparece ao abrir · v304 · 2026-08-12 · Stock › ⇄ 2.ª medida: com VÁRIAS MARCAS debaixo do mesmo artigo, cada linha da alocação passa a converter-se pelo fator da SUA marca e não pela média do cartão — pedir 3 postas do "Bacalhau Ocean Sea" (0,8 kg = 3 un) deixa de dar "Fixaste 3 un — só há 2,737 un" ao guardar, e o que se aloca deixa de ficar em decimais. O total em peças passa a ser a soma das linhas, e trocar a marca de uma linha guarda o número escrito (2 postas continuam 2, não 1,9) · v303 · 2026-08-12 · Refeições: o "Ver detalhe da lista de compras" de uma refeição passada passa a ser o MESMO botão do "Ver detalhe do custo", e ao abrir mostra os dois blocos de sempre (🛒 lista, depois 🧺 comprado), cada um com o seu colapsável; e os dois botões deixam de fugir para baixo ao expandir — passam a ficar ANTES do corpo que abrem, logo o "Esconder" nasce exatamente onde estava o "Ver" · v302 · 2026-08-12 · Refeições: o Cartaz das Ementas sobe para debaixo dos chips dos dias (é do ano, não da refeição aberta); numa refeição já passada a Lista de compras e o 🧺 Comprado fecham-se num só "Ver detalhe da lista de compras" — e o bloco deixa de se chamar "Não comprado" (o que lá está é a lista, com o tratado riscado); no detalhe dos custos diretos/bebida a quantidade ganha coluna própria e traz as duas medidas do lote ("7 un ≈ 3,136 kg"), como no 🧺 Comprado; o cartão do custo ganha um "Ver detalhe do custo" no fim; e abrir diretos/bebida/indiretos passa a mostrar já as linhas lá dentro · v301 · 2026-08-12 · Stock › filtro da alocação: as opções deixam de levar o nome da refeição à frente ("🌙 Jantar Sex, 7/ago · 11" → "🌙 Sex 7/ago · 11", o mesmo rótulo do chip do cartão) — com a contagem atrás a linha partia-se em duas no dropdown do iPhone, e a letra das <option> não se pode encolher (é o sistema que as desenha). O que o nome dizia, o ícone já diz: ☀️ almoço, 🌙 jantar · v300 · 2026-08-12 · Stock: os quatro chips de estado passam a uma combobox (consumido/por gastar · alocado/por alocar, com a contagem em cada opção) e ao lado nasce uma SEGUNDA combobox para a alocação — ver só o que está em Gerais, em Bebidas, no jantar de 7/ago ou no 🎒 de alguém. Escolhido um destino, os chips do cartão e o € da categoria passam a ser os desse destino. A 🍻 bebida de uma refeição vem com ela. E corrige o chip "🧺 por alocar", que desde a v268 (quando o chip "Tudo" saiu) só aparecia a filtrar precisamente por "Por alocar" · v299 · 2026-08-12 · Cash Flows: o "Por detalhar" deixa de ser um chip à parte e passa para dentro do seletor de refeições/tipos, no fim ("📝 Por detalhar · N") — o ecrã já tinha filtros a mais por cima da lista. Deixa de se poder cruzar com uma refeição · v298 · 2026-08-12 · Cash Flows › filtro por refeição/tipo: o dia passa a três letras ("Jantar Sáb, 8/ago" em vez de "Jantar Sábado, 8/ago") — o dropdown do iOS não deixa encolher a letra das opções, e por extenso partia cada refeição em duas linhas · v297 · 2026-08-12 · Cash Flows › filtro por refeição/tipo: a 🍻 bebida de uma refeição deixa de ter entrada própria (funde-se na refeição, que é como se procura) e as entradas passam a dizer a refeição por extenso ("Almoço Segunda, 10/ago"); o 🎒 "leva para casa" sai do filtro — é alocação feita no Stock, não o objetivo da compra. E um chip novo "🧾 Por detalhar" mostra as despesas soltas, sem artigos item a item · v296 · 2026-08-12 · Cash Flows: a lista passa a ordenar-se sempre por ordem descendente (também dentro do mesmo dia, pelo mais recente a entrar) — antes ficava ascendente dentro do dia, o que baralhava. E uma despesa avulsa (sem compra) ganha "🧾 Detalhar por artigo" no editor, para quem a pode editar (admin, ou quem a registou) a transformar numa compra com itens e preços · v295 · 2026-08-12 · Detalhe "Por categoria": o stock ainda POR ALOCAR deixa de cair no balde "Sacos/Depósitos/Similares" — o dinheiro continua a repartir-se pelas refeições na mesma (é bolsa comum), mas cada parcela passa a aparecer na categoria do seu artigo (Conservas, Legumes…), como o stock já alocado. Não estar entregue a uma refeição não o torna menos Conservas. O balde fica só com os sacos/taxas · v294 · 2026-08-12 · Relatório geral (PDF): nova secção "Custos Indiretos por Categoria" — o mesmo detalhe que cada cartão de refeição abre, mas somado por todas elas. Sai da MESMA função do ecrã (catIndirRows), para as duas leituras não poderem discordar · v293 · 2026-08-12 · CORRIGE a v291, que fez as categorias desaparecer do detalhe "Por categoria" (Utensílios, Bebidas, Fruta… iam todas parar a "Sacos/Depósitos/Similares"): o marcador "🧺 Stock" está em CADA artigo que o stock reparte pelas refeições, não só na linha do resto por alocar — o que as separa é a linha do resto ser uma despesa real da compra · v292 · 2026-08-12 · Custo da refeição › detalhe "Por categoria": as linhas "🧾 só despesa" (sacos, depósitos, taxas) voltam a agrupar-se sempre em "Sacos/Depósitos/Similares", mesmo tendo descritivo próprio — reconhecem-se pelo nome (o mesmo dicionário do "🧾 Extras da fatura"), que agora também apanha "Depósito" sozinho · v291 · 2026-08-12 · Custo da refeição › detalhe "Por categoria": a linha 🧺 Stock (o resto por alocar) deixa de cair no nome da loja da compra — vai direto para o catch-all "Sacos/Depósitos/Similares", sem tentar mais nenhum descritivo · v290 · 2026-08-12 · Custo da refeição › detalhe "Por categoria": uma despesa de uma COMPRA (sacos/depósitos, provisória antiga) passa a mostrar-se pelas OBSERVAÇÕES (o artigo) em vez do "Descritivo" da compra (normalmente o nome da loja, partilhado por todas as despesas dela) — a loja aparecia a repetir-se em vez do saco/depósito. E o resto por alocar da linha "🧺 Stock" deixa de se disfarçar atrás do nome da loja: volta a cair no catch-all, que agora aparece mesmo quando há stock por alocar · v289 · 2026-08-12 · Revertida a v288 (categorizar o stock por alocar por lote) — os números de "Sacos/Depósitos/Similares" estavam a inflacionar em vez de encolher, sinal de que a reconstrução não estava a bater certo com o resto real da compra. Volta-se à v287 enquanto se investiga com dados reais · v287 · 2026-08-12 · Custo da refeição › detalhe "Por categoria": uma despesa sem categoria deixa de se amontoar em "Sacos/Depósitos/Similares" — passa a mostrar-se pelo seu próprio descritivo (o artigo do stock, ou o texto escrito na despesa), como se fosse um artigo. O catch-all fica reservado para o que não tem descritivo nenhum (o stock ainda por alocar) · v286 · 2026-08-12 · Quem inseriu uma despesa passa a poder editá-la/apagá-la: sem compra associada é sempre sua (própria/cônjuge); vindo de uma compra com stock só enquanto o admin não tiver ido ao separador Stock realocar os artigos — a partir daí a compra fecha-se para ela, com aviso, e só o admin a edita (requer correr db/despesas_self_edit.sql) · v285 · 2026-08-12 · Custo da refeição: o detalhe de "Custos diretos" passa a ordenar as despesas por valor descendente. Com bebida concreta alocada, a ordem dos blocos passa a ser diretos → bebida (sem o ícone 🍻) → indiretos, e "Custos indiretos" chama-se agora "Outros custos indiretos", com o chip "Bebidas" lá dentro a passar a "Outras bebidas" nesse caso · v284 · 2026-08-12 · Custo da refeição: os custos indiretos ganham um detalhe expansível "Por categoria" — o mesmo € de Bebidas/Cerveja/Gerais, mas repartido pela categoria do artigo (a mesma das Compras/Stock), maior primeiro; o que não é stock nenhum (sacos, depósitos, taxas) ou ainda não tem categoria cai em "Sacos/Depósitos/Similares", sempre por último · v283 · 2026-08-12 · Definições › Parametrizações: a fração da bolsa indireta (Gerais/Bebidas/Cerveja) que entra no preço das refeições deixa de estar fixa em 50% — passa a ser ajustável por ano, só em anos abertos. T-shirts e Stock Sobrante continuam sempre de fora dessa bolsa · v282 · 2026-08-12 · Saldos: a vista "Por refeição" passa a ser a principal, e o seletor "Por parcelas"/"Por refeição" desce para debaixo de Receitas/Despesas, só à vista com o detalhe aberto (ali é que faz diferença — os totais não mudam com a vista) · v281 · 2026-08-12 · Saldos › vista "Por refeição": o custo de cada refeição passa a incluir os indiretos (Gerais/Bebidas/Cerveja) que lhe cabem, como no cartão da refeição — antes só contava os diretos e o custo ficava sempre abaixo da receita. "Outros custos"/"Outras receitas" ganham detalhe por baixo (T-shirts, Stock Sobrante, Quota Extra, Mealheiro, Missão Poupança…), no ecrã e no PDF · v280 · 2026-08-12 · Shop List: um pedido de refeição (Almoço/Jantar) cujo dia já passou e continua por comprar passa a avisar "⚠️ refeição já passou" no cartão de "Em falta" — não se esconde nem se cancela sozinho, só se diz que já ninguém está à espera daquilo · v279 · 2026-08-11 · T-shirts: editar um pedido cujo "Encomendado por" já saiu do plantel deste ano deixa de esconder o campo (o select ficava vazio e o Guardar recusava sempre) — o nome antigo aparece marcado "fora do plantel" e dá para reatribuir a t-shirt a outra pessoa · v278 · 2026-08-11 · Quota Extra: o Fundo de Reserva deixa de ser ignorado nos anos em que as fontes diretas (refeições, convidados, mealheiros, t-shirts, stock sobrante) já cobrem a despesa — passa a somar-se sempre à conta antes de se cortar a zero, para o valor "a guardar" ser mesmo cobrado · v277 · 2026-08-10 · Definições › Parametrizações: novo interruptor "Corrigir Presenças" (por ano) que deixa cada um corrigir as suas presenças de dias já passados desse evento — desligado por defeito, e as contas fechadas continuam a trancar tudo mesmo com ele ligado · v276 · 2026-08-10 · Adicionar Convidado: o campo "Trazido por" deixa de escolher o primeiro membro por ordem alfabética do casal e passa a vir pré-selecionado com o próprio utilizador, como no resto da app · v275 · 2026-08-10 · Shop List: um pedido sem loja própria que está a herdar a loja de outro pedido do mesmo artigo agora pode recusar essa herança ("🚫 Não herdar — deixar sem loja"), sem mexer no pedido que a escreveu · v274 · 2026-08-10 · Pagar Dívida: um pagamento livre / adiantamento (sem dívidas selecionadas) passa a ter uma caixa de observações, para dizer o que é aquele dinheiro · v273 · 2026-08-10 · PDF de pessoa (Saldos): as Refeições ordenam-se por dia e mostram o prato; e as Despesas Adiantadas deixam de mostrar "🧺 Stock" como nota e passam a mostrar o destino real (refeição/tipo) em vez de "Gerais" sempre que a compra tem um destino só · v272 · Stock alocado a uma PESSOA (🎒 leva para casa): no separador Stock, uma alocação pode agora apontar a um membro em vez de a uma refeição — é para as sobras que não voltam a ser usadas. O custo sai do rateio e passa a ser cobrado só a essa pessoa (aparece no saldo dela, como as t-shirts) · v271 · Nos Saldos, uma compra com peça "só despesa" (saco, depósito) deixa de aparecer duplicada em "Despesas adiantadas" — as linhas da mesma compra juntam-se numa só. E "Despesas adiantadas" separa-se em duas: o que já pagaste (📅) e o que está previsto mas ainda por pagar (📌 provisórias) · v270 · As SOBRAS deixam de reabrir o pedido: um lote comprado para uma refeição conta inteiro na cobertura, mesmo com parte por alocar na bolsa comum — compram-se 8 pacotes para o jantar, comem-se 5, e a lista já não pede os outros 3 que estão na despensa. É a mesma leitura que o cartão da refeição já fazia. Mover o stock para outra refeição continua a reabrir o pedido · v269 · Uma falta “dita à mão” passa a dizer que o é — na lista e no cartão da refeição, como já dizia o “coberto” e a folha do 🖨 —, e o bloco “que pedidos é que isto trata?” marca a linha que não é a app a deduzir. Trocar o artigo de um pedido (chouriço de sangue → morcela) deita fora a cobertura declarada sobre o artigo antigo, que ficava a mandar sobre o stock novo';
+const APP_BUILD = 'v307 · 2026-08-13 · Relatório geral (PDF): a "Distribuição por Dia" passa a MATRIZ — uma coluna por dia/refeição, uma linha por categoria e o total à direita, para se seguir a mesma categoria ao longo dos dias; e ganha um quadro final "Valores a Liquidar": o total de cada membro menos as despesas que adiantou e os pagamentos que fez, mais o que já recebeu, dando o saldo — o mesmo número que os Saldos mostram (sai da mesma função) · v306 · 2026-08-13 · Relatório geral (PDF): sai a lista de cash-flows (detalhe a mais para uma folha de resumo) e a indicação do tesoureiro; o "Despesas — Detalhe" passa a ser por CATEGORIA do artigo — o evento inteiro, diretos das refeições incluídos —, em vez do tipo (Gerais/Bebidas/Cerveja); a "Visão por Refeição" ganha coluna de Saldo, fecha um subtotal das refeições e mostra por baixo, uma a uma, as parcelas que mexem no saldo (t-shirts, mealheiro, quota extra, bolsa comum não atribuída) até ao saldo do grupo; nova secção "Distribuição por Dia", com o custo de cada dia repartido pela categoria do artigo; e o resumo por membro passa a dois quadros — o consumo do próprio (refeições + quota) e, a seguir, o total com convidados, t-shirts e sobras · v305 · 2026-08-12 · Refeições: o "Ver detalhe da lista de compras" perde a moldura à volta e fica igual ao "Ver detalhe do custo" — só a risca divisória e a frase. O cartão da lista só aparece ao abrir · v304 · 2026-08-12 · Stock › ⇄ 2.ª medida: com VÁRIAS MARCAS debaixo do mesmo artigo, cada linha da alocação passa a converter-se pelo fator da SUA marca e não pela média do cartão — pedir 3 postas do "Bacalhau Ocean Sea" (0,8 kg = 3 un) deixa de dar "Fixaste 3 un — só há 2,737 un" ao guardar, e o que se aloca deixa de ficar em decimais. O total em peças passa a ser a soma das linhas, e trocar a marca de uma linha guarda o número escrito (2 postas continuam 2, não 1,9) · v303 · 2026-08-12 · Refeições: o "Ver detalhe da lista de compras" de uma refeição passada passa a ser o MESMO botão do "Ver detalhe do custo", e ao abrir mostra os dois blocos de sempre (🛒 lista, depois 🧺 comprado), cada um com o seu colapsável; e os dois botões deixam de fugir para baixo ao expandir — passam a ficar ANTES do corpo que abrem, logo o "Esconder" nasce exatamente onde estava o "Ver" · v302 · 2026-08-12 · Refeições: o Cartaz das Ementas sobe para debaixo dos chips dos dias (é do ano, não da refeição aberta); numa refeição já passada a Lista de compras e o 🧺 Comprado fecham-se num só "Ver detalhe da lista de compras" — e o bloco deixa de se chamar "Não comprado" (o que lá está é a lista, com o tratado riscado); no detalhe dos custos diretos/bebida a quantidade ganha coluna própria e traz as duas medidas do lote ("7 un ≈ 3,136 kg"), como no 🧺 Comprado; o cartão do custo ganha um "Ver detalhe do custo" no fim; e abrir diretos/bebida/indiretos passa a mostrar já as linhas lá dentro · v301 · 2026-08-12 · Stock › filtro da alocação: as opções deixam de levar o nome da refeição à frente ("🌙 Jantar Sex, 7/ago · 11" → "🌙 Sex 7/ago · 11", o mesmo rótulo do chip do cartão) — com a contagem atrás a linha partia-se em duas no dropdown do iPhone, e a letra das <option> não se pode encolher (é o sistema que as desenha). O que o nome dizia, o ícone já diz: ☀️ almoço, 🌙 jantar · v300 · 2026-08-12 · Stock: os quatro chips de estado passam a uma combobox (consumido/por gastar · alocado/por alocar, com a contagem em cada opção) e ao lado nasce uma SEGUNDA combobox para a alocação — ver só o que está em Gerais, em Bebidas, no jantar de 7/ago ou no 🎒 de alguém. Escolhido um destino, os chips do cartão e o € da categoria passam a ser os desse destino. A 🍻 bebida de uma refeição vem com ela. E corrige o chip "🧺 por alocar", que desde a v268 (quando o chip "Tudo" saiu) só aparecia a filtrar precisamente por "Por alocar" · v299 · 2026-08-12 · Cash Flows: o "Por detalhar" deixa de ser um chip à parte e passa para dentro do seletor de refeições/tipos, no fim ("📝 Por detalhar · N") — o ecrã já tinha filtros a mais por cima da lista. Deixa de se poder cruzar com uma refeição · v298 · 2026-08-12 · Cash Flows › filtro por refeição/tipo: o dia passa a três letras ("Jantar Sáb, 8/ago" em vez de "Jantar Sábado, 8/ago") — o dropdown do iOS não deixa encolher a letra das opções, e por extenso partia cada refeição em duas linhas · v297 · 2026-08-12 · Cash Flows › filtro por refeição/tipo: a 🍻 bebida de uma refeição deixa de ter entrada própria (funde-se na refeição, que é como se procura) e as entradas passam a dizer a refeição por extenso ("Almoço Segunda, 10/ago"); o 🎒 "leva para casa" sai do filtro — é alocação feita no Stock, não o objetivo da compra. E um chip novo "🧾 Por detalhar" mostra as despesas soltas, sem artigos item a item · v296 · 2026-08-12 · Cash Flows: a lista passa a ordenar-se sempre por ordem descendente (também dentro do mesmo dia, pelo mais recente a entrar) — antes ficava ascendente dentro do dia, o que baralhava. E uma despesa avulsa (sem compra) ganha "🧾 Detalhar por artigo" no editor, para quem a pode editar (admin, ou quem a registou) a transformar numa compra com itens e preços · v295 · 2026-08-12 · Detalhe "Por categoria": o stock ainda POR ALOCAR deixa de cair no balde "Sacos/Depósitos/Similares" — o dinheiro continua a repartir-se pelas refeições na mesma (é bolsa comum), mas cada parcela passa a aparecer na categoria do seu artigo (Conservas, Legumes…), como o stock já alocado. Não estar entregue a uma refeição não o torna menos Conservas. O balde fica só com os sacos/taxas · v294 · 2026-08-12 · Relatório geral (PDF): nova secção "Custos Indiretos por Categoria" — o mesmo detalhe que cada cartão de refeição abre, mas somado por todas elas. Sai da MESMA função do ecrã (catIndirRows), para as duas leituras não poderem discordar · v293 · 2026-08-12 · CORRIGE a v291, que fez as categorias desaparecer do detalhe "Por categoria" (Utensílios, Bebidas, Fruta… iam todas parar a "Sacos/Depósitos/Similares"): o marcador "🧺 Stock" está em CADA artigo que o stock reparte pelas refeições, não só na linha do resto por alocar — o que as separa é a linha do resto ser uma despesa real da compra · v292 · 2026-08-12 · Custo da refeição › detalhe "Por categoria": as linhas "🧾 só despesa" (sacos, depósitos, taxas) voltam a agrupar-se sempre em "Sacos/Depósitos/Similares", mesmo tendo descritivo próprio — reconhecem-se pelo nome (o mesmo dicionário do "🧾 Extras da fatura"), que agora também apanha "Depósito" sozinho · v291 · 2026-08-12 · Custo da refeição › detalhe "Por categoria": a linha 🧺 Stock (o resto por alocar) deixa de cair no nome da loja da compra — vai direto para o catch-all "Sacos/Depósitos/Similares", sem tentar mais nenhum descritivo · v290 · 2026-08-12 · Custo da refeição › detalhe "Por categoria": uma despesa de uma COMPRA (sacos/depósitos, provisória antiga) passa a mostrar-se pelas OBSERVAÇÕES (o artigo) em vez do "Descritivo" da compra (normalmente o nome da loja, partilhado por todas as despesas dela) — a loja aparecia a repetir-se em vez do saco/depósito. E o resto por alocar da linha "🧺 Stock" deixa de se disfarçar atrás do nome da loja: volta a cair no catch-all, que agora aparece mesmo quando há stock por alocar · v289 · 2026-08-12 · Revertida a v288 (categorizar o stock por alocar por lote) — os números de "Sacos/Depósitos/Similares" estavam a inflacionar em vez de encolher, sinal de que a reconstrução não estava a bater certo com o resto real da compra. Volta-se à v287 enquanto se investiga com dados reais · v287 · 2026-08-12 · Custo da refeição › detalhe "Por categoria": uma despesa sem categoria deixa de se amontoar em "Sacos/Depósitos/Similares" — passa a mostrar-se pelo seu próprio descritivo (o artigo do stock, ou o texto escrito na despesa), como se fosse um artigo. O catch-all fica reservado para o que não tem descritivo nenhum (o stock ainda por alocar) · v286 · 2026-08-12 · Quem inseriu uma despesa passa a poder editá-la/apagá-la: sem compra associada é sempre sua (própria/cônjuge); vindo de uma compra com stock só enquanto o admin não tiver ido ao separador Stock realocar os artigos — a partir daí a compra fecha-se para ela, com aviso, e só o admin a edita (requer correr db/despesas_self_edit.sql) · v285 · 2026-08-12 · Custo da refeição: o detalhe de "Custos diretos" passa a ordenar as despesas por valor descendente. Com bebida concreta alocada, a ordem dos blocos passa a ser diretos → bebida (sem o ícone 🍻) → indiretos, e "Custos indiretos" chama-se agora "Outros custos indiretos", com o chip "Bebidas" lá dentro a passar a "Outras bebidas" nesse caso · v284 · 2026-08-12 · Custo da refeição: os custos indiretos ganham um detalhe expansível "Por categoria" — o mesmo € de Bebidas/Cerveja/Gerais, mas repartido pela categoria do artigo (a mesma das Compras/Stock), maior primeiro; o que não é stock nenhum (sacos, depósitos, taxas) ou ainda não tem categoria cai em "Sacos/Depósitos/Similares", sempre por último · v283 · 2026-08-12 · Definições › Parametrizações: a fração da bolsa indireta (Gerais/Bebidas/Cerveja) que entra no preço das refeições deixa de estar fixa em 50% — passa a ser ajustável por ano, só em anos abertos. T-shirts e Stock Sobrante continuam sempre de fora dessa bolsa · v282 · 2026-08-12 · Saldos: a vista "Por refeição" passa a ser a principal, e o seletor "Por parcelas"/"Por refeição" desce para debaixo de Receitas/Despesas, só à vista com o detalhe aberto (ali é que faz diferença — os totais não mudam com a vista) · v281 · 2026-08-12 · Saldos › vista "Por refeição": o custo de cada refeição passa a incluir os indiretos (Gerais/Bebidas/Cerveja) que lhe cabem, como no cartão da refeição — antes só contava os diretos e o custo ficava sempre abaixo da receita. "Outros custos"/"Outras receitas" ganham detalhe por baixo (T-shirts, Stock Sobrante, Quota Extra, Mealheiro, Missão Poupança…), no ecrã e no PDF · v280 · 2026-08-12 · Shop List: um pedido de refeição (Almoço/Jantar) cujo dia já passou e continua por comprar passa a avisar "⚠️ refeição já passou" no cartão de "Em falta" — não se esconde nem se cancela sozinho, só se diz que já ninguém está à espera daquilo · v279 · 2026-08-11 · T-shirts: editar um pedido cujo "Encomendado por" já saiu do plantel deste ano deixa de esconder o campo (o select ficava vazio e o Guardar recusava sempre) — o nome antigo aparece marcado "fora do plantel" e dá para reatribuir a t-shirt a outra pessoa · v278 · 2026-08-11 · Quota Extra: o Fundo de Reserva deixa de ser ignorado nos anos em que as fontes diretas (refeições, convidados, mealheiros, t-shirts, stock sobrante) já cobrem a despesa — passa a somar-se sempre à conta antes de se cortar a zero, para o valor "a guardar" ser mesmo cobrado · v277 · 2026-08-10 · Definições › Parametrizações: novo interruptor "Corrigir Presenças" (por ano) que deixa cada um corrigir as suas presenças de dias já passados desse evento — desligado por defeito, e as contas fechadas continuam a trancar tudo mesmo com ele ligado · v276 · 2026-08-10 · Adicionar Convidado: o campo "Trazido por" deixa de escolher o primeiro membro por ordem alfabética do casal e passa a vir pré-selecionado com o próprio utilizador, como no resto da app · v275 · 2026-08-10 · Shop List: um pedido sem loja própria que está a herdar a loja de outro pedido do mesmo artigo agora pode recusar essa herança ("🚫 Não herdar — deixar sem loja"), sem mexer no pedido que a escreveu · v274 · 2026-08-10 · Pagar Dívida: um pagamento livre / adiantamento (sem dívidas selecionadas) passa a ter uma caixa de observações, para dizer o que é aquele dinheiro · v273 · 2026-08-10 · PDF de pessoa (Saldos): as Refeições ordenam-se por dia e mostram o prato; e as Despesas Adiantadas deixam de mostrar "🧺 Stock" como nota e passam a mostrar o destino real (refeição/tipo) em vez de "Gerais" sempre que a compra tem um destino só · v272 · Stock alocado a uma PESSOA (🎒 leva para casa): no separador Stock, uma alocação pode agora apontar a um membro em vez de a uma refeição — é para as sobras que não voltam a ser usadas. O custo sai do rateio e passa a ser cobrado só a essa pessoa (aparece no saldo dela, como as t-shirts) · v271 · Nos Saldos, uma compra com peça "só despesa" (saco, depósito) deixa de aparecer duplicada em "Despesas adiantadas" — as linhas da mesma compra juntam-se numa só. E "Despesas adiantadas" separa-se em duas: o que já pagaste (📅) e o que está previsto mas ainda por pagar (📌 provisórias) · v270 · As SOBRAS deixam de reabrir o pedido: um lote comprado para uma refeição conta inteiro na cobertura, mesmo com parte por alocar na bolsa comum — compram-se 8 pacotes para o jantar, comem-se 5, e a lista já não pede os outros 3 que estão na despensa. É a mesma leitura que o cartão da refeição já fazia. Mover o stock para outra refeição continua a reabrir o pedido · v269 · Uma falta “dita à mão” passa a dizer que o é — na lista e no cartão da refeição, como já dizia o “coberto” e a folha do 🖨 —, e o bloco “que pedidos é que isto trata?” marca a linha que não é a app a deduzir. Trocar o artigo de um pedido (chouriço de sangue → morcela) deita fora a cobertura declarada sobre o artigo antigo, que ficava a mandar sobre o stock novo';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -1186,6 +1186,9 @@ function syncSobrasAplicadas(valor){
 
 /* RENDER */
 const eur=x=>new Intl.NumberFormat('pt-PT',{style:'currency',currency:'EUR'}).format(x);
+// O mesmo número sem o símbolo — para quadros onde o € se diz uma vez no
+// cabeçalho e repeti-lo em cada célula só rouba largura (a matriz do PDF).
+const eurN=x=>new Intl.NumberFormat('pt-PT',{minimumFractionDigits:2,maximumFractionDigits:2}).format(x);
 // Ícone "só bebe" — caneca de cerveja com espuma, uma cor (currentColor)
 const BEER_SVG='<svg class="beer-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 11h1a3 3 0 0 1 0 6h-1"/><path d="M9 12v6"/><path d="M13 12v6"/><path d="M14 7.5c-1 0-1.44.5-3 .5s-2-.5-3-.5-1.72.5-2.5.5a2.5 2.5 0 0 1 0-5c.78 0 1.57.5 2.5.5S9.44 3 11 3s2 .5 3 .5 1.72-.5 2.5-.5a2.5 2.5 0 0 1 0 5c-.78 0-1.5-.5-2.5-.5Z"/><path d="M5 8v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V8"/></svg>';
 const BEER_SVG_SM='<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="flex:none"><path d="M17 11h1a3 3 0 0 1 0 6h-1"/><path d="M9 12v6"/><path d="M13 12v6"/><path d="M14 7.5c-1 0-1.44.5-3 .5s-2-.5-3-.5-1.72.5-2.5.5a2.5 2.5 0 0 1 0-5c.78 0 1.57.5 2.5.5S9.44 3 11 3s2 .5 3 .5 1.72-.5 2.5-.5a2.5 2.5 0 0 1 0 5c-.78 0-1.5-.5-2.5-.5Z"/><path d="M5 8v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V8"/></svg>';
@@ -1570,45 +1573,7 @@ function renderAll(){
   updateReadOnlyMode();
 
   // SALDOS — usar cálculo consistente com o ecrã de detalhe
-  const pAll=CALC.pagamentos;
-  const pNR=pAll.filter(p=>!p.ref||!p.ref.startsWith('Reembolso'));
-  const _mvLi=(d,txt,v)=>({k:(d?fmtDiaMes(d)+' — ':'')+txt,v:rnd(v,2)});
-  ms.forEach(m=>{
-    const isTes=m.nome===DATA.evento.tesoureiro;
-    const despL=agruparDespPorCompra(DATA.despesas.filter(x=>x.quem===m.nome));
-    const totalPagoDesp=despL.reduce((a,x)=>a+x.valor,0);
-    const despEfeL=despL.filter(x=>!despProvisoria(x));
-    const despProvL=despL.filter(despProvisoria);
-    const pagoDespEfe=rnd(despEfeL.reduce((a,x)=>a+x.valor,0),2);
-    const pagoDespProv=rnd(despProvL.reduce((a,x)=>a+x.valor,0),2);
-    const rfL=pAll.filter(p=>p.ref&&p.ref.startsWith('Reembolso')&&p.de===m.nome);
-    const reembFeitos=rfL.reduce((a,p)=>a+p.valor,0);
-    const rrL=pAll.filter(p=>p.ref&&p.ref.startsWith('Reembolso')&&p.para===m.nome);
-    const reembRecebidos=rrL.reduce((a,p)=>a+p.valor,0);
-    const rcL=pNR.filter(p=>p.para===m.nome);
-    const receb=rcL.reduce((a,p)=>a+p.valor,0);
-    const mealL=DATA.mealheiros.filter(x=>x.quem===m.nome);
-    const mealT=rnd((m.W||0)+(m.X||0),2);
-    const contribT=rnd(m.Sown+m.AA+(m.TS||0)+(m.SS||0),2);
-    const quotaE=rnd((m.R||0)+(m.U||0),2);
-    let cred=totalPagoDesp;
-    if(isTes) cred+=reembFeitos;
-    if(!isTes){cred+=rnd(m._payerOwnPortion,2);(m._creditedBy||[]).filter(c=>c.payer!==m.nome).forEach(c=>{cred+=c.amount;});}
-    cred=rnd(cred,2);
-    const deb=rnd(contribT+quotaE+mealT+receb+reembRecebidos,2);
-    const paidBy={};
-    if(!isTes)(m._creditedBy||[]).filter(c=>c.payer!==m.nome).forEach(c=>{paidBy[c.payer]=rnd((paidBy[c.payer]||0)+c.amount,2);});
-    m._mv={isTes,
-      pagoDesp:rnd(totalPagoDesp,2),
-      pagoDespEfe,pagoDespEfeL:despEfeL.map(x=>_mvLi(x.dataDesp,x.desc||x.tipo||'despesa',x.valor)),
-      pagoDespProv,pagoDespProvL:despProvL.map(x=>_mvLi(x.dataValor,(x.desc||x.tipo||'despesa'),x.valor)),
-      reembFeitos:rnd(reembFeitos,2),reembFeitosL:rfL.map(p=>_mvLi(p.data,'para '+p.para,p.valor)),
-      reembRecebidos:rnd(reembRecebidos,2),reembRecebidosL:rrL.map(p=>_mvLi(p.data,'de '+p.de,p.valor)),
-      receb:rnd(receb,2),recebL:rcL.map(p=>_mvLi(p.data,'de '+p.de,p.valor)),
-      mealT,mealL:mealL.map(x=>_mvLi(x.data,x.desc||x.subtipo||'mealheiro',x.valor)),
-      ownPortion:isTes?0:rnd(m._payerOwnPortion,2),paidBy};
-    m._sfEcra=rnd(cred-deb,2);
-  });
+  ms.forEach(m=>{const r=saldoMovimentos(m);m._mv=r.mv;m._sfEcra=r.saldo;});
   // Lista fundida (antigo Resumo + saldo individual): despesa por membro, movimentos e saldo
   let h=saldosMembrosHtml();
 
@@ -16054,6 +16019,16 @@ function generatePDF(type,escopo){
     table.gastos-membro th{font-size:8px;letter-spacing:.02em;padding:5px 5px;white-space:nowrap}
     table.gastos-membro td{padding:5px 5px}
     table.gastos-membro td:first-child{white-space:nowrap;font-size:10.5px}
+    /* Matriz da Distribuição por Dia: uma coluna por dia/refeição (ver
+       custosPorDiaCols). Larguras fixas — a primeira coluna leva o nome da
+       categoria e as restantes repartem o que sobra por igual, para as colunas
+       não dançarem de linha para linha. Os números nunca partem; o nome parte. */
+    table.mtx{table-layout:fixed;font-size:9px}
+    table.mtx th,table.mtx td{padding:4px 3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    table.mtx th:first-child,table.mtx td:first-child{width:26%;white-space:normal}
+    table.mtx th{font-size:8px;letter-spacing:0;vertical-align:bottom}
+    table.mtx .mtx-d{display:block}
+    table.mtx .mtx-r{display:block;font-weight:400;text-transform:none;color:#888}
     /* Shop List — folha condensada para levar às compras (ver buildShopReport) */
     .sl-doc h1{font-size:18px}
     .sl-doc .subtitle{font-size:11px;margin-bottom:4px}
@@ -16995,38 +16970,45 @@ function despesasCatRows(){
   return rows;
 }
 
-/* ── Custo distribuído por DIA (e, dentro dele, por categoria) ─────────
+/* ── Custo distribuído por DIA/REFEIÇÃO, e dentro dele por categoria ───
    "Quanto é que este dia custou, e de que é que ele é feito" — os barris de
    cerveja que caíram no sábado, os produtos de limpeza que caíram na segunda.
-   Um dia = as refeições daquele dia, e o custo de cada uma é o MESMO que o
-   cartão dela mostra: os diretos (despesas com data-valor naquela refeição) +
-   a fatia da bolsa comum que lhe cabe. Dentro do dia, os diretos categorizam-se
-   pelo `despCatPartes` e a bolsa vem já repartida por categoria do calcular()
-   (`catIndir`), pelo que a soma das categorias é, por construção, o custo do dia.
+   Uma COLUNA por dia/refeição, que é a unidade a que o custo está agarrado: o
+   custo de cada refeição é o MESMO que o cartão dela mostra — os diretos
+   (despesas com data-valor nessa refeição) + a fatia da bolsa comum que lhe
+   cabe. Os diretos categorizam-se pelo `despCatPartes` e a bolsa vem já
+   repartida por categoria do calcular() (`catIndir`), pelo que a soma das
+   categorias de uma coluna é, por construção, o custo dela.
    NÃO É O EVENTO TODO: só a fração da bolsa comum que entra no preço das
-   refeições (frac_indireta_ref) é que se distribui por dias — o resto é
-   recuperado pela Quota Extra e sai numa linha própria, para o quadro não
-   prometer um total que não tem. */
-function custosPorDiaRows(){
-  if(!CALC)return[];
+   refeições (frac_indireta_ref) é que se distribui — o resto é recuperado pela
+   Quota Extra e sai em linhas próprias, para o quadro não prometer um total que
+   não tem.
+   Devolve {cols,cats,totCol,totCat,total}: as colunas por ordem cronológica e
+   as categorias por peso (maior primeiro, o catch-all sempre no fim). */
+function custosPorDiaCols(){
+  if(!CALC)return{cols:[],cats:[],totCol:{},totCat:{},total:0};
   const ctx=despCatCtx(DATA);
-  const dias={};
-  (CALC.refeicoes||[]).forEach(r=>{
-    const d=dias[r.data]||(dias[r.data]={data:r.data,total:0,cats:{},outros:0,refs:[]});
-    d.refs.push(r.ref);
-    d.total=rnd(d.total+(r.custoTotal||0),2);
+  const cols=[];const totCat={};let total=0;
+  [...(CALC.refeicoes||[])].sort((a,b)=>(a.data||'').localeCompare(b.data||'')).forEach(r=>{
+    const c={data:r.data,ref:r.ref,total:rnd(r.custoTotal||0,2),cats:{}};
+    const add=(k,v)=>{if(!(Math.abs(v)>0.005))return;c.cats[k]=rnd((c.cats[k]||0)+v,2);totCat[k]=rnd((totCat[k]||0)+v,2);};
     (CALC.despesasCalc||[]).forEach(x=>{
       if(x.tipo!==r.ref||x.dataValor!==r.data)return;
-      despCatPartes(x,ctx).forEach(p=>{
-        if(p.cat)d.cats[p.cat]=rnd((d.cats[p.cat]||0)+p.valor,2);
-        else d.outros=rnd(d.outros+p.valor,2);
-      });
+      despCatPartes(x,ctx).forEach(p=>add(p.cat||CAT_INDIR_OUTROS,p.valor));
     });
     const ci=r.catIndir||{};
-    for(const k in ci)d.cats[k]=rnd((d.cats[k]||0)+ci[k],2);
-    d.outros=rnd(d.outros+(r.catIndirOutros||0),2);
+    for(const k in ci)add(k,ci[k]);
+    add(CAT_INDIR_OUTROS,r.catIndirOutros||0);
+    total=rnd(total+c.total,2);
+    cols.push(c);
   });
-  return Object.values(dias).sort((a,b)=>(a.data||'').localeCompare(b.data||''));
+  const cats=Object.keys(totCat).sort((a,b)=>{
+    if(a===CAT_INDIR_OUTROS)return 1;
+    if(b===CAT_INDIR_OUTROS)return-1;
+    return totCat[b]-totCat[a];
+  });
+  const totCol={};cols.forEach(c=>{totCol[c.data+'|'+c.ref]=c.total;});
+  return{cols,cats,totCol,totCat,total};
 }
 
 function buildGeneralReport(){
@@ -17124,40 +17106,45 @@ function buildGeneralReport(){
   h+='</table>';
 
   /* Distribuição por DIA — quanto é que cada dia do evento levou, e de que é
-     que ele é feito (ver custosPorDiaRows). É o que responde a "distribuí X €
+     que ele é feito (ver custosPorDiaCols). É o que responde a "distribuí X €
      de barris no sábado e Y € de produtos de limpeza na segunda".
      Sem categorias parametrizadas fica só o total do dia — o quadro continua a
      valer, é a decomposição que não existe. */
-  const diasPdf=custosPorDiaRows();
-  if(diasPdf.length){
-    const totDias=rnd(diasPdf.reduce((a,d)=>a+d.total,0),2);
-    const sobra=rnd(CALC.totDespesas-totDias,2);
+  const dd=custosPorDiaCols();
+  if(dd.cols.length){
+    const sobra=rnd(CALC.totDespesas-dd.total,2);
+    // Sem o € em cada célula: numa matriz com uma coluna por refeição é ele que
+    // decide se as colunas cabem, e a unidade diz-se uma vez no subtítulo.
+    const cel=v=>Math.abs(v)>0.005?eurN(v):'';
     h+='<h2>Distribuição por Dia</h2>';
-    h+=`<div style="font-size:10px;color:#888;margin:-6px 0 8px">O custo de cada dia — diretos das refeições desse dia mais a fatia da bolsa comum que lhes cabe —, repartido pela categoria do artigo.</div>`;
-    h+='<table><tr><th>Dia / Categoria</th><th class="right">Valor</th></tr>';
-    diasPdf.forEach(d=>{
-      h+=`<tr style="background:#f8f9fa"><td><b>${fmtPdfDate(d.data)} · ${escHtml(d.refs.join(' + '))}</b></td><td class="right"><b>${eur(d.total)}</b></td></tr>`;
-      const cats=Object.entries(d.cats).filter(([,v])=>v>0.005).sort((a,b)=>b[1]-a[1]);
-      if(d.outros>0.005)cats.push([CAT_INDIR_OUTROS,d.outros]);
-      cats.forEach(([cn,v])=>{
-        const ca=cn===CAT_INDIR_OUTROS;
-        h+=`<tr><td style="padding-left:22px;color:${ca?'#aaa':'#666'}">${escHtml(cn)}</td><td class="right" style="color:${ca?'#aaa':'#666'}">${eur(v)}</td></tr>`;
-      });
+    h+=`<div style="font-size:10px;color:#888;margin:-6px 0 8px">Uma coluna por dia/refeição: os custos diretos dela mais a fatia da bolsa comum que lhe cabe, repartidos pela categoria do artigo. Valores em €.</div>`;
+    h+=`<table class="mtx" style="--mtx-n:${dd.cols.length+1}"><tr><th>Categoria</th>`;
+    dd.cols.forEach(c=>{h+=`<th class="right"><span class="mtx-d">${fmtPdfDate(c.data)}</span><span class="mtx-r">${escHtml(c.ref)}</span></th>`;});
+    h+='<th class="right">Total</th></tr>';
+    dd.cats.forEach(cn=>{
+      const ca=cn===CAT_INDIR_OUTROS;
+      h+=`<tr${ca?' style="color:#999"':''}><td>${escHtml(cn)}</td>`;
+      dd.cols.forEach(c=>{h+=`<td class="right">${cel(c.cats[cn]||0)}</td>`;});
+      h+=`<td class="right"><b>${cel(dd.totCat[cn]||0)}</b></td></tr>`;
     });
+    h+=`<tr style="border-top:1px solid #ccc;font-weight:700"><td><b>Total distribuído</b></td>`;
+    dd.cols.forEach(c=>{h+=`<td class="right"><b>${cel(c.total)}</b></td>`;});
+    h+=`<td class="right"><b>${cel(dd.total)}</b></td></tr>`;
     /* O que não cai em dia nenhum diz-se ao pormenor, e não como um resto só:
        as t-shirts e o stock levado para casa não são "recuperados pela Quota
        Extra" — são cobrados direto a quem os encomendou ou levou —, e juntá-los
        ao resto da bolsa comum numa linha com essa frase era dizer uma coisa
-       falsa sobre dois terços dela. */
+       falsa sobre dois terços dela. Estas linhas não têm coluna nenhuma a que
+       pertencer, por isso atravessam a matriz e só marcam o Total. */
     const foraTS=rnd(CALC.totTSdesp||0,2),foraSS=rnd(CALC.totSSdesp||0,2);
     const foraBolsa=rnd(sobra-foraTS-foraSS,2);
     [[foraTS,'T-shirts (cobradas a quem as encomendou)'],
      [foraSS,'Stock Sobrante (cobrado a quem levou)'],
      [foraBolsa,'Bolsa comum não distribuída (recuperada pela Quota Extra)']]
     .forEach(([v,lbl])=>{
-      if(Math.abs(v)>0.005)h+=`<tr><td style="color:#888">${lbl}</td><td class="right" style="color:#888">${eur(v)}</td></tr>`;
+      if(Math.abs(v)>0.005)h+=`<tr style="color:#999"><td colspan="${dd.cols.length+1}">${lbl}</td><td class="right">${cel(v)}</td></tr>`;
     });
-    h+=`<tr style="border-top:2px solid #ddd;font-weight:700"><td><b>Total Despesas</b></td><td class="right"><b>${eur(CALC.totDespesas)}</b></td></tr>`;
+    h+=`<tr style="border-top:2px solid #ddd;font-weight:700"><td colspan="${dd.cols.length+1}"><b>Total Despesas</b></td><td class="right"><b>${cel(CALC.totDespesas)}</b></td></tr>`;
     h+='</table>';
   }
 
@@ -17180,7 +17167,11 @@ function buildGeneralReport(){
     const conv=rnd(m.AA||0,2);
     const ts=rnd(m.TS||0,2);
     const ss=rnd(m.SS||0,2);
-    return{nome:m.nome,refe,bebe,quota,sub,conv,ts,ss,tot:rnd(sub+conv+ts+ss,2)};
+    // Os movimentos saem da mesma função que a lista dos Saldos usa — o quadro
+    // final não recalcula saldo nenhum (ver saldoMovimentos).
+    const sm=saldoMovimentos(m);
+    return{nome:m.nome,refe,bebe,quota,sub,conv,ts,ss,tot:rnd(sub+conv+ts+ss,2),
+      adiant:sm.mv.pagoDesp,pago:sm.mv.pago,recebido:sm.mv.recebido,saldo:sm.saldo};
   }).sort((a,b)=>b.tot-a.tot);
   const gSum=k=>rnd(gRows.reduce((a,g)=>a+g[k],0),2);
   const cel=v=>`<td class="right">${v>0.005?eur(v):'—'}</td>`;
@@ -17212,6 +17203,30 @@ function buildGeneralReport(){
     ${temTS?`<td class="right">${eur(gSum('ts'))}</td>`:''}
     ${temSS?`<td class="right">${eur(gSum('ss'))}</td>`:''}
     <td class="right">${eur(gSum('tot'))}</td></tr>`;
+  h+='</table>';
+
+  /* O quadro com que se fecha a reunião: parte do total de cada um (o mesmo da
+     tabela acima) e abate o que ele já pôs — as despesas que adiantou e os
+     pagamentos que fez —, somando o que já recebeu de volta. O que sobra é o
+     saldo, e é o MESMO número que a app mostra nos Saldos (sai do
+     `saldoMovimentos`, não de uma conta paralela).
+     As colunas "Pago" e "Recebido" só aparecem havendo movimentos — num ano
+     ainda por regularizar seriam duas colunas de traços. */
+  const temPago=gRows.some(g=>g.pago>0.005);
+  const temReceb=gRows.some(g=>g.recebido>0.005);
+  h+='<h2>Valores a Liquidar</h2>';
+  h+=`<div style="font-size:10px;color:#888;margin:-6px 0 8px">Saldo = total a pagar − despesas adiantadas − pagamentos feitos + o que já recebeu de volta. Positivo é a receber; negativo, a pagar.</div>`;
+  h+='<table class="gastos-membro"><tr><th>Membro</th><th class="right">Total</th><th class="right">Adiantado</th>'+(temPago?'<th class="right">Pago</th>':'')+(temReceb?'<th class="right">Recebido</th>':'')+'<th class="right">Saldo</th></tr>';
+  gRows.forEach(g=>{
+    const zero=Math.abs(g.saldo)<0.005;
+    h+=`<tr><td>${escHtml(g.nome)}</td>${cel(g.tot)}${cel(g.adiant)}${temPago?cel(g.pago):''}${temReceb?cel(g.recebido):''}<td class="right ${zero?'zero':(g.saldo>0?'pos':'neg')}"><b>${eur(zero?0:g.saldo)}</b></td></tr>`;
+  });
+  h+=`<tr style="border-top:2px solid #ddd;font-weight:700"><td><b>Total</b></td>
+    <td class="right">${eur(gSum('tot'))}</td>
+    <td class="right">${eur(gSum('adiant'))}</td>
+    ${temPago?`<td class="right">${eur(gSum('pago'))}</td>`:''}
+    ${temReceb?`<td class="right">${eur(gSum('recebido'))}</td>`:''}
+    <td class="right">${eur(gSum('saldo'))}</td></tr>`;
   h+='</table>';
 
   h+=`<div class="footer">Relatório gerado em ${new Date().toLocaleString('pt-PT')} · ${nome} ${ano}</div>`;
@@ -17363,6 +17378,58 @@ function updateReadOnlyMode(){
 }
 
 /* ═══ RESUMO (fundido nos SALDOS) — despesa total por membro + movimentos + saldo ═══ */
+
+/* Movimentos de um membro — o que adiantou, o que pagou, o que recebeu — e o
+   saldo que daí sai. Fica numa função porque tem DOIS leitores: a lista dos
+   Saldos (o renderAll guarda o resultado em `m._mv`/`m._sfEcra`) e o quadro
+   "Valores a Liquidar" do relatório geral. O relatório chama-a outra vez em vez
+   de ler o `_mv` — assim não depende de o ecrã já ter sido pintado — e, sendo a
+   mesma conta, o papel nunca pode dizer um saldo diferente do da app.
+   O saldo é `créditos − débitos`, com os débitos a incluírem o total a pagar do
+   membro (refeições + convidados + t-shirts + sobras + quota/poupança). */
+function saldoMovimentos(m){
+  const pAll=CALC.pagamentos;
+  const pNR=pAll.filter(p=>!p.ref||!p.ref.startsWith('Reembolso'));
+  const _mvLi=(d,txt,v)=>({k:(d?fmtDiaMes(d)+' — ':'')+txt,v:rnd(v,2)});
+  const isTes=m.nome===DATA.evento.tesoureiro;
+  const despL=agruparDespPorCompra(DATA.despesas.filter(x=>x.quem===m.nome));
+  const totalPagoDesp=despL.reduce((a,x)=>a+x.valor,0);
+  const despEfeL=despL.filter(x=>!despProvisoria(x));
+  const despProvL=despL.filter(despProvisoria);
+  const pagoDespEfe=rnd(despEfeL.reduce((a,x)=>a+x.valor,0),2);
+  const pagoDespProv=rnd(despProvL.reduce((a,x)=>a+x.valor,0),2);
+  const rfL=pAll.filter(p=>p.ref&&p.ref.startsWith('Reembolso')&&p.de===m.nome);
+  const reembFeitos=rfL.reduce((a,p)=>a+p.valor,0);
+  const rrL=pAll.filter(p=>p.ref&&p.ref.startsWith('Reembolso')&&p.para===m.nome);
+  const reembRecebidos=rrL.reduce((a,p)=>a+p.valor,0);
+  const rcL=pNR.filter(p=>p.para===m.nome);
+  const receb=rcL.reduce((a,p)=>a+p.valor,0);
+  const mealL=DATA.mealheiros.filter(x=>x.quem===m.nome);
+  const mealT=rnd((m.W||0)+(m.X||0),2);
+  const contribT=rnd(m.Sown+m.AA+(m.TS||0)+(m.SS||0),2);
+  const quotaE=rnd((m.R||0)+(m.U||0),2);
+  let cred=totalPagoDesp;
+  if(isTes) cred+=reembFeitos;
+  if(!isTes){cred+=rnd(m._payerOwnPortion,2);(m._creditedBy||[]).filter(c=>c.payer!==m.nome).forEach(c=>{cred+=c.amount;});}
+  cred=rnd(cred,2);
+  const deb=rnd(contribT+quotaE+mealT+receb+reembRecebidos,2);
+  const paidBy={};
+  if(!isTes)(m._creditedBy||[]).filter(c=>c.payer!==m.nome).forEach(c=>{paidBy[c.payer]=rnd((paidBy[c.payer]||0)+c.amount,2);});
+  const mv={isTes,
+    pagoDesp:rnd(totalPagoDesp,2),
+    pagoDespEfe,pagoDespEfeL:despEfeL.map(x=>_mvLi(x.dataDesp,x.desc||x.tipo||'despesa',x.valor)),
+    pagoDespProv,pagoDespProvL:despProvL.map(x=>_mvLi(x.dataValor,(x.desc||x.tipo||'despesa'),x.valor)),
+    reembFeitos:rnd(reembFeitos,2),reembFeitosL:rfL.map(p=>_mvLi(p.data,'para '+p.para,p.valor)),
+    reembRecebidos:rnd(reembRecebidos,2),reembRecebidosL:rrL.map(p=>_mvLi(p.data,'de '+p.de,p.valor)),
+    receb:rnd(receb,2),recebL:rcL.map(p=>_mvLi(p.data,'de '+p.de,p.valor)),
+    mealT,mealL:mealL.map(x=>_mvLi(x.data,x.desc||x.subtipo||'mealheiro',x.valor)),
+    ownPortion:isTes?0:rnd(m._payerOwnPortion,2),paidBy,
+    // O que o quadro do PDF soma em três colunas: adiantado · pago · recebido.
+    total:rnd(contribT+quotaE,2),
+    pago:rnd((isTes?reembFeitos:rnd(m._payerOwnPortion,2)+Object.values(paidBy).reduce((a,v)=>a+v,0)),2),
+    recebido:rnd(mealT+receb+reembRecebidos,2)};
+  return{mv,saldo:rnd(cred-deb,2)};
+}
 function toggleRsSub(el,ev){
   if(ev)ev.stopPropagation();
   const s=el.nextElementSibling;
