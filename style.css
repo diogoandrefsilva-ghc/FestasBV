@@ -1410,6 +1410,10 @@ button.cmp-chip.qt-tap:active{filter:brightness(.93)}
 .msl-sub.sobra{color:#9A6E0E}
 .msl-sub.sobra .ms-v{color:var(--red)}
 .msl-sub.veio{color:var(--green)}
+/* 🗑 O que se deitou fora. Vermelho (é perda) e SEM coluna de € — ao contrário
+   das de cima, este dinheiro não sai da conta desta refeição: comprou-os ela e
+   paga-os ela. Ver mealShopSection. */
+.msl-sub.perda{color:var(--red)}
 /* Modal do lote: linhas de alocação */
 .lote-ln{display:flex;align-items:center;gap:7px;margin-top:8px}
 .lote-ln select{flex:1;min-width:0;margin:0}
