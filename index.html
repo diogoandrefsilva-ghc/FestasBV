@@ -384,6 +384,17 @@ setTimeout(function(){ if (window.fbvEsconderSplash) window.fbvEsconderSplash();
       <button class="btn ghost write-action" id="lote-addline" style="width:100%;margin-top:10px" onclick="loteAddAloc()">＋ Alocar a uma refeição</button>
       <div class="note" id="lote-resto" style="margin-top:10px"></div>
     </section>
+    <!-- 3.º eixo: ONDE A MERCADORIA FOI PARAR (db/stock_alocacao_stock.sql), à
+         parte de para que foi comprada (a compra) e de quem paga (o bloco de
+         cima). Herda o custo enquanto ninguém o ajustar — e é aqui que vive o
+         🗑 deitado fora. Escrito pelo loteStkFill(); não entra nas contas. -->
+    <section class="lote-alloc-zone lote-stk-zone" id="lote-stk-wrap" style="display:none" aria-labelledby="lote-stk-lbl">
+      <div class="lote-alloc-head">
+        <label id="lote-stk-lbl">🍽️ Onde foi parar</label>
+        <div class="lote-alloc-summary" id="lote-stk-summary" aria-live="polite"></div>
+      </div>
+      <div id="lote-stk-body"></div>
+    </section>
     <!-- 2.º eixo do stock: o que já se GASTOU, à parte de para onde vai o custo
          (db/stock_consumo.sql). Nos artigos de despensa é só ainda há / acabou.
          Escrito pelo loteConsFill() — nada disto entra nas contas. -->

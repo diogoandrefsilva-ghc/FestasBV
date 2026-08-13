@@ -1361,11 +1361,9 @@ button.cmp-chip.qt-tap:active{filter:brightness(.93)}
 .lote-cons-acts .lote-qty-w.nou input[type=number]{padding-right:7px}
 .lote-cons-acts .btn{padding:7px 11px;font-size:12.5px}
 .lote-cons-acts .lca-auto{margin-left:auto;color:var(--faint)}
-/* 🗑 A linha do desperdício, por baixo da do consumo. É a mesma linha de ação
-   (mesmo campo, mesmo botão) — o que a separa é a cor do número já marcado,
-   que é o que distingue perda de funcionamento normal. */
+/* 🗑 O que se deitou fora, na linha de leitura do consumo. Vermelho: é a única
+   das três parcelas que é perda. Quem o declara é o 3.º eixo, acima. */
 .lote-cons-num .lcn-perd,.lote-cons-num .lcn-perd b{color:var(--red)}
-.lote-cons-acts.lca-perd{margin-top:6px}
 /* Interruptor de dois estados (ainda há / acabou) — nos artigos de despensa é
    isto que substitui as quantidades */
 .lote-cons-est{display:flex;gap:8px;margin-top:6px}
@@ -1771,6 +1769,17 @@ button.cmp-chip.qt-tap:active{filter:brightness(.93)}
 .lote-alloc-zone .lote-solos,.lote-alloc-zone .lote-dest{background:rgba(255,253,246,.90)}
 .lote-alloc-zone #lote-addline{border-color:rgba(30,122,77,.34);background:rgba(30,122,77,.08);color:var(--green);font-weight:700}
 .lote-alloc-zone #lote-resto{margin:9px 0 0!important;padding:7px 8px;border-radius:9px;background:rgba(255,253,246,.72);color:var(--muted);line-height:1.4}
+/* ── 3.º eixo: 🍽️ ONDE FOI PARAR ──────────────────────────────────────
+   A mesma moldura da alocação do custo — é a mesma espécie de trabalho
+   (destino + quantidade) — mas em bege e não em verde: o verde é a cor do
+   dinheiro na app, e este bloco não mexe num cêntimo. Postos lado a lado com
+   a mesma cor, os dois eixos voltavam a parecer o mesmo. */
+.lote-stk-zone{border-color:rgba(140,116,74,.30);background:linear-gradient(145deg,rgba(140,116,74,.07),rgba(255,253,246,.86))}
+.lote-stk-zone #lote-stk-lbl{margin:0;flex:0 1 auto;color:#6E5A38}
+.lote-stk-zone .lote-solos{background:rgba(255,253,246,.90)}
+.lote-stk-zone .note{padding:7px 8px;border-radius:9px;background:rgba(255,253,246,.72);line-height:1.4}
+/* A linha do 🗑 destaca-se das outras: é a única que é perda */
+.lote-stk-zone .lote-al.perda .lp-lbl{color:var(--red)}
 @media(max-width:380px){.lote-alloc-head{align-items:flex-start;flex-direction:column}.lote-alloc-summary{justify-content:flex-start}}
 
 /* ═══ CASH-FLOWS — "Mista" (versão C: cabeçalho extrato + cronologia) ═══ */
