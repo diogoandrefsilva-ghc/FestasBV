@@ -1336,6 +1336,9 @@ button.cmp-chip.qt-tap:active{filter:brightness(.93)}
 .stk-cons.desp b{color:var(--green)}
 .stk-cons.desp.fim b{color:var(--red)}
 .stk-cons-mao{font-style:normal;font-size:10.5px;opacity:.7}
+/* 🗑 O que se deitou fora, no rodapé do cartão. Vermelho por ser a única das
+   três parcelas que é perda: gasto e por gastar são funcionamento normal. */
+.stk-cons-perd,.stk-cons-perd b{color:var(--red)}
 /* 💡 no cartão: "parece artigo de despensa". É só o selo — a pergunta com
    Sim/Não vive no modal, que é onde se decide; uma caixa de decisão em cada
    linha da lista fazia do separador um questionário. */
@@ -1358,6 +1361,11 @@ button.cmp-chip.qt-tap:active{filter:brightness(.93)}
 .lote-cons-acts .lote-qty-w.nou input[type=number]{padding-right:7px}
 .lote-cons-acts .btn{padding:7px 11px;font-size:12.5px}
 .lote-cons-acts .lca-auto{margin-left:auto;color:var(--faint)}
+/* 🗑 A linha do desperdício, por baixo da do consumo. É a mesma linha de ação
+   (mesmo campo, mesmo botão) — o que a separa é a cor do número já marcado,
+   que é o que distingue perda de funcionamento normal. */
+.lote-cons-num .lcn-perd,.lote-cons-num .lcn-perd b{color:var(--red)}
+.lote-cons-acts.lca-perd{margin-top:6px}
 /* Interruptor de dois estados (ainda há / acabou) — nos artigos de despensa é
    isto que substitui as quantidades */
 .lote-cons-est{display:flex;gap:8px;margin-top:6px}
