@@ -258,6 +258,9 @@ body.read-only .fab.green,body.contas-fechadas .fab.green{display:none!important
 .btn.prim{background:var(--barrete);color:#fff}.btn.ghost{background:var(--panel2);color:var(--ink);border:1px solid var(--line)}
 .btn:disabled{opacity:.4}
 .note{font-size:11px;color:var(--faint);margin-top:10px;line-height:1.5}
+/* Nota que é um travão, não uma dica (ex.: o acerto de casal a dizer que o
+   líquido dá a receber e não a pagar) — a mesma cor do .cfp-hint.bad */
+.note.bad{color:var(--red);font-weight:600}
 
 /* Cash Flow wheel/carousel */
 .cf-wheel{display:flex;gap:6px;margin-top:6px;overflow-x:auto;padding-bottom:4px;-webkit-overflow-scrolling:touch;scrollbar-width:none}
@@ -304,6 +307,12 @@ body.read-only .fab.green,body.contas-fechadas .fab.green{display:none!important
 .sd-other.open .sd-other-body{display:flex!important}
 .sd-chip.sd-ro{cursor:default}
 .sd-chip.sd-ro:active{transform:none}
+/* Crédito do casal a descontar (acerto de casal): é dinheiro a VIR, não a ir —
+   por isso azul e não verde. O verde é o do chip de dívida ligado, e as duas
+   coisas lado a lado no mesmo painel tinham de se distinguir de relance. */
+.sd-chip.cred.on{border-color:var(--blue);background:rgba(46,111,168,.1)}
+.sd-chip.cred.on .sd-dot{background:var(--blue);box-shadow:0 0 6px rgba(46,111,168,.45)}
+.sd-chip.cred .sd-amt,.sd-chip.cred.on .sd-amt{color:var(--blue)}
 
 /* Card action buttons (edit/delete) */
 .card-actions{display:flex;gap:4px;margin-left:auto;flex-shrink:0}
@@ -993,6 +1002,13 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .cf-quando .cfq[data-q="efet"].on{border-color:var(--barrete);color:var(--barrete)}
 .cf-quando .cfq[data-q="prov"].on{border-color:var(--gold);color:var(--gold)}
 .cf-quando-hint{font-size:11px;color:var(--faint);margin-top:6px;line-height:1.4}
+/* Modo do reembolso: livre · por saldo · por saldo do casal. Uma coluna por
+   modo à vista — com dois cabia em 1fr 1fr, com três não. */
+.cf-quando.rb3{grid-template-columns:repeat(3,1fr)}
+.cf-quando.rb3 .cfq{font-size:11.5px;padding:9px 3px}
+.cf-quando.rb3.rb2{grid-template-columns:1fr 1fr}
+.cf-quando .cfq[data-rb].on{border-color:var(--barrete);color:var(--barrete)}
+.cf-quando .cfq[data-rb="casal"].on{border-color:var(--blue);color:var(--blue)}
 .cf-desc-count{float:right;font-size:10.5px;font-weight:600;color:var(--faint);letter-spacing:.02em}
 .cf-desc-count.full{color:#B5453B}
 /* Despesa paga por vários — uma linha por pagador (quem + quanto pôs) */
