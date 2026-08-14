@@ -819,6 +819,41 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .rdc-hero{background:rgba(168,123,20,.09);border-color:var(--gold)}
 .rdc-people{font-size:11.5px;color:var(--muted);margin-top:5px}
 .rdc-people b{color:var(--ink)}
+/* Preços da refeição: há uma regra principal (o membro que come) e quatro
+   exceções. A regra vive numa faixa própria para os dois preços por sexo se
+   lerem como a mesma decisão, não como duas espécies de cartão. */
+.rdc-pricing{margin-top:10px}
+.rdc-member-rate{background:linear-gradient(110deg,rgba(255,253,246,.92),rgba(255,253,246,.68));border:1px solid rgba(168,123,20,.28);border-radius:10px;padding:9px 11px;text-align:center;min-height:76px}
+.rdc-member-rate.off{opacity:.46}
+.rdc-member-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-family:var(--display);font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--campino)}
+.rdc-member-head b{font-family:var(--sans);font-size:10px;font-weight:700;letter-spacing:0;text-transform:none;color:var(--muted)}
+.rdc-member-prices{display:flex;justify-content:center;gap:17px;margin-top:5px;color:var(--gold);font-variant-numeric:tabular-nums}
+.rdc-member-prices>div{display:grid;grid-template-columns:13px auto;grid-template-rows:auto auto;column-gap:5px;align-items:center;text-align:left}
+.rdc-member-prices svg{grid-row:1 / 3;width:13px;height:13px;justify-self:end}
+.rdc-member-prices span{font-size:20px;font-weight:800;line-height:1}
+.rdc-member-prices small{font-size:9px;color:var(--faint);font-weight:600;line-height:1.15}
+.rdc-member-one{margin-top:9px;color:var(--gold);font-size:23px;font-weight:800;line-height:1;font-variant-numeric:tabular-nums}
+.rdc-member-one small{font-size:10px;font-weight:600;color:var(--faint);white-space:nowrap}
+.rdc-member-note{margin-top:5px;font-size:9.5px;font-style:italic;color:var(--faint)}
+.rdc-rate-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin-top:7px}
+.rdc-rate{min-width:0;min-height:55px;background:rgba(255,253,246,.63);border:1px solid rgba(110,75,25,.13);border-radius:9px;padding:6px 8px;text-align:center;display:flex;flex-direction:column;justify-content:center}
+.rdc-rate.off{opacity:.43}
+.rdc-rate-btn{cursor:pointer;transition:transform .12s,background .12s}
+.rdc-rate-btn:active{transform:scale(.975);background:var(--panel)}
+.rdc-rate-btn.open{box-shadow:0 0 0 1px var(--gold) inset}
+.rdc-rate-k{display:flex;align-items:center;justify-content:center;gap:4px;min-height:14px;font-size:9.5px;letter-spacing:.045em;text-transform:uppercase;color:var(--faint);font-weight:700;line-height:1.05}
+.rdc-rate-k svg{width:11px;height:11px;flex:none}
+.rdc-rate-n{background:rgba(110,75,25,.11);color:var(--muted);font-size:9px;font-weight:700;padding:1px 5px;border-radius:20px;letter-spacing:0}
+.rdc-rate-v{margin-top:3px;color:var(--ink);font-size:16px;font-weight:750;line-height:1.05;font-variant-numeric:tabular-nums}
+.rdc-rate-v .rdc-member-prices{gap:8px;margin-top:0}
+.rdc-rate-v .rdc-member-prices span{font-size:13px}
+.rdc-rate-v .rdc-member-prices small{display:none}
+.rdc-rate-v .rdc-member-prices>div{grid-template-columns:10px auto;column-gap:3px}
+.rdc-rate-v .rdc-member-prices svg{width:10px;height:10px;grid-row:auto}
+.rdc-rate-v .rdc-member-one{margin-top:0;font-size:16px}
+.rdc-rate-v .rdc-member-one small{display:none}
+.rdc-rate-v .rdc-na{font-size:14px}
+@media(max-width:355px){.rdc-member-prices{gap:11px}.rdc-member-prices span{font-size:18px}.rdc-rate{padding-left:5px;padding-right:5px}.rdc-rate-k{font-size:9px}}
 /* Tabela de preços de duas entradas: quem × o quê (ver rdc-cells no app.js).
    Três colunas fixas — "Come · Só bebe · Criança" — repetidas na faixa dos
    membros e na dos convidados, para as duas linhas se lerem uma contra a

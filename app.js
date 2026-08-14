@@ -1885,57 +1885,34 @@ function renderAll(){
         const gPplIt=g=>`<span class="rdc-ppl-it">${escHtml(g.nome)}${gMultAd(g)}${g.membro?`<small> · ${escHtml(g.membro)}</small>`:''}</span>`;
         const kPplIt=k=>`<span class="rdc-ppl-it">${escHtml(k.nome)}${k.n>1?' ×'+k.n:''}${k.de?`<small> · ${escHtml(k.de)}</small>`:''}</span>`;
         const nomeIt=n=>`<span class="rdc-ppl-it">${escHtml(n)}</span>`;
-        /* Uma célula = rótulo (+ contagem) + valor. Com gente, abre a lista.
-           SEM o › que as células soltas tinham: em seis células eram seis
-           setas a dizer o mesmo, e com contagens de dois dígitos ("SÓ BEBE 🍻
-           12 ›") a seta saltava para uma segunda linha e desalinhava a altura
-           da faixa. Quem convida ao toque é a contagem. */
-        const cel=(sfx,lbl,n,valor,lista,vcls)=>{
-          const has=n>0&&lista;
-          const attrs=has?`class="rdc-cell rdc-cell-btn" data-tgt="${pid}${sfx}" onclick="togglePeople('${pid}${sfx}')"`
-                         :`class="rdc-cell${n>0?'':' off'}"`;
-          return{cell:`<div ${attrs}><div class="rdc-cell-k">${lbl}${n>0?`<span class="rdc-cell-n">${n}</span>`:''}</div><div class="rdc-cell-v${vcls?' '+vcls:''}">${valor}</div></div>`,
-                 panel:has?pplPanel(sfx,lista):''};
-        };
         const NA='<span class="rdc-na">N/A</span>',NAOPAGA='<span class="rdc-na">não paga</span>';
         const LBL_BEBE='Só bebe'+BEER_SVG_SM;
         const nMemCome=Math.max(0,calcRef.D-calcRef.E),nMemBebe=Math.max(0,(calcRef.Nbebe||0)-(calcRef.Ebebe||0));
-        /* Com desconto por sexo a célula do membro traz DOIS preços, um por
-           linha — e não uma quarta coluna: três células já ocupam a largura
-           toda num ecrã de 320px, e a faixa dos Convidados, que não tem
-           desconto nenhum, ficaria com três contra quatro. Assim custa ~14px
-           de altura, zero de largura, e a tabela continua a ser uma tabela.
-           Os ícones apanham o dourado da célula pelo `currentColor`.
-           Iguais os dois preços (0%, ou o mínimo a morder dos dois lados),
-           volta a ser um número só: a funcionalidade é invisível a quem não
-           a usa, como o resto das parametrizações tolerantes da app. */
-        const sxVal=(h,f)=>(rnd(h||0,2)===rnd(f||0,2))?eur(h||0)
-          :`<span class="rdc-sx">${SEX_M_SVG}<span class="rdc-sx-v">${eur(h||0)}</span>${SEX_F_SVG}<span class="rdc-sx-v">${eur(f||0)}</span></span>`;
-        /* A coluna do "come" vai SEM RÓTULO — é o defeito, e quem lá está lê-se
-           pela contagem. Não é só arrumação: a célula dos membros tem duas
-           linhas de preço com o desconto ligado, e é a linha do rótulo que ela
-           devolve à faixa, ficando da altura das vizinhas. Os outros dois
-           rótulos ficam, que esses é que são a exceção ("só bebe", "criança"). */
-        const linha=[
-          cel('m','',nMemCome,calcRef.D>0?sxVal(calcRef.Ph,calcRef.Pf):NA,membrosCome.length?membrosCome.map(nomeIt).join(''):'','rdc-cell-v-gold'),
-          cel('mb',LBL_BEBE,nMemBebe,calcRef.D>0?sxVal(calcRef.PbebeH,calcRef.PbebeF):NA,membrosBebe.length?membrosBebe.map(nomeIt).join(''):'','rdc-cell-v-gold'),
-          cel('mk','Criança',nKids(kidsMem),NAOPAGA,kidsMem.map(kPplIt).join('')),
-          cel('g','',calcRef.E,calcRef.E?eur(calcRef.Q):NA,guestsPay.map(gPplIt).join('')),
-          cel('gb',LBL_BEBE,calcRef.Ebebe,calcRef.Ebebe?eur(calcRef.Qbebe||0):NA,guestsBebe.map(gPplIt).join('')),
-          cel('gk','Criança',nKids(kidsConv),NAOPAGA,kidsConv.map(kPplIt).join(''))
-        ];
-        const faixa=(tit,idx)=>`<div class="rdc-grp">${tit}</div><div class="rdc-cells">${idx.map(i=>linha[i].cell).join('')}</div>${idx.map(i=>linha[i].panel).join('')}`;
-        /* A percentagem diz-se UMA VEZ, e LOGO A SEGUIR À FAIXA DOS MEMBROS —
-           é deles que ela fala. No fim do bloco (onde esteve) ficava depois
-           dos Convidados, que pagam preço único, e parecia aplicar-se aos
-           dois. Só aparece quando há dois preços à vista: numa refeição só de
-           homens, ou com o mínimo a achatar os dois lados, a frase apontava
-           para uma diferença que não se vê. */
         const dSx=descontoSexo(DATA.evento);
         const sxDif=(rnd(calcRef.Ph||0,2)!==rnd(calcRef.Pf||0,2))||(rnd(calcRef.PbebeH||0,2)!==rnd(calcRef.PbebeF||0,2));
-        const sxLeg=(dSx>0&&sxDif)
-          ?`<div class="rdc-sx-leg">As mulheres pagam menos ${String(Math.round(dSx*1000)/10).replace('.',',')}%.</div>`:'';
-        const cellsHtml=faixa('Membros',[0,1,2])+sxLeg+faixa('Convidados',[3,4,5]);
+        /* O preço normal dos membros é a resposta principal deste cartão.
+           Em vez de seis células iguais, ganha uma faixa própria: os dois
+           preços são comparáveis, mas a diferença é uma nota da mesma regra,
+           não mais uma categoria. Só bebe, convidados e crianças ficam como
+           exceções compactas logo abaixo. */
+        const rate=(sfx,lbl,n,valor,lista,extra='')=>{
+          const has=n>0&&lista;
+          const attrs=has?` class="rdc-rate rdc-rate-btn" data-tgt="${pid}${sfx}" onclick="togglePeople('${pid}${sfx}')"`:` class="rdc-rate${n>0?'':' off'}"`;
+          return{tile:`<div${attrs}><div class="rdc-rate-k">${lbl}${n>0?`<span class="rdc-rate-n">${n}</span>`:''}</div><div class="rdc-rate-v">${valor}</div>${extra}</div>`,panel:has?pplPanel(sfx,lista):''};
+        };
+        const sexoPreco=(h,f)=>rnd(h||0,2)===rnd(f||0,2)
+          ?`<div class="rdc-member-one">${eur(h||0)} <small>por membro</small></div>`
+          :`<div class="rdc-member-prices"><div>${SEX_M_SVG}<span>${eur(h||0)}</span><small>homens</small></div><div>${SEX_F_SVG}<span>${eur(f||0)}</span><small>mulheres</small></div></div>`;
+        const memList=membrosCome.map(nomeIt).join('');
+        const memHas=nMemCome>0&&memList;
+        const memAttrs=memHas?` class="rdc-member-rate rdc-rate-btn" data-tgt="${pid}m" onclick="togglePeople('${pid}m')"`:` class="rdc-member-rate${nMemCome>0?'':' off'}"`;
+        const descontoTxt=(dSx>0&&sxDif)?`<div class="rdc-member-note">Mulheres pagam menos ${String(Math.round(dSx*1000)/10).replace('.',',')}%.</div>`:'';
+        const membroHtml=`<div${memAttrs}><div class="rdc-member-head"><span>Membros</span>${nMemCome?`<b>${nMemCome} à mesa</b>`:''}</div>${nMemCome?sexoPreco(calcRef.Ph,calcRef.Pf):NA}${descontoTxt}</div>${memHas?pplPanel('m',memList):''}`;
+        const mb=rate('mb',LBL_BEBE,nMemBebe,nMemBebe?sexoPreco(calcRef.PbebeH,calcRef.PbebeF):NA,membrosBebe.map(nomeIt).join(''));
+        const g=rate('g','Convidados',calcRef.E,calcRef.E?eur(calcRef.Q):NA,guestsPay.map(gPplIt).join(''));
+        const gb=rate('gb',LBL_BEBE,calcRef.Ebebe,calcRef.Ebebe?eur(calcRef.Qbebe||0):NA,guestsBebe.map(gPplIt).join(''));
+        const kids=rate('k','Crianças',nKids(kidsAll),NAOPAGA,kidsAll.map(kPplIt).join(''));
+        const cellsHtml=`<div class="rdc-pricing">${membroHtml}<div class="rdc-rate-grid">${mb.tile}${g.tile}${gb.tile}${kids.tile}</div>${mb.panel}${g.panel}${gb.panel}${kids.panel}</div>`;
         const presNota=calcRef.D>0?'':'<div class="rdc-sempres">Sem presenças marcadas</div>';
         const mkey=rd.data+'|'+rd.ref,cid='rdcb'+rd._idx,cOpen=!!MEAL_COST_OPEN[mkey];
         costBox=`<div class="rdc rdc-hero rdc-costs sf">
