@@ -833,6 +833,22 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .rdc-cell-k{font-size:9.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--faint);font-weight:600}
 .rdc-cell-v{font-size:16px;font-weight:700;color:var(--ink);margin-top:0;font-variant-numeric:tabular-nums}
 .rdc-cell-v-gold{color:var(--gold)}
+/* Desconto por sexo: DOIS preços dentro da célula de sempre, um por linha —
+   não uma quarta coluna. As três colunas já ocupam a largura toda a 320px, e
+   a faixa dos Convidados (sem desconto nenhum) ficaria com três contra
+   quatro. Assim o que cresce é ~14px de ALTURA e nada de largura.
+   Os SVG vão em `currentColor` de propósito: apanham o dourado do
+   .rdc-cell-v-gold aqui e o azul/rosa do toggle no Plantel, sem segunda
+   cópia de cada ícone. A 13,5px cabem ícone + "15,00 €" (~59px) numa célula
+   de ~88px úteis; a 16px do preço único não cabiam. */
+.rdc-sx{display:flex;flex-direction:column;align-items:center;gap:1px;line-height:1.15}
+.rdc-sx-l{display:inline-flex;align-items:center;justify-content:center;gap:3px;font-size:13.5px;white-space:nowrap}
+.rdc-sx-l svg{width:11px;height:11px;flex-shrink:0;opacity:.85}
+/* A percentagem, uma vez por cartão e no fim do bloco (como a legenda do `*`
+   das provisórias) — não em cada célula. */
+.rdc-sx-leg{display:flex;align-items:center;justify-content:center;gap:4px;margin-top:8px;font-size:10px;color:var(--faint);font-weight:600}
+.rdc-sx-leg svg{width:11px;height:11px;flex-shrink:0;color:var(--gold)}
+.rdc-sx-leg b{color:var(--gold);font-weight:700}
 .rdc-bebe{font-size:11px;color:var(--blue);font-weight:700;margin-top:3px;display:flex;align-items:center;justify-content:center;gap:3px;font-variant-numeric:tabular-nums}
 .rdc-bebe svg{flex-shrink:0}
 /* Barra de navegação por refeição — quadrados numa só linha (estilo dos convidados) */
