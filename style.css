@@ -844,11 +844,12 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .rdc-sx{display:flex;flex-direction:column;align-items:center;gap:1px;line-height:1.15}
 .rdc-sx-l{display:inline-flex;align-items:center;justify-content:center;gap:3px;font-size:13.5px;white-space:nowrap}
 .rdc-sx-l svg{width:11px;height:11px;flex-shrink:0;opacity:.85}
-/* A percentagem, uma vez por cartão e no fim do bloco (como a legenda do `*`
-   das provisórias) — não em cada célula. */
-.rdc-sx-leg{display:flex;align-items:center;justify-content:center;gap:4px;margin-top:8px;font-size:10px;color:var(--faint);font-weight:600}
-.rdc-sx-leg svg{width:11px;height:11px;flex-shrink:0;color:var(--gold)}
-.rdc-sx-leg b{color:var(--gold);font-weight:700}
+/* A percentagem, uma vez por cartão e logo a seguir à faixa dos MEMBROS — é
+   deles que ela fala; no fim do bloco ficava depois dos Convidados, que pagam
+   preço único, e parecia aplicar-se aos dois. Itálico e mais pequena que tudo
+   o resto: é nota de rodapé da faixa, não mais um número a competir com os
+   preços — daí não levar ícones nem negrito. */
+.rdc-sx-leg{text-align:center;margin-top:5px;font-size:9.5px;font-style:italic;color:var(--faint);line-height:1.3}
 .rdc-bebe{font-size:11px;color:var(--blue);font-weight:700;margin-top:3px;display:flex;align-items:center;justify-content:center;gap:3px;font-variant-numeric:tabular-nums}
 .rdc-bebe svg{flex-shrink:0}
 /* Barra de navegação por refeição — quadrados numa só linha (estilo dos convidados) */
@@ -875,7 +876,11 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 /* Contagem dentro das células membro/convidado */
 /* O rótulo parte-se antes de rebentar a célula: num telemóvel estreito é
    preferível "CONVIDADO" e a contagem em duas linhas a um › cortado. */
-.rdc-cell-k{display:inline-flex;align-items:center;gap:4px;justify-content:center;flex-wrap:wrap}
+/* min-height reserva a linha do rótulo mesmo quando ela fica VAZIA — a coluna
+   do "come" não tem rótulo (é o defeito) e, sem ninguém, também não tem
+   contagem. Sem isto a linha colapsava e o preço dessa célula subia,
+   desalinhado das vizinhas, que têm sempre "SÓ BEBE"/"CRIANÇA". */
+.rdc-cell-k{display:inline-flex;align-items:center;gap:4px;justify-content:center;flex-wrap:wrap;min-height:14px}
 /* 🍻 do "Convidado que só bebe": desenhado, à medida do rótulo (um emoji sai
    maior que o texto e com cor própria — ver a mesma razão no --ic-cart) */
 .rdc-cell-k svg{width:11px;height:11px;flex:none}
