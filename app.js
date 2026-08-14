@@ -5,7 +5,7 @@ const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v311 · 2026-08-14 · Stock › 3.º eixo: novo destino “📦 Ano seguinte”, ao lado do 🗑. Acabadas as festas, o que sobra e não se deita fora aloca-se ao próximo evento — sai do “por gastar” deste ano e ganha estado próprio no filtro, no cartão e na folha do 🖨. Ao CRIAR o ano seguinte, esse stock entra lá sozinho, a 0 € e por alocar, marcado “📦 Ano anterior” — já foi pago no ano que o comprou, e dar-lhe valor outra vez era cobrar a mesma cerveja duas vezes. Se o ano seguinte já existir, entra no momento em que se grava a alocação; e a sincronização é idempotente — mexer no 📦 corrige a quantidade lá, e tirá-lo retira o artigo de lá · v310 · 2026-08-13 · Stock: TRÊS eixos, cada um editável num sítio só — o que foi COMPRADO para a refeição (na compra), de quem é o CUSTO (no separador Stock) e, novo, ONDE A MERCADORIA FOI PARAR (também no Stock). Este terceiro herda o custo enquanto ninguém lhe tocar, e é nele que se reparte o stock por duas refeições ou se diz o que se deitou fora: as 5 batatas palha ficam com o custo todo na sexta e o stock fica “3,5 na sexta · 1,5 🗑 deitado fora”. No cartão da refeição a linha decompõe-se como já fazia (“5 pacotes · 17,10 €” com “↳ 🗑 1,5 pacotes deitados fora” por baixo, sem € — este não sai da conta dela); o filtro do separador ganha “🗑 Deitado fora” e o rodapé do cartão e a folha do 🖨 dizem-no. E o “dar baixa” passa a aparecer só onde faz sentido — no que está parado em Gerais/Bebidas; nas refeições quem responde é o eixo novo. Requer correr db/stock_alocacao_stock.sql · v308 · 2026-08-13 · Relatório geral (PDF): os quadros das despesas fundem-se num só, logo a seguir às Receitas — a matriz por categoria × dia/refeição ganha uma coluna "Fora dos dias" (a bolsa recuperada pela Quota Extra, as t-shirts, o stock levado para casa), com que cada linha passa a valer o total do evento naquela categoria; com isso sai o quadro "Despesas — Detalhe", que dizia as mesmas categorias com outros números. Os dois quadros passam a chamar-se só "Receitas" e "Despesas". E a matriz deixa de cortar os valores na pré-visualização do telemóvel ("223,…"): passa a deslizar na horizontal no ecrã, e no papel fica exatamente como estava · v307 · 2026-08-13 · Relatório geral (PDF): a "Distribuição por Dia" passa a MATRIZ — uma coluna por dia/refeição, uma linha por categoria e o total à direita, para se seguir a mesma categoria ao longo dos dias; e ganha um quadro final "Valores a Liquidar": o total de cada membro menos as despesas que adiantou e os pagamentos que fez, mais o que já recebeu, dando o saldo — o mesmo número que os Saldos mostram (sai da mesma função) · v306 · 2026-08-13 · Relatório geral (PDF): sai a lista de cash-flows (detalhe a mais para uma folha de resumo) e a indicação do tesoureiro; o "Despesas — Detalhe" passa a ser por CATEGORIA do artigo — o evento inteiro, diretos das refeições incluídos —, em vez do tipo (Gerais/Bebidas/Cerveja); a "Visão por Refeição" ganha coluna de Saldo, fecha um subtotal das refeições e mostra por baixo, uma a uma, as parcelas que mexem no saldo (t-shirts, mealheiro, quota extra, bolsa comum não atribuída) até ao saldo do grupo; nova secção "Distribuição por Dia", com o custo de cada dia repartido pela categoria do artigo; e o resumo por membro passa a dois quadros — o consumo do próprio (refeições + quota) e, a seguir, o total com convidados, t-shirts e sobras · v305 · 2026-08-12 · Refeições: o "Ver detalhe da lista de compras" perde a moldura à volta e fica igual ao "Ver detalhe do custo" — só a risca divisória e a frase. O cartão da lista só aparece ao abrir · v304 · 2026-08-12 · Stock › ⇄ 2.ª medida: com VÁRIAS MARCAS debaixo do mesmo artigo, cada linha da alocação passa a converter-se pelo fator da SUA marca e não pela média do cartão — pedir 3 postas do "Bacalhau Ocean Sea" (0,8 kg = 3 un) deixa de dar "Fixaste 3 un — só há 2,737 un" ao guardar, e o que se aloca deixa de ficar em decimais. O total em peças passa a ser a soma das linhas, e trocar a marca de uma linha guarda o número escrito (2 postas continuam 2, não 1,9) · v303 · 2026-08-12 · Refeições: o "Ver detalhe da lista de compras" de uma refeição passada passa a ser o MESMO botão do "Ver detalhe do custo", e ao abrir mostra os dois blocos de sempre (🛒 lista, depois 🧺 comprado), cada um com o seu colapsável; e os dois botões deixam de fugir para baixo ao expandir — passam a ficar ANTES do corpo que abrem, logo o "Esconder" nasce exatamente onde estava o "Ver" · v302 · 2026-08-12 · Refeições: o Cartaz das Ementas sobe para debaixo dos chips dos dias (é do ano, não da refeição aberta); numa refeição já passada a Lista de compras e o 🧺 Comprado fecham-se num só "Ver detalhe da lista de compras" — e o bloco deixa de se chamar "Não comprado" (o que lá está é a lista, com o tratado riscado); no detalhe dos custos diretos/bebida a quantidade ganha coluna própria e traz as duas medidas do lote ("7 un ≈ 3,136 kg"), como no 🧺 Comprado; o cartão do custo ganha um "Ver detalhe do custo" no fim; e abrir diretos/bebida/indiretos passa a mostrar já as linhas lá dentro · v301 · 2026-08-12 · Stock › filtro da alocação: as opções deixam de levar o nome da refeição à frente ("🌙 Jantar Sex, 7/ago · 11" → "🌙 Sex 7/ago · 11", o mesmo rótulo do chip do cartão) — com a contagem atrás a linha partia-se em duas no dropdown do iPhone, e a letra das <option> não se pode encolher (é o sistema que as desenha). O que o nome dizia, o ícone já diz: ☀️ almoço, 🌙 jantar · v300 · 2026-08-12 · Stock: os quatro chips de estado passam a uma combobox (consumido/por gastar · alocado/por alocar, com a contagem em cada opção) e ao lado nasce uma SEGUNDA combobox para a alocação — ver só o que está em Gerais, em Bebidas, no jantar de 7/ago ou no 🎒 de alguém. Escolhido um destino, os chips do cartão e o € da categoria passam a ser os desse destino. A 🍻 bebida de uma refeição vem com ela. E corrige o chip "🧺 por alocar", que desde a v268 (quando o chip "Tudo" saiu) só aparecia a filtrar precisamente por "Por alocar" · v299 · 2026-08-12 · Cash Flows: o "Por detalhar" deixa de ser um chip à parte e passa para dentro do seletor de refeições/tipos, no fim ("📝 Por detalhar · N") — o ecrã já tinha filtros a mais por cima da lista. Deixa de se poder cruzar com uma refeição · v298 · 2026-08-12 · Cash Flows › filtro por refeição/tipo: o dia passa a três letras ("Jantar Sáb, 8/ago" em vez de "Jantar Sábado, 8/ago") — o dropdown do iOS não deixa encolher a letra das opções, e por extenso partia cada refeição em duas linhas · v297 · 2026-08-12 · Cash Flows › filtro por refeição/tipo: a 🍻 bebida de uma refeição deixa de ter entrada própria (funde-se na refeição, que é como se procura) e as entradas passam a dizer a refeição por extenso ("Almoço Segunda, 10/ago"); o 🎒 "leva para casa" sai do filtro — é alocação feita no Stock, não o objetivo da compra. E um chip novo "🧾 Por detalhar" mostra as despesas soltas, sem artigos item a item · v296 · 2026-08-12 · Cash Flows: a lista passa a ordenar-se sempre por ordem descendente (também dentro do mesmo dia, pelo mais recente a entrar) — antes ficava ascendente dentro do dia, o que baralhava. E uma despesa avulsa (sem compra) ganha "🧾 Detalhar por artigo" no editor, para quem a pode editar (admin, ou quem a registou) a transformar numa compra com itens e preços · v295 · 2026-08-12 · Detalhe "Por categoria": o stock ainda POR ALOCAR deixa de cair no balde "Sacos/Depósitos/Similares" — o dinheiro continua a repartir-se pelas refeições na mesma (é bolsa comum), mas cada parcela passa a aparecer na categoria do seu artigo (Conservas, Legumes…), como o stock já alocado. Não estar entregue a uma refeição não o torna menos Conservas. O balde fica só com os sacos/taxas · v294 · 2026-08-12 · Relatório geral (PDF): nova secção "Custos Indiretos por Categoria" — o mesmo detalhe que cada cartão de refeição abre, mas somado por todas elas. Sai da MESMA função do ecrã (catIndirRows), para as duas leituras não poderem discordar · v293 · 2026-08-12 · CORRIGE a v291, que fez as categorias desaparecer do detalhe "Por categoria" (Utensílios, Bebidas, Fruta… iam todas parar a "Sacos/Depósitos/Similares"): o marcador "🧺 Stock" está em CADA artigo que o stock reparte pelas refeições, não só na linha do resto por alocar — o que as separa é a linha do resto ser uma despesa real da compra · v292 · 2026-08-12 · Custo da refeição › detalhe "Por categoria": as linhas "🧾 só despesa" (sacos, depósitos, taxas) voltam a agrupar-se sempre em "Sacos/Depósitos/Similares", mesmo tendo descritivo próprio — reconhecem-se pelo nome (o mesmo dicionário do "🧾 Extras da fatura"), que agora também apanha "Depósito" sozinho · v291 · 2026-08-12 · Custo da refeição › detalhe "Por categoria": a linha 🧺 Stock (o resto por alocar) deixa de cair no nome da loja da compra — vai direto para o catch-all "Sacos/Depósitos/Similares", sem tentar mais nenhum descritivo · v290 · 2026-08-12 · Custo da refeição › detalhe "Por categoria": uma despesa de uma COMPRA (sacos/depósitos, provisória antiga) passa a mostrar-se pelas OBSERVAÇÕES (o artigo) em vez do "Descritivo" da compra (normalmente o nome da loja, partilhado por todas as despesas dela) — a loja aparecia a repetir-se em vez do saco/depósito. E o resto por alocar da linha "🧺 Stock" deixa de se disfarçar atrás do nome da loja: volta a cair no catch-all, que agora aparece mesmo quando há stock por alocar · v289 · 2026-08-12 · Revertida a v288 (categorizar o stock por alocar por lote) — os números de "Sacos/Depósitos/Similares" estavam a inflacionar em vez de encolher, sinal de que a reconstrução não estava a bater certo com o resto real da compra. Volta-se à v287 enquanto se investiga com dados reais · v287 · 2026-08-12 · Custo da refeição › detalhe "Por categoria": uma despesa sem categoria deixa de se amontoar em "Sacos/Depósitos/Similares" — passa a mostrar-se pelo seu próprio descritivo (o artigo do stock, ou o texto escrito na despesa), como se fosse um artigo. O catch-all fica reservado para o que não tem descritivo nenhum (o stock ainda por alocar) · v286 · 2026-08-12 · Quem inseriu uma despesa passa a poder editá-la/apagá-la: sem compra associada é sempre sua (própria/cônjuge); vindo de uma compra com stock só enquanto o admin não tiver ido ao separador Stock realocar os artigos — a partir daí a compra fecha-se para ela, com aviso, e só o admin a edita (requer correr db/despesas_self_edit.sql) · v285 · 2026-08-12 · Custo da refeição: o detalhe de "Custos diretos" passa a ordenar as despesas por valor descendente. Com bebida concreta alocada, a ordem dos blocos passa a ser diretos → bebida (sem o ícone 🍻) → indiretos, e "Custos indiretos" chama-se agora "Outros custos indiretos", com o chip "Bebidas" lá dentro a passar a "Outras bebidas" nesse caso · v284 · 2026-08-12 · Custo da refeição: os custos indiretos ganham um detalhe expansível "Por categoria" — o mesmo € de Bebidas/Cerveja/Gerais, mas repartido pela categoria do artigo (a mesma das Compras/Stock), maior primeiro; o que não é stock nenhum (sacos, depósitos, taxas) ou ainda não tem categoria cai em "Sacos/Depósitos/Similares", sempre por último · v283 · 2026-08-12 · Definições › Parametrizações: a fração da bolsa indireta (Gerais/Bebidas/Cerveja) que entra no preço das refeições deixa de estar fixa em 50% — passa a ser ajustável por ano, só em anos abertos. T-shirts e Stock Sobrante continuam sempre de fora dessa bolsa · v282 · 2026-08-12 · Saldos: a vista "Por refeição" passa a ser a principal, e o seletor "Por parcelas"/"Por refeição" desce para debaixo de Receitas/Despesas, só à vista com o detalhe aberto (ali é que faz diferença — os totais não mudam com a vista) · v281 · 2026-08-12 · Saldos › vista "Por refeição": o custo de cada refeição passa a incluir os indiretos (Gerais/Bebidas/Cerveja) que lhe cabem, como no cartão da refeição — antes só contava os diretos e o custo ficava sempre abaixo da receita. "Outros custos"/"Outras receitas" ganham detalhe por baixo (T-shirts, Stock Sobrante, Quota Extra, Mealheiro, Missão Poupança…), no ecrã e no PDF · v280 · 2026-08-12 · Shop List: um pedido de refeição (Almoço/Jantar) cujo dia já passou e continua por comprar passa a avisar "⚠️ refeição já passou" no cartão de "Em falta" — não se esconde nem se cancela sozinho, só se diz que já ninguém está à espera daquilo · v279 · 2026-08-11 · T-shirts: editar um pedido cujo "Encomendado por" já saiu do plantel deste ano deixa de esconder o campo (o select ficava vazio e o Guardar recusava sempre) — o nome antigo aparece marcado "fora do plantel" e dá para reatribuir a t-shirt a outra pessoa · v278 · 2026-08-11 · Quota Extra: o Fundo de Reserva deixa de ser ignorado nos anos em que as fontes diretas (refeições, convidados, mealheiros, t-shirts, stock sobrante) já cobrem a despesa — passa a somar-se sempre à conta antes de se cortar a zero, para o valor "a guardar" ser mesmo cobrado · v277 · 2026-08-10 · Definições › Parametrizações: novo interruptor "Corrigir Presenças" (por ano) que deixa cada um corrigir as suas presenças de dias já passados desse evento — desligado por defeito, e as contas fechadas continuam a trancar tudo mesmo com ele ligado · v276 · 2026-08-10 · Adicionar Convidado: o campo "Trazido por" deixa de escolher o primeiro membro por ordem alfabética do casal e passa a vir pré-selecionado com o próprio utilizador, como no resto da app · v275 · 2026-08-10 · Shop List: um pedido sem loja própria que está a herdar a loja de outro pedido do mesmo artigo agora pode recusar essa herança ("🚫 Não herdar — deixar sem loja"), sem mexer no pedido que a escreveu · v274 · 2026-08-10 · Pagar Dívida: um pagamento livre / adiantamento (sem dívidas selecionadas) passa a ter uma caixa de observações, para dizer o que é aquele dinheiro · v273 · 2026-08-10 · PDF de pessoa (Saldos): as Refeições ordenam-se por dia e mostram o prato; e as Despesas Adiantadas deixam de mostrar "🧺 Stock" como nota e passam a mostrar o destino real (refeição/tipo) em vez de "Gerais" sempre que a compra tem um destino só · v272 · Stock alocado a uma PESSOA (🎒 leva para casa): no separador Stock, uma alocação pode agora apontar a um membro em vez de a uma refeição — é para as sobras que não voltam a ser usadas. O custo sai do rateio e passa a ser cobrado só a essa pessoa (aparece no saldo dela, como as t-shirts) · v271 · Nos Saldos, uma compra com peça "só despesa" (saco, depósito) deixa de aparecer duplicada em "Despesas adiantadas" — as linhas da mesma compra juntam-se numa só. E "Despesas adiantadas" separa-se em duas: o que já pagaste (📅) e o que está previsto mas ainda por pagar (📌 provisórias) · v270 · As SOBRAS deixam de reabrir o pedido: um lote comprado para uma refeição conta inteiro na cobertura, mesmo com parte por alocar na bolsa comum — compram-se 8 pacotes para o jantar, comem-se 5, e a lista já não pede os outros 3 que estão na despensa. É a mesma leitura que o cartão da refeição já fazia. Mover o stock para outra refeição continua a reabrir o pedido · v269 · Uma falta “dita à mão” passa a dizer que o é — na lista e no cartão da refeição, como já dizia o “coberto” e a folha do 🖨 —, e o bloco “que pedidos é que isto trata?” marca a linha que não é a app a deduzir. Trocar o artigo de um pedido (chouriço de sangue → morcela) deita fora a cobertura declarada sobre o artigo antigo, que ficava a mandar sobre o stock novo';
+const APP_BUILD = 'v312 · 2026-08-14 · Acerto de CASAL nos pagamentos de dívida e nos reembolsos. Em “🤝 Pagar Dívida”, se alguém do casal tiver dinheiro a receber, aparece agora um chip azul “a receber” que DESCONTA no que se entrega: o Mestre tem 20 a receber, o cônjuge dele deve 60, e entregam-se 40 — o campo Valor passa a mostrar o líquido, com a conta à vista. Vale nos dois sentidos: o crédito pode ser de quem está a pagar ou do cônjuge. Em “💸 Reembolso”, escolhida a pessoa, o valor deixa de ter de se escrever à mão: “👤 Por saldo” devolve o saldo dela e “👥 Saldo do casal” devolve a diferença quando um do casal tem a receber e o outro a pagar (só aparecem quando há mesmo o que acertar). Nos dois casos ficam gravados os DOIS movimentos — o pagamento da dívida e o reembolso do crédito —, porque é assim que cada saldo vai a zero sem se mexer numa única regra das contas do grupo: o resultado do grupo não muda e a soma dos saldos continua a fechar. Um pedido de pagamento feito por quem não é admin leva o acerto lá dentro e as duas parcelas nascem quando o admin valida. Sem migração · v311 · 2026-08-14 · Stock › 3.º eixo: novo destino “📦 Ano seguinte”, ao lado do 🗑. Acabadas as festas, o que sobra e não se deita fora aloca-se ao próximo evento — sai do “por gastar” deste ano e ganha estado próprio no filtro, no cartão e na folha do 🖨. Ao CRIAR o ano seguinte, esse stock entra lá sozinho, a 0 € e por alocar, marcado “📦 Ano anterior” — já foi pago no ano que o comprou, e dar-lhe valor outra vez era cobrar a mesma cerveja duas vezes. Se o ano seguinte já existir, entra no momento em que se grava a alocação; e a sincronização é idempotente — mexer no 📦 corrige a quantidade lá, e tirá-lo retira o artigo de lá · v310 · 2026-08-13 · Stock: TRÊS eixos, cada um editável num sítio só — o que foi COMPRADO para a refeição (na compra), de quem é o CUSTO (no separador Stock) e, novo, ONDE A MERCADORIA FOI PARAR (também no Stock). Este terceiro herda o custo enquanto ninguém lhe tocar, e é nele que se reparte o stock por duas refeições ou se diz o que se deitou fora: as 5 batatas palha ficam com o custo todo na sexta e o stock fica “3,5 na sexta · 1,5 🗑 deitado fora”. No cartão da refeição a linha decompõe-se como já fazia (“5 pacotes · 17,10 €” com “↳ 🗑 1,5 pacotes deitados fora” por baixo, sem € — este não sai da conta dela); o filtro do separador ganha “🗑 Deitado fora” e o rodapé do cartão e a folha do 🖨 dizem-no. E o “dar baixa” passa a aparecer só onde faz sentido — no que está parado em Gerais/Bebidas; nas refeições quem responde é o eixo novo. Requer correr db/stock_alocacao_stock.sql · v308 · 2026-08-13 · Relatório geral (PDF): os quadros das despesas fundem-se num só, logo a seguir às Receitas — a matriz por categoria × dia/refeição ganha uma coluna "Fora dos dias" (a bolsa recuperada pela Quota Extra, as t-shirts, o stock levado para casa), com que cada linha passa a valer o total do evento naquela categoria; com isso sai o quadro "Despesas — Detalhe", que dizia as mesmas categorias com outros números. Os dois quadros passam a chamar-se só "Receitas" e "Despesas". E a matriz deixa de cortar os valores na pré-visualização do telemóvel ("223,…"): passa a deslizar na horizontal no ecrã, e no papel fica exatamente como estava · v307 · 2026-08-13 · Relatório geral (PDF): a "Distribuição por Dia" passa a MATRIZ — uma coluna por dia/refeição, uma linha por categoria e o total à direita, para se seguir a mesma categoria ao longo dos dias; e ganha um quadro final "Valores a Liquidar": o total de cada membro menos as despesas que adiantou e os pagamentos que fez, mais o que já recebeu, dando o saldo — o mesmo número que os Saldos mostram (sai da mesma função) · v306 · 2026-08-13 · Relatório geral (PDF): sai a lista de cash-flows (detalhe a mais para uma folha de resumo) e a indicação do tesoureiro; o "Despesas — Detalhe" passa a ser por CATEGORIA do artigo — o evento inteiro, diretos das refeições incluídos —, em vez do tipo (Gerais/Bebidas/Cerveja); a "Visão por Refeição" ganha coluna de Saldo, fecha um subtotal das refeições e mostra por baixo, uma a uma, as parcelas que mexem no saldo (t-shirts, mealheiro, quota extra, bolsa comum não atribuída) até ao saldo do grupo; nova secção "Distribuição por Dia", com o custo de cada dia repartido pela categoria do artigo; e o resumo por membro passa a dois quadros — o consumo do próprio (refeições + quota) e, a seguir, o total com convidados, t-shirts e sobras · v305 · 2026-08-12 · Refeições: o "Ver detalhe da lista de compras" perde a moldura à volta e fica igual ao "Ver detalhe do custo" — só a risca divisória e a frase. O cartão da lista só aparece ao abrir · v304 · 2026-08-12 · Stock › ⇄ 2.ª medida: com VÁRIAS MARCAS debaixo do mesmo artigo, cada linha da alocação passa a converter-se pelo fator da SUA marca e não pela média do cartão — pedir 3 postas do "Bacalhau Ocean Sea" (0,8 kg = 3 un) deixa de dar "Fixaste 3 un — só há 2,737 un" ao guardar, e o que se aloca deixa de ficar em decimais. O total em peças passa a ser a soma das linhas, e trocar a marca de uma linha guarda o número escrito (2 postas continuam 2, não 1,9) · v303 · 2026-08-12 · Refeições: o "Ver detalhe da lista de compras" de uma refeição passada passa a ser o MESMO botão do "Ver detalhe do custo", e ao abrir mostra os dois blocos de sempre (🛒 lista, depois 🧺 comprado), cada um com o seu colapsável; e os dois botões deixam de fugir para baixo ao expandir — passam a ficar ANTES do corpo que abrem, logo o "Esconder" nasce exatamente onde estava o "Ver" · v302 · 2026-08-12 · Refeições: o Cartaz das Ementas sobe para debaixo dos chips dos dias (é do ano, não da refeição aberta); numa refeição já passada a Lista de compras e o 🧺 Comprado fecham-se num só "Ver detalhe da lista de compras" — e o bloco deixa de se chamar "Não comprado" (o que lá está é a lista, com o tratado riscado); no detalhe dos custos diretos/bebida a quantidade ganha coluna própria e traz as duas medidas do lote ("7 un ≈ 3,136 kg"), como no 🧺 Comprado; o cartão do custo ganha um "Ver detalhe do custo" no fim; e abrir diretos/bebida/indiretos passa a mostrar já as linhas lá dentro · v301 · 2026-08-12 · Stock › filtro da alocação: as opções deixam de levar o nome da refeição à frente ("🌙 Jantar Sex, 7/ago · 11" → "🌙 Sex 7/ago · 11", o mesmo rótulo do chip do cartão) — com a contagem atrás a linha partia-se em duas no dropdown do iPhone, e a letra das <option> não se pode encolher (é o sistema que as desenha). O que o nome dizia, o ícone já diz: ☀️ almoço, 🌙 jantar · v300 · 2026-08-12 · Stock: os quatro chips de estado passam a uma combobox (consumido/por gastar · alocado/por alocar, com a contagem em cada opção) e ao lado nasce uma SEGUNDA combobox para a alocação — ver só o que está em Gerais, em Bebidas, no jantar de 7/ago ou no 🎒 de alguém. Escolhido um destino, os chips do cartão e o € da categoria passam a ser os desse destino. A 🍻 bebida de uma refeição vem com ela. E corrige o chip "🧺 por alocar", que desde a v268 (quando o chip "Tudo" saiu) só aparecia a filtrar precisamente por "Por alocar" · v299 · 2026-08-12 · Cash Flows: o "Por detalhar" deixa de ser um chip à parte e passa para dentro do seletor de refeições/tipos, no fim ("📝 Por detalhar · N") — o ecrã já tinha filtros a mais por cima da lista. Deixa de se poder cruzar com uma refeição · v298 · 2026-08-12 · Cash Flows › filtro por refeição/tipo: o dia passa a três letras ("Jantar Sáb, 8/ago" em vez de "Jantar Sábado, 8/ago") — o dropdown do iOS não deixa encolher a letra das opções, e por extenso partia cada refeição em duas linhas · v297 · 2026-08-12 · Cash Flows › filtro por refeição/tipo: a 🍻 bebida de uma refeição deixa de ter entrada própria (funde-se na refeição, que é como se procura) e as entradas passam a dizer a refeição por extenso ("Almoço Segunda, 10/ago"); o 🎒 "leva para casa" sai do filtro — é alocação feita no Stock, não o objetivo da compra. E um chip novo "🧾 Por detalhar" mostra as despesas soltas, sem artigos item a item · v296 · 2026-08-12 · Cash Flows: a lista passa a ordenar-se sempre por ordem descendente (também dentro do mesmo dia, pelo mais recente a entrar) — antes ficava ascendente dentro do dia, o que baralhava. E uma despesa avulsa (sem compra) ganha "🧾 Detalhar por artigo" no editor, para quem a pode editar (admin, ou quem a registou) a transformar numa compra com itens e preços · v295 · 2026-08-12 · Detalhe "Por categoria": o stock ainda POR ALOCAR deixa de cair no balde "Sacos/Depósitos/Similares" — o dinheiro continua a repartir-se pelas refeições na mesma (é bolsa comum), mas cada parcela passa a aparecer na categoria do seu artigo (Conservas, Legumes…), como o stock já alocado. Não estar entregue a uma refeição não o torna menos Conservas. O balde fica só com os sacos/taxas · v294 · 2026-08-12 · Relatório geral (PDF): nova secção "Custos Indiretos por Categoria" — o mesmo detalhe que cada cartão de refeição abre, mas somado por todas elas. Sai da MESMA função do ecrã (catIndirRows), para as duas leituras não poderem discordar · v293 · 2026-08-12 · CORRIGE a v291, que fez as categorias desaparecer do detalhe "Por categoria" (Utensílios, Bebidas, Fruta… iam todas parar a "Sacos/Depósitos/Similares"): o marcador "🧺 Stock" está em CADA artigo que o stock reparte pelas refeições, não só na linha do resto por alocar — o que as separa é a linha do resto ser uma despesa real da compra · v292 · 2026-08-12 · Custo da refeição › detalhe "Por categoria": as linhas "🧾 só despesa" (sacos, depósitos, taxas) voltam a agrupar-se sempre em "Sacos/Depósitos/Similares", mesmo tendo descritivo próprio — reconhecem-se pelo nome (o mesmo dicionário do "🧾 Extras da fatura"), que agora também apanha "Depósito" sozinho · v291 · 2026-08-12 · Custo da refeição › detalhe "Por categoria": a linha 🧺 Stock (o resto por alocar) deixa de cair no nome da loja da compra — vai direto para o catch-all "Sacos/Depósitos/Similares", sem tentar mais nenhum descritivo · v290 · 2026-08-12 · Custo da refeição › detalhe "Por categoria": uma despesa de uma COMPRA (sacos/depósitos, provisória antiga) passa a mostrar-se pelas OBSERVAÇÕES (o artigo) em vez do "Descritivo" da compra (normalmente o nome da loja, partilhado por todas as despesas dela) — a loja aparecia a repetir-se em vez do saco/depósito. E o resto por alocar da linha "🧺 Stock" deixa de se disfarçar atrás do nome da loja: volta a cair no catch-all, que agora aparece mesmo quando há stock por alocar · v289 · 2026-08-12 · Revertida a v288 (categorizar o stock por alocar por lote) — os números de "Sacos/Depósitos/Similares" estavam a inflacionar em vez de encolher, sinal de que a reconstrução não estava a bater certo com o resto real da compra. Volta-se à v287 enquanto se investiga com dados reais · v287 · 2026-08-12 · Custo da refeição › detalhe "Por categoria": uma despesa sem categoria deixa de se amontoar em "Sacos/Depósitos/Similares" — passa a mostrar-se pelo seu próprio descritivo (o artigo do stock, ou o texto escrito na despesa), como se fosse um artigo. O catch-all fica reservado para o que não tem descritivo nenhum (o stock ainda por alocar) · v286 · 2026-08-12 · Quem inseriu uma despesa passa a poder editá-la/apagá-la: sem compra associada é sempre sua (própria/cônjuge); vindo de uma compra com stock só enquanto o admin não tiver ido ao separador Stock realocar os artigos — a partir daí a compra fecha-se para ela, com aviso, e só o admin a edita (requer correr db/despesas_self_edit.sql) · v285 · 2026-08-12 · Custo da refeição: o detalhe de "Custos diretos" passa a ordenar as despesas por valor descendente. Com bebida concreta alocada, a ordem dos blocos passa a ser diretos → bebida (sem o ícone 🍻) → indiretos, e "Custos indiretos" chama-se agora "Outros custos indiretos", com o chip "Bebidas" lá dentro a passar a "Outras bebidas" nesse caso · v284 · 2026-08-12 · Custo da refeição: os custos indiretos ganham um detalhe expansível "Por categoria" — o mesmo € de Bebidas/Cerveja/Gerais, mas repartido pela categoria do artigo (a mesma das Compras/Stock), maior primeiro; o que não é stock nenhum (sacos, depósitos, taxas) ou ainda não tem categoria cai em "Sacos/Depósitos/Similares", sempre por último · v283 · 2026-08-12 · Definições › Parametrizações: a fração da bolsa indireta (Gerais/Bebidas/Cerveja) que entra no preço das refeições deixa de estar fixa em 50% — passa a ser ajustável por ano, só em anos abertos. T-shirts e Stock Sobrante continuam sempre de fora dessa bolsa · v282 · 2026-08-12 · Saldos: a vista "Por refeição" passa a ser a principal, e o seletor "Por parcelas"/"Por refeição" desce para debaixo de Receitas/Despesas, só à vista com o detalhe aberto (ali é que faz diferença — os totais não mudam com a vista) · v281 · 2026-08-12 · Saldos › vista "Por refeição": o custo de cada refeição passa a incluir os indiretos (Gerais/Bebidas/Cerveja) que lhe cabem, como no cartão da refeição — antes só contava os diretos e o custo ficava sempre abaixo da receita. "Outros custos"/"Outras receitas" ganham detalhe por baixo (T-shirts, Stock Sobrante, Quota Extra, Mealheiro, Missão Poupança…), no ecrã e no PDF · v280 · 2026-08-12 · Shop List: um pedido de refeição (Almoço/Jantar) cujo dia já passou e continua por comprar passa a avisar "⚠️ refeição já passou" no cartão de "Em falta" — não se esconde nem se cancela sozinho, só se diz que já ninguém está à espera daquilo · v279 · 2026-08-11 · T-shirts: editar um pedido cujo "Encomendado por" já saiu do plantel deste ano deixa de esconder o campo (o select ficava vazio e o Guardar recusava sempre) — o nome antigo aparece marcado "fora do plantel" e dá para reatribuir a t-shirt a outra pessoa · v278 · 2026-08-11 · Quota Extra: o Fundo de Reserva deixa de ser ignorado nos anos em que as fontes diretas (refeições, convidados, mealheiros, t-shirts, stock sobrante) já cobrem a despesa — passa a somar-se sempre à conta antes de se cortar a zero, para o valor "a guardar" ser mesmo cobrado · v277 · 2026-08-10 · Definições › Parametrizações: novo interruptor "Corrigir Presenças" (por ano) que deixa cada um corrigir as suas presenças de dias já passados desse evento — desligado por defeito, e as contas fechadas continuam a trancar tudo mesmo com ele ligado · v276 · 2026-08-10 · Adicionar Convidado: o campo "Trazido por" deixa de escolher o primeiro membro por ordem alfabética do casal e passa a vir pré-selecionado com o próprio utilizador, como no resto da app · v275 · 2026-08-10 · Shop List: um pedido sem loja própria que está a herdar a loja de outro pedido do mesmo artigo agora pode recusar essa herança ("🚫 Não herdar — deixar sem loja"), sem mexer no pedido que a escreveu · v274 · 2026-08-10 · Pagar Dívida: um pagamento livre / adiantamento (sem dívidas selecionadas) passa a ter uma caixa de observações, para dizer o que é aquele dinheiro · v273 · 2026-08-10 · PDF de pessoa (Saldos): as Refeições ordenam-se por dia e mostram o prato; e as Despesas Adiantadas deixam de mostrar "🧺 Stock" como nota e passam a mostrar o destino real (refeição/tipo) em vez de "Gerais" sempre que a compra tem um destino só · v272 · Stock alocado a uma PESSOA (🎒 leva para casa): no separador Stock, uma alocação pode agora apontar a um membro em vez de a uma refeição — é para as sobras que não voltam a ser usadas. O custo sai do rateio e passa a ser cobrado só a essa pessoa (aparece no saldo dela, como as t-shirts) · v271 · Nos Saldos, uma compra com peça "só despesa" (saco, depósito) deixa de aparecer duplicada em "Despesas adiantadas" — as linhas da mesma compra juntam-se numa só. E "Despesas adiantadas" separa-se em duas: o que já pagaste (📅) e o que está previsto mas ainda por pagar (📌 provisórias) · v270 · As SOBRAS deixam de reabrir o pedido: um lote comprado para uma refeição conta inteiro na cobertura, mesmo com parte por alocar na bolsa comum — compram-se 8 pacotes para o jantar, comem-se 5, e a lista já não pede os outros 3 que estão na despensa. É a mesma leitura que o cartão da refeição já fazia. Mover o stock para outra refeição continua a reabrir o pedido · v269 · Uma falta “dita à mão” passa a dizer que o é — na lista e no cartão da refeição, como já dizia o “coberto” e a folha do 🖨 —, e o bloco “que pedidos é que isto trata?” marca a linha que não é a app a deduzir. Trocar o artigo de um pedido (chouriço de sangue → morcela) deita fora a cobertura declarada sobre o artigo antigo, que ficava a mandar sobre o stock novo';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -1959,17 +1959,28 @@ function cfVisivel(cf){
   if((cf.people||[]).some(n=>MY_NAMES.includes(n)))return true;
   if(cf.source==='pagamentos'){
     const p=DATA.pagamentos[cf.idx];
-    if(p&&p.ref&&MY_NAMES.some(n=>p.ref.includes('own:'+n)||p.ref.includes('conv:'+n)))return true;
+    if(p&&p.ref&&MY_NAMES.some(n=>sdRefTocaNome(p.ref,n)))return true;
   }
   return false;
 }
+/* A `ref` deste pagamento fala desta pessoa? — dívida saldada (own:/conv:, ou
+   o nome à seca das refs antigas) ou crédito descontado (cred:). É o que decide
+   quem vê o movimento e o que o filtro por pessoa apanha. */
+function sdRefTocaNome(ref,nome){
+  if(!ref||!nome)return false;
+  return sdRefKeys(ref).some(k=>sdKeyParse(k).nome===nome);
+}
 
-/* Ref de "saldar" legível: own:/conv: → nomes; vazio → adiantamento */
+/* Ref de "saldar" legível: own:/conv: → nomes; cred: → o crédito descontado,
+   com o − à frente (é o que explica o pagamento não ter sido entregue por
+   inteiro); vazio → adiantamento */
 function sdRefLabel(ref){
-  if(!ref)return 'Adiantamento';
-  return ref.split(/,\s*/).filter(Boolean).map(k=>
-    k.startsWith('own:')?k.slice(4):k.startsWith('conv:')?k.slice(5)+' (conv.)':k
-  ).join(', ');
+  const ks=sdRefKeys(ref);
+  if(!ks.length)return 'Adiantamento';
+  return ks.map(k=>{
+    const p=sdKeyParse(k);
+    return p.tipo==='conv'?p.nome+' (conv.)':p.tipo==='cred'?'− '+p.nome+' (crédito)':p.nome;
+  }).join(', ');
 }
 
 function renderCashFlows(){
@@ -2129,7 +2140,7 @@ function renderCashFlows(){
       if((cf.people||[]).includes(cfFilterPerson)) return true;
       if(cf.source==='pagamentos'){
         const p=DATA.pagamentos[cf.idx];
-        if(p.ref && (p.ref.includes('own:'+cfFilterPerson) || p.ref.includes('conv:'+cfFilterPerson))) return true;
+        if(sdRefTocaNome(p.ref,cfFilterPerson)) return true;
       }
       if(memberGuests.length && cf.people){
         if(cf.people.some(x=>memberGuests.includes(x))) return true;
@@ -3201,6 +3212,9 @@ function abrirHistoricoSeVazio(){
 
 /* ═══ CASH FLOW MODAL ═══ */
 let cfDir='reembolso';
+/* Modo do 💸 Reembolso: 'livre' (valor à mão, como sempre), 'saldo' (o saldo da
+   pessoa) ou 'casal' (o saldo do casal). Ver "ACERTO DE CASAL". */
+let cfRbMode='livre';
 
 function setCfType(t){
   cfDir=t;
@@ -3385,13 +3399,21 @@ function updateCfForm(){
   if(cfDir==='reembolso'){
     f.innerHTML=`
       <label>A quem reembolsaste?</label>
-      <select id="cf-who">${memberOptions(myPrimaryName())}</select>
+      <select id="cf-who" onchange="rbSync()">${memberOptions(myPrimaryName())}</select>
+      <div class="cf-quando rb3" id="cf-rb-modo" style="display:none">
+        <div class="cfq on" data-rb="livre" onclick="setCfRbMode('livre')">💶 Livre</div>
+        <div class="cfq" data-rb="saldo" onclick="setCfRbMode('saldo')">👤 Por saldo</div>
+        <div class="cfq" data-rb="casal" onclick="setCfRbMode('casal')">👥 Saldo do casal</div>
+      </div>
+      <div class="cf-quando-hint" id="cf-rb-hint"></div>
       <div class="inline-row" style="margin-top:14px">
         <div><label>Valor (€)</label><input type="number" id="cf-val" step="0.01" min="0.01" placeholder="0,00" inputmode="decimal"></div>
         <div><label>Data</label><input type="date" id="cf-date" value="${today}"></div>
       </div>
       <label>Descrição</label>
       <textarea id="cf-desc" placeholder="Opcional" rows="2"></textarea>`;
+    cfRbMode='livre';
+    setTimeout(rbSync,10);
   } else if(cfDir==='despesa'){
     f.innerHTML=`
       <div id="cf-who-cell">
@@ -3473,7 +3495,7 @@ function updateCfForm(){
     // à espera de validação — não é dinheiro até o admin dizer que sim.
     const pede=!isAdmin();
     const meus=pede?pagPendMeus():[];
-    const jaPend=meus.length?rnd(meus.reduce((a,p)=>a+pagPendTotal(p),0),2):0;
+    const jaPend=meus.length?rnd(meus.reduce((a,p)=>a+pagPendEntregue(p),0),2):0;
     f.innerHTML=`
       ${pede?`<div class="cf-aviso">🕓 Fica à espera de validação do administrador. Só entra nas contas — e só baixa a tua dívida — depois de ele confirmar que recebeu.</div>`:''}
       ${jaPend>0?`<div class="cf-aviso warn">Já tens ${eur(jaPend)} registado${meus.length>1?'s':''} à espera de validação. Não registes duas vezes o mesmo pagamento.</div>`:''}
@@ -3689,6 +3711,102 @@ function _dividasEmAberto(m){
   return {prop,conv};
 }
 
+/* ═══ ACERTO DE CASAL — a dívida de um e o crédito do outro no mesmo ato ═══
+   Num casal é normal um ter a receber e o outro a pagar, e ninguém faz duas
+   transferências: o João deve 100, a Maria tem 30 a receber, e entrega-se 70.
+   A app só sabia falar de um lado de cada vez — "Pagar Dívida" listava dívidas
+   e mais nada, o "Reembolso" era sempre um valor escrito à mão.
+
+   O QUE FICA GRAVADO SÃO DOIS MOVIMENTOS, não um. É a decisão que manda em
+   tudo o resto aqui:
+     · 🤝 saldar   — João → tesoureiro, 100 (ref `own:João`)
+     · 💸 Reembolso — tesoureiro → Maria, 30
+   Só se moveram 70, e é isso que a app diz (no valor do formulário, no cartão
+   pendente, na ficha do movimento). Mas cada PARCELA é um movimento que a app
+   já sabe contar bem em todo o lado — no calcular(), no saldoMovimentos(), nos
+   relatórios, na ficha do membro, no PDF. A alternativa — uma linha só de 70
+   com um "crédito descontado" lá dentro — obrigava a ensinar esse conceito
+   novo a todos esses sítios, e um esquecido dá contas erradas em silêncio.
+   Assim NÃO SE TOCA no calcular() nem no saldoMovimentos(): as contas do grupo
+   fecham pelas mesmas regras de sempre.
+
+   O que liga os dois é a `ref` do pagamento, que passa a poder levar chaves
+   `cred:Nome=valor` ao lado das `own:`/`conv:`. São inertes no calcular() (o
+   ciclo das partes só conhece own:/conv:) e servem para a app dizer, na ficha
+   e na lista, que aquele pagamento não foi entregue por inteiro. */
+const SD_CRED='cred:';
+/* As chaves da `ref` de um pagamento, interpretadas NUM SÍTIO SÓ. */
+function sdKeyParse(k){
+  k=String(k||'').trim();
+  if(k.startsWith('own:'))return{tipo:'own',nome:k.slice(4),valor:0};
+  if(k.startsWith('conv:'))return{tipo:'conv',nome:k.slice(5),valor:0};
+  if(k.startsWith(SD_CRED)){
+    const r=k.slice(SD_CRED.length),i=r.lastIndexOf('=');
+    if(i<0)return{tipo:'cred',nome:r,valor:0};
+    return{tipo:'cred',nome:r.slice(0,i),valor:rnd(parseFloat(r.slice(i+1))||0,2)};
+  }
+  return{tipo:'?',nome:k,valor:0};
+}
+function sdIsCred(k){return String(k||'').startsWith(SD_CRED);}
+/* O valor viaja na chave porque é o que foi ACERTADO — o saldo de hoje já é
+   outro assim que entre uma despesa (a mesma razão do `pagamentos_pendentes`
+   guardar o que foi pedido e não o que se calcula na hora). */
+function sdCredKey(nome,valor){return SD_CRED+nome+'='+rnd(Math.max(0,+valor||0),2).toFixed(2);}
+function sdRefKeys(ref){return String(ref||'').split(/,\s*/).map(x=>x.trim()).filter(Boolean);}
+function sdRefDividas(ref){return sdRefKeys(ref).filter(k=>!sdIsCred(k));}
+function sdRefCreditos(ref){return sdRefKeys(ref).map(sdKeyParse).filter(x=>x.tipo==='cred'&&x.nome&&x.valor>0.005);}
+function sdCredTotal(ref){return rnd(sdRefCreditos(ref).reduce((a,c)=>a+c.valor,0),2);}
+
+/* O saldo do membro TAL COMO O ECRÃ O MOSTRA (`saldoMovimentos`), e não o
+   `m.saldoFinal` do calcular(): é este o número que a pessoa lê nos Saldos, na
+   ficha e no PDF, e é dele que se fala quando se diz "tem X a receber". Chama-se
+   a função em vez de ler o `m._sfEcra` pela mesma razão que o relatório geral o
+   faz — assim não depende de o ecrã já ter sido pintado. */
+function saldoEcra(m){
+  if(!m||!CALC)return 0;
+  try{return rnd(saldoMovimentos(m).saldo,2);}catch(_){return rnd(m._sfEcra||0,2);}
+}
+function creditoDe(m){return Math.max(0,saldoEcra(m));}
+/* Créditos que este pagamento pode descontar: os do CASAL de quem paga — o
+   dele e o do cônjuge. O caso comum é ele próprio: "tenho 20 a receber, o meu
+   cônjuge deve 60, entrego 40".
+
+   Que ele possa descontar o SEU crédito num pagamento pela dívida DO CÔNJUGE
+   não é contradição nenhuma, e é o que fecha as contas: pagar a dívida de
+   outra pessoa não mexe no saldo de quem paga (só no de quem é pago) — é a
+   regra da app, para o cônjuge como para qualquer amigo. Logo o saldo dele só
+   se move pelo 💸 Reembolso desta operação, e é isso que o põe a zero.
+     Zé deve 60 → o saldar de 60 zera o Zé, e não toca no Mestre.
+     Mestre tem 20 → o reembolso de 20 zera o Mestre.
+     De mão em mão foram 40, que é o que o tesoureiro recebe.
+
+   Duas exclusões, cada uma com a sua razão:
+   · TERCEIROS — descontar o crédito de outra família era o tesoureiro a
+     reembolsá-la através de quem está a pagar: um acerto privado entre dois
+     agregados, não um acerto de casal.
+   · O TESOUREIRO — é a contraparte de todos estes movimentos, e um
+     "de: tes, para: tes" não quer dizer nada.
+   E só havendo dívida NO CASAL: o crédito desconta numa dívida, não existe por
+   si — sozinho seria um reembolso, e para isso há o 💸. */
+function sdCreditosDisp(who,debtors){
+  if(!who||!CALC)return[];
+  const rel=_relatedNames(who);
+  if(!(debtors||[]).some(m=>rel.has(m.nome)))return[];
+  const tes=(DATA&&DATA.evento&&DATA.evento.tesoureiro)||'';
+  const jaDeve=new Set((debtors||[]).map(m=>m.nome));
+  return CALC.membros
+    .filter(m=>rel.has(m.nome)&&m.nome!==tes&&!jaDeve.has(m.nome)&&creditoDe(m)>0.005)
+    .map(m=>({nome:m.nome,valor:creditoDe(m)}));
+}
+function sdCredChip(nome,valor,on,ro){
+  return `<div class="sd-chip cred${on?' on':''}${ro?' sd-ro':''}"${ro?'':' onclick="toggleSdChip(this)"'} data-key="${escHtml(sdCredKey(nome,valor))}">
+    <span class="sd-dot"></span>${escHtml(nome)}${valor>0.005?`<span class="sd-amt">−${eur(valor)}</span>`:''}</div>`;
+}
+function sdCredGroupHtml(chips,lbl){
+  if(!chips)return'';
+  return `<div class="sd-group-lbl sf">${lbl}</div><div class="sd-list">${chips}</div>`;
+}
+
 function updateSdChips(){
   if(!CALC)return;
   const container=document.getElementById('sd-chips');
@@ -3708,6 +3826,13 @@ function updateSdChips(){
     debtors=debtors.filter(m=>rel.has(m.nome));
   }
 
+  // Créditos do casal a descontar — o outro lado do acerto (ver "ACERTO DE CASAL")
+  const creditos=sdCreditosDisp(who,debtors);
+  const credHtml=sdCredGroupHtml(creditos.map(c=>sdCredChip(c.nome,c.valor,false,false)).join(''),
+    'A receber — desconta no que entrega');
+
+  // Sem dívidas não há créditos a mostrar (o sdCreditosDisp já o garante): um
+  // crédito sozinho é um reembolso, e esse entra pelo 💸.
   if(!debtors.length){container.classList.remove('sd-grouped');container.innerHTML='<div class="empty sf" style="width:100%">Sem dívidas ativas por pagar</div>';recalcSdVal();return;}
 
   let mine='',other='',otherN=0;
@@ -3729,7 +3854,7 @@ function updateSdChips(){
       if(rel.has(m.nome))mine+=chip;else{other+=chip;otherN++;}
     }
   });
-  _sdRenderGroups(container,mine,other,otherN,false,true); // criação: "outros" sempre rotulado e colapsado
+  _sdRenderGroups(container,mine,other,otherN,false,true,credHtml); // criação: "outros" sempre rotulado e colapsado
   recalcSdVal();
 }
 
@@ -3753,42 +3878,71 @@ function toggleSdGroup(hdr){const g=hdr.closest('.sd-other');if(g)g.classList.to
 /* Renderiza chips separando próprio/cônjuge das dívidas de outros.
    openOther: secção "outros" aberta por omissão.
    labelOtherAlways: rotula "Dívidas de outros" mesmo sem grupo próprio
-   (usado na consulta — sinaliza que este pagamento saldou dívidas de terceiros). */
-function _sdRenderGroups(container,mine,other,otherN,openOther,labelOtherAlways){
-  const useGroups=!!(mine&&other)||!!(other&&labelOtherAlways);
+   (usado na consulta — sinaliza que este pagamento saldou dívidas de terceiros).
+   extra: bloco a acrescentar no fim (os créditos do casal a descontar). Ter
+   extra obriga ao layout agrupado — em lista corrida ele ficava a ser um item
+   de flex ao lado dos chips, e é um grupo com rótulo próprio. */
+function _sdRenderGroups(container,mine,other,otherN,openOther,labelOtherAlways,extra){
+  extra=extra||'';
+  const useGroups=!!(mine&&other)||!!(other&&labelOtherAlways)||!!extra;
   if(!useGroups){container.classList.remove('sd-grouped');container.innerHTML=(mine||other);return;}
   container.classList.add('sd-grouped');
   let html='';
   if(mine)html+=`<div class="sd-group-lbl sf">Próprio e cônjuge</div><div class="sd-list">${mine}</div>`;
-  html+=`<div class="sd-other${openOther?' open':''}">`+
+  if(other)html+=`<div class="sd-other${openOther?' open':''}">`+
     `<div class="sd-group-hdr sf" onclick="toggleSdGroup(this)"><span>Dívidas de outros<span class="sd-gn">${otherN}</span></span><span class="sd-chev">▾</span></div>`+
     `<div class="sd-list sd-other-body">${other}</div>`+
   `</div>`;
-  container.innerHTML=html;
+  container.innerHTML=html+extra;
+}
+
+/* O que está selecionado num painel de chips: as dívidas (com o valor em aberto
+   HOJE) e os créditos a descontar (com o valor gravado na chave). Serve os dois
+   painéis — o de criar (#sd-chips) e o de editar (#esd-chips). */
+function sdSelecao(sel){
+  const ms=(CALC&&CALC.membros)||[];
+  const out={keys:[],dividas:[],creditos:[],divida:0,credito:0,liquido:0};
+  document.querySelectorAll(sel+' .sd-chip.on').forEach(chip=>{
+    const k=chip.dataset.key,p=sdKeyParse(k);
+    out.keys.push(k);
+    if(p.tipo==='cred'){out.creditos.push({key:k,nome:p.nome,valor:p.valor});out.credito+=p.valor;return;}
+    const m=ms.find(x=>x.nome===p.nome);
+    const v=m?(p.tipo==='conv'?_dividasEmAberto(m).conv:p.tipo==='own'?_dividasEmAberto(m).prop:0):0;
+    out.dividas.push({key:k,nome:p.nome,valor:v});out.divida+=v;
+  });
+  out.divida=rnd(out.divida,2);out.credito=rnd(out.credito,2);
+  out.liquido=rnd(out.divida-out.credito,2);
+  return out;
 }
 
 function recalcSdVal(){
   if(!CALC)return;
-  const ms=CALC.membros;
-  let total=0;
-  const onChips=document.querySelectorAll('#sd-chips .sd-chip.on');
-  onChips.forEach(chip=>{
-    const key=chip.dataset.key;
-    if(key.startsWith('own:')){
-      const nome=key.slice(4);const m=ms.find(x=>x.nome===nome);
-      if(m)total+=_dividasEmAberto(m).prop;
-    } else if(key.startsWith('conv:')){
-      const nome=key.slice(5);const m=ms.find(x=>x.nome===nome);
-      if(m)total+=_dividasEmAberto(m).conv;
-    }
-  });
-  total=rnd(total,2);
+  const s=sdSelecao('#sd-chips');
   const valEl=document.getElementById('cf-val');
   const hint=document.getElementById('cf-val-hint');
-  if(valEl && total>0){
-    valEl.value=total.toFixed(2);
+  if(hint)hint.className='note';
+  if(valEl&&s.creditos.length){
+    /* Com crédito a descontar, o campo é o que se ENTREGA (o líquido) e não se
+       ajusta: o que fica gravado é a dívida inteira mais o reembolso do crédito
+       à parte, e um parcial aqui deixava as duas parcelas sem relação nenhuma
+       com o dinheiro que mudou de mãos. */
+    valEl.value=Math.max(0,s.liquido).toFixed(2);
+    valEl.readOnly=true;valEl.style.opacity='.6';
+    if(hint){
+      if(!s.dividas.length){
+        hint.textContent='Escolhe também a dívida que este pagamento salda — para receber um saldo usa o 💸 Reembolso.';
+        hint.className='note bad';
+      } else if(s.liquido<-0.005){
+        hint.textContent=`O casal tem ${eur(-s.liquido)} a receber — isto é um 💸 Reembolso (por saldo do casal), não um pagamento.`;
+        hint.className='note bad';
+      } else {
+        hint.textContent=`${eur(s.divida)} de dívida − ${eur(s.credito)} de crédito = ${eur(s.liquido)} a entregar. O crédito fica registado como reembolso à parte.`;
+      }
+    }
+  } else if(valEl && s.divida>0){
+    valEl.value=s.divida.toFixed(2);
     // If multiple chips selected, lock value to total (can't partial-pay multiple debts)
-    if(onChips.length>1){
+    if(s.dividas.length>1){
       valEl.readOnly=true;valEl.style.opacity='.6';
       if(hint)hint.textContent='Valor fixo (múltiplas dívidas selecionadas)';
     } else {
@@ -3797,7 +3951,7 @@ function recalcSdVal(){
     }
   } else if(valEl){valEl.readOnly=false;valEl.style.opacity='1';if(hint)hint.textContent='Sem dívidas selecionadas — será registado como pagamento livre / adiantamento.';}
   const livreBox=document.getElementById('cf-livre-box');
-  if(livreBox)livreBox.style.display=onChips.length?'none':'';
+  if(livreBox)livreBox.style.display=s.keys.length?'none':'';
   updateExtraTotal();
 }
 // Atualiza só o aviso "Total a entregar" — NÃO mexe no campo Valor (preserva pagamentos parciais)
@@ -3807,6 +3961,73 @@ function updateExtraTotal(){
   const extra=parseFloat(document.getElementById('cf-extra')?.value)||0;
   const base=parseFloat(document.getElementById('cf-val')?.value)||0;
   totalHint.textContent=extra>0?`Total a entregar: ${eur(rnd(base+extra,2))} (${eur(base)} dívida + ${eur(extra)} poupança)`:'';
+}
+
+/* ── 💸 Reembolso: livre · por saldo · por saldo do casal ──
+   Reembolsar era sempre escrever um número à mão, mesmo quando o número já
+   está no ecrã dos Saldos. Os dois modos novos vão buscá-lo — e o do CASAL é o
+   caso 2 do acerto de casal: o cônjuge tem dívida, o outro tem a receber, e o
+   tesoureiro paga a DIFERENÇA. Como no pagamento, ficam gravadas as duas
+   parcelas (o reembolso de quem tem a receber e o acerto da dívida de quem
+   deve) — cada uma é um movimento que o calcular() já sabe contar. */
+function setCfRbMode(mode){cfRbMode=mode;rbSync();}
+/* O que um reembolso por saldo vai MESMO registar.
+   escopo: 'saldo' = só a pessoa · 'casal' = a pessoa e o(s) cônjuge(s).
+   O tesoureiro fica sempre de fora: é ele a contraparte de todos estes
+   movimentos e um "de: tes, para: tes" não quer dizer nada. */
+function rbPlano(who,escopo){
+  if(!who||!CALC)return null;
+  const tes=(DATA&&DATA.evento&&DATA.evento.tesoureiro)||'';
+  const nomes=escopo==='casal'?[..._relatedNames(who)]:[who];
+  const reemb=[],pag=[],fora=[];
+  nomes.forEach(n=>{
+    const m=CALC.membros.find(x=>x.nome===n);if(!m)return;
+    const s=saldoEcra(m);
+    if(Math.abs(s)<=0.005)return;
+    if(n===tes){fora.push(n);return;}
+    if(s>0)reemb.push({nome:n,valor:rnd(s,2)});
+    else pag.push({nome:n,valor:rnd(-s,2)});
+  });
+  const liq=rnd(reemb.reduce((a,x)=>a+x.valor,0)-pag.reduce((a,x)=>a+x.valor,0),2);
+  return{reemb,pag,liq,fora};
+}
+function rbHintHtml(plano,modo){
+  if(!plano||(!plano.reemb.length&&!plano.pag.length))return 'Nada a acertar — os saldos já estão a zero.';
+  const partes=plano.reemb.map(x=>`💸 reembolso a <b>${escHtml(x.nome)}</b> ${eur(x.valor)}`)
+    .concat(plano.pag.map(x=>`🤝 acerto da dívida de <b>${escHtml(x.nome)}</b> ${eur(x.valor)}`));
+  return `${modo==='casal'?'O casal recebe':'Recebe'} <b>${eur(plano.liq)}</b>${plano.reemb.length+plano.pag.length>1?` — fica registado: ${partes.join(' · ')}`:''}. Os saldos ficam a zero.`
+    +(plano.fora.length?` (${escHtml(plano.fora.join(', '))} é o tesoureiro — fica de fora.)`:'');
+}
+/* Que modos é que esta pessoa tem, e o que o valor/hint dizem em cada um.
+   "Saldo do casal" só aparece quando ACRESCENTA alguma coisa ao individual —
+   ou seja, quando o cônjuge tem saldo. E só quando o líquido é a receber: se
+   for a pagar, o acerto faz-se do outro lado (🤝 Pagar Dívida). */
+function rbSync(){
+  const box=document.getElementById('cf-rb-modo');if(!box)return;
+  const who=document.getElementById('cf-who')?.value||'';
+  const pInd=rbPlano(who,'saldo'),pCas=rbPlano(who,'casal');
+  const temInd=!!(pInd&&pInd.liq>0.005);
+  const temConj=!!CALC&&[..._relatedNames(who)].some(n=>n!==who&&Math.abs(saldoEcra(CALC.membros.find(x=>x.nome===n)))>0.005);
+  const temCas=!!(pCas&&pCas.liq>0.005&&temConj);
+  const opt=k=>box.querySelector(`[data-rb="${k}"]`);
+  if(opt('saldo'))opt('saldo').style.display=temInd?'':'none';
+  if(opt('casal'))opt('casal').style.display=temCas?'':'none';
+  if((cfRbMode==='saldo'&&!temInd)||(cfRbMode==='casal'&&!temCas))cfRbMode='livre';
+  box.style.display=(temInd||temCas)?'':'none';
+  box.classList.toggle('rb2',!(temInd&&temCas));
+  box.querySelectorAll('.cfq').forEach(e=>e.classList.toggle('on',e.dataset.rb===cfRbMode));
+  const plano=cfRbMode==='casal'?pCas:cfRbMode==='saldo'?pInd:null;
+  const val=document.getElementById('cf-val');
+  if(val){
+    val.readOnly=!!plano;val.style.opacity=plano?'.6':'1';
+    if(plano)val.value=Math.max(0,plano.liq).toFixed(2);
+  }
+  const hint=document.getElementById('cf-rb-hint');
+  if(hint){
+    hint.innerHTML=plano?rbHintHtml(plano,cfRbMode)
+      :(box.style.display==='none'?'':'Valor escrito à mão — não mexe no saldo de ninguém para lá do que devolve.');
+    hint.style.display=hint.innerHTML?'':'none';
+  }
 }
 
 function openPayModal(){
@@ -3854,9 +4075,13 @@ async function saveCashFlow(){
   // Com "pagaram vários" o <select> de um pagador só está escondido: quem
   // valida as pessoas é o pagValidar(), linha a linha.
   const despMulti=cfDir==='despesa'&&pagOn('cf');
+  // Um acerto de casal pode ter valor líquido ZERO (a dívida de um cobre o
+  // crédito do outro e ninguém transfere nada) — quem valida esse caso é o
+  // ramo do 'saldar', com a dívida e o crédito à frente.
+  const sdCred=cfDir==='saldar'&&!!document.querySelector('#sd-chips .sd-chip.cred.on');
   if(cfDir!=='tshirts'&&!mealSubCheck){
     if(!who&&!despMulti){toast('Seleciona a pessoa','bad');return;}
-    if(!val||val<=0){toast('Valor inválido','bad');return;}
+    if((!val||val<=0)&&!sdCred){toast('Valor inválido','bad');return;}
   }
 
   const tes=DATA.evento.tesoureiro;
@@ -3866,9 +4091,32 @@ async function saveCashFlow(){
   let commitMsg='';
 
   if(cfDir==='reembolso'){
-    const ref=desc?`Reembolso: ${desc}`:'Reembolso';
-    DATA.pagamentos.push({de:tes,para:who,valor:rnd(val,2),ref,data:date});
-    commitMsg=`Reembolso: ${tes} → ${who} ${eur(val)}`;
+    if(cfRbMode==='livre'){
+      const ref=desc?`Reembolso: ${desc}`:'Reembolso';
+      DATA.pagamentos.push({de:tes,para:who,valor:rnd(val,2),ref,data:date});
+      commitMsg=`Reembolso: ${tes} → ${who} ${eur(val)}`;
+    } else {
+      // Por saldo (individual ou do casal): o valor não se escreve, lê-se — e o
+      // que fica gravado são as parcelas que o põem a zero (ver "ACERTO DE CASAL").
+      const plano=rbPlano(who,cfRbMode);
+      if(!plano||(!plano.reemb.length&&!plano.pag.length)){
+        toast('Nada a acertar — os saldos já estão a zero','bad');
+        document.getElementById('pay-save').disabled=false;return;
+      }
+      if(plano.liq<-0.005){
+        toast(`${cfRbMode==='casal'?'O casal tem':'Tem'} ${eur(-plano.liq)} a pagar — usa o 🤝 Pagar Dívida`,'bad');
+        document.getElementById('pay-save').disabled=false;return;
+      }
+      const casal=cfRbMode==='casal';
+      const quemDeve=plano.pag.map(x=>x.nome).join(', ');
+      const sufixo=desc?` — ${desc}`:'';
+      plano.reemb.forEach(x=>DATA.pagamentos.push({de:tes,para:x.nome,extra:0,
+        valor:x.valor,data:date,
+        ref:`Reembolso: saldo${casal?' do casal':''}${quemDeve?` (acerto com a dívida de ${quemDeve})`:''}${sufixo}`}));
+      plano.pag.forEach(x=>DATA.pagamentos.push({de:x.nome,para:tes,extra:0,
+        valor:x.valor,data:date,ref:'own:'+x.nome}));
+      commitMsg=`Reembolso por saldo${casal?' do casal':''}: ${who} ${eur(plano.liq)}`;
+    }
   } else if(cfDir==='despesa'){
     const tipo=document.getElementById('cf-tipo')?.value||'Gerais';
     const prov=isCfProv('cf');
@@ -3951,26 +4199,36 @@ async function saveCashFlow(){
       commitMsg=`Lata: ${who} ${eur(val)}`;
     }
   } else if(cfDir==='saldar'){
-    const covParts=[];
-    document.querySelectorAll('#sd-chips .sd-chip.on').forEach(chip=>{covParts.push(chip.dataset.key);});
-    if(!covParts.length){
+    const sel=sdSelecao('#sd-chips');
+    const covParts=sel.dividas.map(d=>d.key);
+    const creditos=sel.creditos.filter(c=>c.nome&&c.valor>0.005);
+    if(!covParts.length&&!creditos.length){
       // Pagamento livre / adiantamento — ref fica vazio
       if(!confirm(`Sem dívidas selecionadas. Registar ${eur(val)} como pagamento livre / adiantamento de ${who}?`)){
         document.getElementById('pay-save').disabled=false;return;
       }
     }
-    // If multiple chips selected, enforce total value (no partial across multiple debts)
-    if(covParts.length>1){
-      let expectedTotal=0;
-      covParts.forEach(key=>{
-        if(key.startsWith('own:')){const nome=key.slice(4);const m=CALC.membros.find(x=>x.nome===nome);if(m)expectedTotal+=_dividasEmAberto(m).prop;}
-        else if(key.startsWith('conv:')){const nome=key.slice(5);const m=CALC.membros.find(x=>x.nome===nome);if(m)expectedTotal+=_dividasEmAberto(m).conv;}
-      });
-      expectedTotal=rnd(expectedTotal,2);
-      if(Math.abs(val-expectedTotal)>0.01){toast('Com múltiplas dívidas, o valor tem de ser o total','bad');document.getElementById('pay-save').disabled=false;return;}
+    /* Crédito descontado (acerto de casal): o campo Valor é o LÍQUIDO, logo não
+       serve para validar nada — a dívida que se salda é a soma dos chips e é
+       ela que vai para o pagamento; o crédito sai num reembolso à parte. */
+    if(creditos.length){
+      if(!covParts.length){
+        toast('Escolhe a dívida que este pagamento salda — para receber um saldo usa o 💸 Reembolso','bad');
+        document.getElementById('pay-save').disabled=false;return;
+      }
+      if(sel.liquido<-0.005){
+        toast(`O casal tem ${eur(-sel.liquido)} a receber — usa o 💸 Reembolso por saldo do casal`,'bad');
+        document.getElementById('pay-save').disabled=false;return;
+      }
+    } else if(covParts.length>1){
+      // If multiple chips selected, enforce total value (no partial across multiple debts)
+      if(Math.abs(val-sel.divida)>0.01){toast('Com múltiplas dívidas, o valor tem de ser o total','bad');document.getElementById('pay-save').disabled=false;return;}
     }
+    // O que fica gravado no pagamento é sempre a DÍVIDA; com crédito descontado
+    // não há parcial, por isso é a soma dos chips e não o campo (que é o líquido).
+    const valDivida=creditos.length?sel.divida:rnd(val,2);
     const extra=rnd(Math.max(0,parseFloat(document.getElementById('cf-extra')?.value)||0),2);
-    const ref=covParts.join(', ');
+    const ref=covParts.concat(creditos.map(c=>c.key)).join(', ');
     // ── Não-admin: isto é um PEDIDO, não um lançamento ──
     // O pagamento fica em pagamentos_pendentes e só vira cash-flow quando o
     // admin validar (aprovarPagPend). Nada aqui toca no DATA — as contas não
@@ -3985,7 +4243,8 @@ async function saveCashFlow(){
         toast('Só podes registar pagamentos teus ou do teu cônjuge','bad');
         document.getElementById('pay-save').disabled=false;return;
       }
-      const alheia=covParts.find(k=>!rel.has(k.replace(/^(own|conv):/,'')));
+      // Dívidas E créditos: os dois lados do acerto só podem ser do próprio/cônjuge
+      const alheia=covParts.concat(creditos.map(c=>c.key)).find(k=>!rel.has(sdKeyParse(k).nome));
       if(alheia){
         toast('Só podes pagar dívidas tuas ou do teu cônjuge','bad');
         document.getElementById('pay-save').disabled=false;return;
@@ -3994,13 +4253,16 @@ async function saveCashFlow(){
       const nota=(document.getElementById('cf-nota')?.value||'').trim();
       setSync('load','a guardar…');
       try{
+        /* `valor` é a DÍVIDA (a convenção da tabela), não o líquido: é ele que
+           vai para `pagamentos` quando o admin validar, e é aí que nasce também
+           o reembolso do crédito. O que se entregou lê-se do `ref`. */
         const ins=await queueWrite(()=>sbReq('POST','pagamentos_pendentes',
-          [{evento_id:DATA._sbId,de:who,para:tes,valor:rnd(val,2),extra,ref,data:date||null,
+          [{evento_id:DATA._sbId,de:who,para:tes,valor:valDivida,extra,ref,data:date||null,
             nota,criado_por:meuNomePrincipal()||''}],
           {Prefer:'return=representation'}));
         if(Array.isArray(ins)&&ins[0])PAGPEND.unshift(pagPendRow(ins[0]));
         marcaGuardado();
-        sbLog('pagamento','pediu',who,{valorTxt:eur(rnd(val+extra,2)),dividas:sdRefLabel(ref),nota});
+        sbLog('pagamento','pediu',who,{valorTxt:eur(rnd(valDivida+extra-sel.credito,2)),dividas:sdRefLabel(ref),nota});
         document.getElementById('pay-save').disabled=false;
         closePayModal();
         renderAll();
@@ -4012,11 +4274,17 @@ async function saveCashFlow(){
       }
       return;
     }
-    // p.valor = dinheiro real entregue (dívida + extra). p.extra = fatia que é poupança.
+    // p.valor = dívida saldada + extra. p.extra = fatia que é poupança.
     // A nota só faz sentido no pagamento livre (sem dívida a explicá-lo por si).
     const notaLivre=(!covParts.length&&PAG_NOTA_COL)?(document.getElementById('cf-livre-obs')?.value||'').trim():'';
-    DATA.pagamentos.push({de:who,para:tes,valor:rnd(val+extra,2),ref,data:date,extra,nota:notaLivre});
-    commitMsg=`Saldar: ${who} → ${tes} ${eur(rnd(val+extra,2))}`+(extra>0?` (poupança +${eur(extra)})`:'');
+    const totPag=rnd(valDivida+extra,2);
+    DATA.pagamentos.push({de:who,para:tes,valor:totPag,ref,data:date,extra,nota:notaLivre});
+    // O crédito descontado sai num 💸 Reembolso: é o que faz o saldo de quem
+    // tinha a receber ir a zero sem se tocar no calcular() (ver "ACERTO DE CASAL").
+    creditos.forEach(c=>DATA.pagamentos.push({de:tes,para:c.nome,valor:c.valor,extra:0,data:date,
+      ref:`Reembolso: crédito descontado no pagamento de ${who}`}));
+    commitMsg=`Saldar: ${who} → ${tes} ${eur(totPag)}`+(extra>0?` (poupança +${eur(extra)})`:'')
+      +(creditos.length?` (− ${eur(sel.credito)} de crédito reembolsado)`:'');
   }
 
   const ok=await pushToGitHub(commitMsg);
@@ -4048,7 +4316,13 @@ function pagPendDoAno(){
   return PAGPEND.filter(p=>p.eventoId===DATA._sbId);
 }
 function pagPendAbertos(){return pagPendDoAno().filter(p=>p.estado==='pendente');}
+/* O que vai para `pagamentos` ao validar: a dívida saldada + a poupança. */
 function pagPendTotal(p){return rnd((p.valor||0)+(p.extra||0),2);}
+/* O que MUDOU DE MÃOS: o total menos o crédito do casal que foi descontado
+   (esse sai num reembolso à parte, também só ao validar). São dois números
+   diferentes e é preciso não os trocar — um é das contas, o outro é do bolso. */
+function pagPendCred(p){return sdCredTotal(p&&p.ref);}
+function pagPendEntregue(p){return rnd(Math.max(0,pagPendTotal(p)-pagPendCred(p)),2);}
 /* Um membro ligado a uma conta PEDE (não regista) pagamentos seus e do cônjuge.
    O admin não pede — regista de imediato, como sempre fez. */
 function podePedirPagamento(){return !!_sbSession&&!isAdmin()&&PAGPEND_TABLE&&MY_NAMES.length>0;}
@@ -4071,7 +4345,7 @@ function pagPendBlockHtml(){
   const ord={pendente:0,rejeitado:1};
   rows.sort((a,b)=>(ord[a.estado]-ord[b.estado])||String(b.criadoEm||'').localeCompare(String(a.criadoEm||'')));
   const nPend=rows.filter(p=>p.estado==='pendente').length;
-  const totPend=rnd(rows.filter(p=>p.estado==='pendente').reduce((a,p)=>a+pagPendTotal(p),0),2);
+  const totPend=rnd(rows.filter(p=>p.estado==='pendente').reduce((a,p)=>a+pagPendEntregue(p),0),2);
   // Só sobram rejeitados → o bloco muda de assunto: já não há nada a decidir
   const nota=!nPend
     ? 'Pagamentos que não foram aceites. Tira-os da lista quando estiver resolvido.'
@@ -4082,10 +4356,12 @@ function pagPendBlockHtml(){
     <p class="pp-note">${nota}</p>`;
   rows.forEach(p=>{
     const rej=p.estado==='rejeitado';
-    const total=pagPendTotal(p);
+    const total=pagPendEntregue(p);   // o que mudou de mãos
+    const cred=pagPendCred(p);
     const meta=[];
     if(p.data)meta.push(fmtDiaMes(p.data));
     meta.push(escHtml(sdRefLabel(p.ref)));
+    if(cred>0.005)meta.push(`${eur(pagPendTotal(p))} de dívida − ${eur(cred)} de crédito`);
     if(p.extra>0)meta.push(`🐖 ${eur(p.extra)} poupança`);
     if(p.criadoPor&&p.criadoPor!==p.de)meta.push('registado por '+escHtml(p.criadoPor));
     // Rejeitado só se tira da vista; por validar decide-se (admin) ou cancela-se
@@ -4130,8 +4406,15 @@ async function aprovarPagPend(id){
   if(!p||p.estado!=='pendente')return;
   _ppRejId=null;
   const total=pagPendTotal(p);
+  const creds=sdRefCreditos(p.ref);
+  const credTot=pagPendCred(p);
   const det=p.extra>0?`\n(${eur(p.valor)} de dívida + ${eur(p.extra)} de poupança)`:'';
-  if(!confirm(`Validar o pagamento de ${p.de}?\n\n${eur(total)}${det}\n\nEntra já nas contas como pagamento de dívida.`))return;
+  // Com crédito descontado nascem DOIS movimentos, e o admin tem de o saber
+  // antes de validar — o que ele recebeu foi só a diferença.
+  const detCred=creds.length
+    ? `\n\nAcerto de casal: entregou ${eur(pagPendEntregue(p))} — ${eur(total)} de dívida menos ${eur(credTot)} de crédito de ${creds.map(c=>c.nome).join(', ')}.\nFica registado o pagamento e o reembolso desse crédito.`
+    :'';
+  if(!confirm(`Validar o pagamento de ${p.de}?\n\n${eur(total)}${det}${detCred}\n\nEntra já nas contas como pagamento de dívida.`))return;
   const agora=new Date().toISOString();
   const antes=Object.assign({},p);
   setSync('load','a guardar…');
@@ -4148,9 +4431,14 @@ async function aprovarPagPend(id){
   Object.assign(p,pagPendRow(ret[0]));
   // p.valor em `pagamentos` = dinheiro entregue (dívida + extra); p.extra = a
   // fatia que é poupança. É a mesma convenção do registo feito pelo admin.
-  DATA.pagamentos.push({de:p.de,para:p.para||DATA.evento.tesoureiro,valor:total,
+  const paraTes=p.para||DATA.evento.tesoureiro;
+  DATA.pagamentos.push({de:p.de,para:paraTes,valor:total,
     ref:p.ref,data:p.data||hojeISO(),extra:p.extra});
-  const ok=await pushToGitHub(`Saldar (validado): ${p.de} → ${p.para||DATA.evento.tesoureiro} ${eur(total)}`);
+  // O crédito descontado no pedido vira aqui o 💸 Reembolso que o põe a zero —
+  // as duas parcelas nascem juntas, como no caminho do admin.
+  creds.forEach(c=>DATA.pagamentos.push({de:paraTes,para:c.nome,valor:c.valor,extra:0,
+    data:p.data||hojeISO(),ref:`Reembolso: crédito descontado no pagamento de ${p.de}`}));
+  const ok=await pushToGitHub(`Saldar (validado): ${p.de} → ${paraTes} ${eur(total)}`+(credTot>0.005?` (− ${eur(credTot)} de crédito reembolsado)`:''));
   if(!ok){
     // O ano não gravou: devolve o pedido à fila, senão desaparecia sem nunca
     // ter chegado a ser dinheiro.
@@ -4190,7 +4478,7 @@ async function confirmarRejPagPend(id){
     if(!Array.isArray(ret)||!ret.length){toast('Esse pedido já tinha sido tratado','bad');await carregar();renderAll();return;}
     Object.assign(p,pagPendRow(ret[0]));
     marcaGuardado();
-    sbLog('pagamento','rejeitou',p.de,{valorTxt:eur(pagPendTotal(p)),motivo});
+    sbLog('pagamento','rejeitou',p.de,{valorTxt:eur(pagPendEntregue(p)),motivo});
     renderAll();
     toast('Pagamento rejeitado','ok');
   }catch(e){setSync('err','erro ao guardar');toast(permErrorMsg(e),'bad');}
@@ -4203,13 +4491,13 @@ async function apagarPagPend(id){
   if(!p||p.estado==='aprovado')return;
   _ppRejId=null;
   const pend=p.estado==='pendente';
-  if(!confirm(pend?`Cancelar o pagamento de ${eur(pagPendTotal(p))} que registaste?`:'Tirar este pedido rejeitado da lista?'))return;
+  if(!confirm(pend?`Cancelar o pagamento de ${eur(pagPendEntregue(p))} que registaste?`:'Tirar este pedido rejeitado da lista?'))return;
   setSync('load','a guardar…');
   try{
     await queueWrite(()=>sbReq('DELETE',`pagamentos_pendentes?id=eq.${id}`));
     PAGPEND=PAGPEND.filter(x=>x.id!==id);
     marcaGuardado();
-    if(pend)sbLog('pagamento','cancelou',p.de,{valorTxt:eur(pagPendTotal(p))});
+    if(pend)sbLog('pagamento','cancelou',p.de,{valorTxt:eur(pagPendEntregue(p))});
     renderAll();
     toast(pend?'Pedido cancelado':'Pedido dispensado','ok');
   }catch(e){setSync('err','erro ao guardar');toast(permErrorMsg(e),'bad');}
@@ -4620,22 +4908,34 @@ function cfvSaldarHtml(p){
   const tot=rnd(+p.valor||0,2);
   const extra=rnd(Math.max(0,+p.extra||0),2);
   const divida=rnd(tot-extra,2);
-  const keys=(p.ref||'').split(/,\s*/).map(x=>x.trim()).filter(Boolean);
+  const keys=sdRefDividas(p.ref);
+  const creds=sdRefCreditos(p.ref);
+  const credTot=rnd(creds.reduce((a,c)=>a+c.valor,0),2);
+  const entregue=rnd(Math.max(0,tot-credTot),2);
   let h=cfvHero({type:'saldar',valor:tot,sign:'set',sgn:'',
     kind:'🤝 Pagar dívida',
     title:keys.length?`Acerto de ${keys.length===1?'uma dívida':keys.length+' dívidas'}`:'Adiantamento — sem dívida associada',
     when:p.data?`📅 ${fmtDataLonga(p.data)}`:''});
   h+=cfvFlow(p.de,p.para);
-  // A repartição só se mostra quando há o que repartir: sem extra, a dívida É o total.
-  if(extra>0.005)h+=`<div class="cfv-rows">
+  /* A repartição só se mostra quando há o que repartir: sem extra nem crédito
+     descontado, a dívida É o total. Com crédito, o número do cabeçalho (o que
+     entrou nas contas) e o que mudou de mãos são diferentes — e é aqui que se
+     diz qual é qual, senão o movimento parecia dizer que se entregou mais. */
+  if(extra>0.005||credTot>0.005)h+=`<div class="cfv-rows">
     ${cfvRow('Dívida',eur(divida))}
-    ${cfvRow('🐖 Extra',eur(extra),'vai para a poupança do grupo')}
-    ${cfvRow('Total entregue',eur(tot))}
+    ${extra>0.005?cfvRow('🐖 Extra',eur(extra),'vai para a poupança do grupo'):''}
+    ${credTot>0.005?cfvRow('Crédito descontado','−'+eur(credTot),'reembolsado num movimento à parte'):''}
+    ${cfvRow('Entregue',eur(entregue))}
   </div>`;
   // Sem dívidas associadas não há bloco: o título do cabeçalho já disse o que é
   // ("Adiantamento") e uma caixa "Que dívidas pagou" a responder "nenhuma" é ruído.
   h+=keys.length?cfvBlk('Que dívidas pagou',cfvSdChipsHtml(p.de,keys))
     :'<div class="cfv-note">Pagamento livre — o valor fica como crédito da pessoa e abate a dívida que ela vier a ter.</div>';
+  if(creds.length){
+    h+=cfvBlk('Crédito do casal descontado',
+      `<div class="sd-list">${creds.map(c=>sdCredChip(c.nome,c.valor,true,true)).join('')}</div>`);
+    h+=`<div class="cfv-note">Acerto de casal: entregou ${eur(entregue)} em vez de ${eur(tot)}. O crédito foi devolvido pelo 💸 Reembolso do mesmo dia — são dois movimentos porque são duas contas a fechar.</div>`;
+  }
   if(!keys.length&&(p.nota||'').trim())h+=cfvBlk('Observações',`<div class="cfv-note">${escHtml(p.nota.trim())}</div>`);
   return h;
 }
@@ -4648,10 +4948,9 @@ function cfvSdChipsHtml(payer,keys){
   const rel=_relatedNames(payer);
   let mine='',other='',otherN=0;
   keys.forEach(key=>{
-    const isConv=key.startsWith('conv:');
-    const nome=isConv?key.slice(5):(key.startsWith('own:')?key.slice(4):key);
-    const chip=_sdChip(key,escHtml(nome),isConv,0,true,'',true);
-    if(rel.has(nome))mine+=chip;else{other+=chip;otherN++;}
+    const k=sdKeyParse(key);
+    const chip=_sdChip(key,escHtml(k.nome),k.tipo==='conv',0,true,'',true);
+    if(rel.has(k.nome))mine+=chip;else{other+=chip;otherN++;}
   });
   const tmp=document.createElement('div');
   _sdRenderGroups(tmp,mine,other,otherN,true,true);
@@ -4856,17 +5155,22 @@ function updateEditSdChips(){
     return;
   }
   const rel=_relatedNames(who); // próprio/cônjuge = relativo a quem pagou
-  let mine='',other='',otherN=0;
+  let mine='',other='',otherN=0,cred='';
   selKeys.forEach(key=>{
-    const isConv=key.startsWith('conv:');
-    const nome=isConv?key.slice(5):(key.startsWith('own:')?key.slice(4):key);
-    const m=ms.find(x=>x.nome===nome);
+    const k=sdKeyParse(key);
+    /* O crédito descontado mostra-se mas NÃO se mexe aqui: quem o devolveu foi
+       um 💸 Reembolso à parte, e desmarcá-lo neste formulário deixava esse
+       reembolso órfão, a devolver dinheiro que já ninguém desconta. Mexe-se lá. */
+    if(k.tipo==='cred'){cred+=sdCredChip(k.nome,k.valor,true,true);return;}
+    const isConv=k.tipo==='conv';
+    const m=ms.find(x=>x.nome===k.nome);
     const amt=m?(isConv?_dividasEmAberto(m).conv:_dividasEmAberto(m).prop):0;
-    const chip=_sdChip(key,nome,isConv,amt,true,'toggleEditSdChip'); // clicável: permite re-selecionar p/ recalcular o valor
-    if(rel.has(nome))mine+=chip;else{other+=chip;otherN++;}
+    const chip=_sdChip(key,k.nome,isConv,amt,true,'toggleEditSdChip'); // clicável: permite re-selecionar p/ recalcular o valor
+    if(rel.has(k.nome))mine+=chip;else{other+=chip;otherN++;}
   });
   // "Dívidas de outros" (se existir) é a exceção → mostrar aberto
-  _sdRenderGroups(container,mine,other,otherN,true,true);
+  _sdRenderGroups(container,mine,other,otherN,true,true,
+    sdCredGroupHtml(cred,'Crédito do casal descontado — reembolsado à parte'));
   recalcEditSdVal(false); // ao abrir, NÃO reescrever o valor guardado
 }
 function toggleEditSdChip(el){
@@ -4881,29 +5185,20 @@ function toggleEditSdChip(el){
 }
 function recalcEditSdVal(apply){
   if(!CALC)return;
-  const ms=CALC.membros;
-  let total=0;
-  const onChips=document.querySelectorAll('#esd-chips .sd-chip.on');
-  onChips.forEach(chip=>{
-    const key=chip.dataset.key;
-    if(key.startsWith('own:')){
-      const nome=key.slice(4);const m=ms.find(x=>x.nome===nome);
-      if(m)total+=_dividasEmAberto(m).prop;
-    } else if(key.startsWith('conv:')){
-      const nome=key.slice(5);const m=ms.find(x=>x.nome===nome);
-      if(m)total+=_dividasEmAberto(m).conv;
-    }
-  });
-  total=rnd(total,2);
+  /* O campo Valor é a DÍVIDA saldada (o extra vive no seu campo, o crédito
+     descontado saiu num reembolso à parte) — por isso as contas aqui olham só
+     para os chips de dívida. */
+  const s=sdSelecao('#esd-chips');
+  const n=s.dividas.length;
   const valEl=document.getElementById('ecf-val');
   const hint=document.getElementById('ecf-val-hint');
   if(!valEl)return;
-  if(onChips.length>1){
-    if(apply)valEl.value=total.toFixed(2);
+  if(n>1){
+    if(apply)valEl.value=s.divida.toFixed(2);
     valEl.readOnly=true;valEl.style.opacity='.6';
     if(hint)hint.textContent='Valor fixo (múltiplas dívidas selecionadas)';
-  } else if(onChips.length===1){
-    if(apply)valEl.value=total.toFixed(2);
+  } else if(n===1){
+    if(apply)valEl.value=s.divida.toFixed(2);
     valEl.readOnly=false;valEl.style.opacity='1';
     if(hint)hint.textContent='Podes ajustar o valor para pagamento parcial';
   } else {
@@ -4911,8 +5206,9 @@ function recalcEditSdVal(apply){
     valEl.readOnly=false;valEl.style.opacity='1';
     if(hint)hint.textContent='💡 Pagamento livre / adiantamento — sem dívida associada. O valor fica como crédito da pessoa.';
   }
+  if(hint&&s.creditos.length&&n)hint.textContent+=` · descontado ${eur(s.credito)} de crédito do casal (reembolsado à parte).`;
   const livreBox=document.getElementById('ecf-livre-box');
-  if(livreBox)livreBox.style.display=onChips.length?'none':'';
+  if(livreBox)livreBox.style.display=s.keys.length?'none':'';
 }
 
 function closeEditCf(){
@@ -4946,8 +5242,14 @@ async function saveEditCf(){
       p.valor=rnd(base+extra,2);
       p.extra=extra;
       p.data=document.getElementById('ecf-date').value;
-      const covParts=[];
-      document.querySelectorAll('#esd-chips .sd-chip.on').forEach(chip=>{covParts.push(chip.dataset.key);});
+      const sel=sdSelecao('#esd-chips');
+      /* Sem dívida nenhuma isto passa a ser um pagamento livre, e um crédito
+         descontado pendurado num pagamento livre não quer dizer nada (nem o
+         calcular() o leria). Cai fora — o reembolso que o devolveu continua lá,
+         para o admin decidir o que lhe fazer. */
+      const credOk=sel.dividas.length?sel.creditos:[];
+      const covParts=sel.dividas.map(d=>d.key).concat(credOk.map(c=>c.key));
+      if(sel.creditos.length&&!credOk.length)toast('Sem dívidas, o crédito descontado sai do pagamento — vê o reembolso dele','bad');
       p.ref=covParts.join(', ');
       if(PAG_NOTA_COL)p.nota=covParts.length?'':(document.getElementById('ecf-livre-obs')?.value||'').trim();
     }
@@ -18040,7 +18342,7 @@ function saldosMembrosHtml(){
     // Pagamento já registado mas ainda por validar: não abate ao saldo (não é
     // dinheiro enquanto o admin não confirmar), mas tem de se ver aqui — é
     // para este número que quem pagou vem olhar a seguir.
-    const pendT=rnd(pagPendAbertos().filter(p=>p.de===m.nome).reduce((a,p)=>a+pagPendTotal(p),0),2);
+    const pendT=rnd(pagPendAbertos().filter(p=>p.de===m.nome).reduce((a,p)=>a+pagPendEntregue(p),0),2);
     return `${li?'<div class="rs-mv-title">Movimentos</div>'+li:''}
       <div class="rs-it rs-saldo"><span class="k">Saldo <small>${lblS}</small></span><span class="v ${cls}">${eur(zero?0:sf)}</span></div>
       ${pendT>0.005?`<div class="rs-it rs-pend"><span class="k">🕓 Pago, à espera de validação</span><span class="v">${eur(pendT)}</span></div>`:''}`;
