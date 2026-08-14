@@ -826,24 +826,41 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
    diz-se na faixa, não em cada célula. */
 .rdc-cells{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin-top:5px;align-items:stretch}
 .rdc-grp{font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--gold);font-weight:700;margin-top:9px}
-.rdc-cell{min-width:0;background:var(--panel);border-radius:8px;padding:5px 6px 6px;text-align:center}
+/* Coluna: o RÓTULO fica encostado ao topo (os três formam a linha de
+   cabeçalho da faixa e têm de alinhar entre si) e o VALOR ocupa o resto,
+   centrado nele. Com o desconto por sexo a célula dos membros tem duas linhas
+   de preço e puxa a faixa toda para baixo; sem isto as vizinhas ficavam com o
+   número colado ao topo e um vazio por baixo, e o "7,88 €" alinhava com o
+   primeiro dos dois preços em vez de assentar entre eles. */
+.rdc-cell{min-width:0;background:var(--panel);border-radius:8px;padding:5px 6px 6px;text-align:center;display:flex;flex-direction:column}
 /* Sem ninguém nesta espécie: o preço fica lá (é o que está em vigor), mas
    apagado — assim o olho vai a quem está mesmo na refeição. */
 .rdc-cell.off{opacity:.45}
 .rdc-cell-k{font-size:9.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--faint);font-weight:600}
-.rdc-cell-v{font-size:16px;font-weight:700;color:var(--ink);margin-top:0;font-variant-numeric:tabular-nums}
+.rdc-cell-v{font-size:16px;font-weight:700;color:var(--ink);margin-top:0;font-variant-numeric:tabular-nums;flex:1;display:flex;align-items:center;justify-content:center}
 .rdc-cell-v-gold{color:var(--gold)}
-/* Desconto por sexo: DOIS preços dentro da célula de sempre, um por linha —
-   não uma quarta coluna. As três colunas já ocupam a largura toda a 320px, e
-   a faixa dos Convidados (sem desconto nenhum) ficaria com três contra
-   quatro. Assim o que cresce é ~14px de ALTURA e nada de largura.
-   Os SVG vão em `currentColor` de propósito: apanham o dourado do
-   .rdc-cell-v-gold aqui e o azul/rosa do toggle no Plantel, sem segunda
-   cópia de cada ícone. A 13,5px cabem ícone + "15,00 €" (~59px) numa célula
-   de ~88px úteis; a 16px do preço único não cabiam. */
-.rdc-sx{display:flex;flex-direction:column;align-items:center;gap:1px;line-height:1.15}
-.rdc-sx-l{display:inline-flex;align-items:center;justify-content:center;gap:3px;font-size:13.5px;white-space:nowrap}
-.rdc-sx-l svg{width:11px;height:11px;flex-shrink:0;opacity:.85}
+/* Desconto por sexo: DOIS preços dentro da célula de sempre — não uma quarta
+   coluna. As três colunas já ocupam a largura toda a 320px, e a faixa dos
+   Convidados (sem desconto nenhum) ficaria com três contra quatro. Assim o
+   que cresce é ALTURA e nada de largura. Os SVG vão em `currentColor` de
+   propósito: apanham o dourado do .rdc-cell-v-gold aqui e o azul/rosa do
+   toggle no Plantel, sem segunda cópia de cada ícone.
+
+   GRELHA DE DUAS COLUNAS — ícones numa, valores noutra — e não duas linhas
+   soltas. Cada linha centrada por si ficava escalonada, porque os dois
+   pictogramas não têm a mesma largura (a saia é mais larga que as pernas):
+   os € saíam desalinhados e a célula lia-se torta ao lado das vizinhas, que
+   têm um número só, perfeitamente centrado. Com o `justify-content:center` o
+   par inteiro fica centrado na célula e os valores formam coluna a sério.
+   Os `tabular-nums` fecham o alinhamento: sem eles, algarismos de larguras
+   diferentes voltavam a desencontrar as vírgulas. */
+.rdc-sx{display:grid;grid-template-columns:auto auto;justify-content:center;align-items:center;column-gap:5px;row-gap:2px}
+/* 15px, não 13,5: a 13,5 o preço PRINCIPAL da refeição ficava mais pequeno
+   que o do "só bebe" ao lado (16px) — a informação mais importante da faixa a
+   ler-se como nota de rodapé. E os ícones a 12px sem opacidade, que a 11px
+   esbatidos eram duas manchas que ninguém distinguia. */
+.rdc-sx svg{width:12px;height:12px;justify-self:end}
+.rdc-sx-v{font-size:15px;font-weight:700;line-height:1.2;justify-self:start;font-variant-numeric:tabular-nums;white-space:nowrap}
 /* A percentagem, uma vez por cartão e logo a seguir à faixa dos MEMBROS — é
    deles que ela fala; no fim do bloco ficava depois dos Convidados, que pagam
    preço único, e parecia aplicar-se aos dois. Itálico e mais pequena que tudo
