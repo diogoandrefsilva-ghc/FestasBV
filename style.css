@@ -819,89 +819,25 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .rdc-hero{background:rgba(168,123,20,.09);border-color:var(--gold)}
 .rdc-people{font-size:11.5px;color:var(--muted);margin-top:5px}
 .rdc-people b{color:var(--ink)}
-/* Preços da refeição: há uma regra principal (o membro que come) e quatro
-   exceções. A regra vive numa faixa própria para os dois preços por sexo se
-   lerem como a mesma decisão, não como duas espécies de cartão. */
-.rdc-pricing{margin-top:10px}
-.rdc-member-rate{background:linear-gradient(110deg,rgba(255,253,246,.92),rgba(255,253,246,.68));border:1px solid rgba(168,123,20,.28);border-radius:10px;padding:9px 11px;text-align:center;min-height:76px}
-.rdc-member-rate.off{opacity:.46}
-.rdc-member-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-family:var(--display);font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--campino)}
-.rdc-member-head b{font-family:var(--sans);font-size:10px;font-weight:700;letter-spacing:0;text-transform:none;color:var(--muted)}
-.rdc-member-prices{display:flex;justify-content:center;gap:17px;margin-top:5px;color:var(--gold);font-variant-numeric:tabular-nums}
-.rdc-member-prices>div{display:grid;grid-template-columns:13px auto;grid-template-rows:auto auto;column-gap:5px;align-items:center;text-align:left}
-.rdc-member-prices svg{grid-row:1 / 3;width:13px;height:13px;justify-self:end}
-.rdc-member-prices span{font-size:20px;font-weight:800;line-height:1}
-.rdc-member-prices small{font-size:9px;color:var(--faint);font-weight:600;line-height:1.15}
-.rdc-member-one{margin-top:9px;color:var(--gold);font-size:23px;font-weight:800;line-height:1;font-variant-numeric:tabular-nums}
-.rdc-member-one small{font-size:10px;font-weight:600;color:var(--faint);white-space:nowrap}
-.rdc-member-note{margin-top:5px;font-size:9.5px;font-style:italic;color:var(--faint)}
-.rdc-rate-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin-top:7px}
-.rdc-rate{min-width:0;min-height:55px;background:rgba(255,253,246,.63);border:1px solid rgba(110,75,25,.13);border-radius:9px;padding:6px 8px;text-align:center;display:flex;flex-direction:column;justify-content:center}
-.rdc-rate.off{opacity:.43}
-.rdc-rate-btn{cursor:pointer;transition:transform .12s,background .12s}
-.rdc-rate-btn:active{transform:scale(.975);background:var(--panel)}
-.rdc-rate-btn.open{box-shadow:0 0 0 1px var(--gold) inset}
-.rdc-rate-k{display:flex;align-items:center;justify-content:center;gap:4px;min-height:14px;font-size:9.5px;letter-spacing:.045em;text-transform:uppercase;color:var(--faint);font-weight:700;line-height:1.05}
-.rdc-rate-k svg{width:11px;height:11px;flex:none}
-.rdc-rate-n{background:rgba(110,75,25,.11);color:var(--muted);font-size:9px;font-weight:700;padding:1px 5px;border-radius:20px;letter-spacing:0}
-.rdc-rate-v{margin-top:3px;color:var(--ink);font-size:16px;font-weight:750;line-height:1.05;font-variant-numeric:tabular-nums}
-.rdc-rate-v .rdc-member-prices{gap:8px;margin-top:0}
-.rdc-rate-v .rdc-member-prices span{font-size:13px}
-.rdc-rate-v .rdc-member-prices small{display:none}
-.rdc-rate-v .rdc-member-prices>div{grid-template-columns:10px auto;column-gap:3px}
-.rdc-rate-v .rdc-member-prices svg{width:10px;height:10px;grid-row:auto}
-.rdc-rate-v .rdc-member-one{margin-top:0;font-size:16px}
-.rdc-rate-v .rdc-member-one small{display:none}
-.rdc-rate-v .rdc-na{font-size:14px}
-@media(max-width:355px){.rdc-member-prices{gap:11px}.rdc-member-prices span{font-size:18px}.rdc-rate{padding-left:5px;padding-right:5px}.rdc-rate-k{font-size:9px}}
-/* Tabela de preços de duas entradas: quem × o quê (ver rdc-cells no app.js).
-   Três colunas fixas — "Come · Só bebe · Criança" — repetidas na faixa dos
-   membros e na dos convidados, para as duas linhas se lerem uma contra a
-   outra. Cabem a três porque o rótulo é curto: quem é (membro/convidado)
-   diz-se na faixa, não em cada célula. */
-.rdc-cells{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin-top:5px;align-items:stretch}
-.rdc-grp{font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--gold);font-weight:700;margin-top:9px}
-/* Coluna: o RÓTULO fica encostado ao topo (os três formam a linha de
-   cabeçalho da faixa e têm de alinhar entre si) e o VALOR ocupa o resto,
-   centrado nele. Com o desconto por sexo a célula dos membros tem duas linhas
-   de preço e puxa a faixa toda para baixo; sem isto as vizinhas ficavam com o
-   número colado ao topo e um vazio por baixo, e o "7,88 €" alinhava com o
-   primeiro dos dois preços em vez de assentar entre eles. */
-.rdc-cell{min-width:0;background:var(--panel);border-radius:8px;padding:5px 6px 6px;text-align:center;display:flex;flex-direction:column}
-/* Sem ninguém nesta espécie: o preço fica lá (é o que está em vigor), mas
-   apagado — assim o olho vai a quem está mesmo na refeição. */
-.rdc-cell.off{opacity:.45}
-.rdc-cell-k{font-size:9.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--faint);font-weight:600}
-.rdc-cell-v{font-size:16px;font-weight:700;color:var(--ink);margin-top:0;font-variant-numeric:tabular-nums;flex:1;display:flex;align-items:center;justify-content:center}
-.rdc-cell-v-gold{color:var(--gold)}
-/* Desconto por sexo: DOIS preços dentro da célula de sempre — não uma quarta
-   coluna. As três colunas já ocupam a largura toda a 320px, e a faixa dos
-   Convidados (sem desconto nenhum) ficaria com três contra quatro. Assim o
-   que cresce é ALTURA e nada de largura. Os SVG vão em `currentColor` de
-   propósito: apanham o dourado do .rdc-cell-v-gold aqui e o azul/rosa do
-   toggle no Plantel, sem segunda cópia de cada ícone.
-
-   GRELHA DE DUAS COLUNAS — ícones numa, valores noutra — e não duas linhas
-   soltas. Cada linha centrada por si ficava escalonada, porque os dois
-   pictogramas não têm a mesma largura (a saia é mais larga que as pernas):
-   os € saíam desalinhados e a célula lia-se torta ao lado das vizinhas, que
-   têm um número só, perfeitamente centrado. Com o `justify-content:center` o
-   par inteiro fica centrado na célula e os valores formam coluna a sério.
-   Os `tabular-nums` fecham o alinhamento: sem eles, algarismos de larguras
-   diferentes voltavam a desencontrar as vírgulas. */
-.rdc-sx{display:grid;grid-template-columns:auto auto;justify-content:center;align-items:center;column-gap:5px;row-gap:2px}
-/* 15px, não 13,5: a 13,5 o preço PRINCIPAL da refeição ficava mais pequeno
-   que o do "só bebe" ao lado (16px) — a informação mais importante da faixa a
-   ler-se como nota de rodapé. E os ícones a 12px sem opacidade, que a 11px
-   esbatidos eram duas manchas que ninguém distinguia. */
-.rdc-sx svg{width:12px;height:12px;justify-self:end}
-.rdc-sx-v{font-size:15px;font-weight:700;line-height:1.2;justify-self:start;font-variant-numeric:tabular-nums;white-space:nowrap}
-/* A percentagem, uma vez por cartão e logo a seguir à faixa dos MEMBROS — é
-   deles que ela fala; no fim do bloco ficava depois dos Convidados, que pagam
-   preço único, e parecia aplicar-se aos dois. Itálico e mais pequena que tudo
-   o resto: é nota de rodapé da faixa, não mais um número a competir com os
-   preços — daí não levar ícones nem negrito. */
-.rdc-sx-leg{text-align:center;margin-top:5px;font-size:9.5px;font-style:italic;color:var(--faint);line-height:1.3}
+/* Tarifário de dois níveis: o grupo (Membros · Convidados, ver rdc-grp no
+   app.js) e, dentro dele, uma linha por espécie de gente — rótulo por
+   extenso e contagem à esquerda, preço à direita, como a tabela de preços de
+   um restaurante. Só as espécies com gente geram linha. */
+.rdc-grp{font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--gold);font-weight:700;margin-top:10px}
+.rdc-rows{margin-top:3px}
+.rdc-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:6px 2px;border-top:1px solid rgba(110,75,25,.10)}
+.rdc-rows>.rdc-row:first-child{border-top:none}
+.rdc-row-k{font-size:11.5px;font-weight:600;color:var(--ink);display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap;min-width:0}
+.rdc-row-k svg{width:11px;height:11px;flex:none}
+.rdc-row-v{font-size:15px;font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums;white-space:nowrap}
+.rdc-row-v-gold{color:var(--gold)}
+.rdc-row-btn{cursor:pointer;transition:.12s}
+.rdc-row-btn:active{background:rgba(110,75,25,.06)}
+/* A percentagem, uma vez por cartão, logo a seguir ao grupo dos MEMBROS — é
+   dele que ela fala (só membros pagam por sexo). Itálico e mais pequena que
+   tudo o resto: é nota de rodapé, não mais um número a competir com os
+   preços — daí não levar negrito. */
+.rdc-sx-leg{text-align:right;margin-top:4px;font-size:9.5px;font-style:italic;color:var(--faint);line-height:1.3}
 .rdc-bebe{font-size:11px;color:var(--blue);font-weight:700;margin-top:3px;display:flex;align-items:center;justify-content:center;gap:3px;font-variant-numeric:tabular-nums}
 .rdc-bebe svg{flex-shrink:0}
 /* Barra de navegação por refeição — quadrados numa só linha (estilo dos convidados) */
@@ -918,24 +854,14 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 /* "custo p/ quem só bebe" — dourado, a condizer com o novo código de cores
    das presenças (o azul deixou de querer dizer "só bebe") */
 .rdc-note{font-size:10px;color:var(--gold);font-weight:600;letter-spacing:.01em}
-.rdc-cell-btn{cursor:pointer;transition:.12s}
-.rdc-cell-btn:active{transform:scale(.97)}
-.rdc-cell-arrow{font-size:11px;color:var(--faint);transition:transform .2s}
-.rdc-cell-btn.open .rdc-cell-arrow{transform:rotate(90deg)}
 .rdc-ppl{display:flex;flex-wrap:wrap;gap:5px;margin-top:9px;padding-top:9px;border-top:1px solid rgba(110,75,25,.14)}
+/* O painel de nomes de uma linha do tarifário abre DEBAIXO dela (é irmão da
+   linha dentro do .rdc-rows): sem risca própria — a de cima já é a da linha,
+   a de baixo é a da linha seguinte. */
+.rdc-rows .rdc-ppl{margin-top:0;padding:2px 2px 9px;border-top:none}
 .rdc-ppl-it{font-size:11px;background:var(--panel);border:1px solid var(--line);border-radius:7px;padding:3px 8px;color:var(--ink);font-weight:600}
 .rdc-ppl-it small{color:var(--faint);font-weight:400}
-/* Contagem dentro das células membro/convidado */
-/* O rótulo parte-se antes de rebentar a célula: num telemóvel estreito é
-   preferível "CONVIDADO" e a contagem em duas linhas a um › cortado. */
-/* min-height reserva a linha do rótulo mesmo quando ela fica VAZIA — a coluna
-   do "come" não tem rótulo (é o defeito) e, sem ninguém, também não tem
-   contagem. Sem isto a linha colapsava e o preço dessa célula subia,
-   desalinhado das vizinhas, que têm sempre "SÓ BEBE"/"CRIANÇA". */
-.rdc-cell-k{display:inline-flex;align-items:center;gap:4px;justify-content:center;flex-wrap:wrap;min-height:14px}
-/* 🍻 do "Convidado que só bebe": desenhado, à medida do rótulo (um emoji sai
-   maior que o texto e com cor própria — ver a mesma razão no --ic-cart) */
-.rdc-cell-k svg{width:11px;height:11px;flex:none}
+/* Contagem dentro do rótulo de cada linha */
 .rdc-cell-n{background:rgba(110,75,25,.12);color:var(--muted);font-size:9px;font-weight:700;padding:1px 5px;border-radius:20px;letter-spacing:0}
 .rdc-na{font-size:13px;font-weight:600;color:#BBB3A4}
 .rdc-sempres{font-size:11.5px;color:var(--faint);text-align:center;margin-top:6px}
