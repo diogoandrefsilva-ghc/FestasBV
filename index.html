@@ -773,6 +773,17 @@ setTimeout(function(){ if (window.fbvEsconderSplash) window.fbvEsconderSplash();
           </div>
         </div>
 
+        <div id="adm-descsexo-row" style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;margin-top:10px">
+          <div style="flex:1;min-width:0">
+            <div style="font-size:13px;font-weight:600">Desconto Feminino nas Refeições</div>
+            <div id="adm-descsexo-hint" style="font-size:11px;color:var(--faint);line-height:1.35;margin-top:2px">—</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;flex:0 0 auto">
+            <input type="number" id="adm-descsexo" step="5" min="0" max="90" placeholder="0" onchange="saveParams()" style="width:64px;font-size:14px;padding:8px 7px;text-align:right" inputmode="numeric" aria-label="Percentagem que as mulheres pagam a menos que os homens no preço da refeição">
+            <span style="font-size:12px;font-weight:700;color:var(--muted)">%</span>
+          </div>
+        </div>
+
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px">
           <div style="background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px 12px">
             <div style="font-size:13px;font-weight:600">Missão Poupança</div>
