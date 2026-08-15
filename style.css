@@ -829,6 +829,12 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .rdc-rows>.rdc-row:first-child{border-top:none}
 .rdc-row-k{font-size:11.5px;font-weight:600;color:var(--ink);display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap;min-width:0}
 .rdc-row-k svg{width:11px;height:11px;flex:none}
+/* A percentagem do desconto por sexo ("Pagam menos 10%") vai à frente do
+   contador da linha das Mulheres — é ali que se lê a que preço ela se
+   refere, sem obrigar a associá-la de cabeça a uma frase solta no fim do
+   grupo. Itálico, esbatida e sem negrito: é nota da linha, não mais um
+   valor a competir com o preço à direita. */
+.rdc-row-note{font-size:10px;font-style:italic;font-weight:400;color:var(--faint)}
 .rdc-row-v{font-size:15px;font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums;white-space:nowrap}
 .rdc-row-v-gold{color:var(--gold)}
 .rdc-row-btn{cursor:pointer;transition:.12s}
@@ -838,17 +844,15 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
    anterior), indentada um pouco mais à direita, e puxada para junto da
    linha-mãe (margin-top negativo a comer a padding de baixo dela). Sem
    ícone de cerveja — o texto já diz —, sem negrito e em itálico: é uma
-   nota sobre a linha de cima, não mais um preço a competir com ela. */
+   nota sobre a linha de cima, não mais um preço a competir com ela.
+   `inline-flex`+`gap` no rótulo, como o `.rdc-row-k` de cima: sem isto o
+   contador colava-se ao texto ("só bebe1"), que é a mesma razão por que a
+   linha principal já tinha o gap. */
 .rdc-row-sub{display:flex;align-items:baseline;justify-content:space-between;gap:8px;padding:0 2px 6px 18px;margin-top:-3px}
-.rdc-row-sub-k{font-size:10.5px;font-style:italic;font-weight:400;color:var(--muted)}
+.rdc-row-sub-k{font-size:10.5px;font-style:italic;font-weight:400;color:var(--muted);display:inline-flex;align-items:center;gap:6px}
 .rdc-row-sub-v{font-size:11px;font-style:italic;font-weight:400;color:var(--faint);font-variant-numeric:tabular-nums}
 .rdc-row-sub-btn{cursor:pointer}
 .rdc-row-sub-btn:active{background:rgba(110,75,25,.06)}
-/* A percentagem, uma vez por cartão, logo a seguir ao grupo dos MEMBROS — é
-   dele que ela fala (só membros pagam por sexo). Itálico e mais pequena que
-   tudo o resto: é nota de rodapé, não mais um número a competir com os
-   preços — daí não levar negrito. */
-.rdc-sx-leg{text-align:right;margin-top:4px;font-size:9.5px;font-style:italic;color:var(--faint);line-height:1.3}
 .rdc-bebe{font-size:11px;color:var(--blue);font-weight:700;margin-top:3px;display:flex;align-items:center;justify-content:center;gap:3px;font-variant-numeric:tabular-nums}
 .rdc-bebe svg{flex-shrink:0}
 /* Barra de navegação por refeição — quadrados numa só linha (estilo dos convidados) */
