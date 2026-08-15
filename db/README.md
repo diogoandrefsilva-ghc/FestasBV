@@ -79,8 +79,8 @@ Numa BD limpa, correr por esta ordem (há dependências entre eles):
 21. `validacoes_tipo.sql` — `validacoes.tipo` ('contas' | 'presencas' |
     'convidados'): mais dois checks, ao lado da validação de contas — as
     PRESENÇAS (refeições do próprio membro) e os CONVIDADOS (os que trouxe),
-    cada um no separador a que pertence, não numa lista à parte. Os dois
-    esperam só pela ÚLTIMA REFEIÇÃO, não pelo fecho de contas: ninguém
+    juntos num quadro só nos Saldos, logo a seguir ao saldo do casal. Os
+    dois esperam só pela ÚLTIMA REFEIÇÃO, não pelo fecho de contas: ninguém
     valida a meio das festas, enquanto ainda podem mudar. Mesma tabela,
     mesmo mecanismo (cada amigo valida por si e pelo cônjuge); linhas
     antigas nascem `tipo='contas'` por DEFAULT, para não reescrever o
