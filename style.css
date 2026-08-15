@@ -833,6 +833,17 @@ header .sub{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-
 .rdc-row-v-gold{color:var(--gold)}
 .rdc-row-btn{cursor:pointer;transition:.12s}
 .rdc-row-btn:active{background:rgba(110,75,25,.06)}
+/* Sub-linha de "só bebe/bebem": pendurada da categoria de cima, não uma
+   linha irmã — sem risca própria (a de cima já separou a categoria da
+   anterior), indentada um pouco mais à direita, e puxada para junto da
+   linha-mãe (margin-top negativo a comer a padding de baixo dela). Sem
+   ícone de cerveja — o texto já diz —, sem negrito e em itálico: é uma
+   nota sobre a linha de cima, não mais um preço a competir com ela. */
+.rdc-row-sub{display:flex;align-items:baseline;justify-content:space-between;gap:8px;padding:0 2px 6px 18px;margin-top:-3px}
+.rdc-row-sub-k{font-size:10.5px;font-style:italic;font-weight:400;color:var(--muted)}
+.rdc-row-sub-v{font-size:11px;font-style:italic;font-weight:400;color:var(--faint);font-variant-numeric:tabular-nums}
+.rdc-row-sub-btn{cursor:pointer}
+.rdc-row-sub-btn:active{background:rgba(110,75,25,.06)}
 /* A percentagem, uma vez por cartão, logo a seguir ao grupo dos MEMBROS — é
    dele que ela fala (só membros pagam por sexo). Itálico e mais pequena que
    tudo o resto: é nota de rodapé, não mais um número a competir com os
