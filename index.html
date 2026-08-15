@@ -542,6 +542,21 @@ setTimeout(function(){ if (window.fbvEsconderSplash) window.fbvEsconderSplash();
   </div>
 </div>
 
+<!-- Popup: sugestão automática de notificações push, logo a seguir ao login -->
+<div class="modal-bg" id="pushprompt-bg">
+  <div class="modal" id="pushprompt-modal">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <h3 style="margin-bottom:0">🔔 Ativar notificações?</h3>
+      <button onclick="pushPromptAdiar()" style="background:var(--panel2);border:1px solid var(--line);color:var(--muted);border-radius:9px;width:32px;height:32px;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0">✕</button>
+    </div>
+    <p class="note" style="margin-top:0;margin-bottom:14px">Recebe um aviso quando as contas fecharem — e, se fores o admin, quando alguém declarar um pagamento.</p>
+    <div class="mbtns">
+      <button class="btn" onclick="pushPromptAdiar()">Agora não</button>
+      <button class="btn prim" onclick="pushPromptAtivar()">🔔 Ativar</button>
+    </div>
+  </div>
+</div>
+
 <!-- Refeição Definition modal -->
 <div class="modal-bg" id="refdef-bg">
   <div class="modal" id="refdef-modal">
