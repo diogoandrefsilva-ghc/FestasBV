@@ -1,9 +1,14 @@
-// supabase/functions/push-notificar/index.ts
+// supabase/functions/push-notificar-festasbv/index.ts
 // FestasBV — Envia notificações Web Push (Notification/Push API, sem
-// Telegram). Irmã da Edge Function homónima do SplitBill (mesmo projeto
-// Supabase, schema `festasbv`): as notificações Telegram (notif-festas/
-// notif-pessoais) continuam a existir e não são tocadas por isto — são dois
-// canais paralelos, cada um com o seu interruptor.
+// Telegram). Irmã da Edge Function `push-notificar` do SplitBill (mesmo
+// projeto Supabase, schema `festasbv`): as notificações Telegram
+// (notif-festas/notif-pessoais) continuam a existir e não são tocadas por
+// isto — são dois canais paralelos, cada um com o seu interruptor.
+//
+// CHAMA-SE "push-notificar-festasbv", NÃO "push-notificar": o nome da
+// function é único por PROJETO Supabase, e o SplitBill já usa "push-notificar"
+// neste mesmo projeto. Segue o padrão de "push-notificar-goals" (a app goals,
+// também neste projeto). app.js chama exatamente este slug.
 //
 // Três momentos, todos chamados pela app:
 //   'fecho'                fecharContas() → TODOS os membros com conta
@@ -44,7 +49,7 @@
 //   VAPID_SUBJECT      (opcional) "mailto:..."; sem ele usa um valor por omissão
 // (SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY são injetados automaticamente.)
 //
-// Deploy: supabase functions deploy push-notificar
+// Deploy: supabase functions deploy push-notificar-festasbv
 
 import webpush from "npm:web-push@3.6.7";
 

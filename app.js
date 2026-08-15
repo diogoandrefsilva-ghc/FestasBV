@@ -5918,7 +5918,7 @@ async function sbEnviarPush(tipo,pessoas,descricao,quem){
   const ctrl=new AbortController();
   const timer=setTimeout(()=>ctrl.abort(),15000);
   try{
-    const r=await sbFetch(`${SB_URL}/functions/v1/push-notificar`,{
+    const r=await sbFetch(`${SB_URL}/functions/v1/push-notificar-festasbv`,{
       method:'POST',
       headers:{'Content-Type':'application/json','apikey':SB_KEY,'Authorization':`Bearer ${_sbSession.access_token}`},
       body:JSON.stringify({tipo,pessoas,descricao:descricao||'',quem:quem||''}),

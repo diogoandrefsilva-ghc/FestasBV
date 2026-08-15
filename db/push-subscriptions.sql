@@ -11,8 +11,8 @@
 -- (email) que o gerou — o mesmo utilizador pode ter várias linhas (um por
 -- telemóvel/instalação da PWA).
 --
--- QUEM ENVIA: a Edge Function `push-notificar` (service role, bypassa RLS),
--- chamada pela app em três momentos — ver o cabeçalho de push-notificar.ts.
+-- QUEM ENVIA: a Edge Function `push-notificar-festasbv` (service role, bypassa RLS),
+-- chamada pela app em três momentos — ver o cabeçalho de push-notificar-festasbv.ts.
 -- Resolve amigo→email via `user_amigos` (mesma tabela já usada nas outras
 -- políticas) e manda o push a cada subscription dessa pessoa.
 --
@@ -35,7 +35,7 @@ CREATE INDEX IF NOT EXISTS push_subscriptions_email_idx
 -- GRANTs (sem isto: HTTP 403 / 42501)
 GRANT ALL ON TABLE festasbv.push_subscriptions TO anon, authenticated;
 
--- A service_role (usada pela Edge Function push-notificar) precisa de acesso
+-- A service_role (usada pela Edge Function push-notificar-festasbv) precisa de acesso
 -- ao schema — a RLS ela ignora, mas os GRANTs de schema/tabela não.
 GRANT USAGE ON SCHEMA festasbv TO service_role;
 GRANT ALL ON ALL TABLES    IN SCHEMA festasbv TO service_role;
