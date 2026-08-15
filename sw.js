@@ -1,4 +1,4 @@
-const CACHE_NAME = 'app-cache-v334';
+const CACHE_NAME = 'app-cache-v335';
 
 self.addEventListener('install', () => self.skipWaiting());
 
@@ -43,5 +43,36 @@ self.addEventListener('fetch', (e) => {
                 return res;
             })
         )
+    );
+});
+
+// Notificações push (contas fechadas, pagamento declarado, lembrete) — a Edge
+// Function push-notificar manda um payload {title, body, url}; aqui só se
+// mostra a notificação. Canal à parte do Telegram (notif-festas/notif-pessoais),
+// que não passa pelo service worker.
+self.addEventListener('push', (e) => {
+    let data = { title: 'FestasBV', body: 'Tens uma novidade na app.', url: '/FestasBV/' };
+    try { Object.assign(data, e.data.json()); } catch (err) { /* payload vazio ou não-JSON */ }
+    e.waitUntil(
+        self.registration.showNotification(data.title, {
+            body: data.body,
+            icon: '/FestasBV/icon-192.png',
+            badge: '/FestasBV/icon-192.png',
+            data: { url: data.url || '/FestasBV/' }
+        })
+    );
+});
+
+// Clique na notificação: foca uma janela já aberta da app, ou abre uma nova.
+self.addEventListener('notificationclick', (e) => {
+    e.notification.close();
+    const url = (e.notification.data && e.notification.data.url) || '/FestasBV/';
+    e.waitUntil(
+        self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
+            for (const c of clients) {
+                if (c.url.includes('/FestasBV/') && 'focus' in c) return c.focus();
+            }
+            return self.clients.openWindow(url);
+        })
     );
 });
