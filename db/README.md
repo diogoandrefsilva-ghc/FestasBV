@@ -76,8 +76,14 @@ Numa BD limpa, correr por esta ordem (há dependências entre eles):
     domingo: o custo vai com eles e o objetivo da compra não se apaga. O editor
     da compra escreve o objetivo, o separador Stock escreve o custo, e `NULL`
     (lotes anteriores) = objetivo desconhecido. **Não entra em conta nenhuma**
+21. `validacoes_tipo.sql` — `validacoes.tipo` ('contas' | 'presencas'): um
+    segundo check, ao lado da validação de contas — as PRESENÇAS (as
+    refeições do próprio membro e dos convidados que trouxe), disponível a
+    qualquer momento, sem esperar pelo fecho de contas. Mesma tabela, mesmo
+    mecanismo (cada amigo valida por si e pelo cônjuge); linhas antigas
+    nascem `tipo='contas'` por DEFAULT, para não reescrever o histórico
 
-Os passos 4–20 são migrações add-on idempotentes: correr uma vez cada. A app é
+Os passos 4–21 são migrações add-on idempotentes: correr uma vez cada. A app é
 tolerante a qualquer uma delas faltar — sonda a coluna/tabela e esconde o que
 ainda não existe. (Há mais add-ons no diretório que nunca entraram nesta lista —
 `cobertura.sql`, `bebida_refeicao.sql`, `stock_artigo_fatura.sql`,
@@ -111,7 +117,7 @@ consola do browser o Supabase recusa). Resumo do que está em `policies.sql`:
 | Imputar a t-shirt à conta de membros          | ✅        | ❌ (trigger recusa)                    | ❌               |
 | Trancar/reabrir a encomenda de t-shirts       | ✅        | ❌                                     | ❌               |
 | Fatura das t-shirts (preços + desconto)       | ✅        | ❌                                     | ❌               |
-| Validar contas (`validacoes`)                 | ✅        | ✅ próprias + cônjuge                   | ❌               |
+| Validar contas/presenças (`validacoes`)       | ✅        | ✅ próprias + cônjuge                   | ❌               |
 | Editar/apagar cash-flows                      | ✅        | ❌                                     | ❌               |
 | Mealheiros, reembolsos, pagamentos            | ✅        | ❌                                     | ❌               |
 | Registar pagamento de dívida (a validar)      | ✅ direto | ✅ próprios + cônjuge, fica pendente    | ❌               |

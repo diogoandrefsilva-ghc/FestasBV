@@ -528,14 +528,14 @@ setTimeout(function(){ if (window.fbvEsconderSplash) window.fbvEsconderSplash();
   </div>
 </div>
 
-<!-- Validação de Contas modal -->
+<!-- Validação (Contas / Presenças) modal — o `tipo` passado a abrirValModal() decide qual dos dois -->
 <div class="modal-bg" id="val-bg">
   <div class="modal" id="val-modal">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-      <h3 style="margin-bottom:0">Validar Contas</h3>
+      <h3 style="margin-bottom:0" id="val-title">Validar Contas</h3>
       <button onclick="closeValModal()" style="background:var(--panel2);border:1px solid var(--line);color:var(--muted);border-radius:9px;width:32px;height:32px;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0">✕</button>
     </div>
-    <p class="note" style="margin-top:0;margin-bottom:14px">Confirmas que aceitas as contas apuradas deste ano? Escolhe o que estás a validar:</p>
+    <p class="note" style="margin-top:0;margin-bottom:14px" id="val-intro">Confirmas que aceitas as contas apuradas deste ano? Escolhe o que estás a validar:</p>
     <div id="val-form"></div>
     <div class="mbtns"><button class="btn prim" id="val-save" onclick="confirmarValidacaoUI()">Validar</button></div>
     <div class="note" id="val-note">Fica registado quem validou e quando.</div>

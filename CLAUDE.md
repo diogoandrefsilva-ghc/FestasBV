@@ -507,6 +507,14 @@ Por defeito um não-admin só marca presenças de dias que ainda não acontecera
 - **Vale para membros e filhos, não para convidados.** As policies de `presencas`/`filho_presencas` passam a chamar `presenca_membro_aberta()`/`presenca_filho_aberta()` (`db/presencas_correcao.sql`) em vez de `dia_aberto_membro()`/`dia_aberto_evento()` — funções novas, para não mexer nas que os convidados também usam (`convidados_self_*`), que ficam exatamente como estavam. Pedir para corrigir presenças não foi pedido para reabrir convidados de anos passados.
 - Migração: `db/presencas_correcao.sql`. Tolerante (`presCorrecaoCol`, sondado como o `dividasPublicasCol`): sem ela o interruptor fica escondido e o comportamento é o de sempre (só dias futuros). A coluna grava-se pelo caminho normal do `saveParams()`/`sbGuardarEvento` — não precisa de trigger próprio, porque `eventos` já só aceita escrita de `is_admin()`.
 
+## Dois checks nos Saldos: Validação de Presenças e Validação de Contas (`db/validacoes_tipo.sql`)
+A `validacoes` já sabia validar uma coisa — as contas apuradas, só depois de fechadas (`secContasHtml`/`abrirValModal`). Ganha um **segundo check**, as **Presenças** (as refeições do próprio membro e dos convidados que trouxe), disponível **a qualquer momento** — não espera pelo fecho de contas, ao contrário do de Contas.
+- **É a MESMA tabela e o MESMO mecanismo**, só com uma coluna `tipo` (`'contas'` | `'presencas'`) a distinguir as duas linhas que agora um amigo pode ter no mesmo ano. Quem pode validar o quê não muda: cada amigo valida por si e pelo cônjuge (`meu_amigo`/`nomesValidaveis`); o admin, também pelos amigos sem utilizador.
+- **`secValidacaoBlocoHtml(tipo,titulo)` é o bloco partilhado** — lista + botão "✓ Validar…" + modal (`abrirValModal(tipo)`, um modal só, com título/texto trocados pelo `tipo`). Não repitas este bloco à mão para um terceiro check: parametriza-o.
+- **A gate do fecho é só do tipo `'contas'`**: `abrirValModal`/`confirmarValidacao` recusam contas sem `contasFechadas()`, mas deixam presenças passar sempre. `secContasHtml` chama o bloco de Presenças **antes** do cartão "Estado das Contas" (sempre visível) e o de Contas **só** dentro do `if(fechadas)` (como já era).
+- **`VAL_TIPO_COL`** (sondado por `validacoes?select=tipo&limit=1`, à parte do fetch principal que passou a `select=*`): sem a migração, a Validação de Presenças fica escondida e a de Contas continua exatamente como sempre foi — as linhas gravadas nunca tiveram `tipo`, por isso lê-se sempre `v.tipo||'contas'`.
+- Migração: `db/validacoes_tipo.sql`. Tolerante: `tipo` nasce com DEFAULT `'contas'` (o histórico não muda de sentido) e a UNIQUE passa de `(evento_id,amigo)` para `(evento_id,amigo,tipo)` — sem ela o `on_conflict` do POST cai de volta em `evento_id,amigo`, como sempre.
+
 ## T-shirts (separador 👕)
 Levantamento das t-shirts a encomendar **e** a fatura delas, que **entra nas contas** (desde `db/tshirts_cashflow.sql`).
 
