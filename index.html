@@ -528,20 +528,6 @@ setTimeout(function(){ if (window.fbvEsconderSplash) window.fbvEsconderSplash();
   </div>
 </div>
 
-<!-- Validação (Contas / Presenças) modal — o `tipo` passado a abrirValModal() decide qual dos dois -->
-<div class="modal-bg" id="val-bg">
-  <div class="modal" id="val-modal">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-      <h3 style="margin-bottom:0" id="val-title">Validar Contas</h3>
-      <button onclick="closeValModal()" style="background:var(--panel2);border:1px solid var(--line);color:var(--muted);border-radius:9px;width:32px;height:32px;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0">✕</button>
-    </div>
-    <p class="note" style="margin-top:0;margin-bottom:14px" id="val-intro">Confirmas que aceitas as contas apuradas deste ano? Escolhe o que estás a validar:</p>
-    <div id="val-form"></div>
-    <div class="mbtns"><button class="btn prim" id="val-save" onclick="confirmarValidacaoUI()">Validar</button></div>
-    <div class="note" id="val-note">Fica registado quem validou e quando.</div>
-  </div>
-</div>
-
 <!-- Popup: sugestão automática de notificações push, logo a seguir ao login -->
 <div class="modal-bg" id="pushprompt-bg">
   <div class="modal" id="pushprompt-modal">
@@ -1023,6 +1009,19 @@ setTimeout(function(){ if (window.fbvEsconderSplash) window.fbvEsconderSplash();
             <button class="btn prim" onclick="sbAddFilho()">Adicionar filho/a</button>
           </div>
         </div>
+      </div>
+    </div>
+
+    <!-- 3b2. Validações (só admin) -->
+    <div class="settings-block admin-only">
+      <div class="settings-block-hdr" onclick="toggleSettingsBlock(this)">
+        <span class="sb-icon">📋</span>
+        <span class="sb-title sf">Validações</span>
+        <span class="sb-arrow sf">▼</span>
+      </div>
+      <div class="settings-block-body">
+        <p style="font-size:12px;color:var(--muted);margin-bottom:12px;line-height:1.5">Quem já validou as presenças, os convidados e as contas deste ano. 🔔 manda um lembrete (push, ou email se não tiver push ativo); "—" é um check ainda não disponível (presenças/convidados esperam pela última refeição, contas pelo fecho).</p>
+        <div id="adm-valid-list"><div class="note">A carregar…</div></div>
       </div>
     </div>
 

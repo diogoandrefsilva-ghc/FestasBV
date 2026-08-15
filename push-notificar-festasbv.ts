@@ -10,7 +10,7 @@
 // neste mesmo projeto. Segue o padrão de "push-notificar-goals" (a app goals,
 // também neste projeto). app.js chama exatamente este slug.
 //
-// Três momentos, todos chamados pela app:
+// Quatro momentos, todos chamados pela app:
 //   'fecho'                fecharContas() → TODOS os membros com conta
 //                           ligada, cada um com o que tem a pagar/receber
 //                           (e o saldo do casal, quando há cônjuge) — o
@@ -23,6 +23,13 @@
 //   'lembrete'              o admin, no separador Saldos, pede para lembrar
 //                           um membro concreto de uma dívida em aberto
 //                           (o utilizador espera pelo resultado)
+//   'lembrete_validacao'    o admin, no painel "Validações" (Definições),
+//                           pede para lembrar alguém de validar as
+//                           presenças, os convidados ou as contas
+//                           (db/validacoes_tipo.sql) — o `checkTipo` de
+//                           cada pessoa diz qual dos três. Sem push ativo a
+//                           app cai para um link de email (client-side);
+//                           esta function só sabe de push
 //
 // Resolve amigo→email via `user_amigos` (mesma tabela usada nas outras
 // políticas de equivalência) e manda o push a cada `push_subscriptions`
@@ -33,10 +40,11 @@
 //
 // Chamada pelo browser com o JWT do utilizador (verify_jwt fica LIGADO no
 // deploy). Por cima disso confirma-se que o email consta de
-// `festasbv.allowed_users`. Os tipos 'fecho' e 'lembrete' só o admin pode
-// disparar — é ele quem fecha as contas e quem lembra dívidas; o pedido de
-// pagamento é o único que qualquer membro autorizado pode disparar (é ele
-// que declara "já paguei").
+// `festasbv.allowed_users`. Os tipos 'fecho', 'lembrete' e
+// 'lembrete_validacao' só o admin pode disparar — é ele quem fecha as
+// contas e quem lembra dívidas/validações; o pedido de pagamento é o único
+// que qualquer membro autorizado pode disparar (é ele que declara "já
+// paguei").
 //
 // Secrets necessários (Edge Functions -> Secrets):
 //   VAPID_PUBLIC_KEY   par de chaves só para Web Push (não é a chave do
@@ -144,11 +152,18 @@ async function enviarParaSubs(subs: Sub[], payload: string) {
   return { enviados, falhados };
 }
 
-type Pessoa = { amigo: string; valor: number; casal?: number | null };
-type Tipo = "fecho" | "pagamento_declarado" | "lembrete";
+type CheckTipo = "presencas" | "convidados" | "contas";
+type Pessoa = { amigo: string; valor?: number; casal?: number | null; checkTipo?: CheckTipo };
+type Tipo = "fecho" | "pagamento_declarado" | "lembrete" | "lembrete_validacao";
 
 function eurTxt(v: number) {
   return `€${Math.abs(v).toFixed(2).replace(".", ",")}`;
+}
+
+function checkTipoFrase(t?: CheckTipo): string {
+  if (t === "presencas") return "as tuas presenças";
+  if (t === "convidados") return "os convidados que trouxeste";
+  return "as tuas contas";
 }
 
 // 'fecho': o saldo do PRÓPRIO primeiro, o do CASAL a seguir — só quando há
@@ -167,13 +182,19 @@ function montarMensagem(tipo: Tipo, p: Pessoa, descricao?: string, quem?: string
   if (tipo === "lembrete") {
     return {
       title: "🔔 Lembrete de pagamento",
-      body: `${quem || "O tesoureiro"} lembra-te que ainda deves ${eurTxt(p.valor)}${descricao ? ` — ${descricao}` : ""}`,
+      body: `${quem || "O tesoureiro"} lembra-te que ainda deves ${eurTxt(p.valor ?? 0)}${descricao ? ` — ${descricao}` : ""}`,
+    };
+  }
+  if (tipo === "lembrete_validacao") {
+    return {
+      title: "🔔 Lembrete de validação",
+      body: `${quem || "O admin"} lembra-te de validar ${checkTipoFrase(p.checkTipo)}${descricao ? ` — ${descricao}` : ""}`,
     };
   }
   // 'fecho'
-  let body = fraseSaldo(p.valor);
+  let body = fraseSaldo(p.valor ?? 0);
   body = body.charAt(0).toUpperCase() + body.slice(1) + ".";
-  if (p.casal != null && Math.abs(p.casal - p.valor) > 0.005) {
+  if (p.casal != null && Math.abs(p.casal - (p.valor ?? 0)) > 0.005) {
     body += " " + fraseSaldoCasal(p.casal).charAt(0).toUpperCase() + fraseSaldoCasal(p.casal).slice(1) + ".";
   }
   return {
@@ -208,7 +229,7 @@ Deno.serve(async (req) => {
     // não interessa quem é o "para" do pedido (o tesoureiro do ano pode nem
     // ter conta ligada), interessa avisar quem vai decidir.
     if (tipo === "pagamento_declarado") {
-      const valor = pessoas && pessoas[0] ? pessoas[0].valor : 0;
+      const valor = (pessoas && pessoas[0] ? pessoas[0].valor : 0) ?? 0;
       const subs = await subscriptionsDe([ADMIN_EMAIL]);
       const payload = JSON.stringify({
         title: "✅ Pagamento declarado",
@@ -218,9 +239,10 @@ Deno.serve(async (req) => {
       return json(await enviarParaSubs(subs, payload));
     }
 
-    // 'fecho' e 'lembrete' só o admin os dispara — é ele quem fecha as
-    // contas e quem decide lembrar uma dívida concreta.
-    if (tipo !== "fecho" && tipo !== "lembrete") return json({ error: "tipo inválido" }, 400);
+    // 'fecho', 'lembrete' e 'lembrete_validacao' só o admin os dispara — é
+    // ele quem fecha as contas e quem decide lembrar alguém de uma dívida
+    // ou de um check por validar.
+    if (tipo !== "fecho" && tipo !== "lembrete" && tipo !== "lembrete_validacao") return json({ error: "tipo inválido" }, 400);
     if (emailChamador !== ADMIN_EMAIL) return json({ error: "só o admin" }, 403);
     if (!Array.isArray(pessoas) || pessoas.length === 0) return json({ enviados: 0, falhados: 0 });
 
