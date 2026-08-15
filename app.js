@@ -2,10 +2,12 @@
 const SB_URL = 'https://gjweqwfbnkgnibhajldc.supabase.co';
 const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdqd2Vxd2ZibmtnbmliaGFqbGRjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODExMDk4NzUsImV4cCI6MjA5NjY4NTg3NX0.h6st-RayGhQdsqH7E2Ko-rPWk2QZUpTevO6cbjvlSnk';
 const ADMIN_EMAIL = 'diogo.andre.f.silva@gmail.com';
-// Par de chaves só para notificações Web Push (não é a chave do Supabase, e
-// não é o mesmo par do SplitBill). A privada vive só como secret da Edge
-// Function push-notificar.
-const VAPID_PUBLIC_KEY = 'BJyG9Fw2eMZ2xqW08oBhhzJnTjLTROpO4lWcQHAV09EPEkcJOpGb_5X-Tk9n8jytY_lN9DRRjM7vUqvumsCI-IM';
+// Par de chaves só para notificações Web Push (não é a chave do Supabase).
+// É O MESMO PAR do SplitBill de propósito: os secrets de Edge Functions são
+// por PROJETO Supabase, não por função — e as duas apps vivem no mesmo
+// projeto. A privada já está configurada nos secrets (foi lá posta para o
+// push-notificar do SplitBill); não precisa de se repetir para esta função.
+const VAPID_PUBLIC_KEY = 'BFiwf_z5NJzkXFP6gzxS_naH9cNC2MfCEmejJf32MID8Y_1i49cb8sGINYhH-aFAZmFQLf3V__2ZyeotQIZYQ0U';
 const SESSION_KEY = 'festasbv_sb_session';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.

@@ -34,9 +34,13 @@
 // que declara "já paguei").
 //
 // Secrets necessários (Edge Functions -> Secrets):
-//   VAPID_PUBLIC_KEY   par de chaves só para isto (não é a chave do Supabase;
-//                      não é o mesmo par do SplitBill — cada app tem o seu)
-//   VAPID_PRIVATE_KEY
+//   VAPID_PUBLIC_KEY   par de chaves só para Web Push (não é a chave do
+//   VAPID_PRIVATE_KEY  Supabase). Os secrets são por PROJETO, não por função
+//                      — como o SplitBill já tem o seu push-notificar neste
+//                      MESMO projeto, estes dois já devem estar definidos;
+//                      não é preciso repeti-los. O VAPID_PUBLIC_KEY do
+//                      app.js do FestasBV tem de ser exatamente o mesmo
+//                      valor (é o par do SplitBill, de propósito).
 //   VAPID_SUBJECT      (opcional) "mailto:..."; sem ele usa um valor por omissão
 // (SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY são injetados automaticamente.)
 //
