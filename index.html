@@ -735,6 +735,15 @@ setTimeout(function(){ if (window.fbvEsconderSplash) window.fbvEsconderSplash();
           </label>
         </div>
 
+        <div id="adm-arredmodo-row" style="display:none;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-top:10px">
+          <div style="font-size:13px;font-weight:600">Momento do arredondamento</div>
+          <div style="font-size:11px;color:var(--faint);margin-bottom:6px">A que ponto das contas o "Arredonda Total" se aplica</div>
+          <select id="adm-arredonda-modo" onchange="saveParams()" class="sf" style="width:100%;font-size:14px;padding:8px 10px;-webkit-appearance:none;appearance:none;min-width:0;max-width:100%;box-sizing:border-box;background:var(--panel);border:1px solid var(--line);border-radius:8px;color:var(--ink)">
+            <option value="despesa">Despesa própria — o de sempre</option>
+            <option value="saldo">Saldo final — também convidados, t-shirts, stock</option>
+          </select>
+        </div>
+
         <div id="adm-divpub-row" style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;margin-top:10px">
           <div style="flex:1">
             <div style="font-size:13px;font-weight:600">Dívidas Públicas</div>
