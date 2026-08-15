@@ -130,7 +130,12 @@ body::before{content:"";position:fixed;top:0;left:0;right:0;height:env(safe-area
 .rs-it:last-child{border-bottom:none}
 .rs-it .k{color:var(--muted)}.rs-it .v{font-weight:700;font-variant-numeric:tabular-nums;color:var(--ink)}
 .rs-head .amt-col{text-align:right;flex-shrink:0}
-.rs-head .amt-saldo{font-size:12px;font-weight:700;font-variant-numeric:tabular-nums;margin-top:1px}
+/* Só quando há saldo a mostrar ao lado (has-saldo) é que a despesa total
+   passa a apoio: o ênfase vai para o SALDO A LIQUIDAR, que é a pergunta que
+   se vem responder aqui. Sem saldo visível (privacidade) a despesa continua
+   a ser a única coisa que a linha diz, e fica no tamanho normal. */
+.rs-head .amt-col.has-saldo .amt{font-size:12px;font-weight:600;color:var(--faint)}
+.rs-head .amt-saldo{font-size:18px;font-weight:800;font-variant-numeric:tabular-nums;margin-top:1px}
 .rs-head .amt-saldo.pos{color:var(--green)}.rs-head .amt-saldo.neg{color:var(--red)}.rs-head .amt-saldo.zero{color:var(--muted)}
 .rs-it .v.plus{color:var(--green)}.rs-it .v.minus{color:var(--red)}
 .rs-it .v.pos{color:var(--green)}.rs-it .v.neg{color:var(--red)}.rs-it .v.zero{color:var(--muted)}
