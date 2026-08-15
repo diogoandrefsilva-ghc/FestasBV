@@ -78,8 +78,9 @@ Numa BD limpa, correr por esta ordem (há dependências entre eles):
     (lotes anteriores) = objetivo desconhecido. **Não entra em conta nenhuma**
 21. `validacoes_tipo.sql` — `validacoes.tipo` ('contas' | 'presencas'): um
     segundo check, ao lado da validação de contas — as PRESENÇAS (as
-    refeições do próprio membro e dos convidados que trouxe), disponível a
-    qualquer momento, sem esperar pelo fecho de contas. Mesma tabela, mesmo
+    refeições do próprio membro e dos convidados que trouxe). Espera só pela
+    ÚLTIMA REFEIÇÃO, não pelo fecho de contas: ninguém valida a meio das
+    festas, enquanto as presenças ainda podem mudar. Mesma tabela, mesmo
     mecanismo (cada amigo valida por si e pelo cônjuge); linhas antigas
     nascem `tipo='contas'` por DEFAULT, para não reescrever o histórico
 
