@@ -69,4 +69,14 @@ DROP POLICY IF EXISTS push_subscriptions_delete_propria ON festasbv.push_subscri
 CREATE POLICY push_subscriptions_delete_propria ON festasbv.push_subscriptions
   FOR DELETE TO authenticated
   USING (lower(email) = lower(coalesce(auth.jwt() ->> 'email', '')));
+
+-- O admin vê (só leitura) quem tem push ativo, em Definições › Utilizadores
+-- & Casais — sem isto o SELECT dele batia na policy "própria" de cima e só
+-- via a linha dele mesmo, nunca a dos outros. Não ganha INSERT/UPDATE/DELETE
+-- sobre as subscriptions de terceiros: gerir o dispositivo de outra pessoa
+-- não é coisa do admin, só ver se está ligado.
+DROP POLICY IF EXISTS push_subscriptions_select_admin ON festasbv.push_subscriptions;
+CREATE POLICY push_subscriptions_select_admin ON festasbv.push_subscriptions
+  FOR SELECT TO authenticated
+  USING (festasbv.is_admin());
 -- =====================================================================
