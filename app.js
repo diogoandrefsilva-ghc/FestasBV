@@ -1005,9 +1005,9 @@ function calcular(data){
     const Fbeb=dRef.filter(x=>x.bebida).reduce((a,x)=>a+x.valor,0);
     const I=rnd(F20*(rd.peso||0),2);
     const Ndiv=indiretoComBebe?(Ncomem+Nbebe):Ncomem;   // 2026+: bebes entram no denominador
-    const indiretoPP=Ndiv>0?rnd(I/Ndiv,2):0;
-    const bebidaPP=Ndiv>0?rnd(Fbeb/Ndiv,2):0;
-    const diretoPP=Ncomem>0?rnd(Fdir/Ncomem,2):0;
+    const indiretoPP=Ndiv>0?roundup(I/Ndiv,2):0;
+    const bebidaPP=Ndiv>0?roundup(Fbeb/Ndiv,2):0;
+    const diretoPP=Ncomem>0?roundup(Fdir/Ncomem,2):0;
     const L=rnd(diretoPP+bebidaPP+indiretoPP,2);         // unitário de quem come
     // Modelo legado (pré-2026): não há "só bebe" a dividir nada — a bebida
     // marcada comporta-se como comida (Ndiv=Ncomem) e não lhe toca.
