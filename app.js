@@ -1008,7 +1008,7 @@ function calcular(data){
     const indiretoPP=Ndiv>0?roundup(I/Ndiv,2):0;
     const bebidaPP=Ndiv>0?roundup(Fbeb/Ndiv,2):0;
     const diretoPP=Ncomem>0?roundup(Fdir/Ncomem,2):0;
-    const L=rnd(diretoPP+bebidaPP+indiretoPP,2);         // unitário de quem come
+    const L=diretoPP+bebidaPP+indiretoPP;         // unitário de quem come
     // Modelo legado (pré-2026): não há "só bebe" a dividir nada — a bebida
     // marcada comporta-se como comida (Ndiv=Ncomem) e não lhe toca.
     const Lbebe=rnd(indiretoPP+(indiretoComBebe?bebidaPP:0),2);   // unitário de quem só bebe
