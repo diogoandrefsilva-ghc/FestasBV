@@ -1380,9 +1380,12 @@ button.cmp-chip.qt-tap:active{filter:brightness(.93)}
 .stk-cons-mao{font-style:normal;font-size:10.5px;opacity:.7}
 /* 🗑 O que se deitou fora, no rodapé do cartão. Vermelho por ser a única
    parcela que é perda: gasto e por gastar são funcionamento normal.
+   👥 O que foi distribuído pelo grupo NÃO é perda — aproveitou-se, só não é de
+   ninguém em concreto —, por isso leva cor neutra, não a do alarme.
    📦 O que fica para o ano seguinte não é perda nenhuma — é arrumação —, por
    isso leva a cor do que está guardado, não a do alarme. */
 .stk-cons-perd,.stk-cons-perd b{color:var(--red)}
+.stk-cons-distrib,.stk-cons-distrib b{color:var(--blue)}
 .stk-cons-trans,.stk-cons-trans b{color:#6E5A38}
 /* 💡 no cartão: "parece artigo de despensa". É só o selo — a pergunta com
    Sim/Não vive no modal, que é onde se decide; uma caixa de decisão em cada
@@ -1409,6 +1412,7 @@ button.cmp-chip.qt-tap:active{filter:brightness(.93)}
 /* 🗑 e 📦 na linha de leitura do consumo. Quem os declara é o 3.º eixo, acima:
    um é perda (vermelho), o outro é o que fica guardado para o ano seguinte. */
 .lote-cons-num .lcn-perd,.lote-cons-num .lcn-perd b{color:var(--red)}
+.lote-cons-num .lcn-distrib,.lote-cons-num .lcn-distrib b{color:var(--blue)}
 .lote-cons-num .lcn-trans,.lote-cons-num .lcn-trans b{color:#6E5A38}
 /* Interruptor de dois estados (ainda há / acabou) — nos artigos de despensa é
    isto que substitui as quantidades */
@@ -1824,9 +1828,11 @@ button.cmp-chip.qt-tap:active{filter:brightness(.93)}
 .lote-stk-zone #lote-stk-lbl{margin:0;flex:0 1 auto;color:#6E5A38}
 .lote-stk-zone .lote-solos{background:rgba(255,253,246,.90)}
 .lote-stk-zone .note{padding:7px 8px;border-radius:9px;background:rgba(255,253,246,.72);line-height:1.4}
-/* As duas saídas que só este eixo tem destacam-se das outras — uma é perda
-   (vermelho), a outra é arrumação para o ano que vem (bege) */
+/* As três saídas que só este eixo tem destacam-se das outras — perda
+   (vermelho), distribuído pelo grupo (azul neutro) e arrumação para o ano que
+   vem (bege) */
 .lote-stk-zone .lote-al.perda .lp-lbl{color:var(--red)}
+.lote-stk-zone .lote-al.distrib .lp-lbl{color:var(--blue);font-weight:800}
 .lote-stk-zone .lote-al.trans .lp-lbl{color:#6E5A38;font-weight:800}
 @media(max-width:380px){.lote-alloc-head{align-items:flex-start;flex-direction:column}.lote-alloc-summary{justify-content:flex-start}}
 
