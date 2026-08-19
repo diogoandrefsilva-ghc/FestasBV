@@ -1554,6 +1554,9 @@ button.cmp-chip.qt-tap:active{filter:brightness(.93)}
 .lote-desc-row .leq-in{width:100%;height:34px;margin:0;padding:0 9px;font-size:13px;font-weight:700;border:1px solid var(--line);border-radius:8px;background:#FFFDF6;color:var(--ink)}
 .lote-desc-sw{display:flex;gap:6px;margin-top:6px}
 .lote-desc-sw .lce-opt{padding:7px 6px;font-size:11.5px}
+/* Leitura do desconto no modal do Stock (loteDescFill): o link de volta ao
+   editor da compra, onde ele se declara de facto — mesmo desenho do .lh-go */
+.lote-desc-go{margin-top:4px;background:transparent;border:none;padding:0;font:inherit;font-size:12px;font-weight:700;color:var(--green);cursor:pointer;text-decoration:underline}
 /* Ligação "pertence a" no registo da compra (em todos os artigos) */
 /* Linha de legenda, não campo de formulário: é o que menos se toca no cartão e
    uma caixa de 31px por artigo eram três deslizes a mais numa compra de 30.
