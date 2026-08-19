@@ -214,6 +214,9 @@ body.no-scroll{overflow:hidden;position:fixed;left:0;right:0;width:100%;}
 .collapse-toggle .ct-label .ico-check{color:var(--green);flex-shrink:0}
 .rs-divider{height:1px;background:linear-gradient(90deg,transparent,var(--line) 18%,var(--line) 82%,transparent);margin:13px 8px 5px;border:none}
 .collapse-toggle .ct-val{font-size:14px;font-weight:700;color:var(--ink)}
+/* Descontos (compras em modo "membros", devolução do teto da sobra): andam ao
+   contrário das outras linhas das Contribuições — baixam o que se paga */
+.collapse-toggle .ct-val.plus{color:var(--green)}
 .collapse-toggle .ct-arrow{font-size:12px;color:var(--faint);transition:transform .2s;margin-left:6px}
 .collapse-toggle.open .ct-arrow{transform:rotate(180deg)}
 .collapse-body{max-height:0;overflow:hidden;transition:max-height .3s ease}
