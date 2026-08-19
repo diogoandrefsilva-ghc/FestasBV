@@ -373,6 +373,13 @@ setTimeout(function(){ if (window.fbvEsconderSplash) window.fbvEsconderSplash();
     <div id="lote-orig-wrap" style="display:none">
       <div id="lote-orig-body"></div>
     </div>
+    <!-- Desconto de um lote (db/stock_desconto.sql): a distância entre o preço
+         de tabela e o que se pagou, e o que fazer com ela — no preço, devolvido
+         só aos membros no fecho, ou de sobra no saldo do grupo. Declara-se POR
+         LOTE, aqui e só aqui — não no editor da compra. -->
+    <div id="lote-desc-wrap" style="display:none">
+      <div id="lote-desc-body"></div>
+    </div>
     <!-- O (quantidade) é escrito pelo loteRenderAlocs() e acompanha o que se
          está a alocar — fecha a leitura de cima: comprado · pedido · alocado -->
     <section class="lote-alloc-zone" aria-labelledby="lote-aloc-lbl">

@@ -1546,6 +1546,14 @@ button.cmp-chip.qt-tap:active{filter:brightness(.93)}
    o .lce-opt — é a mesma coisa (duas respostas a uma pergunta), a outra escala */
 .lote-equiv-sw{margin-top:8px}
 .lote-equiv-sw .lce-opt{padding:7px 8px;font-size:12.5px}
+/* Desconto de um lote: um campo por lote (valor) e, só depois de escrito, o
+   segmentado de 3 vias (preço/membros/grupo) — reaproveita o .lce-opt, a
+   mesma peça do "contar em"/"ainda há". */
+.lote-desc-row{margin-top:8px}
+.lote-desc-row .leq-nm{display:block;margin-bottom:4px;font-size:11.5px;font-weight:600;color:var(--faint);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lote-desc-row .leq-in{width:100%;height:34px;margin:0;padding:0 9px;font-size:13px;font-weight:700;border:1px solid var(--line);border-radius:8px;background:#FFFDF6;color:var(--ink)}
+.lote-desc-sw{display:flex;gap:6px;margin-top:6px}
+.lote-desc-sw .lce-opt{padding:7px 6px;font-size:11.5px}
 /* Ligação "pertence a" no registo da compra (em todos os artigos) */
 /* Linha de legenda, não campo de formulário: é o que menos se toca no cartão e
    uma caixa de 31px por artigo eram três deslizes a mais numa compra de 30.
