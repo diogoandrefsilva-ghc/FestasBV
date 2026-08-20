@@ -16,8 +16,8 @@
 -- cada um paga, como um desconto no que tem a liquidar.
 --
 --   teto = 200 €, o evento sobrava 340 €  ->  devolvem-se 140 € aos
---   membros (proporcional ao `m.Sown` de cada um — o que gastou nas
---   refeições, incluindo aquelas em que só bebeu) e a sobra fica em 200 €.
+--   membros (proporcional ao que cada um paga, `m.V` sem as t-shirts) e a
+--   sobra fica em 200 €.
 --
 -- NÃO É UM TETO SOBRE A POUPANÇA ACUMULADA (a de todos os anos, ver
 -- `poupancaAcumuladaAte`). É de propósito: o `calcular()` é uma função pura
@@ -51,7 +51,7 @@ DO $$ BEGIN
 END $$;
 
 COMMENT ON COLUMN festasbv.eventos.teto_reserva IS
-  'Teto da sobra do grupo (saldoGrupo) DESTE evento. O que passar daqui é devolvido aos membros, proporcional ao que cada um gastou em refeições (m.Sown). NULL = sem teto (o comportamento de sempre); 0 = teto a sério, não guardar nada.';
+  'Teto da sobra do grupo (saldoGrupo) DESTE evento. O que passar daqui é devolvido aos membros, proporcional ao que cada um paga (m.V sem as t-shirts). NULL = sem teto (o comportamento de sempre); 0 = teto a sério, não guardar nada.';
 
 -- Sem policies novas: a coluna vive na `eventos` e herda as dela — só o
 -- `is_admin()` escreve, como em todas as parametrizações do ano.
