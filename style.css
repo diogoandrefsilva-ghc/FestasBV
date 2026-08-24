@@ -395,6 +395,10 @@ body.dividas-saldadas .fab-drag-handle{display:none!important}
 .contas-card .cc-title{font-size:16px;font-weight:700;color:var(--ink)}
 .contas-card .cc-sub{font-size:12px;color:var(--faint);margin-top:2px}
 .contas-card .btn{width:100%}
+/* O aviso da fase por extenso (o mesmo texto do email). É o conteúdo do
+   cartão, não uma nota de rodapé: 12px em vez dos 11px das dicas, e ar
+   entre linhas para se ler de uma vez. */
+.contas-card .cc-msg{font-size:12px;line-height:1.55;color:var(--faint);margin:12px 2px 0}
 /* ── Validação (quadro único do próprio agregado, nos Saldos) ── O botão
    NUNCA é verde por defeito: verde é só o selo de "já validado". Tudo
    confirmado, o quadro sai e dá lugar ao .valdone (uma frase curta). */

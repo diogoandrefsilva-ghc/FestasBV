@@ -179,10 +179,19 @@ function checkTipoFrase(t?: CheckTipo): string {
 // Os dois avisos de FASE ('fecho' e 'pagamentos'). O texto é o mesmo para
 // toda a gente e `descricao` é só o nome do evento ("MEO 2026").
 //
-// ⚠️ ESTE TEXTO EXISTE EM DOIS SÍTIOS: aqui (push, escolhido sempre no
-// servidor) e em avisoFaseTexto() no app.js (o email que o admin manda a
-// seguir). É de propósito — o push nunca aceita texto livre do cliente —
-// mas os dois têm de dizer o MESMO. Se mexeres num, mexe no outro.
+// O PUSH É O RESUMO, NÃO A MENSAGEM TODA: o iOS mostra ~4 linhas do corpo
+// no ecrã bloqueado e corta o resto (só aparece ao expandir). Com o
+// parágrafo inteiro aqui, o que ficava cortado era precisamente o "não
+// pagues ainda" — a única coisa que este aviso tinha de dizer. Por isso o
+// corpo cabe no relance e o ESSENCIAL VEM PRIMEIRO; a explicação completa
+// vive no email e no cartão dos Saldos (avisoFaseTexto no app.js). Se
+// voltares a pôr aqui o texto todo, volta a cortar-se no mesmo sítio.
+//
+// ⚠️ O TEXTO DE 'pagamentos' EXISTE EM DOIS SÍTIOS: aqui (push, escolhido
+// sempre no servidor) e em avisoFaseTexto() no app.js (email + cartão). É
+// de propósito — o push nunca aceita texto livre do cliente — mas os dois
+// têm de dizer o mesmo. Se mexeres num, mexe no outro. O de 'fecho' é o
+// resumo do que lá está, e é a versão longa que manda.
 function faseTexto(tipo: "fecho" | "pagamentos", descricao?: string) {
   const ev = descricao || "das Festas";
   if (tipo === "pagamentos") {
@@ -193,7 +202,7 @@ function faseTexto(tipo: "fecho" | "pagamentos", descricao?: string) {
   }
   return {
     title: "🔒 Contas fechadas — em validação",
-    body: `As contas do ${ev} encontram-se fechadas e em validação. Verifica pf as tuas contas e dos teus convidados e, se estiver tudo OK, carrega no botão de validação de contas que aparece no menu de Saldos. Não pagues ainda! A validação de cada pessoa poderá obrigar a acertos nas contas. Receberás notificação quando for altura de pagar.`,
+    body: "Valida as tuas contas e as dos teus convidados nos Saldos. Não pagues ainda, as contas podem alterar.",
   };
 }
 
