@@ -10,7 +10,7 @@
 // neste mesmo projeto. Segue o padrão de "push-notificar-goals" (a app goals,
 // também neste projeto). app.js chama exatamente este slug.
 //
-// Sete momentos, todos chamados pela app:
+// Oito momentos, todos chamados pela app:
 //   'fecho'                fecharContas() → TODOS os membros com conta
 //                           ligada + o ADMIN: o ano fechou e está EM
 //                           VALIDAÇÃO — cada um confirma as suas contas e
@@ -22,6 +22,11 @@
 //                           imediato; um membro fica em pagamentos_pendentes
 //                           à espera) → avisa sempre o ADMIN_EMAIL, que é
 //                           quem aprova (fire-and-forget)
+//   'contas_validadas'     confirmarValidacao(tipo:'contas'), no quadro de
+//                           validações dos Saldos → avisa sempre o
+//                           ADMIN_EMAIL, o mesmo caminho do
+//                           'pagamento_declarado' (é ele quem confere e
+//                           autoriza os pagamentos a seguir; fire-and-forget)
 //   'pagamento_validado'   o outro lado do mesmo pedido: o admin deu o
 //                           pagamento por recebido (validou-o, ou registou-o
 //                           ele próprio sem ninguém declarar nada) → avisa-se
@@ -190,7 +195,8 @@ type Tipo =
   | "pagamento_validado"
   | "pagamento_rejeitado"
   | "lembrete"
-  | "lembrete_validacao";
+  | "lembrete_validacao"
+  | "contas_validadas";
 
 function eurTxt(v: number) {
   return `€${Math.abs(v).toFixed(2).replace(".", ",")}`;
@@ -321,6 +327,21 @@ Deno.serve(async (req) => {
       const payload = JSON.stringify({
         title: "✅ Pagamento declarado",
         body: `${quem || "Alguém"} diz que pagou ${eurTxt(valor)}${descricao ? ` — ${descricao}` : ""} — confirma na app`,
+        url: "/FestasBV/",
+      });
+      return json(await enviarParaSubs(subs, payload));
+    }
+
+    // 'contas_validadas': qualquer membro autorizado pode validar as suas
+    // contas — vai sempre para o ADMIN_EMAIL, como o 'pagamento_declarado'
+    // (é ele quem confere e autoriza os pagamentos a seguir). Não passa por
+    // user_amigos: não interessa quem está no plantel deste ano, interessa
+    // avisar quem decide.
+    if (tipo === "contas_validadas") {
+      const subs = await subscriptionsDe([ADMIN_EMAIL]);
+      const payload = JSON.stringify({
+        title: "✓ Contas validadas",
+        body: `${quem || "Um membro"} validou as suas contas${descricao ? ` — ${descricao}` : ""}`,
         url: "/FestasBV/",
       });
       return json(await enviarParaSubs(subs, payload));
