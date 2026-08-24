@@ -10,7 +10,7 @@
 // neste mesmo projeto. Segue o padrão de "push-notificar-goals" (a app goals,
 // também neste projeto). app.js chama exatamente este slug.
 //
-// Seis momentos, todos chamados pela app:
+// Sete momentos, todos chamados pela app:
 //   'fecho'                fecharContas() → TODOS os membros com conta
 //                           ligada + o ADMIN: o ano fechou e está EM
 //                           VALIDAÇÃO — cada um confirma as suas contas e
@@ -22,10 +22,14 @@
 //                           imediato; um membro fica em pagamentos_pendentes
 //                           à espera) → avisa sempre o ADMIN_EMAIL, que é
 //                           quem aprova (fire-and-forget)
-//   'pagamento_validado'   o outro lado do mesmo pedido: o admin validou-o e
-//                           avisa-se de volta QUEM PAGOU — que o dinheiro
-//                           chegou e como ficaram os saldos do casal
-//                           (fire-and-forget)
+//   'pagamento_validado'   o outro lado do mesmo pedido: o admin deu o
+//                           pagamento por recebido (validou-o, ou registou-o
+//                           ele próprio sem ninguém declarar nada) → avisa-se
+//                           QUEM PAGOU: que o dinheiro chegou e como ficaram
+//                           os saldos do casal (fire-and-forget)
+//   'pagamento_rejeitado'  o outro fim possível: o admin NÃO deu o pagamento
+//                           por recebido → avisa-se quem o declarou, com o
+//                           motivo que ele escreveu (fire-and-forget)
 //   'lembrete'              o admin, no separador Saldos, pede para lembrar
 //                           um membro concreto de uma dívida em aberto
 //                           (o utilizador espera pelo resultado)
@@ -54,12 +58,11 @@
 //
 // Chamada pelo browser com o JWT do utilizador (verify_jwt fica LIGADO no
 // deploy). Por cima disso confirma-se que o email consta de
-// `festasbv.allowed_users`. Os tipos 'fecho', 'pagamentos', 'lembrete',
-// 'lembrete_validacao' e 'pagamento_validado' só o admin pode disparar — é
-// ele quem fecha as contas, quem autoriza os pagamentos, quem lembra
-// dívidas/validações e quem valida um pagamento declarado; o pedido de
-// pagamento é o único que qualquer membro autorizado pode disparar (é ele
-// que declara "já paguei").
+// `festasbv.allowed_users`. Todos os tipos menos um só o admin os pode
+// disparar — é ele quem fecha as contas, quem autoriza os pagamentos, quem
+// lembra dívidas/validações e quem decide se um pagamento entrou ou não; o
+// 'pagamento_declarado' é o único que qualquer membro autorizado dispara (é
+// ele que declara "já paguei").
 //
 // Secrets necessários (Edge Functions -> Secrets):
 //   VAPID_PUBLIC_KEY   par de chaves só para Web Push (não é a chave do
@@ -178,12 +181,14 @@ type Pessoa = {
   checkTipo?: CheckTipo;
   saldo?: number | null;
   saldoConjuge?: number | null;
+  motivo?: string;
 };
 type Tipo =
   | "fecho"
   | "pagamentos"
   | "pagamento_declarado"
   | "pagamento_validado"
+  | "pagamento_rejeitado"
   | "lembrete"
   | "lembrete_validacao";
 
@@ -266,6 +271,19 @@ function montarMensagem(tipo: Tipo, p: Pessoa, descricao?: string, quem?: string
         saldo(p.saldo) + saldo(p.saldoConjuge, "Saldo do teu cônjuge"),
     };
   }
+  // O outro fim: o admin não deu o pagamento por recebido. Sem saldos, ao
+  // contrário do validado — não entrou dinheiro nenhum nas contas, e um
+  // "saldo atual" aqui leria-se como se alguma coisa tivesse mexido. O motivo
+  // é o texto que o admin escreveu no cartão (só ele pode disparar isto) e vem
+  // cortado: um motivo comprido rebentava o payload do push.
+  if (tipo === "pagamento_rejeitado") {
+    const motivo = String(p.motivo ?? "").trim().slice(0, 120);
+    return {
+      title: "✕ Pagamento não confirmado",
+      body: `${quem || "O tesoureiro"} não confirmou o teu pagamento de ${eurTxt(p.valor ?? 0)}.` +
+        (motivo ? ` Motivo: ${motivo}.` : "") + " Não entrou nas contas — vê o pedido na app.",
+    };
+  }
   // 'fecho'/'pagamentos' não passam por aqui (são um payload só para todos,
   // tratados no handler) — este ramo é a rede de segurança de um tipo novo
   // que se esqueça de si próprio.
@@ -310,13 +328,16 @@ Deno.serve(async (req) => {
 
     // Os restantes só o admin os dispara — é ele quem fecha as contas, quem
     // autoriza os pagamentos, quem decide lembrar alguém de uma dívida ou de
-    // um check por validar, e quem valida um pagamento declarado.
-    if (
-      tipo !== "fecho" && tipo !== "pagamentos" && tipo !== "lembrete" &&
-      tipo !== "lembrete_validacao" && tipo !== "pagamento_validado"
-    ) {
-      return json({ error: "tipo inválido" }, 400);
-    }
+    // um check por validar, e quem decide se um pagamento entrou ou não.
+    const soAdmin: Tipo[] = [
+      "fecho",
+      "pagamentos",
+      "lembrete",
+      "lembrete_validacao",
+      "pagamento_validado",
+      "pagamento_rejeitado",
+    ];
+    if (!tipo || !soAdmin.includes(tipo)) return json({ error: "tipo inválido" }, 400);
     if (emailChamador !== ADMIN_EMAIL) return json({ error: "só o admin" }, 403);
     // Lista vazia trava tudo menos os avisos de fase — nesses o admin recebe
     // sempre, mesmo num ano em que ninguém tenha conta ligada (é o "para ver
