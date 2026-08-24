@@ -22,6 +22,10 @@
 //                           imediato; um membro fica em pagamentos_pendentes
 //                           à espera) → avisa sempre o ADMIN_EMAIL, que é
 //                           quem aprova (fire-and-forget)
+//   'pagamento_validado'   o outro lado do mesmo pedido: o admin validou-o e
+//                           avisa-se de volta QUEM PAGOU — que o dinheiro
+//                           chegou e o que ainda falta, a ele e à cara-metade
+//                           (fire-and-forget)
 //   'lembrete'              o admin, no separador Saldos, pede para lembrar
 //                           um membro concreto de uma dívida em aberto
 //                           (o utilizador espera pelo resultado)
@@ -50,11 +54,12 @@
 //
 // Chamada pelo browser com o JWT do utilizador (verify_jwt fica LIGADO no
 // deploy). Por cima disso confirma-se que o email consta de
-// `festasbv.allowed_users`. Os tipos 'fecho', 'pagamentos', 'lembrete' e
-// 'lembrete_validacao' só o admin pode disparar — é ele quem fecha as
-// contas, quem autoriza os pagamentos e quem lembra dívidas/validações; o
-// pedido de pagamento é o único que qualquer membro autorizado pode
-// disparar (é ele que declara "já paguei").
+// `festasbv.allowed_users`. Os tipos 'fecho', 'pagamentos', 'lembrete',
+// 'lembrete_validacao' e 'pagamento_validado' só o admin pode disparar — é
+// ele quem fecha as contas, quem autoriza os pagamentos, quem lembra
+// dívidas/validações e quem valida um pagamento declarado; o pedido de
+// pagamento é o único que qualquer membro autorizado pode disparar (é ele
+// que declara "já paguei").
 //
 // Secrets necessários (Edge Functions -> Secrets):
 //   VAPID_PUBLIC_KEY   par de chaves só para Web Push (não é a chave do
@@ -163,11 +168,35 @@ async function enviarParaSubs(subs: Sub[], payload: string) {
 }
 
 type CheckTipo = "presencas" | "convidados" | "contas";
-type Pessoa = { amigo: string; valor?: number; checkTipo?: CheckTipo };
-type Tipo = "fecho" | "pagamentos" | "pagamento_declarado" | "lembrete" | "lembrete_validacao";
+// `saldo`/`saldoConjuge` só existem no 'pagamento_validado': são as contas do
+// ano, que a app calcula (aqui não há calcular() nenhum) e manda em números —
+// a FRASE é sempre escolhida deste lado. Vêm COM SINAL (negativo = ainda
+// deve); `null` no do cônjuge = não há cônjuge neste ano.
+type Pessoa = {
+  amigo: string;
+  valor?: number;
+  checkTipo?: CheckTipo;
+  saldo?: number | null;
+  saldoConjuge?: number | null;
+};
+type Tipo =
+  | "fecho"
+  | "pagamentos"
+  | "pagamento_declarado"
+  | "pagamento_validado"
+  | "lembrete"
+  | "lembrete_validacao";
 
 function eurTxt(v: number) {
   return `€${Math.abs(v).toFixed(2).replace(".", ",")}`;
+}
+// Um SALDO, ao contrário de um valor, precisa do sinal: é ele que diz de que
+// lado se está (negativo = ainda deve), e é assim que a app o mostra nos
+// Saldos. O cêntimo perdido no arredondamento não é dívida nenhuma — abaixo de
+// meio cêntimo escreve-se zero, senão saía um "−€0,00" a assustar quem já
+// pagou tudo.
+function saldoTxt(v: number) {
+  return (v < -0.005 ? "−" : "") + eurTxt(v);
 }
 
 function checkTipoFrase(t?: CheckTipo): string {
@@ -219,6 +248,24 @@ function montarMensagem(tipo: Tipo, p: Pessoa, descricao?: string, quem?: string
       body: `${quem || "O admin"} lembra-te de validar ${checkTipoFrase(p.checkTipo)}${descricao ? ` — ${descricao}` : ""}`,
     };
   }
+  // O admin aceitou o pagamento declarado. A MENSAGEM É SEMPRE A MESMA — o
+  // que entrou e como ficaram os saldos do casal — e é isso que a torna fácil
+  // de ler: quem a recebe pela segunda vez já sabe onde está cada número, sem
+  // caso especial nenhum a decorar. Os saldos vão com sinal, como no ecrã dos
+  // Saldos: negativo = ainda falta, zero = está saldado. A única frase que
+  // pode faltar é a do cônjuge, quando não há nenhum neste ano.
+  if (tipo === "pagamento_validado") {
+    // Saldo a `null` = a app não tem saldo para dar (não é membro do plantel
+    // deste ano, ou não há cônjuge). Aí a frase desaparece: escrever "€0,00"
+    // seria dizer "está saldado" sobre contas que não se chegaram a fazer.
+    const saldo = (v?: number | null, txt = "Saldo atual") =>
+      v === null || v === undefined ? "" : ` ${txt}: ${saldoTxt(v)}.`;
+    return {
+      title: "✅ Pagamento confirmado",
+      body: `${quem || "O tesoureiro"} confirma que recebeu o teu pagamento de ${eurTxt(p.valor ?? 0)}.` +
+        saldo(p.saldo) + saldo(p.saldoConjuge, "Saldo do teu cônjuge"),
+    };
+  }
   // 'fecho'/'pagamentos' não passam por aqui (são um payload só para todos,
   // tratados no handler) — este ramo é a rede de segurança de um tipo novo
   // que se esqueça de si próprio.
@@ -261,10 +308,13 @@ Deno.serve(async (req) => {
       return json(await enviarParaSubs(subs, payload));
     }
 
-    // 'fecho', 'pagamentos', 'lembrete' e 'lembrete_validacao' só o admin os
-    // dispara — é ele quem fecha as contas, quem autoriza os pagamentos e
-    // quem decide lembrar alguém de uma dívida ou de um check por validar.
-    if (tipo !== "fecho" && tipo !== "pagamentos" && tipo !== "lembrete" && tipo !== "lembrete_validacao") {
+    // Os restantes só o admin os dispara — é ele quem fecha as contas, quem
+    // autoriza os pagamentos, quem decide lembrar alguém de uma dívida ou de
+    // um check por validar, e quem valida um pagamento declarado.
+    if (
+      tipo !== "fecho" && tipo !== "pagamentos" && tipo !== "lembrete" &&
+      tipo !== "lembrete_validacao" && tipo !== "pagamento_validado"
+    ) {
       return json({ error: "tipo inválido" }, 400);
     }
     if (emailChamador !== ADMIN_EMAIL) return json({ error: "só o admin" }, 403);
