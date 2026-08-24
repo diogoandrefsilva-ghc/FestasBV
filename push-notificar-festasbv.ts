@@ -10,12 +10,14 @@
 // neste mesmo projeto. Segue o padrão de "push-notificar-goals" (a app goals,
 // também neste projeto). app.js chama exatamente este slug.
 //
-// Quatro momentos, todos chamados pela app:
+// Cinco momentos, todos chamados pela app:
 //   'fecho'                fecharContas() → TODOS os membros com conta
-//                           ligada, cada um com o que tem a pagar/receber
-//                           (e o saldo do casal, quando há cônjuge) — o
-//                           texto é sempre por pessoa, nunca "toda a gente
-//                           deve o mesmo" (fire-and-forget)
+//                           ligada + o ADMIN: o ano fechou e está EM
+//                           VALIDAÇÃO — cada um confirma as suas contas e
+//                           NÃO paga ainda (fire-and-forget)
+//   'pagamentos'           autorizarPagamentos() → os mesmos destinatários:
+//                           a validação acabou e já se pode pagar
+//                           (fire-and-forget)
 //   'pagamento_declarado'  ao declarar "🤝 Pagar Dívida" (admin regista de
 //                           imediato; um membro fica em pagamentos_pendentes
 //                           à espera) → avisa sempre o ADMIN_EMAIL, que é
@@ -31,6 +33,14 @@
 //                           app cai para um link de email (client-side);
 //                           esta function só sabe de push
 //
+// 'fecho' e 'pagamentos' são os únicos com texto IGUAL PARA TODOS (são um
+// aviso de fase, não um extrato): um payload só, mandado a toda a gente de
+// uma vez. O saldo de cada um não vai lá de propósito — em 'fecho' porque
+// ainda pode mudar com as validações, e em 'pagamentos' porque a app di-lo
+// no ecrã dos Saldos, sempre atualizado. O ADMIN entra sempre na lista,
+// mesmo que não esteja no plantel: é ele que dispara e quer ver o que os
+// outros receberam.
+//
 // Resolve amigo→email via `user_amigos` (mesma tabela usada nas outras
 // políticas de equivalência) e manda o push a cada `push_subscriptions`
 // dessa pessoa. Subscriptions que já não existem do lado do browser
@@ -40,11 +50,11 @@
 //
 // Chamada pelo browser com o JWT do utilizador (verify_jwt fica LIGADO no
 // deploy). Por cima disso confirma-se que o email consta de
-// `festasbv.allowed_users`. Os tipos 'fecho', 'lembrete' e
+// `festasbv.allowed_users`. Os tipos 'fecho', 'pagamentos', 'lembrete' e
 // 'lembrete_validacao' só o admin pode disparar — é ele quem fecha as
-// contas e quem lembra dívidas/validações; o pedido de pagamento é o único
-// que qualquer membro autorizado pode disparar (é ele que declara "já
-// paguei").
+// contas, quem autoriza os pagamentos e quem lembra dívidas/validações; o
+// pedido de pagamento é o único que qualquer membro autorizado pode
+// disparar (é ele que declara "já paguei").
 //
 // Secrets necessários (Edge Functions -> Secrets):
 //   VAPID_PUBLIC_KEY   par de chaves só para Web Push (não é a chave do
@@ -153,8 +163,8 @@ async function enviarParaSubs(subs: Sub[], payload: string) {
 }
 
 type CheckTipo = "presencas" | "convidados" | "contas";
-type Pessoa = { amigo: string; valor?: number; casal?: number | null; checkTipo?: CheckTipo };
-type Tipo = "fecho" | "pagamento_declarado" | "lembrete" | "lembrete_validacao";
+type Pessoa = { amigo: string; valor?: number; checkTipo?: CheckTipo };
+type Tipo = "fecho" | "pagamentos" | "pagamento_declarado" | "lembrete" | "lembrete_validacao";
 
 function eurTxt(v: number) {
   return `€${Math.abs(v).toFixed(2).replace(".", ",")}`;
@@ -166,16 +176,25 @@ function checkTipoFrase(t?: CheckTipo): string {
   return "as tuas contas";
 }
 
-// 'fecho': o saldo do PRÓPRIO primeiro, o do CASAL a seguir — só quando há
-// cônjuge e o total do casal é diferente do saldo individual (sem cônjuge,
-// ou com cônjuge cujas contas não mudam nada, repetir o número era ruído).
-function fraseSaldo(v: number): string {
-  if (Math.abs(v) < 0.005) return "as contas estão saldadas";
-  return v > 0 ? `tens ${eurTxt(v)} a receber` : `tens ${eurTxt(v)} a pagar`;
-}
-function fraseSaldoCasal(v: number): string {
-  if (Math.abs(v) < 0.005) return "o casal está com as contas saldadas";
-  return v > 0 ? `o casal, no total, tem ${eurTxt(v)} a receber` : `o casal, no total, tem ${eurTxt(v)} a pagar`;
+// Os dois avisos de FASE ('fecho' e 'pagamentos'). O texto é o mesmo para
+// toda a gente e `descricao` é só o nome do evento ("MEO 2026").
+//
+// ⚠️ ESTE TEXTO EXISTE EM DOIS SÍTIOS: aqui (push, escolhido sempre no
+// servidor) e em avisoFaseTexto() no app.js (o email que o admin manda a
+// seguir). É de propósito — o push nunca aceita texto livre do cliente —
+// mas os dois têm de dizer o MESMO. Se mexeres num, mexe no outro.
+function faseTexto(tipo: "fecho" | "pagamentos", descricao?: string) {
+  const ev = descricao || "das Festas";
+  if (tipo === "pagamentos") {
+    return {
+      title: "💳 Já podes pagar",
+      body: `As contas do ${ev} encontram-se fechadas e validadas. Podes (e deves!) proceder ao pagamento do teu saldo.`,
+    };
+  }
+  return {
+    title: "🔒 Contas fechadas — em validação",
+    body: `As contas do ${ev} encontram-se fechadas e em validação. Verifica pf as tuas contas e dos teus convidados e, se estiver tudo OK, carrega no botão de validação de contas que aparece no menu de Saldos. Não pagues ainda! A validação de cada pessoa poderá obrigar a acertos nas contas. Receberás notificação quando for altura de pagar.`,
+  };
 }
 
 function montarMensagem(tipo: Tipo, p: Pessoa, descricao?: string, quem?: string) {
@@ -191,16 +210,10 @@ function montarMensagem(tipo: Tipo, p: Pessoa, descricao?: string, quem?: string
       body: `${quem || "O admin"} lembra-te de validar ${checkTipoFrase(p.checkTipo)}${descricao ? ` — ${descricao}` : ""}`,
     };
   }
-  // 'fecho'
-  let body = fraseSaldo(p.valor ?? 0);
-  body = body.charAt(0).toUpperCase() + body.slice(1) + ".";
-  if (p.casal != null && Math.abs(p.casal - (p.valor ?? 0)) > 0.005) {
-    body += " " + fraseSaldoCasal(p.casal).charAt(0).toUpperCase() + fraseSaldoCasal(p.casal).slice(1) + ".";
-  }
-  return {
-    title: "🔒 Contas fechadas" + (descricao ? ` — ${descricao}` : ""),
-    body,
-  };
+  // 'fecho'/'pagamentos' não passam por aqui (são um payload só para todos,
+  // tratados no handler) — este ramo é a rede de segurança de um tipo novo
+  // que se esqueça de si próprio.
+  return { title: "FestasBV", body: descricao || "" };
 }
 
 Deno.serve(async (req) => {
@@ -239,24 +252,48 @@ Deno.serve(async (req) => {
       return json(await enviarParaSubs(subs, payload));
     }
 
-    // 'fecho', 'lembrete' e 'lembrete_validacao' só o admin os dispara — é
-    // ele quem fecha as contas e quem decide lembrar alguém de uma dívida
-    // ou de um check por validar.
-    if (tipo !== "fecho" && tipo !== "lembrete" && tipo !== "lembrete_validacao") return json({ error: "tipo inválido" }, 400);
+    // 'fecho', 'pagamentos', 'lembrete' e 'lembrete_validacao' só o admin os
+    // dispara — é ele quem fecha as contas, quem autoriza os pagamentos e
+    // quem decide lembrar alguém de uma dívida ou de um check por validar.
+    if (tipo !== "fecho" && tipo !== "pagamentos" && tipo !== "lembrete" && tipo !== "lembrete_validacao") {
+      return json({ error: "tipo inválido" }, 400);
+    }
     if (emailChamador !== ADMIN_EMAIL) return json({ error: "só o admin" }, 403);
-    if (!Array.isArray(pessoas) || pessoas.length === 0) return json({ enviados: 0, falhados: 0 });
+    // Lista vazia trava tudo menos os avisos de fase — nesses o admin recebe
+    // sempre, mesmo num ano em que ninguém tenha conta ligada (é o "para ver
+    // como fica" de quem carregou no botão).
+    const lista = Array.isArray(pessoas) ? pessoas : [];
+    const fase = tipo === "fecho" || tipo === "pagamentos";
+    if (lista.length === 0 && !fase) return json({ enviados: 0, falhados: 0 });
 
     // amigo → email (só os amigos pedidos)
-    const nomes = [...new Set(pessoas.map((p) => p.amigo).filter(Boolean))];
+    const nomes = [...new Set(lista.map((p) => p.amigo).filter(Boolean))];
     const orList = nomes.map((n) => `"${n.replace(/"/g, '\\"')}"`).join(",");
-    const eqR = await fetch(
-      `${SB_URL}/rest/v1/user_amigos?amigo=in.(${orList})&select=amigo,email`,
-      { headers: sbHeaders },
-    );
-    const equivalencias: { amigo: string; email: string }[] = eqR.ok ? await eqR.json() : [];
+    const eqR = nomes.length
+      ? await fetch(
+        `${SB_URL}/rest/v1/user_amigos?amigo=in.(${orList})&select=amigo,email`,
+        { headers: sbHeaders },
+      )
+      : null;
+    const equivalencias: { amigo: string; email: string }[] = eqR && eqR.ok ? await eqR.json() : [];
     const emailPorAmigo = new Map(equivalencias.map((e) => [e.amigo, e.email.toLowerCase()]));
 
-    const emails = [...new Set(pessoas.map((p) => emailPorAmigo.get(p.amigo)).filter(Boolean))] as string[];
+    // Avisos de FASE: o mesmo texto para toda a gente, logo um payload só
+    // para TODAS as subscriptions de uma vez. O admin entra sempre na lista
+    // (mesmo fora do plantel, ou sem `amigo` que resolva) — dispara e quer
+    // ver o que os outros receberam. Mandar por pessoa, como os outros
+    // tipos fazem, duplicaria o push a quem está nas duas listas.
+    if (fase) {
+      const alvos = new Set(
+        lista.map((p) => emailPorAmigo.get(p.amigo)).filter(Boolean) as string[],
+      );
+      alvos.add(ADMIN_EMAIL);
+      const subs = await subscriptionsDe([...alvos]);
+      const payload = JSON.stringify({ ...faseTexto(tipo as "fecho" | "pagamentos", descricao), url: "/FestasBV/" });
+      return json(await enviarParaSubs(subs, payload));
+    }
+
+    const emails = [...new Set(lista.map((p) => emailPorAmigo.get(p.amigo)).filter(Boolean))] as string[];
     if (emails.length === 0) return json({ enviados: 0, falhados: 0 });
 
     const subs = await subscriptionsDe(emails);
@@ -264,7 +301,7 @@ Deno.serve(async (req) => {
     let enviados = 0;
     let falhados = 0;
     await Promise.all(
-      pessoas.map(async (p) => {
+      lista.map(async (p) => {
         const emailP = emailPorAmigo.get(p.amigo);
         if (!emailP) return;
         const payload = JSON.stringify({

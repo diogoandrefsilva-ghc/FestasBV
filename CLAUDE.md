@@ -564,6 +564,24 @@ A `validacoes` só sabia validar uma coisa — as contas apuradas, só depois de
 - **`VAL_TIPO_COL`** (sondado por `validacoes?select=tipo&limit=1`, à parte do fetch principal que passou a `select=*`): sem a migração, os três checks ficam escondidos (Presenças e Convidados) ou reduzidos ao comportamento antigo (Contas) — as linhas gravadas nunca tiveram `tipo`, por isso lê-se sempre `v.tipo||'contas'`.
 - Migração: `db/validacoes_tipo.sql`. Tolerante: `tipo` nasce com DEFAULT `'contas'` (o histórico não muda de sentido) e a UNIQUE passa de `(evento_id,amigo)` para `(evento_id,amigo,tipo)`. **Idempotente também para quem já tinha corrido a versão só com `'presencas'`**: o CHECK compara-se pela definição (via `pg_get_constraintdef`), não só pelo nome — sem isso, recorrer o ficheiro não acrescentava `'convidados'` a um constraint que já existia com o valor antigo.
 
+## O fim do ano tem DUAS fases, e cada uma manda o seu aviso (`db/pagamentos_autorizados.sql`)
+Fechar as contas queria dizer duas coisas ao mesmo tempo — "o apuramento parou" e "paguem" — e a segunda estava errada: as validações de cada um ainda podem obrigar a acertos, e quem pagasse pelo número do dia do fecho podia estar a pagar o número errado (e depois a ser reembolsado, ou a pagar outra vez). Passam a ser duas.
+- **🔒 Fechar Contas → EM VALIDAÇÃO.** O aviso diz "confirma as tuas contas e as dos teus convidados, e **não pagues ainda**".
+- **💳 Autorizar Pagamentos → VALIDADAS** (`eventos.pagamentos_autorizados`, botão do admin em Saldos › Estado das Contas, só com o ano fechado). O aviso diz "podes (e deves!) proceder ao pagamento".
+- **NÃO TRANCA NADA**, e é uma decisão: `podeSaldar` fica como estava, o 🤝 continua disponível a quem já o tinha e o admin regista o que for chegando. A fase é um **aviso ao grupo**, não uma trava — travar o 🤝 até à autorização é uma decisão à parte, e nasceria em `pagamentosAutorizados()`.
+- **Reabrir as contas retira a autorização** (mesmo PATCH): se o ano volta a mexer, os números que se mandou pagar deixaram de ser os finais. Retirar a autorização à mão **não avisa ninguém** — um "afinal não paguem" manda-se por outra via, com a explicação; a app não tem texto para isso.
+
+### O aviso vai por DOIS canais e é IGUAL PARA TODOS
+`avisarFase(fase)`: push (fire-and-forget) **e** email. Os dois, porque nenhum chega a toda a gente — o push depende de cada um o ter ativo (no iPhone, só com a app instalada no ecrã principal) e o email chega sempre.
+- **O texto não leva o saldo de ninguém**, ao contrário do que o push do fecho fazia ("tens €42,50 a pagar"). No fecho porque esse número **ainda pode mudar** com as validações — era precisamente o que a nova fase veio evitar; na autorização porque a app o diz no ecrã dos Saldos, sempre atualizado. Se voltares a pôr o valor no aviso do fecho, desfazes a razão de as fases existirem.
+- **O ADMIN recebe o push como toda a gente** — juntado do lado do servidor (`ADMIN_EMAIL` entra sempre na lista), mesmo que não esteja no plantel ou que ninguém tenha conta ligada. É assim que quem carregou no botão vê o que os outros receberam.
+- **Um payload só, não um por pessoa**: o texto é o mesmo, e mandar por pessoa duplicava o push a quem está nas duas listas (membro *e* admin). Os outros tipos (`lembrete`, `lembrete_validacao`) continuam por pessoa, que aí o texto é individual.
+- **O TEXTO EXISTE EM DOIS SÍTIOS, de propósito**: `faseTexto()` na Edge Function (o push — o texto do push escolhe-se **sempre** no servidor, nunca vem livre do cliente) e `avisoFaseTexto()` no `app.js` (o email, que é a app a prepará-lo). Se mexeres num, mexe no outro.
+- **O email abre a app do Gmail** (`abrirGmailApp`, o mesmo do lembrete de validação), com **todos os membros do plantel com conta ligada** no destinatário. A app não manda emails — prepara a mensagem. Como isso a tira do ecrã, **pergunta-se antes**; e como o esquema `googlegmail://` pode não pegar (e o fecho leva a app para fora, onde é fácil o email ficar por mandar), há **📣 Reenviar aviso aos membros**, que repete os dois canais da fase em curso.
+- Quem **não tem conta ligada** não recebe nem push nem email — como no lembrete de validação, tem de ser avisado por fora.
+- **Nada disto vai ao Telegram**: o fecho não escreve no `historico` (nunca escreveu) e continua a não escrever.
+- Migração: `db/pagamentos_autorizados.sql`. Tolerante: sem ela, `pagAutorizCol=false`, o cartão da 2.ª fase fica escondido e o fecho manda só o aviso dele.
+
 ## T-shirts (separador 👕)
 Levantamento das t-shirts a encomendar **e** a fatura delas, que **entra nas contas** (desde `db/tshirts_cashflow.sql`).
 
