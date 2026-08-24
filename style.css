@@ -119,9 +119,11 @@ body::before{content:"";position:fixed;top:0;left:0;right:0;height:env(safe-area
 .rs-head:active{background:var(--panel2)}
 .rs-head .nm{flex:1;font-size:17px;font-weight:600;letter-spacing:-.2px;min-width:0}
 .rs-head .nm small{display:block;font-size:11px;font-weight:500;color:var(--faint);letter-spacing:0}
-/* Marca de "já validou as contas", junto ao nome na lista — verde é sempre
-   o selo de "já feito" (mesma cor do .valmini-row.done). */
+/* Marca junto ao nome na lista — UM estado de cada vez, nunca os dois:
+   dourado = validou as contas, pagamentos ainda não ativos; verde = já
+   saldou (só depois de os pagamentos ficarem ativos). */
 .val-badge{display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;margin-left:6px;border-radius:50%;background:var(--green);color:#fff;font-size:9px;font-weight:800;vertical-align:2px}
+.val-badge.gold{background:var(--gold)}
 .rs-head .amt{font-size:18px;font-weight:700;text-align:right;font-variant-numeric:tabular-nums}
 .rs-head .rs-arrow{color:var(--faint);font-size:10px;margin-left:2px;transition:transform .2s}
 .rs-row.open .rs-arrow{transform:rotate(180deg)}
@@ -175,8 +177,12 @@ body::before{content:"";position:fixed;top:0;left:0;right:0;height:env(safe-area
    pessoa — antes vivia num <details> à cabeça dos Saldos, sempre visível. */
 .rs-sub-note{margin:2px 2px 8px 24px;font-size:11px;color:var(--muted);line-height:1.5}
 .rs-sub-note b{color:var(--ink);font-weight:600}
-/* "Contas validadas em…", no fim do detalhe de quem já validou. */
+/* "Contas validadas em…" / "Saldado em…", no fim do detalhe de cada um —
+   ao contrário do ✓ do cabeçalho (um estado de cada vez), aqui ficam os
+   dois, quando existirem. Verde por omissão (saldado); .gold é a validação. */
 .rs-valcontas{margin:10px 2px 0;padding:9px 10px;background:rgba(30,122,77,.09);border:1px solid rgba(30,122,77,.3);border-radius:10px;font-size:12px;font-weight:700;color:var(--green);text-align:center}
+.rs-valcontas+.rs-valcontas{margin-top:8px}
+.rs-valcontas.gold{background:rgba(168,123,20,.09);border-color:rgba(168,123,20,.35);color:var(--gold)}
 
 /* Cards */
 .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:13px 14px;margin-bottom:8px;box-shadow:0 1px 4px rgba(80,55,20,.07)}
