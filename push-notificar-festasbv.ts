@@ -10,7 +10,7 @@
 // neste mesmo projeto. Segue o padrão de "push-notificar-goals" (a app goals,
 // também neste projeto). app.js chama exatamente este slug.
 //
-// Cinco momentos, todos chamados pela app:
+// Seis momentos, todos chamados pela app:
 //   'fecho'                fecharContas() → TODOS os membros com conta
 //                           ligada + o ADMIN: o ano fechou e está EM
 //                           VALIDAÇÃO — cada um confirma as suas contas e
@@ -24,7 +24,7 @@
 //                           quem aprova (fire-and-forget)
 //   'pagamento_validado'   o outro lado do mesmo pedido: o admin validou-o e
 //                           avisa-se de volta QUEM PAGOU — que o dinheiro
-//                           chegou e o que ainda falta, a ele e à cara-metade
+//                           chegou e como ficaram os saldos do casal
 //                           (fire-and-forget)
 //   'lembrete'              o admin, no separador Saldos, pede para lembrar
 //                           um membro concreto de uma dívida em aberto
