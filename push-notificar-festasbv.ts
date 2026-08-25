@@ -54,6 +54,17 @@
 // mesmo que não esteja no plantel: é ele que dispara e quer ver o que os
 // outros receberam.
 //
+// 'fecho'/'pagamentos' levam também `ano` (o ano do evento que disparou o
+// aviso), verificado AQUI contra o maior `ano` em `eventos` antes de mandar
+// nada. É a trava a sério contra um separador com o app.js antigo em cache
+// mandar "já podes pagar" sobre um ano que já não é o corrente: o
+// anoCorrente() do lado do cliente já evita isto, mas só vale a partir do
+// deploy em que nasceu — quem tinha a página aberta de antes continua a
+// correr o JS velho até recarregar. Foi assim que este aviso saiu por
+// engano sobre 2025, já fechado há um ano (25/08/2026) — o servidor é o
+// único sítio que corre sempre a versão publicada, por isso é ele que tem
+// de confirmar a sério, não só confiar no que o cliente diz que é.
+//
 // Resolve amigo→email via `user_amigos` (mesma tabela usada nas outras
 // políticas de equivalência) e manda o push a cada `push_subscriptions`
 // dessa pessoa. Subscriptions que já não existem do lado do browser
@@ -310,11 +321,12 @@ Deno.serve(async (req) => {
     if (!emailChamador) return json({ error: "não autorizado" }, 403);
     if (!(await estaAutorizado(emailChamador))) return json({ error: "não autorizado" }, 403);
 
-    const { pessoas, descricao, quem, tipo } = (await req.json()) as {
+    const { pessoas, descricao, quem, tipo, ano } = (await req.json()) as {
       pessoas?: Pessoa[];
       descricao?: string;
       quem?: string;
       tipo?: Tipo;
+      ano?: number;
     };
 
     // 'pagamento_declarado': vai SEMPRE para o admin, direto — é ele quem
@@ -385,6 +397,26 @@ Deno.serve(async (req) => {
     // ver o que os outros receberam. Mandar por pessoa, como os outros
     // tipos fazem, duplicaria o push a quem está nas duas listas.
     if (fase) {
+      // TRAVA A SÉRIO contra um cliente com código velho em cache mandar
+      // "já podes pagar"/"em validação" sobre um ano que já não é o
+      // corrente: o `anoCorrente()` do app.js já evita disparar isto, mas
+      // é uma guarda do LADO DO CLIENTE — um separador aberto antes de um
+      // deploy continua a correr o JS antigo até se recarregar, e foi
+      // assim que este aviso saiu por engano sobre um ano fechado há muito
+      // (25/08/2026). Aqui confirma-se a sério, contra a BD, que `ano` é
+      // o maior `ano` em `eventos` — o único sítio que um cliente antigo
+      // não consegue contornar, porque corre sempre a versão publicada
+      // desta function. Sem `ano` (cliente ainda mais antigo, de antes
+      // desta coluna) não se envia — silêncio é mais seguro que adivinhar.
+      const anoR = await fetch(
+        `${SB_URL}/rest/v1/eventos?select=ano&order=ano.desc&limit=1`,
+        { headers: sbHeaders },
+      );
+      const anoRows: { ano: number }[] = anoR.ok ? await anoR.json() : [];
+      const anoCorrente = anoRows[0]?.ano;
+      if (ano == null || anoCorrente == null || ano !== anoCorrente) {
+        return json({ enviados: 0, falhados: 0, bloqueado: "ano_nao_corrente" });
+      }
       const alvos = new Set(
         lista.map((p) => emailPorAmigo.get(p.amigo)).filter(Boolean) as string[],
       );
