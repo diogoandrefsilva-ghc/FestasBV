@@ -737,6 +737,15 @@ setTimeout(function(){ if (window.fbvEsconderSplash) window.fbvEsconderSplash();
           </select>
         </div>
 
+        <div id="adm-precoarr-row" style="display:none;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-top:10px">
+          <div style="font-size:13px;font-weight:600">Arredondamento do preço da refeição</div>
+          <div style="font-size:11px;color:var(--faint);margin-bottom:6px">Como se fecha ao cêntimo cada parcela do preço por pessoa. Um ano já fechado mantém a regra com que fechou</div>
+          <select id="adm-preco-arredonda" onchange="saveParams()" class="sf" style="width:100%;font-size:14px;padding:8px 10px;-webkit-appearance:none;appearance:none;min-width:0;max-width:100%;box-sizing:border-box;background:var(--panel);border:1px solid var(--line);border-radius:8px;color:var(--ink)">
+            <option value="cima">Cêntimo acima — o grupo nunca fica a perder</option>
+            <option value="cent">Cêntimo mais próximo</option>
+          </select>
+        </div>
+
         <div id="adm-divpub-row" style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;margin-top:10px">
           <div style="flex:1">
             <div style="font-size:13px;font-weight:600">Dívidas Públicas</div>
