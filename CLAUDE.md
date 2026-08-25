@@ -637,6 +637,14 @@ O `.no-scroll` do body é `position:fixed` — e isso faz o browser **esquecer o
 - **Travar duas vezes não grava nada**: com o body já fixo o `window.scrollY` é 0, e um modal aberto por cima de outro apagaria a posição a sério. Destravar sem estar travado também não faz nada — é o que deixa os `close*` serem chamados à toa, como sempre foram.
 - Um modal que abre outro fecha o primeiro (repõe o scroll) e o segundo volta a travar no mesmo sítio: é tudo síncrono, não há pintura pelo meio nem salto à vista.
 
+## Gravar um ano APAGA e reinsere as tabelas filhas — e isso não é atómico
+`sbGuardarEvento` faz `DELETE ?evento_id=eq.N` às seis tabelas filhas (membros, refeicoes_def, despesas, convidados, mealheiros, pagamentos) e só depois reinsere cada uma. **Se um INSERT falhar, o DELETE já correu e os dados desapareceram** — não há transação a proteger isto. Aconteceu a 25/08/2026: um `POST pagamentos` devolveu 400 e 2026 ficou sem um único pagamento.
+- **Num INSERT em lote, o PostgREST monta UMA lista de colunas para o lote todo** e preenche com **NULL explícito** as linhas a que uma chave falte — **não aplica o DEFAULT da coluna**. Logo, uma chave que só apareça nalgumas linhas transforma-se num NULL nas outras, e numa coluna `NOT NULL` rebenta o lote inteiro.
+- **Regra: as linhas de um lote têm de ter SEMPRE o mesmo conjunto de chaves.** As chaves condicionais que existem (`nota`, `grupo_pag`, `bebida`, `modo`, …) dependem de flags **globais** de sonda de coluna, por isso saem iguais em todas as linhas — não há problema. A única que chegou a depender da LINHA foi o `criado_em` dos pagamentos (`p.criadoEm` só existe em pagamentos que já passaram pela BD), e foi essa que apagou 2026. Passa a ir sempre, com `p.criadoEm||new Date().toISOString()`.
+- **Se acrescentares uma coluna cujo valor dependa da linha**, põe a chave em todas as linhas (com `null` explícito, se a coluna o aceitar) — nunca a deixes de fora numas e presente noutras.
+- Regressão: `node tests/pagamentos-lote.js` (sem dependências) monta o caso real — dois pagamentos vindos da BD mais um acabado de registar — e falha se as linhas do lote não tiverem todas as mesmas chaves.
+- **O que continua por resolver**: a falta de atomicidade em si. Enquanto o DELETE+INSERT não correr dentro de uma transação (uma função no servidor, chamada por RPC), qualquer erro no meio de uma gravação continua a poder esvaziar uma tabela filha de um ano inteiro.
+
 ## Regras técnicas (não partir a app)
 - `app.js` carrega como `<script src>` **normal, NÃO module** — há `onclick="…"` no HTML, logo as funções têm de ser **globais**. Não converter para módulo.
 - **PWA/cache:** se mexeres em `app.js`, `style.css` ou `index.html`, **sobe `CACHE_NAME` no `sw.js`** (ex.: `app-cache-v3` → `v4`). Estes três já são *network-first* (atualizam sozinhos), mas o bump garante que ninguém fica com versão velha.
