@@ -10,23 +10,34 @@
 // neste mesmo projeto. Segue o padrão de "push-notificar-goals" (a app goals,
 // também neste projeto). app.js chama exatamente este slug.
 //
-// Oito momentos, todos chamados pela app:
-//   'fecho'                fecharContas() → TODOS os membros com conta
+// Dez momentos, todos chamados pela app:
+//   'validar_presencas'    setFase() ao entrar em "Validação Presenças" →
+//                           TODOS os membros com conta ligada + o ADMIN: as
+//                           festas acabaram, cada um confirma as presenças e
+//                           os convidados dele — que ainda se corrigem
+//                           (fire-and-forget)
+//   'fecho'                setFase() ao entrar em "Validação Contas" →
+//                           TODOS os membros com conta
 //                           ligada + o ADMIN: o ano fechou e está EM
 //                           VALIDAÇÃO — cada um confirma as suas contas e
 //                           NÃO paga ainda (fire-and-forget)
-//   'pagamentos'           autorizarPagamentos() → os mesmos destinatários:
+//   'pagamentos'           setFase() ao entrar em "Em Pagamento" → os
+//                           mesmos destinatários:
 //                           a validação acabou e já se pode pagar
 //                           (fire-and-forget)
 //   'pagamento_declarado'  ao declarar "🤝 Pagar Dívida" (admin regista de
 //                           imediato; um membro fica em pagamentos_pendentes
 //                           à espera) → avisa sempre o ADMIN_EMAIL, que é
 //                           quem aprova (fire-and-forget)
-//   'contas_validadas'     confirmarValidacao(tipo:'contas'), no quadro de
-//                           validações dos Saldos → avisa sempre o
+//   'validacao_feita'      confirmarValidacao() de QUALQUER um dos três
+//                           checks (o `checkTipo` diz qual), no quadro de
+//                           validações do slider → avisa sempre o
 //                           ADMIN_EMAIL, o mesmo caminho do
-//                           'pagamento_declarado' (é ele quem confere e
-//                           autoriza os pagamentos a seguir; fire-and-forget)
+//                           'pagamento_declarado' (é ele quem confere e faz
+//                           o ano avançar de fase; fire-and-forget).
+//                           'contas_validadas' é o nome antigo do mesmo
+//                           aviso, de quando só as contas se validavam —
+//                           continua aceite para um cliente em cache
 //   'pagamento_validado'   o outro lado do mesmo pedido: o admin deu o
 //                           pagamento por recebido (validou-o, ou registou-o
 //                           ele próprio sem ninguém declarar nada) → avisa-se
@@ -46,7 +57,8 @@
 //                           app cai para um link de email (client-side);
 //                           esta function só sabe de push
 //
-// 'fecho' e 'pagamentos' são os únicos com texto IGUAL PARA TODOS (são um
+// Os avisos de FASE ('validar_presencas', 'fecho', 'pagamentos' —
+// FASES_AVISO) são os únicos com texto IGUAL PARA TODOS (são um
 // aviso de fase, não um extrato): um payload só, mandado a toda a gente de
 // uma vez. O saldo de cada um não vai lá de propósito — em 'fecho' porque
 // ainda pode mudar com as validações, e em 'pagamentos' porque a app di-lo
@@ -54,7 +66,7 @@
 // mesmo que não esteja no plantel: é ele que dispara e quer ver o que os
 // outros receberam.
 //
-// 'fecho'/'pagamentos' levam também `ano` (o ano do evento que disparou o
+// Os avisos de fase levam também `ano` (o ano do evento que disparou o
 // aviso), verificado AQUI contra o maior `ano` em `eventos` antes de mandar
 // nada. É a trava a sério contra um separador com o app.js antigo em cache
 // mandar "já podes pagar" sobre um ano que já não é o corrente: o
@@ -200,6 +212,7 @@ type Pessoa = {
   motivo?: string;
 };
 type Tipo =
+  | "validar_presencas"
   | "fecho"
   | "pagamentos"
   | "pagamento_declarado"
@@ -207,7 +220,13 @@ type Tipo =
   | "pagamento_rejeitado"
   | "lembrete"
   | "lembrete_validacao"
+  | "validacao_feita"
   | "contas_validadas";
+// Os avisos de FASE: um payload só, igual para toda a gente, e só depois de
+// se confirmar contra a BD que o `ano` é o corrente. Ter isto numa lista em
+// vez de num `||` de três é o que evita que um tipo novo entre por metade
+// dos sítios — a lista é lida na rota e no `soAdmin`.
+const FASES_AVISO: Tipo[] = ["validar_presencas", "fecho", "pagamentos"];
 
 function eurTxt(v: number) {
   return `€${Math.abs(v).toFixed(2).replace(".", ",")}`;
@@ -227,8 +246,8 @@ function checkTipoFrase(t?: CheckTipo): string {
   return "as tuas contas";
 }
 
-// Os dois avisos de FASE ('fecho' e 'pagamentos'). O texto é o mesmo para
-// toda a gente e `descricao` é só o nome do evento ("MEO 2026").
+// Os TRÊS avisos de FASE (FASES_AVISO). O texto é o mesmo para toda a
+// gente e `descricao` é só o nome do evento ("MEO 2026").
 //
 // O PUSH É O RESUMO, NÃO A MENSAGEM TODA: o iOS mostra ~4 linhas do corpo
 // no ecrã bloqueado e corta o resto (só aparece ao expandir). Com o
@@ -238,13 +257,24 @@ function checkTipoFrase(t?: CheckTipo): string {
 // vive no email e no cartão dos Saldos (avisoFaseTexto no app.js). Se
 // voltares a pôr aqui o texto todo, volta a cortar-se no mesmo sítio.
 //
-// ⚠️ O TEXTO DE 'pagamentos' EXISTE EM DOIS SÍTIOS: aqui (push, escolhido
-// sempre no servidor) e em avisoFaseTexto() no app.js (email + cartão). É
-// de propósito — o push nunca aceita texto livre do cliente — mas os dois
-// têm de dizer o mesmo. Se mexeres num, mexe no outro. O de 'fecho' é o
-// resumo do que lá está, e é a versão longa que manda.
-function faseTexto(tipo: "fecho" | "pagamentos", descricao?: string) {
+// ⚠️ ESTE TEXTO EXISTE EM DOIS SÍTIOS: aqui (push, escolhido sempre no
+// servidor) e em avisoFaseTexto() no app.js (email + cartão). É de
+// propósito — o push nunca aceita texto livre do cliente — mas os dois têm
+// de dizer o mesmo. Se mexeres num, mexe no outro. Em 'validar_presencas'
+// e 'pagamentos' são a MESMA frase (cabem no relance); em 'fecho' este é o
+// resumo, e é a versão longa do app.js que manda.
+function faseTexto(tipo: Tipo, descricao?: string) {
   const ev = descricao || "das Festas";
+  // A 1.ª fase que pede alguma coisa ao grupo: acabaram as festas e cada um
+  // confirma o que lhe diz respeito, enquanto ainda se corrige. Cabe no
+  // relance, por isso o email e o cartão dizem exatamente isto (ao
+  // contrário do 'fecho', em que o push é resumo de um texto maior).
+  if (tipo === "validar_presencas") {
+    return {
+      title: "✋ Valida as tuas presenças",
+      body: `O ${ev} chegou ao fim. É tempo de validares/confirmares as tuas presenças e dos teus convidados.`,
+    };
+  }
   if (tipo === "pagamentos") {
     return {
       title: "💳 Já podes pagar",
@@ -344,16 +374,29 @@ Deno.serve(async (req) => {
       return json(await enviarParaSubs(subs, payload));
     }
 
-    // 'contas_validadas': qualquer membro autorizado pode validar as suas
-    // contas — vai sempre para o ADMIN_EMAIL, como o 'pagamento_declarado'
-    // (é ele quem confere e autoriza os pagamentos a seguir). Não passa por
-    // user_amigos: não interessa quem está no plantel deste ano, interessa
-    // avisar quem decide.
-    if (tipo === "contas_validadas") {
+    // 'validacao_feita': qualquer membro autorizado pode confirmar um dos
+    // TRÊS checks (presenças, convidados, contas) — vai sempre para o
+    // ADMIN_EMAIL, como o 'pagamento_declarado'. Não passa por user_amigos:
+    // não interessa quem está no plantel deste ano, interessa avisar quem
+    // decide — é ele que confere e faz o ano avançar de fase.
+    //
+    // 'contas_validadas' é o NOME ANTIGO do mesmo aviso, de quando só as
+    // contas se validavam. Continua a ser aceite porque um separador com o
+    // app.js velho em cache ainda o manda — e aí não vem `checkTipo`, o que
+    // dá 'contas', que é exatamente o que esse cliente quer dizer.
+    if (tipo === "validacao_feita" || tipo === "contas_validadas") {
+      // `pessoas` e não `lista`: este ramo corre ANTES de a lista ser
+      // montada (é dos que não passam por user_amigos — vai direto ao admin).
+      const t: CheckTipo = pessoas?.[0]?.checkTipo ?? "contas";
+      const txt = {
+        presencas: { title: "✓ Presenças validadas", frase: "validou as suas presenças" },
+        convidados: { title: "✓ Convidados validados", frase: "validou os seus convidados" },
+        contas: { title: "✓ Contas validadas", frase: "validou as suas contas" },
+      }[t];
       const subs = await subscriptionsDe([ADMIN_EMAIL]);
       const payload = JSON.stringify({
-        title: "✓ Contas validadas",
-        body: `${quem || "Um membro"} validou as suas contas${descricao ? ` — ${descricao}` : ""}`,
+        title: txt.title,
+        body: `${quem || "Um membro"} ${txt.frase}${descricao ? ` — ${descricao}` : ""}`,
         url: "/FestasBV/",
       });
       return json(await enviarParaSubs(subs, payload));
@@ -363,8 +406,7 @@ Deno.serve(async (req) => {
     // autoriza os pagamentos, quem decide lembrar alguém de uma dívida ou de
     // um check por validar, e quem decide se um pagamento entrou ou não.
     const soAdmin: Tipo[] = [
-      "fecho",
-      "pagamentos",
+      ...FASES_AVISO,
       "lembrete",
       "lembrete_validacao",
       "pagamento_validado",
@@ -376,7 +418,7 @@ Deno.serve(async (req) => {
     // sempre, mesmo num ano em que ninguém tenha conta ligada (é o "para ver
     // como fica" de quem carregou no botão).
     const lista = Array.isArray(pessoas) ? pessoas : [];
-    const fase = tipo === "fecho" || tipo === "pagamentos";
+    const fase = FASES_AVISO.includes(tipo);
     if (lista.length === 0 && !fase) return json({ enviados: 0, falhados: 0 });
 
     // amigo → email (só os amigos pedidos)
@@ -422,7 +464,7 @@ Deno.serve(async (req) => {
       );
       alvos.add(ADMIN_EMAIL);
       const subs = await subscriptionsDe([...alvos]);
-      const payload = JSON.stringify({ ...faseTexto(tipo as "fecho" | "pagamentos", descricao), url: "/FestasBV/" });
+      const payload = JSON.stringify({ ...faseTexto(tipo, descricao), url: "/FestasBV/" });
       return json(await enviarParaSubs(subs, payload));
     }
 

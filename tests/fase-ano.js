@@ -41,6 +41,9 @@ try{vm.runInContext(fs.readFileSync(appPath,'utf8'),ctx,{filename:appPath});}cat
    funções não leem (é a mesma nota que o teste dos pagamentos deixa sobre as
    sondas de coluna). Escreve-se por script, no MESMO contexto. */
 const evt=o=>{ctx.__d={_sbId:7,evento:Object.assign({ano:2026},o)};vm.runInContext('DATA=__d;',ctx);};
+// As `const` do topo (FASES, FASE_KEYS, FASE_AVISO) também vivem no escopo
+// lexical do script e não em ctx.* — leem-se por avaliação, não por ctx.
+const val=expr=>vm.runInContext(expr,ctx);
 vm.runInContext('_sbSession={user:{email:"admin@x.pt"}};',ctx);
 
 // ── 1) A fase manda nos dois predicados ──────────────────────────────────
@@ -81,14 +84,18 @@ const patches=[];
 ctx.sbReq=async(method,path,body)=>{patches.push({method,path,body});return null;};
 ctx.queueWrite=fn=>fn();
 ctx.setSync=noop;ctx.marcaGuardado=noop;ctx.renderAll=noop;ctx.toast=noop;ctx.syncMirror=noop;
-ctx.avisarFase=noop;ctx.isAdmin=()=>true;ctx.anoCorrente=()=>false;
+ctx.isAdmin=()=>true;
+// O avisarFase é capturado, não silenciado: qual fase avisa (e qual não
+// avisa) é metade do que este ficheiro guarda.
+const avisos=[];ctx.avisarFase=f=>avisos.push(f);
+let CORRENTE=false;ctx.anoCorrente=()=>CORRENTE;
 // Sem despesas provisórias e com a última refeição já passada — as condições
 // que travam a entrada em val_contas testam-se à parte (faseMotivoAvancar)
 ctx.temDespesasPendentes=()=>false;
 ctx.ultimaRefeicaoISO=()=>'2020-01-01';
 
 async function corre(de,para){
-  patches.length=0;
+  patches.length=0;avisos.length=0;
   evt({fase:de,faseCol:true,pagAutorizCol:true,
     contasFechadas:['val_contas','pagamento','fechado'].includes(de),
     pagamentosAutorizados:['pagamento','fechado'].includes(de)});
@@ -166,6 +173,51 @@ async function corre(de,para){
   // A última fase não tem para onde ir
   evt({fase:'fechado',faseCol:true,pagAutorizCol:true,contasFechadas:true,pagamentosAutorizados:true});
   assert.ok(ctx.faseMotivoAvancar(),'a última fase não avança');
+
+  // ── 5) QUE FASE MANDA QUE AVISO ────────────────────────────────────────
+  // Três fases avisam (FASE_AVISO), duas não; recuar nunca avisa; e num ano
+  // que já não é o corrente não sai nada — a fase grava-se na mesma.
+  CORRENTE=true;
+  assert.deepStrictEqual(Object.keys(val('FASE_AVISO')).sort(),
+    ['pagamento','val_contas','val_presencas'],'só três fases avisam');
+  await corre('aberto','val_presencas');
+  assert.deepStrictEqual(avisos,['presencas'],'val_presencas avisa');
+  await corre('val_presencas','val_contas');
+  assert.deepStrictEqual(avisos,['fecho'],'val_contas avisa');
+  await corre('val_contas','pagamento');
+  assert.deepStrictEqual(avisos,['pagamentos'],'pagamento avisa');
+  await corre('pagamento','fechado');
+  assert.deepStrictEqual(avisos,[],'fechado não avisa');
+  // Recuar é silencioso — decisão, não esquecimento
+  for(const [de,para] of [['fechado','pagamento'],['pagamento','val_contas'],['val_contas','val_presencas'],['val_presencas','aberto']]){
+    await corre(de,para);
+    assert.deepStrictEqual(avisos,[],'recuar '+de+'→'+para+' não avisa');
+  }
+  // Ano que já não é o corrente: grava, não avisa
+  CORRENTE=false;
+  const b2=await corre('aberto','val_presencas');
+  assert.ok(b2,'ano antigo grava a fase');
+  assert.deepStrictEqual(avisos,[],'ano antigo não avisa ninguém');
+  CORRENTE=true;
+
+  // ── 6) O TEXTO das três fases que avisam ───────────────────────────────
+  // O cartão (faseMsgHtml) tem de ler o MESMO avisoFaseTexto que escreve o
+  // email — se um dia divergirem, a app e o email dizem coisas diferentes.
+  evt({fase:'aberto',faseCol:true,pagAutorizCol:true,nome:'MEO 2026'});
+  assert.strictEqual(ctx.faseAtual(),null,'Ano Aberto não tem aviso a repetir');
+  Object.entries(val('FASE_AVISO')).forEach(([fase,aviso])=>{
+    evt({fase,faseCol:true,pagAutorizCol:true,nome:'MEO 2026',
+      contasFechadas:['val_contas','pagamento'].includes(fase),
+      pagamentosAutorizados:fase==='pagamento'});
+    const t=ctx.avisoFaseTexto(aviso);
+    assert.ok(t&&t.assunto&&t.corpo,'avisoFaseTexto('+aviso+') tem assunto e corpo');
+    assert.ok(t.assunto.includes('MEO 2026'),'o assunto nomeia o evento');
+    assert.strictEqual(ctx.faseAtual(),aviso,'faseAtual em '+fase);
+    assert.strictEqual(ctx.faseMsgHtml(),t.corpo,'o cartão de '+fase+' lê o texto do email');
+  });
+  evt({fase:'fechado',faseCol:true,pagAutorizCol:true,contasFechadas:true,pagamentosAutorizados:true});
+  assert.strictEqual(ctx.faseAtual(),null,'Ano Fechado não tem aviso a repetir');
+  assert.ok(ctx.faseMsgHtml(),'…mas o cartão diz na mesma o que é');
 
   console.log('fase-ano: OK');
   // O arranque da app (sbInit) fica agendado no contexto e rebenta contra o
