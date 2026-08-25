@@ -14,7 +14,7 @@ const SESSION_KEY = 'festasbv_sb_session';
 const APP_URL = 'https://diogoandrefsilva-ghc.github.io/FestasBV/';
 // Etiqueta de versão — visível em Definições › Conta. Bump a cada deploy relevante
 // para se confirmar de imediato se o telemóvel já tem a build nova.
-const APP_BUILD = 'v365 · 2026-08-25 · CORRIGE perda de dados: registar um pagamento novo num ano que já tinha pagamentos apagava TODOS os pagamentos desse ano. Gravar o ano faz DELETE+INSERT das tabelas filhas, e no INSERT em lote o PostgREST usa uma lista de colunas para o lote todo, pondo NULL EXPLÍCITO (não o DEFAULT) nas linhas a que uma chave falte: os pagamentos já gravados levavam `criado_em`, o novo não, e o NULL rebentava o NOT NULL da coluna — com o DELETE já feito, o ano ficava sem pagamento nenhum. A chave passa a ir em todas as linhas (o pagamento novo leva a hora do momento). Regressão em tests/pagamentos-lote.js · v364 · 2026-08-25 · O cartão "Pagamentos autorizados" (Saldos) reconhece quando já não há nada a pagar (todos os saldos a 0 €, a mesma conta que já esconde o FAB de cash-flow) e troca de aviso para constatação: "✅ Ano saldado", em verde, sem os botões de lembrar ninguém. Sem coluna nova nem ação de trancar — é derivado, como o resto · v363 · 2026-08-25 · Saldos: com os pagamentos já autorizados, o quadro "Confirmações necessárias" (Presenças/Convidados/Contas do casal) sai por inteiro, venha o que vier por validar — o dinheiro já anda, e ninguém volta atrás por causa de uma presença ou de um convidado por confirmar. Um ano como o 2025, fechado antes de a validação de presenças/convidados sequer existir, deixa de pedir para sempre duas confirmações que já não têm para onde ir · v362 · 2026-08-25 · CORRIGE: um separador com o app.js de antes do fix da v361 ainda conseguia mandar "já podes pagar" sobre um ano antigo (aconteceu, sobre 2025) — o anoCorrente() é uma guarda do lado do cliente, e não vale enquanto a página não recarrega. O aviso de fase ("fecho"/"pagamentos") passa a levar o ano do evento, e a Edge Function push-notificar-festasbv recusa-se a mandar a toda a gente se esse ano não bater com o maior ano em eventos — a trava a sério, do lado do servidor, que corre sempre a versão publicada. Requer o deploy novo da function (já feito) · v361 · 2026-08-25 · "Autorizar Pagamentos" deixa de avisar toda a gente quando o ano já não é o corrente (há um evento mais recente a seguir) — só grava o carimbo, para o ✓ de quem já está saldado passar a verde nos anos antigos. Um evento de há anos não tem ninguém à espera de saber "já podes pagar"; mandar o aviso na mesma era confundir. Pela mesma razão, "📣 Reenviar aviso aos membros" só aparece no ano corrente · v360 · 2026-08-25 · CORRIGE contas de anos JÁ FECHADOS a mudarem sozinhas: o preço unitário de uma refeição passou a arredondar ao cêntimo ACIMA (17/08/2026) e, como a app não guarda o apuramento — recalcula-o ao vivo —, isso reescreveu em silêncio a sobra de 2025, que fechou a 03/08 com 126,45 € e passou a mostrar 129,45 €. O arredondamento passa a ser parâmetro POR ANO (Definições › Parametrizações › "Arredondamento do preço da refeição"): cada ano guarda a regra com que fechou. Requer correr db/preco_arredonda.sql, que repõe "cêntimo mais próximo" nos anos fechados antes da mudança (2025 volta a 126,45 €) e deixa 2026 no "cêntimo acima" com que fechou (208,20 €, inalterado). Sem a migração nada muda: arredonda sempre para cima, como hoje · v359 · 2026-08-25 · Cash Flows: com "Dívidas Públicas" ligado (Definições › Parametrizações), os movimentos de 🤝 Pagar Dívida e 💸 Reembolso deixam de ficar restritos a quem está envolvido — todos os membros passam a ver os de todos, como já acontecia no saldo/detalhe de cada um. Desligado (o defeito), continua como sempre: um não-admin só vê os seus e os do cônjuge · v358 · 2026-08-25 · CORRIGE a v357: gravar QUALQUER coisa no evento (mesmo só acrescentar um pagamento) reescrevia a hora de registo (criado_em) de TODOS os pagamentos já existentes para a hora desse save — o DELETE+POST que substitui a tabela toda não levava o criado_em antigo. Passa a preservá-lo para pagamentos que já o tinham; só um pagamento mesmo novo (ainda sem ter passado pela BD) ganha a hora do momento · v357 · 2026-08-25 · "✓ Saldado em…" (Saldos, detalhe de cada membro) ganha a hora, como já tinha "Contas validadas em…" — "Saldado em DD/MM/AAAA, às HH:MM". Precisa da hora do REGISTO do pagamento, que a app nunca guardava (só a data escrita no formulário); requer correr db/pagamentos_criado_em.sql, sem a qual a frase continua a mostrar só a data · v356 · 2026-08-24 · O ✓ de "contas validadas" (Saldos) passa a ser UM estado de cada vez: dourado enquanto só validou (pagamentos ainda não ativos) e desliga-se sozinho assim que se autorizam os pagamentos — manter dourado ali passava a mensagem errada de "está pago". A partir daí o ✓ passa a verde e só aparece a quem já saldou a dívida. No detalhe de cada um mantêm-se as duas datas, sempre que existirem: "Contas validadas em…" e "Saldado em…" (esta, a data do último pagamento que lhe saldou a dívida própria, ref `own:Nome`). A frase "✓ Contas validadas em [data]" que aparecia no quadro de validações (entre o casal e os restantes membros) sai — já se via, repetida, no ✓ de cada nome · v355 · 2026-08-24 · Saldos: o cartão "Contas em validação"/"Pagamentos autorizados" sobe para logo a seguir ao saldo do grupo (antes só aparecia lá em baixo, depois da lista de membros toda). A explicação "De onde vem a Quota Extra e a Poupança?" sai do <details> fixo à cabeça da lista de Saldos — passa a viver dentro do "de onde vem isto" de cada pessoa, ao abrir a Quota Extra/Poupança dela. Quem já validou as CONTAS ganha uma marca ✓ junto ao nome na lista, e o detalhe de cada um passa a fechar com "✓ Contas validadas em DD/MM/AAAA, às HH:MM". E sempre que alguém valida as contas, o admin recebe agora um push a avisar (tipo novo "contas_validadas" na Edge Function push-notificar-festasbv — requer novo deploy) · v354 · 2026-08-24 · Dar um pagamento por recebido avisa de volta quem pagou (push): "o Diogo confirma que recebeu o teu pagamento de X. Saldo atual: Y. Saldo do teu cônjuge: Z." Sai dos dois caminhos — validar um pedido declarado e o admin registá-lo ele próprio. Rejeitar também avisa ("não confirmou o teu pagamento de X. Motivo: … Não entrou nas contas"), que era o outro sítio onde se ficava à espera sem resposta · v353 · 2026-08-24 · Validar um pagamento declarado avisa de volta quem pagou (push): "o Diogo confirma que recebeu o teu pagamento de X. Saldo atual: Y. Saldo do teu cônjuge: Z." Declarar já avisava o admin; do outro lado ficava-se à espera sem saber se o dinheiro tinha sido dado por recebido. A mensagem é sempre a mesma, com os saldos do ecrã e com sinal (negativo = ainda falta); sem cônjuge no plantel deste ano, essa frase não sai ·v352 · 2026-08-24 · O aviso do fecho encurta no push e cresce na app: o iPhone só mostra ~4 linhas no ecrã bloqueado e cortava justamente o "não pagues ainda", por isso o push passa a ser o resumo ("Valida as tuas contas e as dos teus convidados nos Saldos. Não pagues ainda, as contas podem alterar.") e a explicação por extenso — a mesma do email — passa a estar no cartão da fase, em Saldos › Estado das Contas, para quem não apanhou a notificação · v351 · 2026-08-24 · Separador Stock deixa de desaparecer inteiro num ano de contas fechadas — só some se esse ano não tiver stock nenhum (ex.: 2025). Com stock, fica visível e só de leitura (🔒 aviso no topo; ＋ Stock e ✨ sugerir categorias escondidos). T-shirts já não dependia disto — continuava sempre visível · v350 · 2026-08-24 · Fim do ano em DUAS fases, cada uma com o seu aviso a todos os membros (push + email): fechar as contas passa a dizer "em validação, não pagues ainda" — cada um confirma as suas contas e as validações ainda podem obrigar a acertos —, e um botão novo do admin (Saldos › Estado das Contas) dá-as por validadas e autoriza os pagamentos ("podes e deves pagar"). O push deixa de levar o saldo de cada um (ainda pode mudar) e passa a ir também para o admin, que vê o que os outros receberam; o email abre a app do Gmail com todos os membros com conta no destinatário. Há "Reenviar aviso" para quando o Gmail não pega. Não tranca nada: registar pagamentos continua como estava. Requer correr db/pagamentos_autorizados.sql; sem ela o cartão fica escondido · v349 · 2026-08-19 · Teto da sobra do grupo: o desconto volta a ser repartido por tudo o que cada um tem a pagar (refeições, quota extra/poupança e stock levado para casa), mas SEM as t-shirts — são uma encomenda pessoal e quem encomendou mais camisolas não pôs mais dinheiro na bolsa que gerou a sobra. Reverte a base só-refeições da v348 · v347 · 2026-08-19 · Teto da sobra do grupo (Definições › Parametrizações, por ano): define-se até onde vale a pena guardar e o que passar disso é devolvido aos membros, proporcional ao que cada um paga, como desconto no que tem a liquidar. Interruptor à parte do valor porque "sem teto" e "teto a zero" são respostas diferentes. É o teto da sobra DESTE ano, não da poupança acumulada. Aparece na ficha do membro, no detalhe dos Saldos e no relatório. E CORRIGE: o desconto de uma compra em modo "membros" (v346) baixava o que o membro paga sem nada no ecrã a dizê-lo — passa a ter linha própria nos mesmos sítios. Requer correr db/teto_reserva.sql · v346 · 2026-08-19 · Desconto de uma compra: novo bloco "🏷️ Descontos" no fim do registo de uma compra por artigo, com duas maneiras de chegar ao desconto de cada artigo — 💶 Geral (escreve-se o total da fatura e reparte-se pelo preço de cada artigo) ou 🎯 Por artigo (à mão) — e uma escolha só, para a compra toda, do que fazer com ele: a) 💶 no preço (é já o pago, sem mais nada), b) 👥 devolvido aos membros no fecho de contas (proporcional ao que consumiram — convidados não) ou c) 💰 sobra do saldo do grupo. Declarava-se antes no separador Stock (v345); passa a viver na compra, que é onde se lê a fatura — o Stock passa a mostrar só a leitura, com um link a voltar ao editor. Requer correr db/stock_desconto.sql; sem ela o bloco fica escondido · v345 · 2026-08-19 · Desconto num lote de stock (separador Stock, no modal do artigo): quando uma fatura vem com desconto, escolhe-se por lote o que fazer com ele — 💶 Preço (o valor gravado já é o pago, sem mais nada a fazer), 👥 Membros (o preço da refeição fica de tabela para todos, membros e convidados, mas no fecho os membros recuperam a sua parte proporcional ao que consumiram — convidados não) ou 💰 Grupo (fica de tabela para todos e o desconto vira sobra do saldoGrupo, sem se devolver a ninguém — a mesma lógica que já existia para o desconto de uma fatura de t-shirts). Requer correr db/stock_desconto.sql; sem ela o preço é sempre o gravado em `valor`, como sempre foi · v344 · 2026-08-19 · CORRIGE: o Relatório Geral (PDF) podia mostrar uns cêntimos de "Bolsa comum não atribuída a uma refeição" mesmo com os pesos das refeições a somar 100% — vinha de arredondar o indireto de CADA refeição (F20×peso) a cêntimo, independentemente, e a soma desses arredondamentos raramente batia certo com o F20 total. Passa a fechar pela regra da fatura já usada noutros sítios (o cêntimo que sobra vai para a refeição de maior peso), para a soma dos indiretos bater sempre, a cêntimo exato, contra a bolsa indireta · v343 · 2026-08-17 · Stock › 3.º eixo ("Onde foi parar"): novo destino "👥 Distribuído pelo grupo", irmão do 🗑 e do 📦 — para sobras que alguém levou (sem se saber ao certo quem, ou sem se querer cobrar a ninguém em concreto), diferente de "deitado fora" (que implica desperdício) e não mexe num cêntimo, como os outros dois. Conta como consumido, não transita para o ano seguinte, aparece no filtro de estado, no rodapé do cartão, no detalhe do custo de uma refeição e na folha do 🖨, com cor própria (azul, sem ser o alarme do 🗑). E CORRIGE: escolher um destino do 🎒 Leva para casa dentro de "Onde foi parar" (3.º eixo) dizia "o custo vai para o saldo dela" — mentira ali, porque esse eixo não mexe no custo (só a alocação do custo, 2.º eixo, o faz); a legenda passa a dizer o que acontece mesmo neste eixo ("não mexe no custo, só diz onde a mercadoria ficou") · v342 · 2026-08-17 · CORRIGE: escrever "Já se gastou" à mão num artigo do stock com mais do que um lote podia gravar menos do que o escrito — o consumo repartia-se por FIFO pela quantidade CHEIA de cada lote, ignorando o que esse lote já tinha marcado como 🗑 Deitado fora/📦 Ano seguinte no 3.º eixo; se o desperdício calhasse no lote mais antigo, o excesso desaparecia em silêncio ao mostrar (14 no total, 4 deitados fora, escrever 10 gastos ficava a valer só 6). Agora a repartição usa o que cada lote AINDA PODE receber de consumo, nunca a quantidade cheia · v341 · 2026-08-17 · Relatório geral (PDF): o cabeçalho passa a UMA linha só — "Receitas − Despesas = Saldo", com a Poupança Acumulada pendurada por baixo do valor do Saldo em vez de um 4.º cartão à parte; o quadro de Despesas sobe para ANTES das Receitas; no "Resumo por Membro" a coluna "Quota" passa a "Extra" (com nota a explicar que pode vir de quota extra para cobrir custos e/ou poupança) e a coluna "Só bebida" funde-se em "Refeições" (é a mesma refeição); e a frase do "Total por Membro" ("o que cada um trouxe ou encomendou") passa a dizer o que a tabela mostra mesmo — convidados, t-shirts e sobras de stock imputados · v340 · 2026-08-16 · CORRIGE: a categoria "Sacos/Depósitos/Similares" (Custo da refeição › Por categoria, e a matriz de Despesas do relatório PDF) deixa de adivinhar pelo nome do artigo quais são as linhas "🧾 só despesa" de uma compra — passa a usar a MESMA regra estrutural da ficha da compra (qualquer despesa da compra que não seja a linha agregada "🧺 Stock" é, por construção, só despesa). Um "Saco Plástico Reutilizável CONTINENTE" escapava ao dicionário de palavras por trazer a marca colada ao produto e aparecia com linha própria em vez de cair no catch-all, discordando da própria ficha da compra que já o dizia "só despesa" · v339 · 2026-08-16 · Relatório geral (PDF): os cartões do cabeçalho (Saldo/Receitas/Despesas/Poupança) passam de flexbox a grid — na pré-visualização de um telemóvel, com 4 cartões, um valor em € não encolhia abaixo do que precisa e obrigava a scroll horizontal; agora o que não cabe numa linha desce para a seguinte, e no papel (mais largo) ficam sempre juntos, como antes · v338 · 2026-08-16 · Relatório geral (PDF): a matriz de Despesas ganha o TOTAL e o PESO (%) de cada categoria logo a seguir ao nome dela — antes da distribuição por dia/refeição, que passa a vir depois; nas Receitas, "Convidados" passa a "Refeições (convidados)"; e o cabeçalho ganha um cartão "Poupança Acumulada" quando ainda houver reserva por usar de anos anteriores · v337 · 2026-08-15 · Custo da refeição: sai a linha "Crianças · não pagam" (já se listam por extenso no "Quem vai?"/"Quem foi?" logo a seguir) e, com ela, os mini-títulos "Membros"/"Convidados" — o rótulo de cada linha já diz de quem se fala. O contador do "Quem vai?"/"Quem foi?" passa a separar adultos de crianças ("10+3", como a grelha de Presenças já fazia) · v336 · 2026-08-15 · Custo da refeição: a linha "Homens"/"Mulheres" só aparece com o desconto por sexo LIGADO (Definições › Parametrizações). Sem desconto (o defeito, e o caso de quem não quer usar a funcionalidade), volta a haver uma linha única "Membros" — como era antes desta funcionalidade existir · v335 · 2026-08-15 · Painel "Validações": frase de "falta fechar as contas" mais curta, para caber numa linha só. E o 🔔 Lembrar, sem push ativo, passa a tentar abrir a APP do Gmail no telemóvel (esquema googlegmail://) em vez de ir direto ao Gmail no browser — só cai para o browser se a app não estiver instalada · v334 · 2026-08-15 · CORRIGE a v333: com Presenças e Convidados já validados mas as Contas ainda por fechar, o quadro de validações desaparecia por completo — sem "Contas validadas" (ainda não há) nem explicação nenhuma, como se nada estivesse pendente. Passa a mostrar "✓ Presenças e Convidados confirmados — falta fechar as contas" enquanto se espera pelo fecho · v333 · 2026-08-15 · CORRIGE a v332: os três checks (Presenças/Convidados/Contas) voltam a viver TODOS juntos nos Saldos, logo a seguir ao saldo do casal — em vez de espalhados por Presenças/Convidados/Saldos. Passam a ser um QUADRO ÚNICO "Confirmações necessárias" com uma linha por check em falta; assim que não sobra nada por validar, o quadro sai por inteiro e dá lugar a uma frase curta, "✓ Contas validadas em [data]" · v332 · 2026-08-15 · Validações reorganizadas: em vez de listas à parte nos Saldos, cada check vive no separador a que pertence — "✋ Presenças validadas" na grelha de Presenças (logo a seguir ao meu agregado), "👥 Convidados validados" no separador Convidados, e "💳 Contas validadas" nos Saldos logo a seguir ao saldo do casal (não no fim de todos os membros). Convidados passa a ser um CHECK PRÓPRIO, separado de Presenças. O botão deixa de ser verde antes de validado (verde é só o selo de "já feito"). Novo painel de admin "📋 Validações" (Definições): uma matriz por membro × check, com 🔔 para lembrar quem tem conta ligada (push; sem push ativo abre o Gmail com o email pronto) e ✓ Marcar para quem não tem conta. Requer correr de novo db/validacoes_tipo.sql (agora com 3 tipos) e o deploy novo da Edge Function push-notificar-festasbv (tipo lembrete_validacao) · v331 · 2026-08-15 · CORRIGE a v330: a Validação de Presenças não podia ficar "disponível a qualquer momento" — ninguém valida presenças A MEIO DAS FESTAS, enquanto elas ainda podem mudar (falta alguém, chega mais gente). Passa a esperar pela ÚLTIMA REFEIÇÃO (não pelo fecho de contas, que é o do check de Contas) — antes disso o bloco nem aparece nos Saldos, e o modal/gravação recusam na mesma se se lá chegar por outro caminho · v330 · 2026-08-15 · Saldos ganham um SEGUNDO check, ao lado da Validação de Contas: "Validação de Presenças" — cada um confirma que as refeições em que esteve (e os convidados que trouxe) estão bem registadas. Mesma mecânica de sempre (valida por si e pelo cônjuge; o admin, também pelos amigos sem utilizador). Requer correr db/validacoes_tipo.sql; sem ela fica escondida e a Validação de Contas continua exatamente como era · v329 · 2026-08-15 · CORRIGE a v328 (sinal trocado): a SOBRA DO GRUPO (saldoGrupo) no saldo do tesoureiro é um CRÉDITO a favor dele ("🏦 Saldo do grupo — fica guardado", junto das despesas adiantadas), não um débito — com o sinal errado o saldo dele, uma vez tudo liquidado, ia parar a −416 € em vez de 0. A soma de cred−deb de todos os membros fecha sempre em −saldoGrupo (os pagamentos entre membros cancelam-se na soma); como cada membro normal vai a zero ao pagar tudo, sobra só o tesoureiro, e sem este crédito o saldo dele convergia para −saldoGrupo (a dever!) em vez de 0. O "Saldo do Grupo" (208,21 €) continua sem se mexer · v327 · 2026-08-15 · Saldos: o ênfase de cada membro passa a ser o SALDO A LIQUIDAR (maior, a bold) e a despesa total fica pequena e esbatida, de apoio — para não haver dúvida do número que interessa. Sem défice a repartir este ano, a Quota Extra desaparece de vez (linha e comentários), em vez de aparecer a "—". PDF de pessoa: passa a vir pré-selecionado o próprio membro, e ganha as secções T-shirts e Stock Sobrante que faltavam (e que já entravam no saldo sem se verem no papel) · v326 · 2026-08-15 · Definições › Parametrizações: "Arredonda Total" ganha um segundo MOMENTO — além da despesa própria (o de sempre), passa a poder arredondar a dívida final a liquidar (própria + convidados + t-shirts + stock, líquida de adiantamentos/mealheiro/reembolsos, mas antes de pagamentos de dívida) — para quem paga só o valor exato continuar a ficar com o cêntimo em aberto. Seletor novo, só visível com o arredondamento ligado; o tesoureiro fica sempre no modo despesa. Requer correr db/arredonda_modo.sql; sem ela o comportamento é sempre o de sempre · v325 · 2026-08-15 · Relatório geral (PDF) › Detalhe Refeições: o "Custo total" ganha entre parênteses quantos adultos e crianças a refeição serviu, e as linhas de preço por sexo ganham a percentagem do desconto ao lado ("+10%" no homem, "-10%" na mulher) · v324 · 2026-08-15 · Relatório geral (PDF) › Detalhe Refeições: cada linha de custo ganha uma nota pequena a dizer do que se trata — "Custos diretos (compras refeição)", "Bebida (barris cerveja/sangria)", "Indiretos (renda, limpeza, bricolage, talheres, etc.)" · v323 · 2026-08-15 · Relatório geral (PDF): a matriz de Despesas fecha ao cêntimo exato também ENTRE COLUNAS — cada dia arredondava-se a cêntimo por si, e a soma dos dias podia ficar 0,01/0,02 abaixo ou acima do que a categoria vale, mesmo já sem o ruído da v322 no "Fora dos dias". Fecha-se pela mesma regra da fatura já usada noutros sítios da app: o cêntimo que falta ou sobra vai sempre para o dia com maior expressão daquela categoria — nunca fica repartido nem escondido numa coluna que não é a dele · v322 · 2026-08-15 · Relatório geral (PDF): corrige o ruído de ±0,01/±0,02 que aparecia na coluna "Fora dos dias" da matriz de Despesas em categorias sem nada de facto por explicar — vinha de arredondar a cêntimo a fatia de cada categoria em CADA refeição (catSplit), 8-10 vezes, e o resíduo desse arredondamento repetido ia parar ali disfarçado de dinheiro por alocar. Passa a acumular-se a 6 casas e só se arredonda a cêntimo no ecrã/PDF, uma vez, no fim — a "Fora dos dias" volta a mostrar só o que é mesmo bolsa comum não distribuída pelos dias. É só apresentação do relatório: não mexe em nenhuma conta real (saldos, quotas, o que cada um paga) · v321 · 2026-08-15 · Relatório geral (PDF): nova secção "Detalhe Refeições", entre as Despesas e a Visão por Refeição — para cada refeição, o custo explicado (diretos/bebida/indiretos e o total) e o tarifário que daí sai (preço membro homem/mulher, preço convidado, só bebida homem/mulher/convidado), com o prato principal no título quando definido · v320 · 2026-08-15 · Definições › Utilizadores & Casais: cada conta com notificações push ativas passa a ter um 🔔 verde ao lado do email, como o selo "admin" — o admin já não precisa de ir ao Supabase para saber quem já ativou. Requer a policy nova de db/push-subscriptions.sql (push_subscriptions_select_admin), que dá ao admin leitura sobre as subscriptions de toda a gente (só leitura, nunca escrita) · v319 · 2026-08-15 · Notificações push: pop-up automático a sugerir ativar logo a seguir ao login (Ativar/Agora não), como já fazia o SplitBill; e a caixa em Definições deixa de desaparecer calada quando o browser não suporta — no iPhone/iPad diz que é preciso instalar a app no ecrã principal primeiro (é assim que o iOS trata o Web Push) · v318 · 2026-08-15 · Notificações PUSH (sem Telegram), a par do canal existente: quando as contas fecham, cada membro com conta ligada recebe um aviso com o que tem a pagar/receber (e o saldo do casal, havendo cônjuge); quando alguém que não é admin declara "🤝 Pagar Dívida", o admin recebe logo um aviso; e o admin ganha um botão "🔔 Lembrar" junto ao saldo de quem deve, nos Saldos. Ativa-se em Definições › Notificações › "Ativar notificações push". Requer correr db/push-subscriptions.sql e fazer deploy da Edge Function push-notificar (secrets VAPID_PUBLIC_KEY/VAPID_PRIVATE_KEY) · v317 · 2026-08-14 · Custo da refeição: acabamentos. A percentagem do desconto por sexo ("Pagam menos 10%") deixa de ser uma frase solta no fim do grupo dos Membros e passa a ir à frente do contador da linha "Mulheres" — itálico, esbatida, ali onde se lê a que preço ela se refere. E o contador do "só bebe/bebem" ganha folga do texto (estava colado, "só bebe1") · v316 · 2026-08-14 · Custo da refeição: "só bebe/bebem" passa de linha irmã a SUB-LINHA da categoria (Homens · Mulheres · Convidado) — pendurada por baixo dela, indentada, sem o ícone de cerveja, sem negrito e em itálico, com o preço mais esbatido. Sem ninguém a comer nessa categoria (raro: alguém só bebe sem ninguém dessa espécie à mesa) volta a ser linha normal, para não desaparecer · v315 · 2026-08-14 · Custo da refeição: os preços passam a um tarifário de DOIS NÍVEIS — o grupo (Membros · Convidados) e, dentro dele, uma linha por espécie de gente. Nos membros a linha vem já partida por sexo, por extenso e sem pictograma (“Homens”/“Mulheres”, cada um com o seu contador e o seu preço), e havendo membros só a beber ganham as suas próprias linhas (“Homens 🍺 só bebem”/“Mulheres 🍺 só bebem”) — só aparecem se existirem. Convidados ganham um bloco semelhante (Convidado · Convidado 🍺 só bebe · Crianças), sem distinção por sexo (só membros pagam por sexo). A percentagem do desconto continua a dizer-se uma vez, logo a seguir aos Membros · v314 · 2026-08-14 · Grelha do custo da refeição, acabamento: com desconto por sexo os dois preços passam a alinhar em coluna (ícones de um lado, valores do outro) em vez de cada linha se centrar por si — os dois pictogramas têm larguras diferentes e os € saíam escalonados. O preço sobe de 13,5 para 15px (a 13,5 o preço principal da refeição ficava mais pequeno que o do “só bebe” ao lado) e os ícones de 11 para 12px sem esbatimento. E o valor de cada célula passa a centrar-se na altura disponível, para o “7,88 €” do “só bebe” assentar entre os dois preços em vez de alinhar com o primeiro · v313 · 2026-08-14 · Desconto feminino no preço das refeições. Em Definições › Parametrizações, por ano, define-se quanto as mulheres pagam A MENOS QUE OS HOMENS no preço da refeição (vale no “come” e no “só bebe”). O agravamento deles não se escreve — é automático e sai da contagem de cada refeição —, e o TOTAL COBRADO AO GRUPO NÃO MUDA: só muda quem o põe. Com 8 homens e 4 mulheres a 20%, uma refeição de 14,00 €/pessoa passa a 15,00 € e 12,00 €. No cartão da refeição a célula dos membros passa a mostrar os dois preços, um por linha, com a percentagem dita uma vez por baixo deles — as colunas ficam onde estavam, e a coluna do “come” perde o rótulo (é o defeito), devolvendo à faixa a linha que os dois preços ocupam. Os convidados pagam preço único (a linha deles não tem sexo) e o mínimo por refeição aplica-se aos dois lados. A 0% (o defeito, e o de cada ano novo) nada muda e o preço volta a ser um só. Requer correr db/desconto_sexo.sql · v312 · 2026-08-14 · Acerto de CASAL nos pagamentos de dívida e nos reembolsos. Em “🤝 Pagar Dívida”, se alguém do casal tiver dinheiro a receber, aparece agora um chip azul “a receber” que DESCONTA no que se entrega: o Mestre tem 20 a receber, o cônjuge dele deve 60, e entregam-se 40 — o campo Valor passa a mostrar o líquido, com a conta à vista. Vale nos dois sentidos: o crédito pode ser de quem está a pagar ou do cônjuge. Em “💸 Reembolso”, escolhida a pessoa, o valor deixa de ter de se escrever à mão: “👤 Por saldo” devolve o saldo dela e “👥 Saldo do casal” devolve a diferença quando um do casal tem a receber e o outro a pagar (só aparecem quando há mesmo o que acertar). Nos dois casos ficam gravados os DOIS movimentos — o pagamento da dívida e o reembolso do crédito —, porque é assim que cada saldo vai a zero sem se mexer numa única regra das contas do grupo: o resultado do grupo não muda e a soma dos saldos continua a fechar. Um pedido de pagamento feito por quem não é admin leva o acerto lá dentro e as duas parcelas nascem quando o admin valida. Sem migração · v311 · 2026-08-14 · Stock › 3.º eixo: novo destino “📦 Ano seguinte”, ao lado do 🗑. Acabadas as festas, o que sobra e não se deita fora aloca-se ao próximo evento — sai do “por gastar” deste ano e ganha estado próprio no filtro, no cartão e na folha do 🖨. Ao CRIAR o ano seguinte, esse stock entra lá sozinho, a 0 € e por alocar, marcado “📦 Ano anterior” — já foi pago no ano que o comprou, e dar-lhe valor outra vez era cobrar a mesma cerveja duas vezes. Se o ano seguinte já existir, entra no momento em que se grava a alocação; e a sincronização é idempotente — mexer no 📦 corrige a quantidade lá, e tirá-lo retira o artigo de lá · v310 · 2026-08-13 · Stock: TRÊS eixos, cada um editável num sítio só — o que foi COMPRADO para a refeição (na compra), de quem é o CUSTO (no separador Stock) e, novo, ONDE A MERCADORIA FOI PARAR (também no Stock). Este terceiro herda o custo enquanto ninguém lhe tocar, e é nele que se reparte o stock por duas refeições ou se diz o que se deitou fora: as 5 batatas palha ficam com o custo todo na sexta e o stock fica “3,5 na sexta · 1,5 🗑 deitado fora”. No cartão da refeição a linha decompõe-se como já fazia (“5 pacotes · 17,10 €” com “↳ 🗑 1,5 pacotes deitados fora” por baixo, sem € — este não sai da conta dela); o filtro do separador ganha “🗑 Deitado fora” e o rodapé do cartão e a folha do 🖨 dizem-no. E o “dar baixa” passa a aparecer só onde faz sentido — no que está parado em Gerais/Bebidas; nas refeições quem responde é o eixo novo. Requer correr db/stock_alocacao_stock.sql · v308 · 2026-08-13 · Relatório geral (PDF): os quadros das despesas fundem-se num só, logo a seguir às Receitas — a matriz por categoria × dia/refeição ganha uma coluna "Fora dos dias" (a bolsa recuperada pela Quota Extra, as t-shirts, o stock levado para casa), com que cada linha passa a valer o total do evento naquela categoria; com isso sai o quadro "Despesas — Detalhe", que dizia as mesmas categorias com outros números. Os dois quadros passam a chamar-se só "Receitas" e "Despesas". E a matriz deixa de cortar os valores na pré-visualização do telemóvel ("223,…"): passa a deslizar na horizontal no ecrã, e no papel fica exatamente como estava · v307 · 2026-08-13 · Relatório geral (PDF): a "Distribuição por Dia" passa a MATRIZ — uma coluna por dia/refeição, uma linha por categoria e o total à direita, para se seguir a mesma categoria ao longo dos dias; e ganha um quadro final "Valores a Liquidar": o total de cada membro menos as despesas que adiantou e os pagamentos que fez, mais o que já recebeu, dando o saldo — o mesmo número que os Saldos mostram (sai da mesma função) · v306 · 2026-08-13 · Relatório geral (PDF): sai a lista de cash-flows (detalhe a mais para uma folha de resumo) e a indicação do tesoureiro; o "Despesas — Detalhe" passa a ser por CATEGORIA do artigo — o evento inteiro, diretos das refeições incluídos —, em vez do tipo (Gerais/Bebidas/Cerveja); a "Visão por Refeição" ganha coluna de Saldo, fecha um subtotal das refeições e mostra por baixo, uma a uma, as parcelas que mexem no saldo (t-shirts, mealheiro, quota extra, bolsa comum não atribuída) até ao saldo do grupo; nova secção "Distribuição por Dia", com o custo de cada dia repartido pela categoria do artigo; e o resumo por membro passa a dois quadros — o consumo do próprio (refeições + quota) e, a seguir, o total com convidados, t-shirts e sobras · v305 · 2026-08-12 · Refeições: o "Ver detalhe da lista de compras" perde a moldura à volta e fica igual ao "Ver detalhe do custo" — só a risca divisória e a frase. O cartão da lista só aparece ao abrir · v304 · 2026-08-12 · Stock › ⇄ 2.ª medida: com VÁRIAS MARCAS debaixo do mesmo artigo, cada linha da alocação passa a converter-se pelo fator da SUA marca e não pela média do cartão — pedir 3 postas do "Bacalhau Ocean Sea" (0,8 kg = 3 un) deixa de dar "Fixaste 3 un — só há 2,737 un" ao guardar, e o que se aloca deixa de ficar em decimais. O total em peças passa a ser a soma das linhas, e trocar a marca de uma linha guarda o número escrito (2 postas continuam 2, não 1,9) · v303 · 2026-08-12 · Refeições: o "Ver detalhe da lista de compras" de uma refeição passada passa a ser o MESMO botão do "Ver detalhe do custo", e ao abrir mostra os dois blocos de sempre (🛒 lista, depois 🧺 comprado), cada um com o seu colapsável; e os dois botões deixam de fugir para baixo ao expandir — passam a ficar ANTES do corpo que abrem, logo o "Esconder" nasce exatamente onde estava o "Ver" · v302 · 2026-08-12 · Refeições: o Cartaz das Ementas sobe para debaixo dos chips dos dias (é do ano, não da refeição aberta); numa refeição já passada a Lista de compras e o 🧺 Comprado fecham-se num só "Ver detalhe da lista de compras" — e o bloco deixa de se chamar "Não comprado" (o que lá está é a lista, com o tratado riscado); no detalhe dos custos diretos/bebida a quantidade ganha coluna própria e traz as duas medidas do lote ("7 un ≈ 3,136 kg"), como no 🧺 Comprado; o cartão do custo ganha um "Ver detalhe do custo" no fim; e abrir diretos/bebida/indiretos passa a mostrar já as linhas lá dentro · v301 · 2026-08-12 · Stock › filtro da alocação: as opções deixam de levar o nome da refeição à frente ("🌙 Jantar Sex, 7/ago · 11" → "🌙 Sex 7/ago · 11", o mesmo rótulo do chip do cartão) — com a contagem atrás a linha partia-se em duas no dropdown do iPhone, e a letra das <option> não se pode encolher (é o sistema que as desenha). O que o nome dizia, o ícone já diz: ☀️ almoço, 🌙 jantar · v300 · 2026-08-12 · Stock: os quatro chips de estado passam a uma combobox (consumido/por gastar · alocado/por alocar, com a contagem em cada opção) e ao lado nasce uma SEGUNDA combobox para a alocação — ver só o que está em Gerais, em Bebidas, no jantar de 7/ago ou no 🎒 de alguém. Escolhido um destino, os chips do cartão e o € da categoria passam a ser os desse destino. A 🍻 bebida de uma refeição vem com ela. E corrige o chip "🧺 por alocar", que desde a v268 (quando o chip "Tudo" saiu) só aparecia a filtrar precisamente por "Por alocar" · v299 · 2026-08-12 · Cash Flows: o "Por detalhar" deixa de ser um chip à parte e passa para dentro do seletor de refeições/tipos, no fim ("📝 Por detalhar · N") — o ecrã já tinha filtros a mais por cima da lista. Deixa de se poder cruzar com uma refeição · v298 · 2026-08-12 · Cash Flows › filtro por refeição/tipo: o dia passa a três letras ("Jantar Sáb, 8/ago" em vez de "Jantar Sábado, 8/ago") — o dropdown do iOS não deixa encolher a letra das opções, e por extenso partia cada refeição em duas linhas · v297 · 2026-08-12 · Cash Flows › filtro por refeição/tipo: a 🍻 bebida de uma refeição deixa de ter entrada própria (funde-se na refeição, que é como se procura) e as entradas passam a dizer a refeição por extenso ("Almoço Segunda, 10/ago"); o 🎒 "leva para casa" sai do filtro — é alocação feita no Stock, não o objetivo da compra. E um chip novo "🧾 Por detalhar" mostra as despesas soltas, sem artigos item a item · v296 · 2026-08-12 · Cash Flows: a lista passa a ordenar-se sempre por ordem descendente (também dentro do mesmo dia, pelo mais recente a entrar) — antes ficava ascendente dentro do dia, o que baralhava. E uma despesa avulsa (sem compra) ganha "🧾 Detalhar por artigo" no editor, para quem a pode editar (admin, ou quem a registou) a transformar numa compra com itens e preços · v295 · 2026-08-12 · Detalhe "Por categoria": o stock ainda POR ALOCAR deixa de cair no balde "Sacos/Depósitos/Similares" — o dinheiro continua a repartir-se pelas refeições na mesma (é bolsa comum), mas cada parcela passa a aparecer na categoria do seu artigo (Conservas, Legumes…), como o stock já alocado. Não estar entregue a uma refeição não o torna menos Conservas. O balde fica só com os sacos/taxas · v294 · 2026-08-12 · Relatório geral (PDF): nova secção "Custos Indiretos por Categoria" — o mesmo detalhe que cada cartão de refeição abre, mas somado por todas elas. Sai da MESMA função do ecrã (catIndirRows), para as duas leituras não poderem discordar · v293 · 2026-08-12 · CORRIGE a v291, que fez as categorias desaparecer do detalhe "Por categoria" (Utensílios, Bebidas, Fruta… iam todas parar a "Sacos/Depósitos/Similares"): o marcador "🧺 Stock" está em CADA artigo que o stock reparte pelas refeições, não só na linha do resto por alocar — o que as separa é a linha do resto ser uma despesa real da compra · v292 · 2026-08-12 · Custo da refeição › detalhe "Por categoria": as linhas "🧾 só despesa" (sacos, depósitos, taxas) voltam a agrupar-se sempre em "Sacos/Depósitos/Similares", mesmo tendo descritivo próprio — reconhecem-se pelo nome (o mesmo dicionário do "🧾 Extras da fatura"), que agora também apanha "Depósito" sozinho · v291 · 2026-08-12 · Custo da refeição › detalhe "Por categoria": a linha 🧺 Stock (o resto por alocar) deixa de cair no nome da loja da compra — vai direto para o catch-all "Sacos/Depósitos/Similares", sem tentar mais nenhum descritivo · v290 · 2026-08-12 · Custo da refeição › detalhe "Por categoria": uma despesa de uma COMPRA (sacos/depósitos, provisória antiga) passa a mostrar-se pelas OBSERVAÇÕES (o artigo) em vez do "Descritivo" da compra (normalmente o nome da loja, partilhado por todas as despesas dela) — a loja aparecia a repetir-se em vez do saco/depósito. E o resto por alocar da linha "🧺 Stock" deixa de se disfarçar atrás do nome da loja: volta a cair no catch-all, que agora aparece mesmo quando há stock por alocar · v289 · 2026-08-12 · Revertida a v288 (categorizar o stock por alocar por lote) — os números de "Sacos/Depósitos/Similares" estavam a inflacionar em vez de encolher, sinal de que a reconstrução não estava a bater certo com o resto real da compra. Volta-se à v287 enquanto se investiga com dados reais · v287 · 2026-08-12 · Custo da refeição › detalhe "Por categoria": uma despesa sem categoria deixa de se amontoar em "Sacos/Depósitos/Similares" — passa a mostrar-se pelo seu próprio descritivo (o artigo do stock, ou o texto escrito na despesa), como se fosse um artigo. O catch-all fica reservado para o que não tem descritivo nenhum (o stock ainda por alocar) · v286 · 2026-08-12 · Quem inseriu uma despesa passa a poder editá-la/apagá-la: sem compra associada é sempre sua (própria/cônjuge); vindo de uma compra com stock só enquanto o admin não tiver ido ao separador Stock realocar os artigos — a partir daí a compra fecha-se para ela, com aviso, e só o admin a edita (requer correr db/despesas_self_edit.sql) · v285 · 2026-08-12 · Custo da refeição: o detalhe de "Custos diretos" passa a ordenar as despesas por valor descendente. Com bebida concreta alocada, a ordem dos blocos passa a ser diretos → bebida (sem o ícone 🍻) → indiretos, e "Custos indiretos" chama-se agora "Outros custos indiretos", com o chip "Bebidas" lá dentro a passar a "Outras bebidas" nesse caso · v284 · 2026-08-12 · Custo da refeição: os custos indiretos ganham um detalhe expansível "Por categoria" — o mesmo € de Bebidas/Cerveja/Gerais, mas repartido pela categoria do artigo (a mesma das Compras/Stock), maior primeiro; o que não é stock nenhum (sacos, depósitos, taxas) ou ainda não tem categoria cai em "Sacos/Depósitos/Similares", sempre por último · v283 · 2026-08-12 · Definições › Parametrizações: a fração da bolsa indireta (Gerais/Bebidas/Cerveja) que entra no preço das refeições deixa de estar fixa em 50% — passa a ser ajustável por ano, só em anos abertos. T-shirts e Stock Sobrante continuam sempre de fora dessa bolsa · v282 · 2026-08-12 · Saldos: a vista "Por refeição" passa a ser a principal, e o seletor "Por parcelas"/"Por refeição" desce para debaixo de Receitas/Despesas, só à vista com o detalhe aberto (ali é que faz diferença — os totais não mudam com a vista) · v281 · 2026-08-12 · Saldos › vista "Por refeição": o custo de cada refeição passa a incluir os indiretos (Gerais/Bebidas/Cerveja) que lhe cabem, como no cartão da refeição — antes só contava os diretos e o custo ficava sempre abaixo da receita. "Outros custos"/"Outras receitas" ganham detalhe por baixo (T-shirts, Stock Sobrante, Quota Extra, Mealheiro, Missão Poupança…), no ecrã e no PDF · v280 · 2026-08-12 · Shop List: um pedido de refeição (Almoço/Jantar) cujo dia já passou e continua por comprar passa a avisar "⚠️ refeição já passou" no cartão de "Em falta" — não se esconde nem se cancela sozinho, só se diz que já ninguém está à espera daquilo · v279 · 2026-08-11 · T-shirts: editar um pedido cujo "Encomendado por" já saiu do plantel deste ano deixa de esconder o campo (o select ficava vazio e o Guardar recusava sempre) — o nome antigo aparece marcado "fora do plantel" e dá para reatribuir a t-shirt a outra pessoa · v278 · 2026-08-11 · Quota Extra: o Fundo de Reserva deixa de ser ignorado nos anos em que as fontes diretas (refeições, convidados, mealheiros, t-shirts, stock sobrante) já cobrem a despesa — passa a somar-se sempre à conta antes de se cortar a zero, para o valor "a guardar" ser mesmo cobrado · v277 · 2026-08-10 · Definições › Parametrizações: novo interruptor "Corrigir Presenças" (por ano) que deixa cada um corrigir as suas presenças de dias já passados desse evento — desligado por defeito, e as contas fechadas continuam a trancar tudo mesmo com ele ligado · v276 · 2026-08-10 · Adicionar Convidado: o campo "Trazido por" deixa de escolher o primeiro membro por ordem alfabética do casal e passa a vir pré-selecionado com o próprio utilizador, como no resto da app · v275 · 2026-08-10 · Shop List: um pedido sem loja própria que está a herdar a loja de outro pedido do mesmo artigo agora pode recusar essa herança ("🚫 Não herdar — deixar sem loja"), sem mexer no pedido que a escreveu · v274 · 2026-08-10 · Pagar Dívida: um pagamento livre / adiantamento (sem dívidas selecionadas) passa a ter uma caixa de observações, para dizer o que é aquele dinheiro · v273 · 2026-08-10 · PDF de pessoa (Saldos): as Refeições ordenam-se por dia e mostram o prato; e as Despesas Adiantadas deixam de mostrar "🧺 Stock" como nota e passam a mostrar o destino real (refeição/tipo) em vez de "Gerais" sempre que a compra tem um destino só · v272 · Stock alocado a uma PESSOA (🎒 leva para casa): no separador Stock, uma alocação pode agora apontar a um membro em vez de a uma refeição — é para as sobras que não voltam a ser usadas. O custo sai do rateio e passa a ser cobrado só a essa pessoa (aparece no saldo dela, como as t-shirts) · v271 · Nos Saldos, uma compra com peça "só despesa" (saco, depósito) deixa de aparecer duplicada em "Despesas adiantadas" — as linhas da mesma compra juntam-se numa só. E "Despesas adiantadas" separa-se em duas: o que já pagaste (📅) e o que está previsto mas ainda por pagar (📌 provisórias) · v270 · As SOBRAS deixam de reabrir o pedido: um lote comprado para uma refeição conta inteiro na cobertura, mesmo com parte por alocar na bolsa comum — compram-se 8 pacotes para o jantar, comem-se 5, e a lista já não pede os outros 3 que estão na despensa. É a mesma leitura que o cartão da refeição já fazia. Mover o stock para outra refeição continua a reabrir o pedido · v269 · Uma falta “dita à mão” passa a dizer que o é — na lista e no cartão da refeição, como já dizia o “coberto” e a folha do 🖨 —, e o bloco “que pedidos é que isto trata?” marca a linha que não é a app a deduzir. Trocar o artigo de um pedido (chouriço de sangue → morcela) deita fora a cobertura declarada sobre o artigo antigo, que ficava a mandar sobre o stock novo';
+const APP_BUILD = 'v367 · 2026-08-25 · Notificações das fases: a entrada em "Validação Presenças" passa a avisar o grupo (push + email, os mesmos dois canais das outras duas) — "O MEO 2026 chegou ao fim. É tempo de validares/confirmares as tuas presenças e dos teus convidados." Era a fase que mais pedia uma ação e a única que não a pedia a ninguém: o texto existia só no cartão, e quem não abrisse a app não sabia. E o admin passa a ser avisado quando alguém valida QUALQUER um dos três checks, não só as contas — presenças e convidados desbloqueiam a passagem a "Validação Contas" da mesma maneira, e ele precisa de saber que pode avançar sem ir espreitar a matriz das Validações. Requer o deploy novo da Edge Function push-notificar-festasbv (já feito), que aceita na mesma o nome antigo do aviso para um separador com o app.js em cache. Recuar de fase continua a não avisar ninguém, de propósito · v366 · 2026-08-25 · O estado do ano passa a ser UMA coisa com CINCO momentos, num slider à cabeça dos Saldos: Ano Aberto · Validação Presenças · Validação Contas · Em Pagamento · Ano Fechado. Eram dois booleanos independentes, e não chegavam — um ano em pagamento e um ano acabado tinham exatamente os mesmos valores, logo a app não os distinguia (2025 e 2026). O admin avança/recua com o ‹ › (um passo de cada vez, cada transição com a sua confirmação e o seu aviso); os outros só leem. O slider substitui os dois cartões que diziam pedaços disto em sítios diferentes (o "Estado das Contas" lá em baixo e o cartão da fase lá em cima) e traz para dentro dele as confirmações do próprio agregado — que se pediam à cabeça e se respondiam dois ecrãs abaixo — e o atalho para pagar a dívida quando o ano está em pagamento. A Validação de Contas tranca presenças e convidados como o fecho de contas sempre trancou (é o mesmo momento, com nome novo); o Ano Fechado tranca também os pagamentos, a toda a gente. Migração db/fase_ano.sql (tolerante: sem ela ficam as três fases de sempre). Regressão em tests/fase-ano.js · v365 · 2026-08-25 · CORRIGE perda de dados: registar um pagamento novo num ano que já tinha pagamentos apagava TODOS os pagamentos desse ano. Gravar o ano faz DELETE+INSERT das tabelas filhas, e no INSERT em lote o PostgREST usa uma lista de colunas para o lote todo, pondo NULL EXPLÍCITO (não o DEFAULT) nas linhas a que uma chave falte: os pagamentos já gravados levavam `criado_em`, o novo não, e o NULL rebentava o NOT NULL da coluna — com o DELETE já feito, o ano ficava sem pagamento nenhum. A chave passa a ir em todas as linhas (o pagamento novo leva a hora do momento). Regressão em tests/pagamentos-lote.js · v364 · 2026-08-25 · O cartão "Pagamentos autorizados" (Saldos) reconhece quando já não há nada a pagar (todos os saldos a 0 €, a mesma conta que já esconde o FAB de cash-flow) e troca de aviso para constatação: "✅ Ano saldado", em verde, sem os botões de lembrar ninguém. Sem coluna nova nem ação de trancar — é derivado, como o resto · v363 · 2026-08-25 · Saldos: com os pagamentos já autorizados, o quadro "Confirmações necessárias" (Presenças/Convidados/Contas do casal) sai por inteiro, venha o que vier por validar — o dinheiro já anda, e ninguém volta atrás por causa de uma presença ou de um convidado por confirmar. Um ano como o 2025, fechado antes de a validação de presenças/convidados sequer existir, deixa de pedir para sempre duas confirmações que já não têm para onde ir · v362 · 2026-08-25 · CORRIGE: um separador com o app.js de antes do fix da v361 ainda conseguia mandar "já podes pagar" sobre um ano antigo (aconteceu, sobre 2025) — o anoCorrente() é uma guarda do lado do cliente, e não vale enquanto a página não recarrega. O aviso de fase ("fecho"/"pagamentos") passa a levar o ano do evento, e a Edge Function push-notificar-festasbv recusa-se a mandar a toda a gente se esse ano não bater com o maior ano em eventos — a trava a sério, do lado do servidor, que corre sempre a versão publicada. Requer o deploy novo da function (já feito) · v361 · 2026-08-25 · "Autorizar Pagamentos" deixa de avisar toda a gente quando o ano já não é o corrente (há um evento mais recente a seguir) — só grava o carimbo, para o ✓ de quem já está saldado passar a verde nos anos antigos. Um evento de há anos não tem ninguém à espera de saber "já podes pagar"; mandar o aviso na mesma era confundir. Pela mesma razão, "📣 Reenviar aviso aos membros" só aparece no ano corrente · v360 · 2026-08-25 · CORRIGE contas de anos JÁ FECHADOS a mudarem sozinhas: o preço unitário de uma refeição passou a arredondar ao cêntimo ACIMA (17/08/2026) e, como a app não guarda o apuramento — recalcula-o ao vivo —, isso reescreveu em silêncio a sobra de 2025, que fechou a 03/08 com 126,45 € e passou a mostrar 129,45 €. O arredondamento passa a ser parâmetro POR ANO (Definições › Parametrizações › "Arredondamento do preço da refeição"): cada ano guarda a regra com que fechou. Requer correr db/preco_arredonda.sql, que repõe "cêntimo mais próximo" nos anos fechados antes da mudança (2025 volta a 126,45 €) e deixa 2026 no "cêntimo acima" com que fechou (208,20 €, inalterado). Sem a migração nada muda: arredonda sempre para cima, como hoje · v359 · 2026-08-25 · Cash Flows: com "Dívidas Públicas" ligado (Definições › Parametrizações), os movimentos de 🤝 Pagar Dívida e 💸 Reembolso deixam de ficar restritos a quem está envolvido — todos os membros passam a ver os de todos, como já acontecia no saldo/detalhe de cada um. Desligado (o defeito), continua como sempre: um não-admin só vê os seus e os do cônjuge · v358 · 2026-08-25 · CORRIGE a v357: gravar QUALQUER coisa no evento (mesmo só acrescentar um pagamento) reescrevia a hora de registo (criado_em) de TODOS os pagamentos já existentes para a hora desse save — o DELETE+POST que substitui a tabela toda não levava o criado_em antigo. Passa a preservá-lo para pagamentos que já o tinham; só um pagamento mesmo novo (ainda sem ter passado pela BD) ganha a hora do momento · v357 · 2026-08-25 · "✓ Saldado em…" (Saldos, detalhe de cada membro) ganha a hora, como já tinha "Contas validadas em…" — "Saldado em DD/MM/AAAA, às HH:MM". Precisa da hora do REGISTO do pagamento, que a app nunca guardava (só a data escrita no formulário); requer correr db/pagamentos_criado_em.sql, sem a qual a frase continua a mostrar só a data · v356 · 2026-08-24 · O ✓ de "contas validadas" (Saldos) passa a ser UM estado de cada vez: dourado enquanto só validou (pagamentos ainda não ativos) e desliga-se sozinho assim que se autorizam os pagamentos — manter dourado ali passava a mensagem errada de "está pago". A partir daí o ✓ passa a verde e só aparece a quem já saldou a dívida. No detalhe de cada um mantêm-se as duas datas, sempre que existirem: "Contas validadas em…" e "Saldado em…" (esta, a data do último pagamento que lhe saldou a dívida própria, ref `own:Nome`). A frase "✓ Contas validadas em [data]" que aparecia no quadro de validações (entre o casal e os restantes membros) sai — já se via, repetida, no ✓ de cada nome · v355 · 2026-08-24 · Saldos: o cartão "Contas em validação"/"Pagamentos autorizados" sobe para logo a seguir ao saldo do grupo (antes só aparecia lá em baixo, depois da lista de membros toda). A explicação "De onde vem a Quota Extra e a Poupança?" sai do <details> fixo à cabeça da lista de Saldos — passa a viver dentro do "de onde vem isto" de cada pessoa, ao abrir a Quota Extra/Poupança dela. Quem já validou as CONTAS ganha uma marca ✓ junto ao nome na lista, e o detalhe de cada um passa a fechar com "✓ Contas validadas em DD/MM/AAAA, às HH:MM". E sempre que alguém valida as contas, o admin recebe agora um push a avisar (tipo novo "contas_validadas" na Edge Function push-notificar-festasbv — requer novo deploy) · v354 · 2026-08-24 · Dar um pagamento por recebido avisa de volta quem pagou (push): "o Diogo confirma que recebeu o teu pagamento de X. Saldo atual: Y. Saldo do teu cônjuge: Z." Sai dos dois caminhos — validar um pedido declarado e o admin registá-lo ele próprio. Rejeitar também avisa ("não confirmou o teu pagamento de X. Motivo: … Não entrou nas contas"), que era o outro sítio onde se ficava à espera sem resposta · v353 · 2026-08-24 · Validar um pagamento declarado avisa de volta quem pagou (push): "o Diogo confirma que recebeu o teu pagamento de X. Saldo atual: Y. Saldo do teu cônjuge: Z." Declarar já avisava o admin; do outro lado ficava-se à espera sem saber se o dinheiro tinha sido dado por recebido. A mensagem é sempre a mesma, com os saldos do ecrã e com sinal (negativo = ainda falta); sem cônjuge no plantel deste ano, essa frase não sai ·v352 · 2026-08-24 · O aviso do fecho encurta no push e cresce na app: o iPhone só mostra ~4 linhas no ecrã bloqueado e cortava justamente o "não pagues ainda", por isso o push passa a ser o resumo ("Valida as tuas contas e as dos teus convidados nos Saldos. Não pagues ainda, as contas podem alterar.") e a explicação por extenso — a mesma do email — passa a estar no cartão da fase, em Saldos › Estado das Contas, para quem não apanhou a notificação · v351 · 2026-08-24 · Separador Stock deixa de desaparecer inteiro num ano de contas fechadas — só some se esse ano não tiver stock nenhum (ex.: 2025). Com stock, fica visível e só de leitura (🔒 aviso no topo; ＋ Stock e ✨ sugerir categorias escondidos). T-shirts já não dependia disto — continuava sempre visível · v350 · 2026-08-24 · Fim do ano em DUAS fases, cada uma com o seu aviso a todos os membros (push + email): fechar as contas passa a dizer "em validação, não pagues ainda" — cada um confirma as suas contas e as validações ainda podem obrigar a acertos —, e um botão novo do admin (Saldos › Estado das Contas) dá-as por validadas e autoriza os pagamentos ("podes e deves pagar"). O push deixa de levar o saldo de cada um (ainda pode mudar) e passa a ir também para o admin, que vê o que os outros receberam; o email abre a app do Gmail com todos os membros com conta no destinatário. Há "Reenviar aviso" para quando o Gmail não pega. Não tranca nada: registar pagamentos continua como estava. Requer correr db/pagamentos_autorizados.sql; sem ela o cartão fica escondido · v349 · 2026-08-19 · Teto da sobra do grupo: o desconto volta a ser repartido por tudo o que cada um tem a pagar (refeições, quota extra/poupança e stock levado para casa), mas SEM as t-shirts — são uma encomenda pessoal e quem encomendou mais camisolas não pôs mais dinheiro na bolsa que gerou a sobra. Reverte a base só-refeições da v348 · v347 · 2026-08-19 · Teto da sobra do grupo (Definições › Parametrizações, por ano): define-se até onde vale a pena guardar e o que passar disso é devolvido aos membros, proporcional ao que cada um paga, como desconto no que tem a liquidar. Interruptor à parte do valor porque "sem teto" e "teto a zero" são respostas diferentes. É o teto da sobra DESTE ano, não da poupança acumulada. Aparece na ficha do membro, no detalhe dos Saldos e no relatório. E CORRIGE: o desconto de uma compra em modo "membros" (v346) baixava o que o membro paga sem nada no ecrã a dizê-lo — passa a ter linha própria nos mesmos sítios. Requer correr db/teto_reserva.sql · v346 · 2026-08-19 · Desconto de uma compra: novo bloco "🏷️ Descontos" no fim do registo de uma compra por artigo, com duas maneiras de chegar ao desconto de cada artigo — 💶 Geral (escreve-se o total da fatura e reparte-se pelo preço de cada artigo) ou 🎯 Por artigo (à mão) — e uma escolha só, para a compra toda, do que fazer com ele: a) 💶 no preço (é já o pago, sem mais nada), b) 👥 devolvido aos membros no fecho de contas (proporcional ao que consumiram — convidados não) ou c) 💰 sobra do saldo do grupo. Declarava-se antes no separador Stock (v345); passa a viver na compra, que é onde se lê a fatura — o Stock passa a mostrar só a leitura, com um link a voltar ao editor. Requer correr db/stock_desconto.sql; sem ela o bloco fica escondido · v345 · 2026-08-19 · Desconto num lote de stock (separador Stock, no modal do artigo): quando uma fatura vem com desconto, escolhe-se por lote o que fazer com ele — 💶 Preço (o valor gravado já é o pago, sem mais nada a fazer), 👥 Membros (o preço da refeição fica de tabela para todos, membros e convidados, mas no fecho os membros recuperam a sua parte proporcional ao que consumiram — convidados não) ou 💰 Grupo (fica de tabela para todos e o desconto vira sobra do saldoGrupo, sem se devolver a ninguém — a mesma lógica que já existia para o desconto de uma fatura de t-shirts). Requer correr db/stock_desconto.sql; sem ela o preço é sempre o gravado em `valor`, como sempre foi · v344 · 2026-08-19 · CORRIGE: o Relatório Geral (PDF) podia mostrar uns cêntimos de "Bolsa comum não atribuída a uma refeição" mesmo com os pesos das refeições a somar 100% — vinha de arredondar o indireto de CADA refeição (F20×peso) a cêntimo, independentemente, e a soma desses arredondamentos raramente batia certo com o F20 total. Passa a fechar pela regra da fatura já usada noutros sítios (o cêntimo que sobra vai para a refeição de maior peso), para a soma dos indiretos bater sempre, a cêntimo exato, contra a bolsa indireta · v343 · 2026-08-17 · Stock › 3.º eixo ("Onde foi parar"): novo destino "👥 Distribuído pelo grupo", irmão do 🗑 e do 📦 — para sobras que alguém levou (sem se saber ao certo quem, ou sem se querer cobrar a ninguém em concreto), diferente de "deitado fora" (que implica desperdício) e não mexe num cêntimo, como os outros dois. Conta como consumido, não transita para o ano seguinte, aparece no filtro de estado, no rodapé do cartão, no detalhe do custo de uma refeição e na folha do 🖨, com cor própria (azul, sem ser o alarme do 🗑). E CORRIGE: escolher um destino do 🎒 Leva para casa dentro de "Onde foi parar" (3.º eixo) dizia "o custo vai para o saldo dela" — mentira ali, porque esse eixo não mexe no custo (só a alocação do custo, 2.º eixo, o faz); a legenda passa a dizer o que acontece mesmo neste eixo ("não mexe no custo, só diz onde a mercadoria ficou") · v342 · 2026-08-17 · CORRIGE: escrever "Já se gastou" à mão num artigo do stock com mais do que um lote podia gravar menos do que o escrito — o consumo repartia-se por FIFO pela quantidade CHEIA de cada lote, ignorando o que esse lote já tinha marcado como 🗑 Deitado fora/📦 Ano seguinte no 3.º eixo; se o desperdício calhasse no lote mais antigo, o excesso desaparecia em silêncio ao mostrar (14 no total, 4 deitados fora, escrever 10 gastos ficava a valer só 6). Agora a repartição usa o que cada lote AINDA PODE receber de consumo, nunca a quantidade cheia · v341 · 2026-08-17 · Relatório geral (PDF): o cabeçalho passa a UMA linha só — "Receitas − Despesas = Saldo", com a Poupança Acumulada pendurada por baixo do valor do Saldo em vez de um 4.º cartão à parte; o quadro de Despesas sobe para ANTES das Receitas; no "Resumo por Membro" a coluna "Quota" passa a "Extra" (com nota a explicar que pode vir de quota extra para cobrir custos e/ou poupança) e a coluna "Só bebida" funde-se em "Refeições" (é a mesma refeição); e a frase do "Total por Membro" ("o que cada um trouxe ou encomendou") passa a dizer o que a tabela mostra mesmo — convidados, t-shirts e sobras de stock imputados · v340 · 2026-08-16 · CORRIGE: a categoria "Sacos/Depósitos/Similares" (Custo da refeição › Por categoria, e a matriz de Despesas do relatório PDF) deixa de adivinhar pelo nome do artigo quais são as linhas "🧾 só despesa" de uma compra — passa a usar a MESMA regra estrutural da ficha da compra (qualquer despesa da compra que não seja a linha agregada "🧺 Stock" é, por construção, só despesa). Um "Saco Plástico Reutilizável CONTINENTE" escapava ao dicionário de palavras por trazer a marca colada ao produto e aparecia com linha própria em vez de cair no catch-all, discordando da própria ficha da compra que já o dizia "só despesa" · v339 · 2026-08-16 · Relatório geral (PDF): os cartões do cabeçalho (Saldo/Receitas/Despesas/Poupança) passam de flexbox a grid — na pré-visualização de um telemóvel, com 4 cartões, um valor em € não encolhia abaixo do que precisa e obrigava a scroll horizontal; agora o que não cabe numa linha desce para a seguinte, e no papel (mais largo) ficam sempre juntos, como antes · v338 · 2026-08-16 · Relatório geral (PDF): a matriz de Despesas ganha o TOTAL e o PESO (%) de cada categoria logo a seguir ao nome dela — antes da distribuição por dia/refeição, que passa a vir depois; nas Receitas, "Convidados" passa a "Refeições (convidados)"; e o cabeçalho ganha um cartão "Poupança Acumulada" quando ainda houver reserva por usar de anos anteriores · v337 · 2026-08-15 · Custo da refeição: sai a linha "Crianças · não pagam" (já se listam por extenso no "Quem vai?"/"Quem foi?" logo a seguir) e, com ela, os mini-títulos "Membros"/"Convidados" — o rótulo de cada linha já diz de quem se fala. O contador do "Quem vai?"/"Quem foi?" passa a separar adultos de crianças ("10+3", como a grelha de Presenças já fazia) · v336 · 2026-08-15 · Custo da refeição: a linha "Homens"/"Mulheres" só aparece com o desconto por sexo LIGADO (Definições › Parametrizações). Sem desconto (o defeito, e o caso de quem não quer usar a funcionalidade), volta a haver uma linha única "Membros" — como era antes desta funcionalidade existir · v335 · 2026-08-15 · Painel "Validações": frase de "falta fechar as contas" mais curta, para caber numa linha só. E o 🔔 Lembrar, sem push ativo, passa a tentar abrir a APP do Gmail no telemóvel (esquema googlegmail://) em vez de ir direto ao Gmail no browser — só cai para o browser se a app não estiver instalada · v334 · 2026-08-15 · CORRIGE a v333: com Presenças e Convidados já validados mas as Contas ainda por fechar, o quadro de validações desaparecia por completo — sem "Contas validadas" (ainda não há) nem explicação nenhuma, como se nada estivesse pendente. Passa a mostrar "✓ Presenças e Convidados confirmados — falta fechar as contas" enquanto se espera pelo fecho · v333 · 2026-08-15 · CORRIGE a v332: os três checks (Presenças/Convidados/Contas) voltam a viver TODOS juntos nos Saldos, logo a seguir ao saldo do casal — em vez de espalhados por Presenças/Convidados/Saldos. Passam a ser um QUADRO ÚNICO "Confirmações necessárias" com uma linha por check em falta; assim que não sobra nada por validar, o quadro sai por inteiro e dá lugar a uma frase curta, "✓ Contas validadas em [data]" · v332 · 2026-08-15 · Validações reorganizadas: em vez de listas à parte nos Saldos, cada check vive no separador a que pertence — "✋ Presenças validadas" na grelha de Presenças (logo a seguir ao meu agregado), "👥 Convidados validados" no separador Convidados, e "💳 Contas validadas" nos Saldos logo a seguir ao saldo do casal (não no fim de todos os membros). Convidados passa a ser um CHECK PRÓPRIO, separado de Presenças. O botão deixa de ser verde antes de validado (verde é só o selo de "já feito"). Novo painel de admin "📋 Validações" (Definições): uma matriz por membro × check, com 🔔 para lembrar quem tem conta ligada (push; sem push ativo abre o Gmail com o email pronto) e ✓ Marcar para quem não tem conta. Requer correr de novo db/validacoes_tipo.sql (agora com 3 tipos) e o deploy novo da Edge Function push-notificar-festasbv (tipo lembrete_validacao) · v331 · 2026-08-15 · CORRIGE a v330: a Validação de Presenças não podia ficar "disponível a qualquer momento" — ninguém valida presenças A MEIO DAS FESTAS, enquanto elas ainda podem mudar (falta alguém, chega mais gente). Passa a esperar pela ÚLTIMA REFEIÇÃO (não pelo fecho de contas, que é o do check de Contas) — antes disso o bloco nem aparece nos Saldos, e o modal/gravação recusam na mesma se se lá chegar por outro caminho · v330 · 2026-08-15 · Saldos ganham um SEGUNDO check, ao lado da Validação de Contas: "Validação de Presenças" — cada um confirma que as refeições em que esteve (e os convidados que trouxe) estão bem registadas. Mesma mecânica de sempre (valida por si e pelo cônjuge; o admin, também pelos amigos sem utilizador). Requer correr db/validacoes_tipo.sql; sem ela fica escondida e a Validação de Contas continua exatamente como era · v329 · 2026-08-15 · CORRIGE a v328 (sinal trocado): a SOBRA DO GRUPO (saldoGrupo) no saldo do tesoureiro é um CRÉDITO a favor dele ("🏦 Saldo do grupo — fica guardado", junto das despesas adiantadas), não um débito — com o sinal errado o saldo dele, uma vez tudo liquidado, ia parar a −416 € em vez de 0. A soma de cred−deb de todos os membros fecha sempre em −saldoGrupo (os pagamentos entre membros cancelam-se na soma); como cada membro normal vai a zero ao pagar tudo, sobra só o tesoureiro, e sem este crédito o saldo dele convergia para −saldoGrupo (a dever!) em vez de 0. O "Saldo do Grupo" (208,21 €) continua sem se mexer · v327 · 2026-08-15 · Saldos: o ênfase de cada membro passa a ser o SALDO A LIQUIDAR (maior, a bold) e a despesa total fica pequena e esbatida, de apoio — para não haver dúvida do número que interessa. Sem défice a repartir este ano, a Quota Extra desaparece de vez (linha e comentários), em vez de aparecer a "—". PDF de pessoa: passa a vir pré-selecionado o próprio membro, e ganha as secções T-shirts e Stock Sobrante que faltavam (e que já entravam no saldo sem se verem no papel) · v326 · 2026-08-15 · Definições › Parametrizações: "Arredonda Total" ganha um segundo MOMENTO — além da despesa própria (o de sempre), passa a poder arredondar a dívida final a liquidar (própria + convidados + t-shirts + stock, líquida de adiantamentos/mealheiro/reembolsos, mas antes de pagamentos de dívida) — para quem paga só o valor exato continuar a ficar com o cêntimo em aberto. Seletor novo, só visível com o arredondamento ligado; o tesoureiro fica sempre no modo despesa. Requer correr db/arredonda_modo.sql; sem ela o comportamento é sempre o de sempre · v325 · 2026-08-15 · Relatório geral (PDF) › Detalhe Refeições: o "Custo total" ganha entre parênteses quantos adultos e crianças a refeição serviu, e as linhas de preço por sexo ganham a percentagem do desconto ao lado ("+10%" no homem, "-10%" na mulher) · v324 · 2026-08-15 · Relatório geral (PDF) › Detalhe Refeições: cada linha de custo ganha uma nota pequena a dizer do que se trata — "Custos diretos (compras refeição)", "Bebida (barris cerveja/sangria)", "Indiretos (renda, limpeza, bricolage, talheres, etc.)" · v323 · 2026-08-15 · Relatório geral (PDF): a matriz de Despesas fecha ao cêntimo exato também ENTRE COLUNAS — cada dia arredondava-se a cêntimo por si, e a soma dos dias podia ficar 0,01/0,02 abaixo ou acima do que a categoria vale, mesmo já sem o ruído da v322 no "Fora dos dias". Fecha-se pela mesma regra da fatura já usada noutros sítios da app: o cêntimo que falta ou sobra vai sempre para o dia com maior expressão daquela categoria — nunca fica repartido nem escondido numa coluna que não é a dele · v322 · 2026-08-15 · Relatório geral (PDF): corrige o ruído de ±0,01/±0,02 que aparecia na coluna "Fora dos dias" da matriz de Despesas em categorias sem nada de facto por explicar — vinha de arredondar a cêntimo a fatia de cada categoria em CADA refeição (catSplit), 8-10 vezes, e o resíduo desse arredondamento repetido ia parar ali disfarçado de dinheiro por alocar. Passa a acumular-se a 6 casas e só se arredonda a cêntimo no ecrã/PDF, uma vez, no fim — a "Fora dos dias" volta a mostrar só o que é mesmo bolsa comum não distribuída pelos dias. É só apresentação do relatório: não mexe em nenhuma conta real (saldos, quotas, o que cada um paga) · v321 · 2026-08-15 · Relatório geral (PDF): nova secção "Detalhe Refeições", entre as Despesas e a Visão por Refeição — para cada refeição, o custo explicado (diretos/bebida/indiretos e o total) e o tarifário que daí sai (preço membro homem/mulher, preço convidado, só bebida homem/mulher/convidado), com o prato principal no título quando definido · v320 · 2026-08-15 · Definições › Utilizadores & Casais: cada conta com notificações push ativas passa a ter um 🔔 verde ao lado do email, como o selo "admin" — o admin já não precisa de ir ao Supabase para saber quem já ativou. Requer a policy nova de db/push-subscriptions.sql (push_subscriptions_select_admin), que dá ao admin leitura sobre as subscriptions de toda a gente (só leitura, nunca escrita) · v319 · 2026-08-15 · Notificações push: pop-up automático a sugerir ativar logo a seguir ao login (Ativar/Agora não), como já fazia o SplitBill; e a caixa em Definições deixa de desaparecer calada quando o browser não suporta — no iPhone/iPad diz que é preciso instalar a app no ecrã principal primeiro (é assim que o iOS trata o Web Push) · v318 · 2026-08-15 · Notificações PUSH (sem Telegram), a par do canal existente: quando as contas fecham, cada membro com conta ligada recebe um aviso com o que tem a pagar/receber (e o saldo do casal, havendo cônjuge); quando alguém que não é admin declara "🤝 Pagar Dívida", o admin recebe logo um aviso; e o admin ganha um botão "🔔 Lembrar" junto ao saldo de quem deve, nos Saldos. Ativa-se em Definições › Notificações › "Ativar notificações push". Requer correr db/push-subscriptions.sql e fazer deploy da Edge Function push-notificar (secrets VAPID_PUBLIC_KEY/VAPID_PRIVATE_KEY) · v317 · 2026-08-14 · Custo da refeição: acabamentos. A percentagem do desconto por sexo ("Pagam menos 10%") deixa de ser uma frase solta no fim do grupo dos Membros e passa a ir à frente do contador da linha "Mulheres" — itálico, esbatida, ali onde se lê a que preço ela se refere. E o contador do "só bebe/bebem" ganha folga do texto (estava colado, "só bebe1") · v316 · 2026-08-14 · Custo da refeição: "só bebe/bebem" passa de linha irmã a SUB-LINHA da categoria (Homens · Mulheres · Convidado) — pendurada por baixo dela, indentada, sem o ícone de cerveja, sem negrito e em itálico, com o preço mais esbatido. Sem ninguém a comer nessa categoria (raro: alguém só bebe sem ninguém dessa espécie à mesa) volta a ser linha normal, para não desaparecer · v315 · 2026-08-14 · Custo da refeição: os preços passam a um tarifário de DOIS NÍVEIS — o grupo (Membros · Convidados) e, dentro dele, uma linha por espécie de gente. Nos membros a linha vem já partida por sexo, por extenso e sem pictograma (“Homens”/“Mulheres”, cada um com o seu contador e o seu preço), e havendo membros só a beber ganham as suas próprias linhas (“Homens 🍺 só bebem”/“Mulheres 🍺 só bebem”) — só aparecem se existirem. Convidados ganham um bloco semelhante (Convidado · Convidado 🍺 só bebe · Crianças), sem distinção por sexo (só membros pagam por sexo). A percentagem do desconto continua a dizer-se uma vez, logo a seguir aos Membros · v314 · 2026-08-14 · Grelha do custo da refeição, acabamento: com desconto por sexo os dois preços passam a alinhar em coluna (ícones de um lado, valores do outro) em vez de cada linha se centrar por si — os dois pictogramas têm larguras diferentes e os € saíam escalonados. O preço sobe de 13,5 para 15px (a 13,5 o preço principal da refeição ficava mais pequeno que o do “só bebe” ao lado) e os ícones de 11 para 12px sem esbatimento. E o valor de cada célula passa a centrar-se na altura disponível, para o “7,88 €” do “só bebe” assentar entre os dois preços em vez de alinhar com o primeiro · v313 · 2026-08-14 · Desconto feminino no preço das refeições. Em Definições › Parametrizações, por ano, define-se quanto as mulheres pagam A MENOS QUE OS HOMENS no preço da refeição (vale no “come” e no “só bebe”). O agravamento deles não se escreve — é automático e sai da contagem de cada refeição —, e o TOTAL COBRADO AO GRUPO NÃO MUDA: só muda quem o põe. Com 8 homens e 4 mulheres a 20%, uma refeição de 14,00 €/pessoa passa a 15,00 € e 12,00 €. No cartão da refeição a célula dos membros passa a mostrar os dois preços, um por linha, com a percentagem dita uma vez por baixo deles — as colunas ficam onde estavam, e a coluna do “come” perde o rótulo (é o defeito), devolvendo à faixa a linha que os dois preços ocupam. Os convidados pagam preço único (a linha deles não tem sexo) e o mínimo por refeição aplica-se aos dois lados. A 0% (o defeito, e o de cada ano novo) nada muda e o preço volta a ser um só. Requer correr db/desconto_sexo.sql · v312 · 2026-08-14 · Acerto de CASAL nos pagamentos de dívida e nos reembolsos. Em “🤝 Pagar Dívida”, se alguém do casal tiver dinheiro a receber, aparece agora um chip azul “a receber” que DESCONTA no que se entrega: o Mestre tem 20 a receber, o cônjuge dele deve 60, e entregam-se 40 — o campo Valor passa a mostrar o líquido, com a conta à vista. Vale nos dois sentidos: o crédito pode ser de quem está a pagar ou do cônjuge. Em “💸 Reembolso”, escolhida a pessoa, o valor deixa de ter de se escrever à mão: “👤 Por saldo” devolve o saldo dela e “👥 Saldo do casal” devolve a diferença quando um do casal tem a receber e o outro a pagar (só aparecem quando há mesmo o que acertar). Nos dois casos ficam gravados os DOIS movimentos — o pagamento da dívida e o reembolso do crédito —, porque é assim que cada saldo vai a zero sem se mexer numa única regra das contas do grupo: o resultado do grupo não muda e a soma dos saldos continua a fechar. Um pedido de pagamento feito por quem não é admin leva o acerto lá dentro e as duas parcelas nascem quando o admin valida. Sem migração · v311 · 2026-08-14 · Stock › 3.º eixo: novo destino “📦 Ano seguinte”, ao lado do 🗑. Acabadas as festas, o que sobra e não se deita fora aloca-se ao próximo evento — sai do “por gastar” deste ano e ganha estado próprio no filtro, no cartão e na folha do 🖨. Ao CRIAR o ano seguinte, esse stock entra lá sozinho, a 0 € e por alocar, marcado “📦 Ano anterior” — já foi pago no ano que o comprou, e dar-lhe valor outra vez era cobrar a mesma cerveja duas vezes. Se o ano seguinte já existir, entra no momento em que se grava a alocação; e a sincronização é idempotente — mexer no 📦 corrige a quantidade lá, e tirá-lo retira o artigo de lá · v310 · 2026-08-13 · Stock: TRÊS eixos, cada um editável num sítio só — o que foi COMPRADO para a refeição (na compra), de quem é o CUSTO (no separador Stock) e, novo, ONDE A MERCADORIA FOI PARAR (também no Stock). Este terceiro herda o custo enquanto ninguém lhe tocar, e é nele que se reparte o stock por duas refeições ou se diz o que se deitou fora: as 5 batatas palha ficam com o custo todo na sexta e o stock fica “3,5 na sexta · 1,5 🗑 deitado fora”. No cartão da refeição a linha decompõe-se como já fazia (“5 pacotes · 17,10 €” com “↳ 🗑 1,5 pacotes deitados fora” por baixo, sem € — este não sai da conta dela); o filtro do separador ganha “🗑 Deitado fora” e o rodapé do cartão e a folha do 🖨 dizem-no. E o “dar baixa” passa a aparecer só onde faz sentido — no que está parado em Gerais/Bebidas; nas refeições quem responde é o eixo novo. Requer correr db/stock_alocacao_stock.sql · v308 · 2026-08-13 · Relatório geral (PDF): os quadros das despesas fundem-se num só, logo a seguir às Receitas — a matriz por categoria × dia/refeição ganha uma coluna "Fora dos dias" (a bolsa recuperada pela Quota Extra, as t-shirts, o stock levado para casa), com que cada linha passa a valer o total do evento naquela categoria; com isso sai o quadro "Despesas — Detalhe", que dizia as mesmas categorias com outros números. Os dois quadros passam a chamar-se só "Receitas" e "Despesas". E a matriz deixa de cortar os valores na pré-visualização do telemóvel ("223,…"): passa a deslizar na horizontal no ecrã, e no papel fica exatamente como estava · v307 · 2026-08-13 · Relatório geral (PDF): a "Distribuição por Dia" passa a MATRIZ — uma coluna por dia/refeição, uma linha por categoria e o total à direita, para se seguir a mesma categoria ao longo dos dias; e ganha um quadro final "Valores a Liquidar": o total de cada membro menos as despesas que adiantou e os pagamentos que fez, mais o que já recebeu, dando o saldo — o mesmo número que os Saldos mostram (sai da mesma função) · v306 · 2026-08-13 · Relatório geral (PDF): sai a lista de cash-flows (detalhe a mais para uma folha de resumo) e a indicação do tesoureiro; o "Despesas — Detalhe" passa a ser por CATEGORIA do artigo — o evento inteiro, diretos das refeições incluídos —, em vez do tipo (Gerais/Bebidas/Cerveja); a "Visão por Refeição" ganha coluna de Saldo, fecha um subtotal das refeições e mostra por baixo, uma a uma, as parcelas que mexem no saldo (t-shirts, mealheiro, quota extra, bolsa comum não atribuída) até ao saldo do grupo; nova secção "Distribuição por Dia", com o custo de cada dia repartido pela categoria do artigo; e o resumo por membro passa a dois quadros — o consumo do próprio (refeições + quota) e, a seguir, o total com convidados, t-shirts e sobras · v305 · 2026-08-12 · Refeições: o "Ver detalhe da lista de compras" perde a moldura à volta e fica igual ao "Ver detalhe do custo" — só a risca divisória e a frase. O cartão da lista só aparece ao abrir · v304 · 2026-08-12 · Stock › ⇄ 2.ª medida: com VÁRIAS MARCAS debaixo do mesmo artigo, cada linha da alocação passa a converter-se pelo fator da SUA marca e não pela média do cartão — pedir 3 postas do "Bacalhau Ocean Sea" (0,8 kg = 3 un) deixa de dar "Fixaste 3 un — só há 2,737 un" ao guardar, e o que se aloca deixa de ficar em decimais. O total em peças passa a ser a soma das linhas, e trocar a marca de uma linha guarda o número escrito (2 postas continuam 2, não 1,9) · v303 · 2026-08-12 · Refeições: o "Ver detalhe da lista de compras" de uma refeição passada passa a ser o MESMO botão do "Ver detalhe do custo", e ao abrir mostra os dois blocos de sempre (🛒 lista, depois 🧺 comprado), cada um com o seu colapsável; e os dois botões deixam de fugir para baixo ao expandir — passam a ficar ANTES do corpo que abrem, logo o "Esconder" nasce exatamente onde estava o "Ver" · v302 · 2026-08-12 · Refeições: o Cartaz das Ementas sobe para debaixo dos chips dos dias (é do ano, não da refeição aberta); numa refeição já passada a Lista de compras e o 🧺 Comprado fecham-se num só "Ver detalhe da lista de compras" — e o bloco deixa de se chamar "Não comprado" (o que lá está é a lista, com o tratado riscado); no detalhe dos custos diretos/bebida a quantidade ganha coluna própria e traz as duas medidas do lote ("7 un ≈ 3,136 kg"), como no 🧺 Comprado; o cartão do custo ganha um "Ver detalhe do custo" no fim; e abrir diretos/bebida/indiretos passa a mostrar já as linhas lá dentro · v301 · 2026-08-12 · Stock › filtro da alocação: as opções deixam de levar o nome da refeição à frente ("🌙 Jantar Sex, 7/ago · 11" → "🌙 Sex 7/ago · 11", o mesmo rótulo do chip do cartão) — com a contagem atrás a linha partia-se em duas no dropdown do iPhone, e a letra das <option> não se pode encolher (é o sistema que as desenha). O que o nome dizia, o ícone já diz: ☀️ almoço, 🌙 jantar · v300 · 2026-08-12 · Stock: os quatro chips de estado passam a uma combobox (consumido/por gastar · alocado/por alocar, com a contagem em cada opção) e ao lado nasce uma SEGUNDA combobox para a alocação — ver só o que está em Gerais, em Bebidas, no jantar de 7/ago ou no 🎒 de alguém. Escolhido um destino, os chips do cartão e o € da categoria passam a ser os desse destino. A 🍻 bebida de uma refeição vem com ela. E corrige o chip "🧺 por alocar", que desde a v268 (quando o chip "Tudo" saiu) só aparecia a filtrar precisamente por "Por alocar" · v299 · 2026-08-12 · Cash Flows: o "Por detalhar" deixa de ser um chip à parte e passa para dentro do seletor de refeições/tipos, no fim ("📝 Por detalhar · N") — o ecrã já tinha filtros a mais por cima da lista. Deixa de se poder cruzar com uma refeição · v298 · 2026-08-12 · Cash Flows › filtro por refeição/tipo: o dia passa a três letras ("Jantar Sáb, 8/ago" em vez de "Jantar Sábado, 8/ago") — o dropdown do iOS não deixa encolher a letra das opções, e por extenso partia cada refeição em duas linhas · v297 · 2026-08-12 · Cash Flows › filtro por refeição/tipo: a 🍻 bebida de uma refeição deixa de ter entrada própria (funde-se na refeição, que é como se procura) e as entradas passam a dizer a refeição por extenso ("Almoço Segunda, 10/ago"); o 🎒 "leva para casa" sai do filtro — é alocação feita no Stock, não o objetivo da compra. E um chip novo "🧾 Por detalhar" mostra as despesas soltas, sem artigos item a item · v296 · 2026-08-12 · Cash Flows: a lista passa a ordenar-se sempre por ordem descendente (também dentro do mesmo dia, pelo mais recente a entrar) — antes ficava ascendente dentro do dia, o que baralhava. E uma despesa avulsa (sem compra) ganha "🧾 Detalhar por artigo" no editor, para quem a pode editar (admin, ou quem a registou) a transformar numa compra com itens e preços · v295 · 2026-08-12 · Detalhe "Por categoria": o stock ainda POR ALOCAR deixa de cair no balde "Sacos/Depósitos/Similares" — o dinheiro continua a repartir-se pelas refeições na mesma (é bolsa comum), mas cada parcela passa a aparecer na categoria do seu artigo (Conservas, Legumes…), como o stock já alocado. Não estar entregue a uma refeição não o torna menos Conservas. O balde fica só com os sacos/taxas · v294 · 2026-08-12 · Relatório geral (PDF): nova secção "Custos Indiretos por Categoria" — o mesmo detalhe que cada cartão de refeição abre, mas somado por todas elas. Sai da MESMA função do ecrã (catIndirRows), para as duas leituras não poderem discordar · v293 · 2026-08-12 · CORRIGE a v291, que fez as categorias desaparecer do detalhe "Por categoria" (Utensílios, Bebidas, Fruta… iam todas parar a "Sacos/Depósitos/Similares"): o marcador "🧺 Stock" está em CADA artigo que o stock reparte pelas refeições, não só na linha do resto por alocar — o que as separa é a linha do resto ser uma despesa real da compra · v292 · 2026-08-12 · Custo da refeição › detalhe "Por categoria": as linhas "🧾 só despesa" (sacos, depósitos, taxas) voltam a agrupar-se sempre em "Sacos/Depósitos/Similares", mesmo tendo descritivo próprio — reconhecem-se pelo nome (o mesmo dicionário do "🧾 Extras da fatura"), que agora também apanha "Depósito" sozinho · v291 · 2026-08-12 · Custo da refeição › detalhe "Por categoria": a linha 🧺 Stock (o resto por alocar) deixa de cair no nome da loja da compra — vai direto para o catch-all "Sacos/Depósitos/Similares", sem tentar mais nenhum descritivo · v290 · 2026-08-12 · Custo da refeição › detalhe "Por categoria": uma despesa de uma COMPRA (sacos/depósitos, provisória antiga) passa a mostrar-se pelas OBSERVAÇÕES (o artigo) em vez do "Descritivo" da compra (normalmente o nome da loja, partilhado por todas as despesas dela) — a loja aparecia a repetir-se em vez do saco/depósito. E o resto por alocar da linha "🧺 Stock" deixa de se disfarçar atrás do nome da loja: volta a cair no catch-all, que agora aparece mesmo quando há stock por alocar · v289 · 2026-08-12 · Revertida a v288 (categorizar o stock por alocar por lote) — os números de "Sacos/Depósitos/Similares" estavam a inflacionar em vez de encolher, sinal de que a reconstrução não estava a bater certo com o resto real da compra. Volta-se à v287 enquanto se investiga com dados reais · v287 · 2026-08-12 · Custo da refeição › detalhe "Por categoria": uma despesa sem categoria deixa de se amontoar em "Sacos/Depósitos/Similares" — passa a mostrar-se pelo seu próprio descritivo (o artigo do stock, ou o texto escrito na despesa), como se fosse um artigo. O catch-all fica reservado para o que não tem descritivo nenhum (o stock ainda por alocar) · v286 · 2026-08-12 · Quem inseriu uma despesa passa a poder editá-la/apagá-la: sem compra associada é sempre sua (própria/cônjuge); vindo de uma compra com stock só enquanto o admin não tiver ido ao separador Stock realocar os artigos — a partir daí a compra fecha-se para ela, com aviso, e só o admin a edita (requer correr db/despesas_self_edit.sql) · v285 · 2026-08-12 · Custo da refeição: o detalhe de "Custos diretos" passa a ordenar as despesas por valor descendente. Com bebida concreta alocada, a ordem dos blocos passa a ser diretos → bebida (sem o ícone 🍻) → indiretos, e "Custos indiretos" chama-se agora "Outros custos indiretos", com o chip "Bebidas" lá dentro a passar a "Outras bebidas" nesse caso · v284 · 2026-08-12 · Custo da refeição: os custos indiretos ganham um detalhe expansível "Por categoria" — o mesmo € de Bebidas/Cerveja/Gerais, mas repartido pela categoria do artigo (a mesma das Compras/Stock), maior primeiro; o que não é stock nenhum (sacos, depósitos, taxas) ou ainda não tem categoria cai em "Sacos/Depósitos/Similares", sempre por último · v283 · 2026-08-12 · Definições › Parametrizações: a fração da bolsa indireta (Gerais/Bebidas/Cerveja) que entra no preço das refeições deixa de estar fixa em 50% — passa a ser ajustável por ano, só em anos abertos. T-shirts e Stock Sobrante continuam sempre de fora dessa bolsa · v282 · 2026-08-12 · Saldos: a vista "Por refeição" passa a ser a principal, e o seletor "Por parcelas"/"Por refeição" desce para debaixo de Receitas/Despesas, só à vista com o detalhe aberto (ali é que faz diferença — os totais não mudam com a vista) · v281 · 2026-08-12 · Saldos › vista "Por refeição": o custo de cada refeição passa a incluir os indiretos (Gerais/Bebidas/Cerveja) que lhe cabem, como no cartão da refeição — antes só contava os diretos e o custo ficava sempre abaixo da receita. "Outros custos"/"Outras receitas" ganham detalhe por baixo (T-shirts, Stock Sobrante, Quota Extra, Mealheiro, Missão Poupança…), no ecrã e no PDF · v280 · 2026-08-12 · Shop List: um pedido de refeição (Almoço/Jantar) cujo dia já passou e continua por comprar passa a avisar "⚠️ refeição já passou" no cartão de "Em falta" — não se esconde nem se cancela sozinho, só se diz que já ninguém está à espera daquilo · v279 · 2026-08-11 · T-shirts: editar um pedido cujo "Encomendado por" já saiu do plantel deste ano deixa de esconder o campo (o select ficava vazio e o Guardar recusava sempre) — o nome antigo aparece marcado "fora do plantel" e dá para reatribuir a t-shirt a outra pessoa · v278 · 2026-08-11 · Quota Extra: o Fundo de Reserva deixa de ser ignorado nos anos em que as fontes diretas (refeições, convidados, mealheiros, t-shirts, stock sobrante) já cobrem a despesa — passa a somar-se sempre à conta antes de se cortar a zero, para o valor "a guardar" ser mesmo cobrado · v277 · 2026-08-10 · Definições › Parametrizações: novo interruptor "Corrigir Presenças" (por ano) que deixa cada um corrigir as suas presenças de dias já passados desse evento — desligado por defeito, e as contas fechadas continuam a trancar tudo mesmo com ele ligado · v276 · 2026-08-10 · Adicionar Convidado: o campo "Trazido por" deixa de escolher o primeiro membro por ordem alfabética do casal e passa a vir pré-selecionado com o próprio utilizador, como no resto da app · v275 · 2026-08-10 · Shop List: um pedido sem loja própria que está a herdar a loja de outro pedido do mesmo artigo agora pode recusar essa herança ("🚫 Não herdar — deixar sem loja"), sem mexer no pedido que a escreveu · v274 · 2026-08-10 · Pagar Dívida: um pagamento livre / adiantamento (sem dívidas selecionadas) passa a ter uma caixa de observações, para dizer o que é aquele dinheiro · v273 · 2026-08-10 · PDF de pessoa (Saldos): as Refeições ordenam-se por dia e mostram o prato; e as Despesas Adiantadas deixam de mostrar "🧺 Stock" como nota e passam a mostrar o destino real (refeição/tipo) em vez de "Gerais" sempre que a compra tem um destino só · v272 · Stock alocado a uma PESSOA (🎒 leva para casa): no separador Stock, uma alocação pode agora apontar a um membro em vez de a uma refeição — é para as sobras que não voltam a ser usadas. O custo sai do rateio e passa a ser cobrado só a essa pessoa (aparece no saldo dela, como as t-shirts) · v271 · Nos Saldos, uma compra com peça "só despesa" (saco, depósito) deixa de aparecer duplicada em "Despesas adiantadas" — as linhas da mesma compra juntam-se numa só. E "Despesas adiantadas" separa-se em duas: o que já pagaste (📅) e o que está previsto mas ainda por pagar (📌 provisórias) · v270 · As SOBRAS deixam de reabrir o pedido: um lote comprado para uma refeição conta inteiro na cobertura, mesmo com parte por alocar na bolsa comum — compram-se 8 pacotes para o jantar, comem-se 5, e a lista já não pede os outros 3 que estão na despensa. É a mesma leitura que o cartão da refeição já fazia. Mover o stock para outra refeição continua a reabrir o pedido · v269 · Uma falta “dita à mão” passa a dizer que o é — na lista e no cartão da refeição, como já dizia o “coberto” e a folha do 🖨 —, e o bloco “que pedidos é que isto trata?” marca a linha que não é a app a deduzir. Trocar o artigo de um pedido (chouriço de sangue → morcela) deita fora a cobertura declarada sobre o artigo antigo, que ficava a mandar sobre o stock novo';
 let _sbSession = null;
 let _writeChain = Promise.resolve(true);   // fila de escritas serializada (padrão Expenses-Acc)
 let _writeBusy = 0;
@@ -283,8 +283,76 @@ function permErrorMsg(e){
   return 'Erro: '+m;
 }
 
+/* ── A FASE DO ANO (db/fase_ano.sql) ───────────────────────────────────
+   Cinco momentos por ordem, e UMA coluna a dizer em qual deles o ano está.
+   Eram dois booleanos independentes (`contas_fechadas`, `pagamentos_
+   autorizados`) e não chegavam: um ano EM PAGAMENTO e um ano ACABADO
+   tinham exatamente os mesmos dois valores, logo a app não os distinguia.
+
+     0 aberto        · tudo se edita
+     1 val_presencas · as festas acabaram; cada um confirma as SUAS
+                       presenças e convidados — que ainda se corrigem
+     2 val_contas    · o apuramento parou (= as "contas fechadas" de
+                       sempre): presenças, convidados, despesas e
+                       mealheiros trancam para toda a gente, admin
+                       incluído. Confirmam-se as contas. NÃO SE PAGA AINDA
+     3 pagamento     · contas dadas por validadas: o dinheiro pode andar
+     4 fechado       · acabou — nem pagamentos se registam
+
+   OS DOIS PREDICADOS DE SEMPRE DERIVAM DAQUI, nunca ao contrário:
+   contasFechadas() é "chegou a val_contas", pagamentosAutorizados() é
+   "chegou a pagamento". É o que faz o diff ser pequeno — as dezenas de
+   sítios que perguntam `contasFechadas()` não sabem que a fase existe e
+   continuam a comportar-se exatamente como antes.
+
+   Escreve-se NUM SÍTIO SÓ (`setFase`), que grava a fase E mantém os dois
+   booleanos em sincronia: são eles que um separador aberto com o app.js
+   velho em cache continua a ler.
+
+   Sem a migração a coluna não existe: a fase deriva-se dos booleanos e o
+   ano só pode estar em aberto / val_contas / pagamento. O slider continua
+   a funcionar — o ‹ › salta as duas fases que não se conseguem gravar
+   (ver faseGravavel), em vez de trancar o admin fora do fecho de contas. */
+/* O ícone de val_presencas/val_contas é o MESMO do check correspondente no
+   quadro das confirmações (✋/💳): é a mesma pergunta, e duas figuras para
+   ela obrigavam a aprender duas. */
+const FASES=[
+  {k:'aberto',        lbl:'Ano Aberto',          curto:'Aberto',    ic:'🔓'},
+  {k:'val_presencas', lbl:'Validação Presenças', curto:'Presenças', ic:'✋'},
+  {k:'val_contas',    lbl:'Validação Contas',    curto:'Contas',    ic:'💳'},
+  {k:'pagamento',     lbl:'Em Pagamento',        curto:'Pagamento', ic:'💶'},
+  {k:'fechado',       lbl:'Ano Fechado',         curto:'Fechado',   ic:'🔒'}
+];
+const FASE_KEYS=FASES.map(f=>f.k);
+/* Que AVISO manda cada fase, ao entrar nela (avisoFaseTexto/sbNotificarFase).
+   As que não estão aqui não avisam ninguém — Ano Aberto porque não pede nada,
+   e Ano Fechado porque não há ação nenhuma a pedir depois de acabar. É esta
+   tabela, e não um `if` por fase, que decide o disparo no setFase, o texto do
+   cartão e se o botão "📣 Reenviar aviso" aparece: um aviso novo entra num
+   sítio só. RECUAR NUNCA AVISA (ver setFase) — um "afinal não paguem"
+   manda-se por outra via, com a explicação. */
+const FASE_AVISO={val_presencas:'presencas',val_contas:'fecho',pagamento:'pagamentos'};
+function faseCol(){return !!(DATA&&DATA.evento&&DATA.evento.faseCol);}
+/* A fase do ano carregado. Sem coluna (ou com um valor que não conhecemos)
+   lê-se dos dois booleanos — é o comportamento de antes desta coluna. */
+function faseDoAno(){
+  if(!DATA||!DATA.evento)return'aberto';
+  const f=DATA.evento.fase;
+  if(faseCol()&&FASE_KEYS.indexOf(f)>=0)return f;
+  return DATA.evento.pagamentosAutorizados?'pagamento':(DATA.evento.contasFechadas?'val_contas':'aberto');
+}
+function faseIdx(){const i=FASE_KEYS.indexOf(faseDoAno());return i<0?0:i;}
+function faseInfo(k){const i=FASE_KEYS.indexOf(k);return FASES[i<0?faseIdx():i];}
+/* Quando é que o ano entrou na fase em que está. Sem a coluna (ou em anos
+   anteriores a ela) vale o carimbo do booleano correspondente. */
+function faseDesdeISO(){
+  const ev=DATA&&DATA.evento;if(!ev)return null;
+  if(faseCol()&&ev.faseEm)return ev.faseEm;
+  return faseIdx()>=3?(ev.pagamentosAutorizadosEm||null):(faseIdx()>=2?(ev.contasFechadasEm||null):null);
+}
+
 /* ── Fecho de contas + validação ── */
-function contasFechadas(){return !!(DATA&&DATA.evento&&DATA.evento.contasFechadas);}
+function contasFechadas(){return faseIdx()>=2;}
 /* Guarda de escrita para anos fechados. O CSS esconde os botões, mas isso é só a
    camada de cima: quem chegar à função à mesma (modal já aberto, ecrã em cache,
    onclick inline) tem de bater aqui. Devolve true = a edição não pode seguir. */
@@ -293,19 +361,30 @@ function bloqueadoPorFecho(){
   toast('Contas fechadas — o ano já não se edita','bad');
   return true;
 }
-/* ── 2.ª fase: pagamentos autorizados ──────────────────────────────────
-   Fechar as contas deixou de querer dizer "paguem". Passou a haver duas
-   fases: FECHADAS (o apuramento parou, mas cada um ainda tem de validar as
-   suas contas — e uma validação pode obrigar a acertos) e VALIDADAS, que é
-   quando o admin autoriza os pagamentos. Cada fase manda o seu aviso a
-   toda a gente (push + email) — ver avisoFaseTexto.
+/* ── 3.ª fase: pagamentos autorizados ──────────────────────────────────
+   Fechar as contas nunca quis dizer "paguem": entre uma coisa e a outra
+   ficam as validações de cada um, que ainda podem obrigar a acertos. Cada
+   fase manda o seu aviso a toda a gente (push + email) — ver avisoFaseTexto.
    NÃO TRANCA NADA, de propósito: quem já podia registar um pagamento
    continua a poder (podeSaldar), e o admin regista os que forem chegando.
-   A fase é um aviso ao grupo, não uma trava — travar o 🤝 antes da
-   autorização é uma decisão à parte, e é aqui que nasceria. */
-function pagamentosAutorizados(){return !!(DATA&&DATA.evento&&DATA.evento.pagamentosAutorizados);}
+   A fase é um aviso ao grupo, não uma trava — quem tranca os pagamentos é
+   a fase SEGUINTE (pagamentosTrancados), no fim de tudo. */
+function pagamentosAutorizados(){return faseIdx()>=3;}
 function pagAutorizCol(){return !!(DATA&&DATA.evento&&DATA.evento.pagAutorizCol);}
-function podeAutorizarPagamentos(){return isAdmin()&&!!DATA&&!!DATA._sbId&&pagAutorizCol()&&contasFechadas()&&!pagamentosAutorizados();}
+/* ── 5.ª e última: ano fechado ──────────────────────────────────────────
+   Aqui sim, o dinheiro para: ninguém regista pagamentos, nem o admin.
+   É a única fase que tranca alguma coisa para lá do que o val_contas já
+   trancava — e tranca só isto, porque é só isto que ainda estava aberto
+   depois do apuramento parar. */
+function pagamentosTrancados(){return faseIdx()>=4;}
+/* Irmão do bloqueadoPorFecho, para o outro lado do ano: devolve true = o
+   pagamento não pode seguir. A UI já esconde os botões; isto é para o
+   esconder não ser a única proteção. */
+function bloqueadoPorAnoFechado(){
+  if(!pagamentosTrancados())return false;
+  toast('Ano fechado — já não se registam pagamentos','bad');
+  return true;
+}
 // O ano com o `ano` mais alto (ALL_YEARS vem ordenado a crescer) — é o único
 // onde um aviso de fase ainda tem alguém à espera dele. Um ano mais antigo
 // (fechado antes desta funcionalidade existir, ou só arrumado depois) não
@@ -317,7 +396,13 @@ function ultimaRefeicaoISO(){const ds=(DATA&&DATA.refeicoesDef||[]).map(r=>r.dat
 // as festas as presenças ainda podem mudar (alguém falta, chega mais tarde),
 // e validar a meio era confirmar um retrato que ainda ia mudar. Ao contrário
 // da Validação de Contas, não espera pelo FECHO — só pela data.
+// A FASE ABRE-AS TAMBÉM, e nunca as fecha: o admin que ponha o ano em
+// "Validação Presenças" está a pedir precisamente isso, e a partir daí a
+// pergunta está feita ao grupo. É um OR de propósito — depois da última
+// refeição continuam a abrir sozinhas, como sempre, esteja a fase onde
+// estiver (e sem a migração da fase é este o único caminho que resta).
 function presencasValidaveis(){
+  if(faseIdx()>=1)return true;
   const ult=ultimaRefeicaoISO();
   return !!ult&&hojeISO()>=ult;
 }
@@ -326,14 +411,6 @@ function presencasValidaveis(){
    já saber a que refeição pertence ("o jantar de sábado") sem ter sido paga. */
 function despProvisoria(d){return !d.dataDesp;}
 function temDespesasPendentes(){return (DATA&&DATA.despesas||[]).some(despProvisoria);}
-function podeFecharContas(){
-  if(!isAdmin()||!DATA||!DATA._sbId)return false;
-  if(contasFechadas())return false;
-  const ult=ultimaRefeicaoISO();
-  if(!ult||hojeISO()<ult)return false;
-  if(temDespesasPendentes())return false;
-  return true;
-}
 function dividasTodasSaldadas(){
   if(!CALC||!CALC.membros||!CALC.membros.length)return false;
   return CALC.membros.every(m=>typeof m._sfEcra==='number'&&Math.abs(m._sfEcra)<0.005);
@@ -492,6 +569,9 @@ function updateContasUI(){
   // Contas fechadas é justamente quando se pagam as dívidas: quem pode registar
   // um pagamento (para validação) continua a ter o FAB dos cash-flows.
   document.body.classList.toggle('pode-saldar',podeSaldar());
+  // Última fase: o FAB dos cash-flows sai para TODA A GENTE, admin incluído
+  // — as regras acima só o tiram a quem não é admin.
+  document.body.classList.toggle('ano-fechado',pagamentosTrancados());
   // Ponto no separador Cash quando há pagamentos à espera de decisão: sem isto,
   // o admin só dava com eles se lá fosse por acaso.
   const cashTab=document.querySelector('.tab[data-tab="cashflows"]');
@@ -502,76 +582,127 @@ function updateContasUI(){
   if(fechadas&&TAB==='compras')setTab('saldos');
 }
 
-async function fecharContas(){
-  if(!isAdmin()||!DATA||!DATA._sbId)return;
-  if(!podeFecharContas()){toast('Ainda não é possível fechar as contas','bad');return;}
-  if(!confirm('Fechar as contas deste ano?\n\nO ano deixa de ser editável (até para ti) e entra em VALIDAÇÃO: cada membro é avisado para confirmar as contas dele — e para ainda não pagar. Podes reabrir a qualquer momento.'))return;
-  const agora=new Date().toISOString();
-  setSync('load','a guardar…');
-  try{
-    await queueWrite(()=>sbReq('PATCH',`eventos?id=eq.${DATA._sbId}`,{contas_fechadas:true,contas_fechadas_em:agora,contas_fechadas_por:_sbSession.user.email}));
-    DATA.evento.contasFechadas=true;DATA.evento.contasFechadasEm=agora;DATA.evento.contasFechadasPor=_sbSession.user.email;
-    syncMirror();marcaGuardado();renderAll();toast('Contas fechadas 🔒','ok');
-    avisarFase('fecho');  // push (fire-and-forget) + email, os dois canais do aviso
-  }catch(e){setSync('err','erro ao guardar');toast(permErrorMsg(e),'bad');}
+/* ── AVANÇAR / RECUAR A FASE — o único sítio que a escreve ─────────────
+   Grava a `fase` E mantém os dois booleanos em sincronia (val_contas+ ⇒
+   contas_fechadas; pagamento+ ⇒ pagamentos_autorizados). Os booleanos são
+   o que um separador com o app.js velho em cache continua a ler, e o que
+   as funções do servidor podem querer — mas quem manda é a fase.
+
+   Os carimbos `_em`/`_por` de cada booleano só se escrevem quando ele
+   MUDA de valor: recuar de 'fechado' para 'pagamento' não pode reescrever
+   a hora a que as contas fecharam.
+
+   OS AVISOS SAEM DAS TRANSIÇÕES, não das fases: entrar em val_contas
+   manda o "contas em validação, não pagues ainda", entrar em pagamento
+   manda o "já podes pagar" — os dois de sempre (avisoFaseTexto). Recuar
+   nunca avisa: um "afinal não paguem" manda-se por outra via, com a
+   explicação — a app não tem texto para isso. As duas fases novas
+   (val_presencas, fechado) também não avisam: o texto do push escolhe-se
+   sempre do lado do servidor (push-notificar-festasbv.ts) e não há lá
+   redação para elas. */
+function faseMotivoBloqueio(){
+  const ult=ultimaRefeicaoISO();
+  if(!ult)return'Define primeiro as refeições do ano.';
+  if(hojeISO()<ult)return'Só a partir da última refeição ('+ult+').';
+  return null;
 }
-/* A 2.ª fase: as validações chegaram todas e o dinheiro pode andar. Só
-   acrescenta o carimbo e manda o aviso — não muda o que a app deixa fazer
-   (ver a nota em pagamentosAutorizados).
-   NUM ANO QUE JÁ NÃO É O CORRENTE (anoCorrente()===false — fechado antes
-   desta funcionalidade existir, ou só arrumado depois) o aviso NÃO SAI: não
-   há ninguém à espera de saber que "já pode pagar" de um evento de há anos,
-   e mandá-lo era confundir, não informar. O carimbo grava-se na mesma —
-   é ele que dá o ✓ verde a quem já está saldado, em vez do dourado (ver
-   saldosMembrosHtml) — só o `avisarFase` fica de fora. */
-async function autorizarPagamentos(){
-  if(!isAdmin()||!DATA||!DATA._sbId)return;
-  if(!pagAutorizCol()){toast('Falta correr a migração db/pagamentos_autorizados.sql','bad');return;}
-  if(!contasFechadas()){toast('Fecha primeiro as contas do ano','bad');return;}
-  if(pagamentosAutorizados())return;
-  const corrente=anoCorrente();
-  const msg=corrente
-    ?'Dar as contas por validadas e autorizar os pagamentos?\n\nTodos os membros são avisados de que já podem pagar.'
-    :'Marcar os pagamentos deste ano (já não é o corrente) como autorizados?\n\nNinguém é avisado — é só para o registo ficar arrumado (o ✓ passa a verde onde já está saldado).';
-  if(!confirm(msg))return;
-  const agora=new Date().toISOString();
-  setSync('load','a guardar…');
-  try{
-    await queueWrite(()=>sbReq('PATCH',`eventos?id=eq.${DATA._sbId}`,{pagamentos_autorizados:true,pagamentos_autorizados_em:agora,pagamentos_autorizados_por:_sbSession.user.email}));
-    DATA.evento.pagamentosAutorizados=true;DATA.evento.pagamentosAutorizadosEm=agora;DATA.evento.pagamentosAutorizadosPor=_sbSession.user.email;
-    syncMirror();marcaGuardado();renderAll();toast('Pagamentos autorizados 💳','ok');
-    if(corrente)avisarFase('pagamentos');
-  }catch(e){setSync('err','erro ao guardar');toast(permErrorMsg(e),'bad');}
+/* SEM db/fase_ano.sql só existem os dois booleanos, e eles só sabem dizer
+   três das cinco fases. As outras duas não se podem GRAVAR — logo o ‹ ›
+   salta-as, em vez de trancar o slider por inteiro e deixar o admin sem
+   maneira nenhuma de fechar as contas (que era o que ele sempre pôde
+   fazer). A régua continua a mostrar as cinco: é o modelo, e escondê-las
+   fazia o slider mudar de forma consoante uma migração que não é dele. */
+function faseGravavel(k){return faseCol()||k==='aberto'||k==='val_contas'||k==='pagamento';}
+/* A fase para onde o ‹ › vai — a seguinte (d=1) ou a anterior (d=-1) que
+   este Supabase consiga gravar. null = não há para onde ir nesse sentido. */
+function faseVizinha(d){
+  let i=faseIdx()+d;
+  while(i>=0&&i<FASES.length&&!faseGravavel(FASE_KEYS[i]))i+=d;
+  return(i>=0&&i<FASES.length)?FASE_KEYS[i]:null;
 }
-// Voltar atrás na autorização (enganou-se, ou apareceu um acerto por fazer).
-// Não avisa ninguém: um "afinal não paguem" manda-se por outra via, com a
-// explicação — a app não tem texto para isso.
-async function retirarAutorizacaoPagamentos(){
-  if(!isAdmin()||!DATA||!DATA._sbId||!pagAutorizCol())return;
-  if(!confirm('Retirar a autorização de pagamentos?\n\nNinguém é avisado — o aviso de "já podem pagar" já foi enviado.'))return;
-  setSync('load','a guardar…');
-  try{
-    await queueWrite(()=>sbReq('PATCH',`eventos?id=eq.${DATA._sbId}`,{pagamentos_autorizados:false,pagamentos_autorizados_em:null,pagamentos_autorizados_por:null}));
-    DATA.evento.pagamentosAutorizados=false;DATA.evento.pagamentosAutorizadosEm=null;DATA.evento.pagamentosAutorizadosPor=null;
-    syncMirror();marcaGuardado();renderAll();toast('Autorização retirada','ok');
-  }catch(e){setSync('err','erro ao guardar');toast(permErrorMsg(e),'bad');}
+/* O que impede o ano de AVANÇAR — string com o motivo, ou null se pode ir.
+   As condições que já travavam o "Fechar Contas" (última refeição passada,
+   nenhuma despesa provisória) passam a travar a entrada em val_contas, que
+   é exatamente o mesmo momento. */
+function faseMotivoAvancar(){
+  const alvo=faseVizinha(1);
+  if(!alvo)return faseIdx()>=FASES.length-1
+    ?'O ano já está na última fase.'
+    :'Sem db/fase_ano.sql o ano não vai além desta fase.';
+  if(alvo==='pagamento'&&!pagAutorizCol())return'Falta correr a migração db/pagamentos_autorizados.sql.';
+  if(alvo==='val_presencas'||alvo==='val_contas'){
+    const m=faseMotivoBloqueio();
+    if(m)return m;
+  }
+  if(alvo==='val_contas'&&temDespesasPendentes())
+    return'Há despesas provisórias por confirmar — mete-lhes a data de pagamento (ou apaga-as).';
+  return null;
 }
-async function reabrirContas(){
+function podeRecuarFase(){return isAdmin()&&!!DATA&&!!DATA._sbId&&!!faseVizinha(-1);}
+/* Dito ao admin, e só a ele: as duas fases que a régua mostra mas que este
+   Supabase ainda não sabe guardar. */
+function faseNotaMigracao(){return faseCol()?'':'Corre db/fase_ano.sql no Supabase para usar as cinco fases — sem ela o ‹ › salta a Validação de Presenças e o Ano Fechado.';}
+/* A frase do confirm() de cada transição. Diz o que MUDA — não repete o
+   nome da fase, que está no botão e no slider. */
+function faseConfirmTxt(de,para){
+  const nome=faseInfo(para).lbl;
+  const av=FASE_KEYS.indexOf(para)>FASE_KEYS.indexOf(de);
+  if(av){
+    if(para==='val_presencas')return`Avançar para "${nome}"?\n\nAs presenças e os convidados continuam a poder corrigir-se — cada um passa a poder confirmar os seus.`;
+    if(para==='val_contas')return`Avançar para "${nome}"?\n\nO ano deixa de ser editável (até para ti): presenças, convidados, despesas e mealheiros trancam. Cada membro é avisado para confirmar as contas dele — e para ainda não pagar.`;
+    if(para==='pagamento')return`Avançar para "${nome}"?\n\nTodos os membros são avisados de que já podem pagar.`;
+    return`Avançar para "${nome}"?\n\nDeixa de se registar qualquer pagamento, a ti inclusive. Ninguém é avisado.`;
+  }
+  if(de==='fechado')return`Voltar a "${nome}"?\n\nOs pagamentos voltam a poder registar-se. Ninguém é avisado.`;
+  if(de==='pagamento')return`Voltar a "${nome}"?\n\nRetira a autorização de pagamentos. Ninguém é avisado — o aviso de "já podem pagar" já foi enviado.`;
+  if(de==='val_contas')return`Voltar a "${nome}"?\n\nO ano volta a ficar editável.`;
+  return`Voltar a "${nome}"?`;
+}
+async function setFase(para){
   if(!isAdmin()||!DATA||!DATA._sbId)return;
-  if(!confirm('Reabrir as contas deste ano? O ano volta a ficar editável.'))return;
+  const de=faseDoAno();
+  if(para===de)return;
+  const iDe=FASE_KEYS.indexOf(de),iPara=FASE_KEYS.indexOf(para);
+  if(iPara<0)return;
+  // Um passo de cada vez (o passo que o ‹ › daria): o slider não salta
+  // fases, e uma chamada que saltasse deixava por mandar o aviso das que
+  // atravessou. É também aqui que a falta da migração se faz sentir — o
+  // faseVizinha só devolve o que este Supabase consegue gravar.
+  if(para!==faseVizinha(iPara>iDe?1:-1))return;
+  if(iPara>iDe){
+    const m=faseMotivoAvancar();
+    if(m){toast(m,'bad');return;}
+  }
+  if(!confirm(faseConfirmTxt(de,para)))return;
+  const fech=iPara>=2, aut=iPara>=3;
+  const agora=new Date().toISOString(), email=_sbSession?_sbSession.user.email:'';
+  const patch={};
+  // Sem a coluna não se grava fase nenhuma — o que fica a dizer em que ponto
+  // o ano está são os dois booleanos, como antes desta funcionalidade.
+  if(faseCol())Object.assign(patch,{fase:para,fase_em:agora,fase_por:email});
+  // Só se carimba o booleano que MUDA — recuar de 'fechado' para
+  // 'pagamento' não pode reescrever a hora a que as contas fecharam.
+  if(fech!==contasFechadas())Object.assign(patch,{contas_fechadas:fech,contas_fechadas_em:fech?agora:null,contas_fechadas_por:fech?email:null});
+  if(pagAutorizCol()&&aut!==pagamentosAutorizados())Object.assign(patch,{pagamentos_autorizados:aut,pagamentos_autorizados_em:aut?agora:null,pagamentos_autorizados_por:aut?email:null});
   setSync('load','a guardar…');
   try{
-    // Reabrir retira a autorização de pagamentos: se o ano volta a mexer, os
-    // números que se mandou pagar já não são os finais. Só se manda a coluna
-    // havendo migração — sem ela o PATCH dava 400 e o reabrir falhava.
-    const patch={contas_fechadas:false,contas_fechadas_em:null,contas_fechadas_por:null};
-    if(pagAutorizCol())Object.assign(patch,{pagamentos_autorizados:false,pagamentos_autorizados_em:null,pagamentos_autorizados_por:null});
     await queueWrite(()=>sbReq('PATCH',`eventos?id=eq.${DATA._sbId}`,patch));
-    DATA.evento.contasFechadas=false;DATA.evento.contasFechadasEm=null;DATA.evento.contasFechadasPor=null;
-    DATA.evento.pagamentosAutorizados=false;DATA.evento.pagamentosAutorizadosEm=null;DATA.evento.pagamentosAutorizadosPor=null;
-    syncMirror();marcaGuardado();renderAll();toast('Contas reabertas 🔓','ok');
+    const ev=DATA.evento;
+    if(faseCol()){ev.fase=para;ev.faseEm=agora;ev.fasePor=email;}
+    if('contas_fechadas' in patch){ev.contasFechadas=fech;ev.contasFechadasEm=patch.contas_fechadas_em;ev.contasFechadasPor=patch.contas_fechadas_por;}
+    if('pagamentos_autorizados' in patch){ev.pagamentosAutorizados=aut;ev.pagamentosAutorizadosEm=patch.pagamentos_autorizados_em;ev.pagamentosAutorizadosPor=patch.pagamentos_autorizados_por;}
+    syncMirror();marcaGuardado();renderAll();
+    toast(faseInfo(para).ic+' '+faseInfo(para).lbl,'ok');
+    /* NUM ANO QUE JÁ NÃO É O CORRENTE (anoCorrente()===false — arrumado só
+       agora, ou fechado antes destas fases existirem) o aviso NÃO SAI: não
+       há ninguém à espera de saber que "já pode pagar" de um evento de há
+       anos, e mandá-lo era confundir, não informar. A fase grava-se na
+       mesma — é ela que dá o ✓ verde a quem já está saldado. */
+    if(iPara>iDe&&anoCorrente()&&FASE_AVISO[para])avisarFase(FASE_AVISO[para]);
   }catch(e){setSync('err','erro ao guardar');toast(permErrorMsg(e),'bad');}
 }
+function faseAvancar(){const k=faseVizinha(1);if(k)setFase(k);}
+function faseRecuar(){const k=faseVizinha(-1);if(k)setFase(k);}
 
 // tipo: 'contas' (só depois do FECHO) | 'presencas'/'convidados' (só depois
 // da ÚLTIMA REFEIÇÃO — a meio das festas os dois ainda podem mudar).
@@ -609,11 +740,11 @@ async function confirmarValidacao(amigos,tipo){
     const lbl=t==='presencas'?'Presença':t==='convidados'?'Convidados':'Conta';
     const lblPl=t==='presencas'?'Presenças':t==='convidados'?'Convidados':'Contas';
     toast(amigos.length>1?lblPl+' validad'+(t==='convidados'?'os':'as')+' ✓':lbl+' validad'+(t==='convidados'?'os':'a')+' ✓','ok');
-    // 4) Sempre que se validam as CONTAS, avisa o admin — é ele quem confere
-    // e autoriza os pagamentos a seguir. Não avisa quando é o próprio admin a
+    // 4) Sempre que se valida um check, avisa o admin — é ele quem confere e
+    // faz o ano avançar de fase. Não avisa quando é o próprio admin a
     // disparar (a validar as suas, ou a marcar as de alguém sem conta em
     // admMarcarValidado): ele já sabe, foi ele que carregou no botão.
-    if(t==='contas'&&!isAdmin())amigos.forEach(a=>sbNotificarContasValidadas(a));
+    if(!isAdmin())amigos.forEach(a=>sbNotificarValidacaoFeita(a,t));
   }catch(e){setSync('err','erro ao guardar');toast(permErrorMsg(e),'bad');}
 }
 async function removerValidacao(amigo,tipo){
@@ -630,11 +761,13 @@ async function removerValidacao(amigo,tipo){
   }catch(e){setSync('err','erro ao guardar');toast(permErrorMsg(e),'bad');}
 }
 
-// Quadro único, nos Saldos, logo a seguir ao saldo do casal — junta os TRÊS
-// checks do PRÓPRIO agregado (self+cônjuge) num só lugar, em vez de um
-// widget por separador. Uma linha por (check × nome) que ainda esteja
-// DISPONÍVEL (presenças/convidados esperam a última refeição; contas, o
-// fecho) — o que não está disponível não é "necessário" ainda, e não
+// Quadro único, DENTRO do slider do estado do ano (faseSliderHtml, à cabeça
+// dos Saldos) — junta os TRÊS checks do PRÓPRIO agregado (self+cônjuge) num
+// só lugar, em vez de um widget por separador. Viveu no meio da lista de
+// membros até a fase existir; agora fica onde a pergunta é feita.
+// Uma linha por (check × nome) que ainda esteja DISPONÍVEL (presenças e
+// convidados esperam a última refeição ou a fase 'val_presencas'; contas,
+// o fecho) — o que não está disponível não é "necessário" ainda, e não
 // aparece. O botão NUNCA é verde antes de validado: verde é só o selo de
 // "já feito".
 // Quando não sobra nada por validar, o quadro INTEIRO sai e dá lugar a uma
@@ -695,88 +828,114 @@ function quadroValidacoesHtml(){
 async function validarMinha(nome,tipo){await confirmarValidacao([nome],tipo);}
 async function anularMinhaValidacao(nome,tipo){await removerValidacao(nome,tipo);}
 
-// 2.ª fase do fim do ano — em validação / pagamentos autorizados. Separada
-// de secContasHtml() de propósito: é o aviso mais urgente do ecrã ("não
-// pagues ainda" / "já podes pagar"), por isso renderAll() põe-na logo a
-// seguir ao saldo do grupo, não lá em baixo depois da lista de membros
-// inteira. O cartão "Estado das Contas" (fechar/reabrir) é ferramenta do
-// admin, não aviso a todos, e fica onde estava.
-function secFaseHtml(){
-  if(!DATA)return'';
-  if(!contasFechadas()||!pagAutorizCol())return'';
-  const admin=isAdmin();
-  const aut=pagamentosAutorizados();
+/* ═══ SLIDER DO ESTADO DO ANO ══════════════════════════════════════════
+   Um cartão só, à cabeça dos Saldos, a responder à pergunta que toda a
+   gente faz no fim das festas: em que ponto é que isto está, e o que é
+   que se espera de mim agora. Substituiu DOIS cartões que diziam pedaços
+   disto em sítios diferentes — o "Estado das Contas" (fechar/reabrir, do
+   admin, lá em baixo) e o cartão da fase (o aviso, lá em cima) — e que
+   podiam contradizer-se, por serem duas leituras de dois booleanos.
+
+   O que ele junta, por ordem de leitura:
+     · a fase em que o ano está, com a régua das cinco e o carimbo de
+       quando lá entrou;
+     · o ‹ › do ADMIN, e só dele, para avançar/recuar um passo de cada vez
+       (ou o motivo por que não pode avançar);
+     · o aviso por extenso da fase, quando ela tem um (avisoFaseTexto — o
+       mesmo texto do email, para as três leituras não poderem discordar);
+     · as confirmações do próprio agregado (quadroValidacoesHtml), que é
+       onde a pergunta "validas isto?" nasce;
+     · o atalho para pagar a dívida, quando o ano está em pagamento.
+
+   A RÉGUA É SÓ INFORMAÇÃO — não se toca nela para saltar para uma fase.
+   Quem avança é o ‹ ›, um passo de cada vez, com a confirmação e o aviso
+   de cada transição (setFase). Uma régua clicável saltava fases e deixava
+   avisos por mandar. */
+function faseDotsHtml(){
+  const at=faseIdx();
+  return `<div class="fase-track" role="img" aria-label="Fase ${at+1} de ${FASES.length}: ${faseInfo().lbl}">
+    <div class="fase-line"><i style="width:${at?(at/(FASES.length-1)*100).toFixed(2):0}%"></i></div>
+    <div class="fase-steps">${FASES.map((f,i)=>
+      `<div class="fase-step ${i<at?'done':(i===at?'at':'')}"><span class="fase-dot"></span><span class="fase-lbl">${f.curto}</span></div>`
+    ).join('')}</div>
+  </div>`;
+}
+/* O que a fase tem a dizer a quem não é admin. Só as fases que TÊM alguma
+   coisa a dizer é que levam texto — nas outras, a régua e o título já
+   dizem tudo, e um parágrafo a explicar o óbvio só empurra o resto para
+   baixo. Nada disto se inventa aqui: val_contas e pagamento leem o mesmo
+   avisoFaseTexto que escreve o email e alimenta o push. */
+function faseMsgHtml(){
+  const k=faseDoAno();
   // "Já podes pagar" deixa de fazer sentido quando já não há nada a pagar.
   // dividasTodasSaldadas() é a mesma conta que já esconde o FAB de
-  // cash-flow (updateContasUI) — reaproveita-se em vez de inventar um
-  // estado novo: sem saldo nenhum em aberto, o cartão troca de AVISO para
-  // CONSTATAÇÃO, e os botões que só fariam sentido a lembrar alguém somem.
-  const saldado=aut&&dividasTodasSaldadas();
-  // A explicação por extenso vem do MESMO sítio que escreve o email
-  // (avisoFaseTexto): o push é só o resumo — cabe-lhe caber no ecrã
-  // bloqueado —, e quem quiser o texto inteiro lê-o aqui, na app, sem
-  // depender de ter apanhado a notificação. Três sítios, uma redação.
-  const msg=saldado?'Todos os saldos estão a 0 € — não há mais nada a pagar.':avisoFaseTexto(aut?'pagamentos':'fecho').corpo;
-  let s=`<div class="mlist"><div class="contas-card ${saldado?'saldado':(aut?'fechada':'aberta')}">
-          <div class="cc-row">
-            <span class="cc-ic">${saldado?'✅':(aut?'💳':'🕓')}</span>
-            <div class="cc-txt">
-              <div class="cc-title">${saldado?'Ano saldado':(aut?'Pagamentos autorizados':'Contas em validação')}</div>
-              ${aut?`<div class="cc-sub">Autorizados a ${fmtDataHora(DATA.evento.pagamentosAutorizadosEm)}</div>`:''}
-            </div>
-          </div>
-          <p class="cc-msg sf">${msg}</p>`;
-  if(admin){
-    if(!aut){
-      s+=`<button class="btn prim sf" style="margin-top:13px" onclick="autorizarPagamentos()">💳 Autorizar Pagamentos</button>`;
-    }
-    // "Reenviar aviso" só faz sentido enquanto ainda há alguém para lembrar
-    // — nem no ano que já não é o corrente, nem com tudo já saldado (não
-    // há "já podes pagar" nenhum por repetir).
-    if(!saldado&&anoCorrente()){
-      s+=`<button class="btn ghost sf" style="margin-top:8px" onclick="reenviarAvisoFase()">📣 Reenviar aviso aos membros</button>`;
-    }
-    if(aut){
-      s+=`<button class="btn ghost sf" style="margin-top:8px" onclick="retirarAutorizacaoPagamentos()">↩︎ Retirar autorização</button>`;
-    }
-  }
-  s+='</div></div>';
-  return s;
+  // cash-flow (updateContasUI) — reaproveita-se em vez de inventar estado.
+  if(k==='pagamento'&&dividasTodasSaldadas())return'Todos os saldos estão a 0 € — não há mais nada a pagar.';
+  if(FASE_AVISO[k])return avisoFaseTexto(FASE_AVISO[k]).corpo;
+  if(k==='fechado')return'O ano está encerrado: já não se registam pagamentos.';
+  return'';
 }
-function secContasHtml(){
+/* O saldo por liquidar do meu agregado (eu + cônjuge), para o atalho de
+   pagamento. Sai do `_sfEcra` que o renderAll já calculou — é o número
+   que a lista dos Saldos mostra, não uma segunda conta que pudesse
+   discordar dela. */
+function faseMinhaDivida(){
+  if(!CALC||!CALC.membros)return 0;
+  let d=0;
+  CALC.membros.forEach(m=>{if(MY_NAMES.includes(m.nome)&&typeof m._sfEcra==='number'&&m._sfEcra<-0.005)d+=-m._sfEcra;});
+  return rnd(d,2);
+}
+function faseSliderHtml(){
   if(!DATA)return'';
-  const fechadas=contasFechadas();
-  const admin=isAdmin();
-  let s='';
-  // ── Estado das Contas ──
-  s+='<div class="sec-title sf" style="margin-top:26px">Estado das Contas</div>';
-  s+='<div class="mlist">';
-  s+=`<div class="contas-card ${fechadas?'fechada':'aberta'}">
-        <div class="cc-row">
-          <span class="cc-ic">${fechadas?'🔒':'🔓'}</span>
-          <div class="cc-txt">
-            <div class="cc-title">${fechadas?'Contas fechadas':'Contas abertas'}</div>
-            <div class="cc-sub">${fechadas?('Fechadas a '+fmtDataHora(DATA.evento.contasFechadasEm)):'Ano editável — apuramento em curso'}</div>
-          </div>
-        </div>`;
+  const at=faseIdx(),f=faseInfo(),admin=isAdmin();
+  // O motivo por que o › está apagado — serve o botão e a linha por baixo
+  const mot=admin?faseMotivoAvancar():null;
+  const saldado=at>=3&&dividasTodasSaldadas();
+  // A cor do cartão segue o estado, não a fase: dourado enquanto há algo a
+  // fazer, verde quando está feito (o mesmo verde do ✓ de "saldado" ao
+  // lado de cada nome). O ano aberto não é aviso nenhum e fica neutro.
+  const cls=at===0?'aberta':((at>=4||saldado)?'saldado':'fechada');
+  const desde=faseDesdeISO();
+  let s=`<div class="mlist"><div class="contas-card fase-card ${cls}">
+    <div class="cc-row">
+      <span class="cc-ic">${saldado&&at===3?'✅':f.ic}</span>
+      <div class="cc-txt">
+        <div class="cc-title">${saldado&&at===3?'Ano saldado':f.lbl}</div>
+        <div class="cc-sub">${desde?('Desde '+fmtDataHora(desde)):'Apuramento em curso'}</div>
+      </div>`;
   if(admin){
-    if(fechadas){
-      s+=`<button class="btn ghost sf" style="margin-top:13px" onclick="reabrirContas()">🔓 Reabrir Contas</button>`;
-    } else if(podeFecharContas()){
-      s+=`<button class="btn prim sf" style="margin-top:13px" onclick="fecharContas()">🔒 Fechar Contas</button>`;
-    } else {
-      const ult=ultimaRefeicaoISO();
-      let motivo;
-      if(!ult)motivo='Define primeiro as refeições do ano.';
-      else if(hojeISO()<ult)motivo='Disponível a partir da última refeição ('+ult+').';
-      else if(temDespesasPendentes())motivo='Há despesas provisórias por confirmar — mete-lhes a data de pagamento (ou apaga-as).';
-      else motivo='Indisponível de momento.';
-      s+=`<button class="btn prim sf" style="margin-top:13px;opacity:.4;pointer-events:none">🔒 Fechar Contas</button>
-          <p class="sf" style="font-size:11px;color:var(--faint);margin:8px 2px 0">${motivo}</p>`;
-    }
-  } else if(fechadas){
-    s+=`<p class="sf" style="font-size:11px;color:var(--faint);margin:11px 2px 0">Este ano já não é editável.</p>`;
+    s+=`<div class="fase-nav">
+      <button class="fase-arw" ${podeRecuarFase()?'':'disabled'} onclick="faseRecuar()" title="Recuar">‹</button>
+      <button class="fase-arw" ${mot?'disabled':''} onclick="faseAvancar()" title="Avançar">›</button>
+    </div>`;
   }
+  s+=`</div>${faseDotsHtml()}`;
+  const msg=faseMsgHtml();
+  if(msg)s+=`<p class="cc-msg sf">${msg}</p>`;
+  if(admin){
+    // Porque é que o › está apagado. Só se diz quando há mesmo um obstáculo
+    // a levantar — na última fase o slider já mostra que não há para onde ir.
+    if(mot&&at<FASES.length-1)s+=`<p class="sf fase-motivo">${mot}</p>`;
+    // A nota da migração é uma dica de fundo — cala-se quando o motivo do ›
+    // apagado já está a falar do mesmo ficheiro.
+    const nota=mot?'':faseNotaMigracao();
+    if(nota)s+=`<p class="sf fase-motivo">${nota}</p>`;
+    // "Reenviar aviso" só faz sentido enquanto ainda há alguém para lembrar
+    // — nem no ano que já não é o corrente, nem com tudo já saldado.
+    if(faseAtual()&&!saldado&&anoCorrente())
+      s+=`<button class="btn ghost sf" style="margin-top:10px" onclick="reenviarAvisoFase()">📣 Reenviar aviso aos membros</button>`;
+  }
+  // As confirmações do próprio agregado vivem AQUI, e não no meio da lista
+  // de membros onde nasceram: é a mesma pergunta que a fase está a fazer,
+  // e respondia-se dois ecrãs abaixo de onde ela aparecia.
+  s+=quadroValidacoesHtml();
+  // Atalho para o cash-flow do pagamento — a ação que a fase 'pagamento'
+  // pede, no sítio onde a pede. Só a quem pode registar um (podeSaldar) e
+  // só havendo mesmo dívida no agregado: um botão a levar a um modal que
+  // não teria nada para escolher era pior do que não o ter.
+  const div=faseMinhaDivida();
+  if(at===3&&podeSaldar()&&div>0.005)
+    s+=`<button class="btn prim sf" style="margin-top:10px" onclick="openPayModal()">🤝 Pagar a minha dívida · ${eur(div)}</button>`;
   s+='</div></div>';
   return s;
 }
@@ -2023,15 +2182,13 @@ function renderAll(){
 
   // SALDOS — usar cálculo consistente com o ecrã de detalhe
   ms.forEach(m=>{const r=saldoMovimentos(m);m._mv=r.mv;m._sfEcra=r.saldo;});
-  // FASE (em validação / pagamentos autorizados) — logo a seguir ao saldo do
-  // grupo: é o aviso mais urgente do ecrã, não algo para se descobrir lá em
-  // baixo, depois da lista de membros toda.
-  let h=secFaseHtml();
+  // ESTADO DO ANO — logo a seguir ao saldo do grupo: é a primeira pergunta
+  // de quem abre a app no fim das festas ("em que ponto é que isto está?"),
+  // não algo para se descobrir lá em baixo, depois da lista de membros toda.
+  // Traz consigo as confirmações do próprio e o atalho do pagamento.
+  let h=faseSliderHtml();
   // Lista fundida (antigo Resumo + saldo individual): despesa por membro, movimentos e saldo
   h+=saldosMembrosHtml();
-
-  // CONTAS — fecho de contas (depois do saldo global)
-  h+=secContasHtml();
 
   // RELATÓRIOS — links movidos do antigo tab para o fundo dos Saldos
   h+=`<div class="sec-title sf" style="margin-top:24px">Relatórios</div>
@@ -3306,7 +3463,7 @@ async function carregar(){
     if(TSHIRTS_TABLE)(await tsRes.json()).forEach(t=>{(tsByEv[t.evento_id]=tsByEv[t.evento_id]||[]).push(t);});
     ALL_YEARS=rows.map(ev=>({
       _sbId: ev.id,
-      evento:{tshirtsTrancadas:!!ev.tshirts_trancadas,tshirtPrecoHomem:N(ev.tshirt_preco_homem),tshirtPrecoMulher:N(ev.tshirt_preco_mulher),tshirtPrecoCrianca:N(ev.tshirt_preco_crianca),tshirtDesconto:N(ev.tshirt_desconto),nome:ev.nome,ano:ev.ano,tesoureiro:ev.tesoureiro,arredondaTotal:!!ev.arredonda_total,arredondaModo:ev.arredonda_modo||'despesa',arredondaModoCol:('arredonda_modo' in ev),missaoPoupanca:N(ev.missao_poupanca),fundoReserva:N(ev.fundo_reserva),sobrasAplicadas:N(ev.sobras_aplicadas),sobrasAplicadasCol:('sobras_aplicadas' in ev),fatorModo:ev.fator_modo||'fixo',fatorThreshold:ev.fator_threshold!=null?N(ev.fator_threshold):FATOR_THRESHOLD_DEFAULT,dividasPublicas:!!ev.dividas_publicas,dividasPublicasCol:('dividas_publicas' in ev),presCorrecao:!!ev.pres_correcao,presCorrecaoCol:('pres_correcao' in ev),fracIndiretaRef:ev.frac_indireta_ref!=null?N(ev.frac_indireta_ref):0.5,fracIndiretaRefCol:('frac_indireta_ref' in ev),descontoSexo:ev.desconto_sexo!=null?N(ev.desconto_sexo):0,descontoSexoCol:('desconto_sexo' in ev),tetoReserva:ev.teto_reserva!=null?N(ev.teto_reserva):null,tetoReservaCol:('teto_reserva' in ev),precoArredonda:ev.preco_arredonda==='cent'?'cent':'cima',precoArredondaCol:('preco_arredonda' in ev),contasFechadas:!!ev.contas_fechadas,contasFechadasEm:ev.contas_fechadas_em||null,contasFechadasPor:ev.contas_fechadas_por||null,pagamentosAutorizados:!!ev.pagamentos_autorizados,pagamentosAutorizadosEm:ev.pagamentos_autorizados_em||null,pagamentosAutorizadosPor:ev.pagamentos_autorizados_por||null,pagAutorizCol:('pagamentos_autorizados' in ev)},
+      evento:{tshirtsTrancadas:!!ev.tshirts_trancadas,tshirtPrecoHomem:N(ev.tshirt_preco_homem),tshirtPrecoMulher:N(ev.tshirt_preco_mulher),tshirtPrecoCrianca:N(ev.tshirt_preco_crianca),tshirtDesconto:N(ev.tshirt_desconto),nome:ev.nome,ano:ev.ano,tesoureiro:ev.tesoureiro,arredondaTotal:!!ev.arredonda_total,arredondaModo:ev.arredonda_modo||'despesa',arredondaModoCol:('arredonda_modo' in ev),missaoPoupanca:N(ev.missao_poupanca),fundoReserva:N(ev.fundo_reserva),sobrasAplicadas:N(ev.sobras_aplicadas),sobrasAplicadasCol:('sobras_aplicadas' in ev),fatorModo:ev.fator_modo||'fixo',fatorThreshold:ev.fator_threshold!=null?N(ev.fator_threshold):FATOR_THRESHOLD_DEFAULT,dividasPublicas:!!ev.dividas_publicas,dividasPublicasCol:('dividas_publicas' in ev),presCorrecao:!!ev.pres_correcao,presCorrecaoCol:('pres_correcao' in ev),fracIndiretaRef:ev.frac_indireta_ref!=null?N(ev.frac_indireta_ref):0.5,fracIndiretaRefCol:('frac_indireta_ref' in ev),descontoSexo:ev.desconto_sexo!=null?N(ev.desconto_sexo):0,descontoSexoCol:('desconto_sexo' in ev),tetoReserva:ev.teto_reserva!=null?N(ev.teto_reserva):null,tetoReservaCol:('teto_reserva' in ev),precoArredonda:ev.preco_arredonda==='cent'?'cent':'cima',precoArredondaCol:('preco_arredonda' in ev),fase:ev.fase||null,faseEm:ev.fase_em||null,fasePor:ev.fase_por||null,faseCol:('fase' in ev),contasFechadas:!!ev.contas_fechadas,contasFechadasEm:ev.contas_fechadas_em||null,contasFechadasPor:ev.contas_fechadas_por||null,pagamentosAutorizados:!!ev.pagamentos_autorizados,pagamentosAutorizadosEm:ev.pagamentos_autorizados_em||null,pagamentosAutorizadosPor:ev.pagamentos_autorizados_por||null,pagAutorizCol:('pagamentos_autorizados' in ev)},
       membros:(ev.membros||[]).sort((a,b)=>a.nome.localeCompare(b.nome,'pt')).map(m=>({
         _id:m.id,nome:m.nome,fator:N(m.fator),sexo:m.sexo==='F'?'F':'M',
         presencas:(m.presencas||[]).map(p=>({k:`${p.dia}|${p.ref}`,modo:p.modo==='bebe'?'bebe':'come'}))
@@ -3408,6 +3565,10 @@ async function sbGuardarEvento(y,slot){
     // Só grava a flag se a coluna já existir no Supabase (migração: ALTER TABLE eventos ADD dividas_publicas)
     if(ev.dividasPublicasCol)evRow.dividas_publicas=!!ev.dividasPublicas;
     if(ev.presCorrecaoCol)evRow.pres_correcao=!!ev.presCorrecao;
+    // A fase do ano segue no evRow para o INSERT de um ano NOVO nascer em
+    // 'aberto' explicitamente. Nas gravações seguintes é um PATCH, que só
+    // toca nas colunas listadas — quem escreve a fase a sério é o setFase.
+    if(ev.faseCol)evRow.fase=FASE_KEYS.indexOf(ev.fase)>=0?ev.fase:'aberto';
     if(ev.fracIndiretaRefCol)evRow.frac_indireta_ref=ev.fracIndiretaRef!=null?ev.fracIndiretaRef:0.5;
     if(ev.descontoSexoCol)evRow.desconto_sexo=ev.descontoSexo!=null?ev.descontoSexo:0;
     if(ev.arredondaModoCol)evRow.arredonda_modo=ev.arredondaModo==='saldo'?'saldo':'despesa';
@@ -4630,7 +4791,7 @@ function openPayModal(){
   if(ttl)ttl.textContent=nOpts>1?'Cash Flows':(podeSald&&!podeDespesa?'Cash Flows — Pagar Dívida':'Cash Flows — Despesas');
   setCfType((fechadas||!podeDespesa)?'saldar':'despesa');
   const note=document.getElementById('cf-note');
-  if(note)note.textContent=fechadas?'Contas fechadas — só pagamentos de dívidas.':(admin?'Guardado na base de dados do grupo.':'Podes registar despesas e pagamentos teus ou do teu cônjuge.');
+  if(note)note.textContent=pagamentosTrancados()?'Ano fechado — já não se registam pagamentos.':(fechadas?'Contas fechadas — só pagamentos de dívidas.':(admin?'Guardado na base de dados do grupo.':'Podes registar despesas e pagamentos teus ou do teu cônjuge.'));
 }
 function closePayModal(){
   document.getElementById('pay-bg').classList.remove('show');
@@ -4638,6 +4799,9 @@ function closePayModal(){
 }
 
 async function saveCashFlow(){
+  // Ano fechado (a última fase) não deixa entrar cash-flow nenhum — os
+  // pagamentos eram a única coisa que o val_contas ainda deixava passar.
+  if(bloqueadoPorAnoFechado())return;
   if(contasFechadas()&&(cfDir==='despesa'||cfDir==='mealheiro'||cfDir==='tshirts')){toast('Contas fechadas — só pagamentos de dívidas','bad');return;}
   const who=document.getElementById('cf-who')?.value;
   const val=parseFloat(document.getElementById('cf-val')?.value);
@@ -4917,8 +5081,11 @@ function pagPendEntregue(p){return rnd(Math.max(0,pagPendTotal(p)-pagPendCred(p)
 /* Um membro ligado a uma conta PEDE (não regista) pagamentos seus e do cônjuge.
    O admin não pede — regista de imediato, como sempre fez. */
 function podePedirPagamento(){return !!_sbSession&&!isAdmin()&&PAGPEND_TABLE&&MY_NAMES.length>0;}
-/* A opção "🤝 Pagar Dívida" tem dono neste utilizador? */
-function podeSaldar(){return !!_sbSession&&(isAdmin()||podePedirPagamento());}
+/* A opção "🤝 Pagar Dívida" tem dono neste utilizador? Na última fase do ano
+   não tem dono nenhum: com o ano fechado ninguém regista pagamentos, nem o
+   admin (pagamentosTrancados). É por aqui que o FAB e a opção desaparecem;
+   a trava a sério está no saveCashFlow. */
+function podeSaldar(){return !!_sbSession&&!pagamentosTrancados()&&(isAdmin()||podePedirPagamento());}
 /* O que o próprio já tem à espera — para não pedir duas vezes a mesma dívida. */
 function pagPendMeus(){return pagPendAbertos().filter(p=>MY_NAMES.includes(p.de));}
 /* Cartão que o admin está a rejeitar (mostra a caixa do motivo). A app não usa
@@ -4992,6 +5159,9 @@ function pagPendBlockHtml(){
    pronto a ser aprovado outra vez. O `estado=eq.pendente` no PATCH é a trava
    contra dois toques seguidos (ou dois telemóveis ao mesmo tempo). */
 async function aprovarPagPend(id){
+  // Validar um pedido é lançar o pagamento — logo, tranca com o ano fechado
+  // pela mesma regra que trava o registo direto. O pedido fica na fila.
+  if(bloqueadoPorAnoFechado())return;
   if(!isAdmin()){toast('Só o administrador valida pagamentos','bad');return;}
   const p=PAGPEND.find(x=>x.id===id);
   if(!p||p.estado!=='pendente')return;
@@ -5173,6 +5343,10 @@ function cfViewTipoOf(source,idx){
    que sempre a deixou editar depois de fechadas as contas — a ficha não é sítio
    para mudar essa regra às escondidas. */
 function cfPodeEditar(t,idx){
+  // Com o ano na última fase, um pagamento já não se mexe: registá-lo está
+  // trancado, e editá-lo era a mesma escrita pela porta do lado. As despesas
+  // e mealheiros já estavam trancados desde o val_contas.
+  if(pagamentosTrancados()&&(t==='saldar'||t==='reembolso'))return false;
   if(t==='compra')return isAdmin()||compraEditavelSelf(idx);
   if(isAdmin())return !(contasFechadas()&&(t==='despesa'||t==='mealheiro'));
   return t==='despesa'&&!contasFechadas()&&despesaEditavelSelf((DATA.despesas||[])[idx]);
@@ -6369,11 +6543,13 @@ function renderMyNotif(){
 
 /* ── Notificações PUSH (Web Push, sem Telegram · festasbv.push_subscriptions) ──
    Canal paralelo ao Telegram, ligado por conta+dispositivo em Definições
-   (pushAtivar/pushDesativar). Seis disparos, todos fire-and-forget (menos os
+   (pushAtivar/pushDesativar). Sete disparos, todos fire-and-forget (menos os
    lembretes, que esperam pelo resultado para dar feedback a quem os pediu):
-     1) fecharContas() e autorizarPagamentos() → avisarFase(): os avisos das
-        duas FASES do fim do ano, a todos os membros com conta ligada (mais
-        o admin, que os dispara e quer ver como ficam)
+     1) setFase() ao entrar em 'val_presencas' / 'val_contas' / 'pagamento'
+        → avisarFase(): os avisos das TRÊS fases que pedem alguma coisa ao
+        grupo (ver FASE_AVISO), a todos os membros com conta ligada (mais o
+        admin, que os dispara e quer ver como ficam). Ano Aberto e Ano
+        Fechado não avisam, e recuar nunca avisa.
      2) pedir "🤝 Pagar Dívida" sem ser admin → sbNotificarPagamentoDeclarado():
         avisa sempre o admin, que é quem aprova
     2b) dar um pagamento por recebido — validar o pedido, ou registá-lo o
@@ -6384,9 +6560,9 @@ function renderMyNotif(){
      3) 🔔 Lembrar, no separador Saldos (só admin) → enviarLembretePagamento()
      4) 🔔 Lembrar de validar, no painel Validações (só admin) →
         lembrarValidacao(), que sem push ativo cai para email
-     5) validar as CONTAS (quadro dos Saldos) → sbNotificarContasValidadas():
-        avisa sempre o admin, o mesmo caminho do 'pagamento_declarado' — é
-        ele quem confere e autoriza os pagamentos a seguir
+     5) validar QUALQUER dos três checks (quadro das confirmações, no slider)
+        → sbNotificarValidacaoFeita(): avisa sempre o admin, o mesmo caminho
+        do 'pagamento_declarado' — é ele quem confere e faz o ano avançar
    A Edge Function push-notificar resolve amigo→email e manda o push a cada
    dispositivo subscrito. Sem a migração (PUSH_COL=false) os controlos
    escondem-se e as chamadas não saem. */
@@ -6513,7 +6689,7 @@ async function sbEnviarPush(tipo,pessoas,descricao,quem,ano){
    linhas do corpo no ecrã bloqueado e corta o resto, e o que ficava
    cortado era precisamente o "não pagues ainda". A versão longa é esta, e
    vive em DOIS sítios que a leem daqui: o email (emailFase) e o cartão da
-   fase nos Saldos (secContasHtml) — assim quem não apanhou a notificação
+   fase nos Saldos (faseSliderHtml) — assim quem não apanhou a notificação
    tem na mesma a explicação, e as três não podem discordar.
 
    ⚠️ O texto do push está à parte, em faseTexto() na Edge Function
@@ -6522,6 +6698,13 @@ async function sbEnviarPush(tipo,pessoas,descricao,quem,ano){
 function eventoNomeAviso(){return (DATA&&DATA.evento&&(DATA.evento.nome||('MEO '+DATA.evento.ano)))||'das Festas';}
 function avisoFaseTexto(fase){
   const ev=eventoNomeAviso();
+  /* A 1.ª fase que pede alguma coisa ao grupo. Cabe no relance, por isso o
+     push diz EXATAMENTE isto (faseTexto na Edge Function) — ao contrário do
+     'fecho', em que o push é resumo de um texto maior. */
+  if(fase==='presencas')return{
+    assunto:`${ev} — valida as tuas presenças`,
+    corpo:`O ${ev} chegou ao fim. É tempo de validares/confirmares as tuas presenças e dos teus convidados.`
+  };
   if(fase==='pagamentos')return{
     assunto:`${ev} — já podes pagar`,
     corpo:`As contas do ${ev} encontram-se fechadas e validadas. Podes (e deves!) proceder ao pagamento do teu saldo.`
@@ -6564,7 +6747,11 @@ function sbNotificarFase(fase){
   // a toda a gente, em vez de confiar só no anoCorrente() daqui (que, num
   // separador aberto com código velho em cache, já mandou por engano o
   // aviso de "já podes pagar" sobre um ano fechado há muito — 25/08/2026).
-  sbEnviarPush(fase==='pagamentos'?'pagamentos':'fecho',pessoas,eventoNomeAviso(),null,DATA.evento.ano);
+  // A chave do aviso ('presencas'/'fecho'/'pagamentos') mapeia no `tipo` da
+  // Edge Function; só a das presenças é que muda de nome (lá é um `Tipo`, e
+  // 'presencas' sozinho confundia-se com o CheckTipo do mesmo nome).
+  const TIPO_FASE={presencas:'validar_presencas',fecho:'fecho',pagamentos:'pagamentos'};
+  sbEnviarPush(TIPO_FASE[fase]||'fecho',pessoas,eventoNomeAviso(),null,DATA.evento.ano);
 }
 // Email. A app não manda emails — prepara a mensagem e abre a app do Gmail
 // (o mesmo abrirGmailApp do lembrete de validação), com todos os membros no
@@ -6577,22 +6764,23 @@ function emailFase(fase){
   toast('A abrir o Gmail…','ok');
   return true;
 }
-// Em que fase é que o ano está — é ela que o botão "Reenviar aviso" repete.
-function faseAtual(){return pagamentosAutorizados()?'pagamentos':'fecho';}
+// Qual o aviso da fase em curso — é ele que o botão "Reenviar aviso" repete.
+// null nas fases que não mandam nada; ver FASE_AVISO, junto ao modelo.
+function faseAtual(){return FASE_AVISO[faseDoAno()]||null;}
 // Reenviar o aviso da fase em curso, pelos dois canais. Existe porque
 // nenhum dos dois é garantido: o push depende de cada um o ter ativo e o
 // Gmail abre-se por um esquema que pode não pegar (e o fecho leva a app
 // para fora do ecrã, onde é fácil o email ficar por mandar).
 function reenviarAvisoFase(){
-  if(!isAdmin()||!contasFechadas())return;
-  // O botão já não aparece num ano que não seja o corrente (secFaseHtml),
+  if(!isAdmin()||!faseAtual())return;
+  // O botão já não aparece num ano que não seja o corrente (faseSliderHtml),
   // mas a trava a sério é aqui: reenviar o aviso de fase de um evento de
   // há anos não tem ninguém à espera dele, e mandava-o na mesma se alguém
   // chegasse a esta função por outro caminho.
   if(!anoCorrente())return;
   const fase=faseAtual();
   const n=emailsDosMembros().length;
-  const q=fase==='pagamentos'?'de "já podes pagar"':'de "contas em validação"';
+  const q={presencas:'de "valida as tuas presenças"',fecho:'de "contas em validação"',pagamentos:'de "já podes pagar"'}[fase];
   if(!confirm(`Reenviar o aviso ${q}?\n\nPush a quem o tem ativo, e o Gmail abre com o email para ${n} membro${n===1?'':'s'}.`))return;
   sbNotificarFase(fase);
   emailFase(fase);
@@ -6606,14 +6794,18 @@ function avisarFase(fase){
   if(!confirm(`Abrir o Gmail com o mesmo aviso para os ${emails.length} membros com conta ligada?`))return;
   emailFase(fase);
 }
-// 5) Fire-and-forget, chamado sempre que se valida as CONTAS (confirmarValidacao,
-// tipo:'contas') — avisa sempre o admin, o mesmo caminho do 'pagamento_declarado'
-// (vai direto para o ADMIN_EMAIL, não passa por user_amigos: não interessa
-// quem é o admin no plantel deste ano, interessa avisar quem decide). Só
-// para 'contas' — é o check que desbloqueia autorizar pagamentos, não
-// presenças/convidados.
-function sbNotificarContasValidadas(nome){
-  sbEnviarPush('contas_validadas',[{amigo:''}],eventoNomeAviso(),nome);
+// 5) Fire-and-forget, chamado sempre que se valida QUALQUER um dos três checks
+// (confirmarValidacao) — avisa sempre o admin, o mesmo caminho do
+// 'pagamento_declarado' (vai direto para o ADMIN_EMAIL, não passa por
+// user_amigos: não interessa quem é o admin no plantel deste ano, interessa
+// avisar quem decide). Chegou a ser só das contas, de quando era o único
+// check que desbloqueava alguma coisa; com as fases, presenças e convidados
+// desbloqueiam a passagem a "Validação Contas" exatamente da mesma maneira,
+// e o admin precisa de saber quando pode avançar sem ir espreitar a matriz.
+// O `checkTipo` diz qual dos três — a frase escolhe-se no servidor, como em
+// todos os tipos.
+function sbNotificarValidacaoFeita(nome,tipo){
+  sbEnviarPush('validacao_feita',[{amigo:'',checkTipo:valTipoNorm(tipo)}],eventoNomeAviso(),nome);
 }
 // 2) Fire-and-forget, chamado quando um não-admin declara "já paguei" — avisa
 // sempre o admin, que é quem aprova o pedido em pagamentos_pendentes.
@@ -7071,7 +7263,7 @@ async function addNewYear(){
   const mealheiros=[];
 
   const newYear={
-    evento:{nome:'MEO '+yearVal,ano:yearVal,tesoureiro:tesVal,arredondaTotal:false,arredondaModo:'despesa',arredondaModoCol:!!DATA.evento.arredondaModoCol,missaoPoupanca:0,fundoReserva:0,sobrasAplicadas:0,sobrasAplicadasCol:!!DATA.evento.sobrasAplicadasCol,fracIndiretaRef:0.5,fracIndiretaRefCol:!!DATA.evento.fracIndiretaRefCol,descontoSexo:0,descontoSexoCol:!!DATA.evento.descontoSexoCol,tetoReserva:null,tetoReservaCol:!!DATA.evento.tetoReservaCol,precoArredonda:'cima',precoArredondaCol:!!DATA.evento.precoArredondaCol,fatorModo:'fixo',fatorThreshold:FATOR_THRESHOLD_DEFAULT},
+    evento:{nome:'MEO '+yearVal,ano:yearVal,tesoureiro:tesVal,arredondaTotal:false,arredondaModo:'despesa',arredondaModoCol:!!DATA.evento.arredondaModoCol,missaoPoupanca:0,fundoReserva:0,sobrasAplicadas:0,sobrasAplicadasCol:!!DATA.evento.sobrasAplicadasCol,fracIndiretaRef:0.5,fracIndiretaRefCol:!!DATA.evento.fracIndiretaRefCol,descontoSexo:0,descontoSexoCol:!!DATA.evento.descontoSexoCol,tetoReserva:null,tetoReservaCol:!!DATA.evento.tetoReservaCol,precoArredonda:'cima',precoArredondaCol:!!DATA.evento.precoArredondaCol,fase:'aberto',faseCol:!!DATA.evento.faseCol,fatorModo:'fixo',fatorThreshold:FATOR_THRESHOLD_DEFAULT},
     membros,
     despesas:[],
     convidados:[],
@@ -19942,16 +20134,15 @@ function saldosMembrosHtml(){
   let h='<div class="sec-title sf">Despesa e Saldo por Membro</div><div class="mlist">';
   if(!_admin&&!MY_NAMES.length&&rows.length) h+='<div class="empty sf" style="margin-bottom:10px">Liga a tua conta a um membro nas Definições para veres o teu saldo.</div>';
   if(!rows.length) h+='<div class="empty sf">Sem membros.</div>';
-  let _prevRk=null,_valDone=false;
+  // O quadro das confirmações vivia aqui, entre o meu agregado e os outros
+  // membros. Mudou-se para dentro do slider do estado do ano (à cabeça dos
+  // Saldos): é a fase que faz a pergunta "validas isto?", e respondia-se
+  // dois ecrãs abaixo de onde ela aparecia. O que fica é só a risca a
+  // separar "eu + cônjuge" dos restantes.
+  let _prevRk=null;
   rows.forEach(g=>{
     const _rk=_rankR(g.nome);
-    if(_prevRk!==null&&_prevRk<2&&_rk===2){
-      h+='<div class="rs-divider sf"></div>';
-      // O quadro de validações fica logo a seguir ao saldo do casal — não no
-      // final da lista toda, depois de todos os outros membros.
-      h+=quadroValidacoesHtml();
-      _valDone=true;
-    }
+    if(_prevRk!==null&&_prevRk<2&&_rk===2)h+='<div class="rs-divider sf"></div>';
     _prevRk=_rk;
     const tag=g.nome===DATA.evento.tesoureiro?' · tesoureiro':'';
     let sub='despesa total'+tag,saldoHtml='',zero=null;
@@ -19976,9 +20167,6 @@ function saldosMembrosHtml(){
         <div class="amt-col${saldoHtml?' has-saldo':''}"><div class="amt">${eur(g.tot)}</div>${saldoHtml}</div><span class="rs-arrow">▼</span>
       </div>${det(g)}</div>`;
   });
-  // Sem "outros" membros a seguir (só eu/casal no plantel) a transição
-  // acima nunca dispara — o quadro ainda tem de aparecer no fim da lista.
-  if(!_valDone)h+=quadroValidacoesHtml();
   if(rows.length){
     const quotaList=rows.filter(g=>g.quota>0.005).map(g=>({k:g.nome,v:g.quota}));
     const poupList=rows.filter(g=>g.poup>0.005).map(g=>({k:g.nome,v:g.poup}));
