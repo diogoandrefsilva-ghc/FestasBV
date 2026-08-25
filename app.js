@@ -6545,6 +6545,11 @@ function faseAtual(){return pagamentosAutorizados()?'pagamentos':'fecho';}
 // para fora do ecrã, onde é fácil o email ficar por mandar).
 function reenviarAvisoFase(){
   if(!isAdmin()||!contasFechadas())return;
+  // O botão já não aparece num ano que não seja o corrente (secFaseHtml),
+  // mas a trava a sério é aqui: reenviar o aviso de fase de um evento de
+  // há anos não tem ninguém à espera dele, e mandava-o na mesma se alguém
+  // chegasse a esta função por outro caminho.
+  if(!anoCorrente())return;
   const fase=faseAtual();
   const n=emailsDosMembros().length;
   const q=fase==='pagamentos'?'de "já podes pagar"':'de "contas em validação"';
