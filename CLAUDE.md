@@ -88,6 +88,13 @@ A ficha (`openMember`, bloco "Pagamentos Recebidos") só sabia mostrar uma linha
 - **O formato ANTIGO (`tipo:'?'`) fica de fora desta lista de propósito**: nunca alimentou `m._payerOwnPortion`/`m._creditedBy` (só o `credited[nome]` que fecha o saldo), e incluí-lo aqui desalinhava a soma do bloco da soma de "Créditos" no Saldo Final, mais abaixo — duas leituras a poderem discordar por um cêntimo.
 - Regressão: `node tests/pagamentos-detalhe.js`.
 
+### O mesmo detalhe no cartão do RESUMO (Saldos), não só na ficha
+O "Resumo fundido nos Saldos" (a lista de membros, antes de se abrir a ficha) tem o seu próprio "Pagou para saldar"/"Pago por Nome" (`saldoMovimentos`/`mvHtml`), e sofria do mesmo problema — um adiantamento de 20€ e um 🤝 de 33€ apareciam somados em "Pagou para saldar: 53,00€", sem detalhe.
+- **`saldoMovimentos` passa a expor `mv.ownPortionL`/`mv.paidByL`** — listas de `{k,v}` lidas do MESMO `p._alloc`, no mesmo formato `_mvLi` que `pagoDespEfeL`/`mealL` já usam neste cartão. `mvHtml` passa essas listas ao `line(...)`, que já sabia desenhar a seta ▼ e as sub-linhas — não é preciso HTML novo.
+- **Aqui NÃO há a exceção "só com mais do que um"**: as linhas vizinhas do mesmo cartão (Despesas adiantadas, Mealheiro) já expandem sempre que há lista, mesmo com um único item — seguir essa consistência interna importa mais do que a regra "não há nada a detalhar sozinho" da ficha, que é um cartão diferente.
+- **`paidByL` é por PAGADOR**, como o `paidBy` que já existia — detalha quando o MESMO pagador contribuiu mais do que uma vez (o cônjuge, em dois momentos), não quando há vários pagadores diferentes (esses já eram linhas próprias).
+- Regressão: `node tests/resumo-saldo-movimentos.js`.
+
 ### Observações num pagamento livre (`pagamentos.nota`)
 Um acerto de dívida explica-se sozinho pelas dívidas que a `ref` lista; um **pagamento livre / adiantamento** (sem dívidas selecionadas) não — é só um número. A caixa de observações só faz sentido aí, por isso só aparece nesse caso.
 - **A caixa abre/fecha com os chips** (`recalcSdVal`/`recalcEditSdVal`, `#cf-livre-box`/`#ecf-livre-box`): 0 chips selecionados → pagamento livre → caixa visível. Selecionar uma dívida esconde-a — a nota não se grava nesse caso (`p.nota=covParts.length?'':…`), para não ficar pendurada num pagamento que já se explica por si.
