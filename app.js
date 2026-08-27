@@ -6072,7 +6072,12 @@ async function saveEditCf(){
       const covParts=sel.dividas.map(d=>d.key).concat(credOk.map(c=>c.key));
       if(sel.creditos.length&&!credOk.length)toast('Sem dívidas, o crédito descontado sai do pagamento — vê o reembolso dele','bad');
       p.ref=covParts.join(', ');
-      if(PAG_NOTA_COL)p.nota=covParts.length?'':(document.getElementById('ecf-livre-obs')?.value||'').trim();
+      // Com dívidas a caixa livre nem aparece — não se grava o que lá estiver
+      // escrito. Mas NÃO se apaga o que já lá estava: um pagamento validado a
+      // partir de um pedido (🕓) chega aqui com o "Como pagaste?" já gravado em
+      // p.nota, e uma edição qualquer (corrigir a data, por exemplo) não pode
+      // apagar essa observação só por a dívida estar selecionada.
+      if(PAG_NOTA_COL&&!covParts.length)p.nota=(document.getElementById('ecf-livre-obs')?.value||'').trim();
     }
   } else if(source==='despesas'){
     const d=DATA.despesas[idx];
