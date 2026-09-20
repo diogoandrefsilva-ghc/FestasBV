@@ -700,6 +700,44 @@ O `.no-scroll` do body é `position:fixed` — e isso faz o browser **esquecer o
 - Regressão: `node tests/pagamentos-lote.js` (sem dependências) monta o caso real — dois pagamentos vindos da BD mais um acabado de registar — e falha se as linhas do lote não tiverem todas as mesmas chaves.
 - **O que continua por resolver**: a falta de atomicidade em si. Enquanto o DELETE+INSERT não correr dentro de uma transação (uma função no servidor, chamada por RPC), qualquer erro no meio de uma gravação continua a poder esvaziar uma tabela filha de um ano inteiro.
 
+## O registo central de acessos ao Gemini (schema `ia_uso`)
+Esta app chama o Gemini numa função só, mas não é a única: são **cinco** no
+mesmo projeto Supabase, por oito Edge Functions. O schema **`ia_uso`** é
+uma linha por chamada (app, função, modelo, tokens, custo estimado,
+duração, quem, erro), para a pergunta *"quanto é que isto custa ao todo?"*
+ter onde ser respondida.
+
+**A secção canónica é a do `CLAUDE.md` da WineCatalog** — a fonte de
+verdade do schema é o `db/ia_uso.sql` desse repo. Aqui fica só o que é
+preciso saber para não partir nada:
+
+- **Daqui escreve a `fatura-ocr.ts`** (`app: "festasbv"`), e é a ÚNICA
+  coisa que ela regista: ao contrário das funções das apps de vinhos, esta
+  nunca teve um `sync_log` próprio. É este o único rasto do que gasta — e
+  do que falha.
+- Por isso a `registarIaUso()` é chamada em **seis** sítios (sobrecarga,
+  erro do Gemini, resposta ilegível, sucesso, timeout, exceção) em vez de
+  um só, e o `emailAutorizado()` passou a devolver também o email, para o
+  registo saber quem chamou.
+- **`detalhe.modo` diz qual das QUATRO utilizações foi** — `fatura`,
+  `lista`, `artigos` ou `normalizar`. É a única das oito functions que faz
+  quatro coisas diferentes com a mesma chamada, e sem isto o registo dizia
+  "fatura-ocr" a quatro trabalhos que custam coisas muito diferentes (uma
+  foto de talão não é o mesmo que normalizar 200 nomes só-texto). A
+  variável `modo` existe só para isto.
+
+- **Nunca deita abaixo o trabalho que estava a ser feito**: vive num
+  `try/catch` que engole tudo — é registo, não é o trabalho.
+- **E é essa mesma regra que o faz falhar em SILÊNCIO quando está mal
+  configurado.** Já aconteceu: sem os GRANTs do `db/ia_uso.sql`, os INSERTs
+  levavam 403 e a tabela ficava a zero linhas sem um erro em lado nenhum.
+  Se `ia_uso.registos` estiver vazia, confere **(1)** se `ia_uso` está nos
+  *Exposed schemas* do painel e **(2)** se o bloco de GRANTs correu — só
+  depois desconfia do código.
+- **Não há migração a correr deste lado** e nada aqui depende disto: se o
+  schema `ia_uso` não existir, estas funções comportam-se exatamente como
+  antes.
+
 ## Regras técnicas (não partir a app)
 - `app.js` carrega como `<script src>` **normal, NÃO module** — há `onclick="…"` no HTML, logo as funções têm de ser **globais**. Não converter para módulo.
 - **PWA/cache:** se mexeres em `app.js`, `style.css` ou `index.html`, **sobe `CACHE_NAME` no `sw.js`** (ex.: `app-cache-v3` → `v4`). Estes três já são *network-first* (atualizam sozinhos), mas o bump garante que ninguém fica com versão velha.
