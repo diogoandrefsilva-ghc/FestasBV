@@ -543,13 +543,29 @@ Deno.serve(async (req) => {
       return json({ error: `gemini ${status} (${model})${msg ? ": " + msg.slice(0, 200) : ""}` }, 502);
     }
     const gd = await g.json();
-    const text = gd?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+    const cand = gd?.candidates?.[0];
+    const motivo = String(cand?.finishReason ?? "");
+    const text = cand?.content?.parts?.[0]?.text ?? "";
+    /* Um 200 com o corpo VAZIO não é o mesmo que uma resposta que não se
+       entendeu: ali houve texto, aqui o modelo gastou o orçamento a pensar
+       e não escreveu nada. Os dois já davam erro — o que faltava era dizer
+       QUAL, e o `finishReason` é que o diz (`MAX_TOKENS` e `SAFETY` são
+       avarias muito diferentes). Ver o CLAUDE.md da WineCatalog, "O 200
+       vazio". */
+    if (!String(text).trim()) {
+      await registarIaUso("erro", {
+        modo, passo: "gemini_vazio", modelo: model, finishReason: motivo || null,
+        erro: `o modelo não devolveu resposta (${motivo || "vazia"})`, ms: Date.now() - inicio,
+        ...(gd?.usageMetadata ? { usageMetadata: gd.usageMetadata } : {}),
+      }, quem);
+      return json({ error: `o modelo não devolveu resposta (${motivo || "vazia"}) — tenta outra vez` }, 502);
+    }
     let parsed: unknown;
     try {
       parsed = JSON.parse(text);
     } catch (_) {
       await registarIaUso("erro", {
-        modo, modelo: model, erro: "resposta ilegível do modelo", ms: Date.now() - inicio,
+        modo, modelo: model, erro: "resposta ilegível do modelo", finishReason: motivo || null, ms: Date.now() - inicio,
         ...(gd?.usageMetadata ? { usageMetadata: gd.usageMetadata } : {}),
       }, quem);
       return json({ error: "resposta ilegível do modelo" }, 502);
