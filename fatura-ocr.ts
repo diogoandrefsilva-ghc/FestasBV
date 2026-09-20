@@ -307,14 +307,14 @@ ${catsLista(cats)}` : ""}${desp ? `
   (c) bebidas. Na dúvida, deixa de fora — é o admin que confirma.
   Se nenhum encaixar, devolve [].` : ""}`;
 
-async function emailAutorizado(auth: string): Promise<boolean> {
+async function emailAutorizado(auth: string): Promise<{ ok: boolean; email: string | null }> {
   // 1) quem é o utilizador deste token?
   const u = await fetch(`${SB_URL}/auth/v1/user`, {
     headers: { apikey: SB_SRV, Authorization: auth },
   });
-  if (!u.ok) return false;
+  if (!u.ok) return { ok: false, email: null };
   const email = ((await u.json()).email ?? "").toLowerCase();
-  if (!email) return false;
+  if (!email) return { ok: false, email: null };
   // 2) consta de festasbv.allowed_users?
   const r = await fetch(
     `${SB_URL}/rest/v1/allowed_users?email=eq.${encodeURIComponent(email)}&select=email`,
@@ -326,9 +326,48 @@ async function emailAutorizado(auth: string): Promise<boolean> {
       },
     },
   );
-  if (!r.ok) return false;
+  if (!r.ok) return { ok: false, email };
   const rows = await r.json();
-  return Array.isArray(rows) && rows.length > 0;
+  return { ok: Array.isArray(rows) && rows.length > 0, email };
+}
+
+/* Registo em `ia_uso.registos` — schema à parte, no MESMO projeto Supabase,
+   partilhado pelas cinco apps que chamam o Gemini (ver o CLAUDE.md da
+   WineCatalog, "O registo central de acessos ao Gemini"). Esta função nunca
+   teve um sync_log próprio — é este o único rasto do que gasta. `detalhe.modo`
+   diz qual das quatro utilizações foi (fatura/lista/artigos/normalizar).
+   Nunca deita a resposta abaixo por isto falhar. */
+async function registarIaUso(estado: string, detalhe: Record<string, unknown>, quem: string | null): Promise<void> {
+  try {
+    const usage = (detalhe.usageMetadata ?? null) as
+      | { promptTokenCount?: number; candidatesTokenCount?: number; thoughtsTokenCount?: number; totalTokenCount?: number }
+      | null;
+    await fetch(`${SB_URL}/rest/v1/registos`, {
+      method: "POST",
+      headers: {
+        apikey: SB_SRV, Authorization: `Bearer ${SB_SRV}`,
+        "Content-Type": "application/json", "Content-Profile": "ia_uso",
+        Prefer: "return=minimal",
+      },
+      body: JSON.stringify({
+        app: "festasbv", funcao: "fatura-ocr",
+        estado: estado === "pedido" || estado === "erro" ? estado : "ok",
+        modelo: (detalhe.modelo as string | undefined) ?? null,
+        pesquisa_web: false,
+        tokens_entrada: usage?.promptTokenCount ?? null,
+        tokens_saida: usage?.candidatesTokenCount ?? null,
+        tokens_pensamento: usage?.thoughtsTokenCount ?? null,
+        tokens_total: usage?.totalTokenCount ?? null,
+        custo_estimado_eur: null,
+        duracao_ms: (detalhe.ms as number | undefined) ?? null,
+        quem,
+        erro: estado === "erro" ? (String((detalhe.erro as string | undefined) ?? "").slice(0, 500) || null) : null,
+        detalhe,
+      }),
+    });
+  } catch (_e) {
+    // nunca deita a chamada principal abaixo
+  }
 }
 
 Deno.serve(async (req) => {
@@ -339,9 +378,14 @@ Deno.serve(async (req) => {
       headers: { ...CORS, "Content-Type": "application/json" },
     });
 
+  const inicio = Date.now();
+  let quem: string | null = null;
+
   try {
     const auth = req.headers.get("Authorization") ?? "";
-    if (!(await emailAutorizado(auth))) {
+    const { ok, email } = await emailAutorizado(auth);
+    quem = email;
+    if (!ok) {
       return json({ error: "não autorizado" }, 403);
     }
 
@@ -376,16 +420,19 @@ Deno.serve(async (req) => {
     // as sugestões de categoria na mesma resposta). As duas de texto não levam
     // imagem.
     let parts: unknown[];
+    let modo: string;
     if (!image && Array.isArray(normalizar)) {
       const nomes = limparNomes(normalizar as unknown[]);
       if (nomes.length < 2) return json({ error: "poucos artigos para normalizar" }, 400);
       parts = [{ text: promptNormalizar(nomes, cats, despensa === true) }];
+      modo = "normalizar";
     } else if (!image && Array.isArray(artigos)) {
       const nomes = limparNomes(artigos as unknown[]);
       if (!nomes.length || !cats.length) {
         return json({ error: "artigos ou categorias em falta" }, 400);
       }
       parts = [{ text: promptClassificar(nomes, cats) }];
+      modo = "artigos";
     } else {
       if (!image || typeof image !== "string" || image.length > 6_000_000) {
         return json({ error: "imagem em falta ou demasiado grande" }, 400);
@@ -398,6 +445,7 @@ Deno.serve(async (req) => {
             : promptFatura(cats, pedidosLista),
         },
       ];
+      modo = lista ? "lista" : "fatura";
     }
 
     // O Safari/iOS corta pedidos que passem dos ~60s ("Load failed", sem
@@ -475,6 +523,7 @@ Deno.serve(async (req) => {
       console.error("gemini", model, status, detail.slice(0, 500));
       // Sobrecarga esgotou todos os modelos → mensagem amiga (não o texto cru).
       if (transitorio(status)) {
+        await registarIaUso("erro", { modo, modelo: model, erro: `sobrecarga (${status})`, ms: Date.now() - inicio }, quem);
         return json({
           error: "o serviço de leitura está com muita procura agora — espera um minuto e tenta outra vez",
         }, 503);
@@ -490,6 +539,7 @@ Deno.serve(async (req) => {
           .filter(Boolean);
         if (fv.length) msg += ` [${fv.join(", ")}]`;
       } catch (_) { /**/ }
+      await registarIaUso("erro", { modo, modelo: model, erro: msg || `HTTP ${status}`, ms: Date.now() - inicio }, quem);
       return json({ error: `gemini ${status} (${model})${msg ? ": " + msg.slice(0, 200) : ""}` }, 502);
     }
     const gd = await g.json();
@@ -498,17 +548,27 @@ Deno.serve(async (req) => {
     try {
       parsed = JSON.parse(text);
     } catch (_) {
+      await registarIaUso("erro", {
+        modo, modelo: model, erro: "resposta ilegível do modelo", ms: Date.now() - inicio,
+        ...(gd?.usageMetadata ? { usageMetadata: gd.usageMetadata } : {}),
+      }, quem);
       return json({ error: "resposta ilegível do modelo" }, 502);
     }
+    await registarIaUso("ok", {
+      modo, modelo: model, ms: Date.now() - inicio,
+      ...(gd?.usageMetadata ? { usageMetadata: gd.usageMetadata } : {}),
+    }, quem);
     return json(parsed);
   } catch (e) {
     const err = e as Error;
     // Estoirou o nosso timeout antes de o modelo responder.
     if (err.name === "AbortError") {
+      await registarIaUso("erro", { passo: "timeout", ms: Date.now() - inicio }, quem);
       return json({
         error: "o modelo demorou demasiado a ler a imagem — tenta uma foto mais nítida ou um PDF com menos páginas",
       }, 504);
     }
+    await registarIaUso("erro", { passo: "excecao", erro: err.message.slice(0, 500), ms: Date.now() - inicio }, quem);
     return json({ error: err.message }, 500);
   }
 });
