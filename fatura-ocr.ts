@@ -351,6 +351,9 @@ async function registarIaUso(estado: string, detalhe: Record<string, unknown>, q
       },
       body: JSON.stringify({
         app: "festasbv", funcao: "fatura-ocr",
+        // A funcionalidade é o `modo` (fatura/lista/artigos/normalizar): o
+        // painel de custos (AI-API-Control) conta o custo médio de cada uma.
+        funcionalidade: (detalhe.modo as string | null | undefined) ?? null,
         estado: estado === "pedido" || estado === "erro" ? estado : "ok",
         modelo: (detalhe.modelo as string | undefined) ?? null,
         pesquisa_web: false,
@@ -380,6 +383,9 @@ Deno.serve(async (req) => {
 
   const inicio = Date.now();
   let quem: string | null = null;
+  // Fora do `try` para o timeout e a exceção também saberem que
+  // funcionalidade era (o `ia_uso` conta o custo por funcionalidade).
+  let modoUso: string | null = null;
 
   try {
     const auth = req.headers.get("Authorization") ?? "";
@@ -447,6 +453,7 @@ Deno.serve(async (req) => {
       ];
       modo = lista ? "lista" : "fatura";
     }
+    modoUso = modo;
 
     // O Safari/iOS corta pedidos que passem dos ~60s ("Load failed", sem
     // detalhe). Impomos um limite próprio mais curto para conseguir devolver
@@ -579,12 +586,12 @@ Deno.serve(async (req) => {
     const err = e as Error;
     // Estoirou o nosso timeout antes de o modelo responder.
     if (err.name === "AbortError") {
-      await registarIaUso("erro", { passo: "timeout", ms: Date.now() - inicio }, quem);
+      await registarIaUso("erro", { modo: modoUso, passo: "timeout", ms: Date.now() - inicio }, quem);
       return json({
         error: "o modelo demorou demasiado a ler a imagem — tenta uma foto mais nítida ou um PDF com menos páginas",
       }, 504);
     }
-    await registarIaUso("erro", { passo: "excecao", erro: err.message.slice(0, 500), ms: Date.now() - inicio }, quem);
+    await registarIaUso("erro", { modo: modoUso, passo: "excecao", erro: err.message.slice(0, 500), ms: Date.now() - inicio }, quem);
     return json({ error: err.message }, 500);
   }
 });
